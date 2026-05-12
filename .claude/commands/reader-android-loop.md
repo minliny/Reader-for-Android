@@ -1,3 +1,7 @@
+---
+description: Reader for Android 10-minute cron loop — one safe task per cycle, auto-cancel when queue exhausted
+---
+
 # Reader for Android Cron Loop Command
 
 This is the command file for `/loop 10m /reader-android-loop`.
