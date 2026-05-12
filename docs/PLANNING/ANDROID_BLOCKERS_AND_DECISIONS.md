@@ -58,3 +58,4 @@
 |------|----|------------|-------------|
 | 2026-05-13 | BD-017 | ANDROID_SDK not yet verified; Gradle tasks blocked | Audit |
 | 2026-05-13 | BD-018 | Gradle wrapper not generated | Audit |
+| 2026-05-13 | BD-012 | Auto-commit enabled for planning docs; first commit created (6a5da26) | Loop iteration 1 |

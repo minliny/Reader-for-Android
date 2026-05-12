@@ -14,7 +14,7 @@ This is the command file for `/loop 10m /reader-android-loop`.
 6. If Core public API is insufficient, record gap — NEVER bypass boundary.
 7. One task per iteration maximum.
 8. Tasks needing user decisions are skipped (marked BLOCKED).
-9. No READY tasks → stop with BLOCKED_NEEDS_USER.
+9. No READY tasks → auto-cancel the loop timer via CronDelete, then output BLOCKED_NEEDS_USER.
 10. Validate before commit. No validation pass = no commit.
 11. NEVER push.
 12. Default: no network access.
@@ -54,7 +54,7 @@ From ANDROID_AUTODEV_QUEUE.md:
 - Pick first task with Status == READY
 - Skip if Blockers field contains unresolved P0 blocker
 - Mark it IN_PROGRESS
-- If no READY task: output BLOCKED_NEEDS_USER, update blockers, stop
+- If no READY task: run CronDelete on this loop's job ID (find via CronList), output BLOCKED_NEEDS_USER, update blockers, stop
 
 ### 4. Execute
 
@@ -106,15 +106,18 @@ All Gradle/code tasks are BLOCKED until:
 
 ---
 
-## When Blocked
+## When Blocked (auto-cancel)
 
-If loop stops with BLOCKED_NEEDS_USER:
-1. User reviews `docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md`
-2. User resolves P0 decisions (updates status to RESOLVED)
-3. User updates task statuses from BLOCKED to READY
-4. User restarts: `/loop 10m /reader-android-loop`
+If all tasks are DONE/BLOCKED/SKIPPED (zero READY):
+1. Loop calls CronDelete to cancel the scheduled timer (prevents empty wake-ups)
+2. Loop outputs BLOCKED_NEEDS_USER with summary of remaining BLOCKED tasks
+3. User reviews `docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md`
+4. User resolves decisions, updates task statuses from BLOCKED to READY
+5. User restarts: `/loop 10m /reader-android-loop`
 
-## To Stop
+The auto-cancel ensures the loop does not keep firing every 10 minutes when there is nothing to do.
+
+## To Stop manually
 
 ```
 /loop off

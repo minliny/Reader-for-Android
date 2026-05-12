@@ -13,7 +13,7 @@ You are running the Reader for Android autonomous development loop.
 7. If Reader-Core public API is insufficient, record the gap in docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md — NEVER bypass the boundary.
 8. Prefer small, reversible changes. One loop iteration completes at most ONE task.
 9. If a task needs user decision, mark it BLOCKED and select another READY task.
-10. If no READY task exists, update blockers doc and stop with BLOCKED_NEEDS_USER.
+10. If no READY task exists, auto-cancel the loop timer via CronDelete, update blockers doc, and stop with BLOCKED_NEEDS_USER.
 11. Before editing code, run the blocker preflight.
 12. After editing, run the task's validation command(s).
 13. Commit only if validation passes and changes are coherent.
@@ -45,7 +45,7 @@ Check each of these. If a check fails and blocks all READY tasks, stop.
 - Select first READY task sorted by Priority (P0 > P1 > P2 > P3), then Stage, then ID
 - Skip tasks whose Blockers field contains unresolved P0 blockers
 - Update task status to IN_PROGRESS in the queue file
-- If no READY task: output "BLOCKED_NEEDS_USER", update blockers doc, stop
+- If no READY task: find this loop's job via CronList, call CronDelete, output "BLOCKED_NEEDS_USER — loop auto-cancelled", update blockers doc, stop
 
 ### Step 4: Implement
 - Read relevant existing files first

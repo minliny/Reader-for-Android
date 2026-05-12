@@ -74,7 +74,7 @@ Each 10-minute iteration:
 2. **Select task**:
    - First READY task by priority (P0 > P1 > P2 > P3) and stage order
    - Skip if task blockers not resolved
-   - If no READY task → record status, stop with `BLOCKED_NEEDS_USER`
+   - If no READY task → auto-cancel loop timer via CronDelete, output `BLOCKED_NEEDS_USER`
 
 3. **Execute**:
    - Mark selected task `IN_PROGRESS`
@@ -99,6 +99,12 @@ Each 10-minute iteration:
 
 ## 5. How to Stop
 
+### Automatic stop (when queue exhausted)
+
+When all tasks are DONE/BLOCKED/SKIPPED (zero READY), the loop **automatically cancels its own timer** via CronDelete. This prevents empty wake-ups every 10 minutes.
+
+### Manual stop
+
 Inside Claude Code:
 
 ```
@@ -106,6 +112,13 @@ Inside Claude Code:
 ```
 
 Or just close Claude Code (Ctrl+C / Cmd+C).
+
+### What happens after auto-cancel
+
+The loop outputs `BLOCKED_NEEDS_USER — loop auto-cancelled`. To resume:
+1. Resolve blockers in `docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md`
+2. Update BLOCKED tasks back to READY
+3. Restart: `/loop 10m /reader-android-loop`
 
 ---
 
