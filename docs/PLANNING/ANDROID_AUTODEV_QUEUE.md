@@ -33,7 +33,7 @@
 | P1-S2-002 | S2 | P1 | DONE | Write DATA_LAYER_DESIGN.md design doc | Write docs/design/DATA_LAYER_DESIGN.md only | Doc covers Room vs DataStore tradeoffs | None | No (doc only, no code) |
 | P1-S2-003 | S2 | P1 | BLOCKED | Define FakeCoreBridge interface + fake impl | Write Kotlin interface + fake class | Compiles, returns mock data for all methods | Depends on P1-S2-001 | No |
 | P1-S3-001 | S3 | P1 | BLOCKED | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | Interface covers search/detail/TOC/content | BLOCKED_CORE_INTEGRATION_STRATEGY | Yes: how to bridge Swift Core to Kotlin |
-| P1-S3-002 | S3 | P1 | READY | Write CORE_BRIDGE_DESIGN.md documenting integration strategy | Write docs/design/CORE_BRIDGE_DESIGN.md only | Doc covers 3 strategies (JSON contract, KMP, embedded) with recommendation | None | No (doc only, analysis) |
+| P1-S3-002 | S3 | P1 | DONE | Write CORE_BRIDGE_DESIGN.md documenting integration strategy | Write docs/design/CORE_BRIDGE_DESIGN.md only | Doc covers 3 strategies (JSON contract, KMP, embedded) with recommendation | None | No (doc only, analysis) |
 | P1-S4-001 | S4 | P1 | BLOCKED | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | Import Legado-compatible JSON, list sources | Depends on S1 + S2 | No |
 | P1-S4-002 | S4 | P1 | BLOCKED | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | UI renders source list, toggle works, delete works | Depends on S1 + P1-S4-001 | No |
 | P1-S5-001 | S5 | P1 | BLOCKED | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | Depends on S1 + FakeCoreBridge | No |
