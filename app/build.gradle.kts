@@ -73,6 +73,9 @@ dependencies {
     // DataStore Preferences (for theme, reading settings)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // OkHttp (HTTP client for book source fetching)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Room (for structured data: bookshelf, progress, cache)
     val roomVersion = "2.7.0"
     implementation("androidx.room:room-runtime:$roomVersion")
