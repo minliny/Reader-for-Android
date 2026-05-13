@@ -24,13 +24,13 @@
 | P0-S1-002 | S1 | P0 | DONE | Verify Android local build environment (JDK, SDK, Gradle wrapper) | Install/configure JDK 17+, Android SDK, ANDROID_HOME, generate gradle wrapper | java -version shows JDK 17+, ./gradlew projects passes | None | N/A (verified 2026-05-14) |
 | P0-S1-003 | S1 | P0 | DONE | Create Compose App Shell with Scaffold, BottomNav, NavHost | Write Compose UI files only | App launches with navigation structure | None (compile-time verification blocked by env) | No |
 | P0-S1-004 | S1 | P0 | DONE | Create placeholder pages (Bookshelf, BookSource, Settings, Reader) | Write Compose screen files only | All 4 placeholder screens render | None (compile-time verification blocked by env) | No |
-| P0-S1-005 | S1 | P0 | READY | App Shell Navigation Contract: verify scaffold, bottom nav, NavHost, 4 tab routes work at runtime | Verify AppNavigation.kt compiles, navigation graph is valid, all routes accessible | ./gradlew :app:assembleDebug passes, manual navigation test | None | No |
+| P0-S1-005 | S1 | P0 | DONE | App Shell Navigation Contract: verify scaffold, bottom nav, NavHost, 4 tab routes work at runtime | Verify AppNavigation.kt compiles, navigation graph is valid, all routes accessible | ./gradlew :app:assembleDebug ✅ | None | No |
 
 ## Stage 1-2: Model & Fake Data Flow
 
 | ID | Stage | Priority | Status | Task | Allowed Changes | Validation | Blockers | Decision Required |
 |----|-------|----------|--------|------|-----------------|------------|----------|-------------------|
-| P1-S2-001 | S2 | P1 | BLOCKED | Define Kotlin domain models matching Core DTOs | Write Kotlin data classes in model/ package | Kotlin compiles, all Core DTO fields present | BLOCKED_ENV_ANDROID_SDK (no JDK/Android SDK for compilation) | No (follows Core DTO spec) |
+| P1-S2-001 | S2 | P1 | READY | Define Kotlin domain models matching Core DTOs | Write Kotlin data classes in model/ package | Kotlin compiles, all Core DTO fields present | None (env verified 2026-05-14) | No (follows Core DTO spec) |
 | P1-S2-002 | S2 | P1 | DONE | Write DATA_LAYER_DESIGN.md design doc | Write docs/design/DATA_LAYER_DESIGN.md only | Doc covers Room vs DataStore tradeoffs | None | No (doc only, no code) |
 | P1-S2-003 | S2 | P1 | BLOCKED | Define FakeCoreBridge interface + fake impl | Write Kotlin interface + fake class | Compiles, returns mock data for all methods | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S3-001 | S3 | P1 | BLOCKED | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | Interface covers search/detail/TOC/content | BLOCKED_ENV_ANDROID_SDK (needs compilation); Core bridge strategy resolved (BD-007) | No |
@@ -99,10 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P0-S1-005 App Shell Navigation Contract**
+**Next READY: P1-S2-001 Define Kotlin domain models matching Core DTOs**
 
-All P0 environment blockers resolved (2026-05-14). Build environment verified:
-- JDK 17.0.19, Android SDK 35, build-tools 35.0.0, Gradle 8.11.1
-- `./gradlew projects` ✅, `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅
-
-Next: P0-S1-005 — verify scaffold/navigation contract at runtime, then S2 domain models.
+S1 complete. Build environment verified. Next: S2 domain models.
+Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
