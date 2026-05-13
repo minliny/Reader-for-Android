@@ -41,7 +41,7 @@
 | P1-S5-002 | S5 | P1 | DONE | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | compileDebugKotlin ✅ | None | No |
 | P1-S5-003 | S5 | P1 | DONE | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | compileDebugKotlin ✅ | None | No |
 | P1-S5-004 | S5 | P1 | DONE | Create ReaderScreen with fake content | Write Compose UI + fake ViewModel | compileDebugKotlin ✅ | None | No |
-| P1-S5-005 | S5 | P1 | READY | Wire Search→Detail→TOC→Reader navigation with fake data | Modify navigation graph, pass fake IDs between screens | Full fake flow: search→detail→TOC→reader | None | No |
+| P1-S5-005 | S5 | P1 | DONE | Wire Search→Detail→TOC→Reader navigation with fake data | Modify navigation graph, pass fake IDs between screens | compileDebugKotlin ✅ | None | No |
 
 ## Stage 3: Design Docs (can be done in parallel with any stage)
 
@@ -62,7 +62,7 @@
 | P2-S5-008 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | Real TOC returns chapter list | Depends on P2-S5-006 | No |
 | P2-S5-009 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | Depends on P2-S5-006 | No |
 | P2-S6-001 | S6 | P2 | BLOCKED | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | Progress saved and restored on app restart | Depends on storage decision | No |
-| P2-S6-002 | S6 | P2 | BLOCKED | Implement reader font/theme settings | Write settings screen, DataStore prefs | Font size change reflects in reader | Depends on S1 + storage decision | No |
+| P2-S6-002 | S6 | P2 | READY | Implement reader font/theme settings | Write settings screen, DataStore prefs | Font size change reflects in reader | None (storage decisions resolved BD-005, BD-025) | No |
 | P2-S6-003 | S6 | P2 | BLOCKED | Implement chapter content cache | Write cache manager using Room/file cache | Cached chapter loads without network | Depends on storage decision + real HTTP | No |
 
 ---
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P1-S5-003 Create TOCScreen with fake chapter list**
+**Next READY: P2-S6-002 Implement reader font/theme settings (prefs via DataStore)**
 
 S1 complete. Build environment verified. Next: S2 domain models.
 Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
