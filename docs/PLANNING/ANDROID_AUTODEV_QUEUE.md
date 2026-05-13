@@ -99,7 +99,21 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P2-S6-003 Chapter content cache**
+**LOOP AUTO-CANCELLED — zero READY tasks (2026-05-14)**
+
+All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
+1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
+2. **BD-009** (JS engine) → S7 WebView/JS
+3. **BD-010** (WebDAV lib) → S11 WebDAV
+4. **BD-011** (EPUB parser) → S9 local books
+
+Progress summary through S6:
+- S0-S1: App shell, Gradle, Compose scaffold ✅
+- S2-S3: Domain models, CoreBridge, FakeCoreBridge ✅
+- S4: BookSourceRepository + SourceManagementScreen ✅
+- S5: Search → Detail → TOC → Reader full navigation ✅
+- S6: DataStore (settings) + Room (progress, cache) ✅
+- Next stage: S7 (WebView/JS/Cookie/Login) or S5 real integration (needs BD-008)
 
 S1 complete. Build environment verified. Next: S2 domain models.
 Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
