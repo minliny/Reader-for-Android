@@ -16,12 +16,12 @@
 | BD-005 | USER_DECISION | P1 | Storage | Room vs DataStore for local persistence | RESOLVED: Room for structured data (sources, bookshelf, chapters, progress, cache), DataStore for preferences (theme, reading settings) | P1-S2-001 through P2-S6-* | RESOLVED (2026-05-13) |
 | BD-006 | USER_DECISION | P1 | Networking | OkHttp vs kTor for HTTP client | RESOLVED: OkHttp | P2-S3-003, P2-S5-* | RESOLVED (2026-05-13) |
 | BD-007 | USER_DECISION | P0 | Core Integration | How to bridge Swift Reader-Core to Kotlin Android | RESOLVED: JSON-level contract / bridge boundary — Android defines equivalent Kotlin DTOs, implements protocols natively, validates against Core conformance tests; no direct Swift↔Kotlin linking | P1-S3-*, all P2 tasks | RESOLVED (2026-05-13) |
-| BD-008 | USER_DECISION | P1 | Security | Allow network access for real HTTP fetch | Default to NO network access until explicitly approved; fake data only for early stages | P2-S3-003, P2-S5-* | OPEN |
+| BD-008 | USER_DECISION | P1 | Security | Allow network access for real HTTP fetch | RESOLVED: Network access granted (2026-05-14) | P2-S3-003, P2-S5-* | RESOLVED (2026-05-14) |
 | BD-009 | USER_DECISION | P2 | Dynamic Runtime | QuickJS vs Hermes for JS engine | Deferred to S7; write design doc first (P3-S7-001-DOC) | P3-S7-003 | OPEN |
 | BD-010 | USER_DECISION | P2 | WebDAV | WebDAV client library selection | Deferred to S11; write design doc first (P3-S11-001-DOC) | P3-S11-* | OPEN |
 | BD-011 | USER_DECISION | P2 | Local Books | EPUB parser library selection | Deferred to S9; no decision needed now | P3-S9-002 | OPEN |
-| BD-012 | USER_DECISION | P1 | Automation | Allow automatic git commit by loop | Default: allow local commit only; NEVER push; NEVER force push; NEVER amend | All loop tasks | OPEN |
-| BD-013 | USER_DECISION | P1 | Automation | Allow automatic Gradle file creation/modification | Allow for S0-S1 project setup; disallow for adding new dependencies without user approval | P0-S1-001, P0-S1-002 | OPEN |
+| BD-012 | USER_DECISION | P1 | Automation | Allow automatic git commit by loop | RESOLVED: Local commit allowed; NEVER push without explicit user request | All loop tasks | RESOLVED (2026-05-14) |
+| BD-013 | USER_DECISION | P1 | Automation | Allow automatic Gradle file creation/modification | RESOLVED: Allowed with dependency justification in report (per BD-025) | P0-S1-001, P0-S1-002 | RESOLVED (2026-05-14) |
 | BD-014 | USER_DECISION | P1 | Security | Allow reading local files (for local book feature) | Deferred to S9; not needed before | P3-S9-* | OPEN |
 | BD-015 | USER_DECISION | P2 | Release | Open source release vs Play Store compliance strategy | Not blocking development; record as deferred | None (no current tasks) | OPEN |
 | BD-016 | USER_DECISION | P1 | Security | Handling of cookies, tokens, credentials | No credential storage until S7 login adapter; never commit secrets; never log credentials | P3-S7-004 | OPEN |
