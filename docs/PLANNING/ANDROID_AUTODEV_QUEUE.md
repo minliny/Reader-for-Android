@@ -62,7 +62,7 @@
 | P2-S5-008 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | Real TOC returns chapter list | Depends on P2-S5-006 | No |
 | P2-S5-009 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | Depends on P2-S5-006 | No |
 | P2-S6-001 | S6 | P2 | BLOCKED | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | Progress saved and restored on app restart | Depends on storage decision | No |
-| P2-S6-002 | S6 | P2 | READY | Implement reader font/theme settings | Write settings screen, DataStore prefs | Font size change reflects in reader | None (storage decisions resolved BD-005, BD-025) | No |
+| P2-S6-002 | S6 | P2 | DONE | Implement reader font/theme settings | Write settings screen, DataStore prefs | compileDebugKotlin ✅ | None | No |
 | P2-S6-003 | S6 | P2 | BLOCKED | Implement chapter content cache | Write cache manager using Room/file cache | Cached chapter loads without network | Depends on storage decision + real HTTP | No |
 
 ---

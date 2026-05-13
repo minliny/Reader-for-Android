@@ -69,6 +69,9 @@ dependencies {
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
 
+    // DataStore Preferences (for theme, reading settings)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
