@@ -38,8 +38,8 @@
 | P1-S4-001 | S4 | P1 | DONE | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | compileDebugKotlin ✅ | None | No |
 | P1-S4-002 | S4 | P1 | DONE | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | compileDebugKotlin ✅ | None | No |
 | P1-S5-001 | S5 | P1 | DONE | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | compileDebugKotlin ✅ | None | No |
-| P1-S5-002 | S5 | P1 | READY | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | Detail screen shows name, author, cover, intro | None | No |
-| P1-S5-003 | S5 | P1 | BLOCKED | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | Chapter list renders, tap navigates to reader | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-002 | S5 | P1 | DONE | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | compileDebugKotlin ✅ | None | No |
+| P1-S5-003 | S5 | P1 | READY | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | Chapter list renders, tap navigates to reader | None | No |
 | P1-S5-004 | S5 | P1 | BLOCKED | Create ReaderScreen with fake content | Write Compose UI + fake ViewModel | Content text renders in scrollable view | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S5-005 | S5 | P1 | BLOCKED | Wire Search→Detail→TOC→Reader navigation with fake data | Modify navigation graph, pass fake IDs between screens | Full fake flow: search→detail→TOC→reader | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P1-S5-002 Create BookDetailScreen with fake info**
+**Next READY: P1-S5-003 Create TOCScreen with fake chapter list**
 
 S1 complete. Build environment verified. Next: S2 domain models.
 Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
