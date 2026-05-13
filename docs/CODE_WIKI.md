@@ -15,7 +15,9 @@
 5. [依赖关系](#依赖关系)
 6. [项目运行方式](#项目运行方式)
 7. [开发路线图](#开发路线图)
-8. [决策记录](#决策记录)
+8. [待决策事项摘要](#待决策事项摘要)
+9. [P0 下一步执行计划](#p0-下一步执行计划)
+10. [决策记录](#决策记录)
 
 ---
 
@@ -414,6 +416,95 @@ Data Layer
 - 实现 WebDAV 客户端适配器
 - 实现备份/恢复 UI + WorkManager 调度
 - 实现进度云同步管理器
+
+---
+
+## 待决策事项摘要
+
+| ID | 决策主题 | 推荐方案 | 是否阻塞 P0 | 是否需要用户确认 | 备注 |
+|----|---------|---------|-----------|----------------|------|
+| BD-UI-001 | Android UI 框架 | Jetpack Compose | 否 | 否 | 已默认采用 |
+| BD-BUILD-001 | 构建系统 | Gradle Kotlin DSL | 否 | 否 | 已默认采用 |
+| BD-007 | Core 集成策略 | JSON 契约桥接，先 FakeCoreBridge，后真实适配 | 否 | 否 | 已默认采用 |
+| BD-006 | HTTP 客户端 | OkHttp | 否 | 否 | P2 阶段，不影响 P0 |
+| BD-005 | 本地结构化存储 | Room | 否 | 否 | P2/P3 阶段，不影响 P0 |
+| BD-005-1 | 用户设置/进度存储 | DataStore | 否 | 否 | P2/P3 阶段，不影响 P0 |
+| BD-005-2 | 章节缓存 | 文件系统 | 否 | 否 | P2/P3 阶段，不影响 P0 |
+| BD-005-3 | Cookie/会话存储 | EncryptedSharedPreferences 或 AndroidX Security | 否 | 否 | P3 阶段，不影响 P0 |
+| BD-BG-001 | 后台任务框架 | WorkManager | 否 | 否 | P3 阶段，不影响 P0 |
+| BD-009 | JS 引擎 | QuickJS + Android WebView 双引擎 | 否 | 否 | P3 阶段，不影响 P0 |
+| BD-010 | WebDAV 实现 | OkHttp 手动实现 | 否 | 否 | P3 阶段，不影响 P0 |
+| BD-008 | 网络访问权限 | 推迟到 P2 阶段决策 | 否 | 是 | P0 阶段不接真实网络 |
+
+> 说明：以上推荐方案已作为项目默认方向写入 Wiki。对于不阻塞 P0 的决策，可在后续阶段再确认。
+
+---
+
+## P0 下一步执行计划
+
+### P0 最小目标
+
+创建可构建的 Reader for Android 最小工程骨架，具备基础 UI 结构和 FakeCoreBridge 接口。
+
+### 具体执行任务
+
+#### 任务 1：创建 Android Gradle 项目骨架
+- 创建 `settings.gradle.kts`，配置项目名称、仓库
+- 创建根目录 `build.gradle.kts`，配置 Kotlin 版本、Android Gradle Plugin
+- 创建 `gradle/wrapper/` 目录，包含 `gradle-wrapper.properties` 和 `gradlew`/`gradlew.bat` 脚本
+- 创建 `gradle.properties` 配置文件
+- 创建 `app/` 模块目录
+
+#### 任务 2：配置 app 模块
+- 创建 `app/build.gradle.kts`，配置：
+  - `minSdk = 26`，`targetSdk = 34`（或最新稳定版）
+  - Compose 依赖：`androidx.activity:activity-compose`、`androidx.compose.ui:ui` 等
+  - Kotlin 依赖
+- 创建 `app/src/main/AndroidManifest.xml`，配置：
+  - 应用名称、图标
+  - MainActivity
+  - 必要权限（INTERNET 后续阶段加）
+- 创建 `app/src/main/res/` 基础资源目录结构
+
+#### 任务 3：创建 Compose App 壳
+- 创建 `MainActivity.kt`，继承 `ComponentActivity`，启用 Compose
+- 创建 `ReaderTheme.kt`，定义基础主题颜色、Typography、Shape
+- 创建 `ReaderApp.kt`，作为应用根 Composable
+
+#### 任务 4：创建基础导航结构
+- 定义 `Screen` 密封类：`Bookshelf`、`Search`、`Reader`、`BookSource`、`Settings`
+- 创建 `NavigationGraph.kt`，使用 `NavHost` 和 `composable` 路由
+- 创建 `BottomNavigationBar.kt`，实现底部导航栏
+
+#### 任务 5：创建占位页面
+- 创建 `ui/screens/BookshelfScreen.kt` - 简单文本 "书架页面"
+- 创建 `ui/screens/SearchScreen.kt` - 简单文本 "搜索页面"
+- 创建 `ui/screens/ReaderScreen.kt` - 简单文本 "阅读器页面"
+- 创建 `ui/screens/BookSourceScreen.kt` - 简单文本 "书源管理页面"
+- 创建 `ui/screens/SettingsScreen.kt` - 简单文本 "设置页面"
+
+#### 任务 6：创建 FakeCoreBridge 接口和最小 DTO
+- 创建 `domain/ReaderCoreBridge.kt` 接口
+- 创建 `domain/dto/` 包，定义最小 DTO：
+  - `BookSource.kt`（仅 id, name, url 字段）
+  - `SearchResultItem.kt`（仅 title, author, bookUrl 字段）
+  - `TOCItem.kt`（仅 title, contentUrl 字段）
+  - `ContentPage.kt`（仅 content 字段）
+  - `BookInfo.kt`（仅 title, author, intro 字段）
+- 创建 `domain/FakeCoreBridge.kt`，实现接口，返回硬编码模拟数据
+
+#### 任务 7：项目构建验证
+- 运行 `./gradlew assembleDebug`，确保构建成功
+- 在模拟器或设备上运行应用，验证能正常启动并显示底部导航
+
+### P0 不涉及的内容（明确边界）
+- ❌ 真实网络请求
+- ❌ 真实 Reader-Core 集成
+- ❌ WebView / JS 功能
+- ❌ WebDAV 功能
+- ❌ TTS 功能
+- ❌ 本地持久化（Room/DataStore）
+- ❌ 复杂 UI 样式
 
 ---
 
