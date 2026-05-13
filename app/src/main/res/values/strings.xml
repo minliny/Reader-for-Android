@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Reader for Android</string>
+    <string name="nav_bookshelf">书架</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_reader">阅读器</string>
+    <string name="nav_booksource">书源</string>
+    <string name="nav_settings">设置</string>
+</resources>
