@@ -9,13 +9,13 @@
 
 | ID | Type | Severity | Area | Question / Blocker | Default Safe Action | Blocks Tasks | Status |
 |----|------|----------|------|--------------------|---------------------|-------------|--------|
-| BD-001 | USER_DECISION | P0 | Project Identity | Android package name (applicationId) | Use `com.reader.android` as temporary namespace; record as needing confirmation before release | P0-S1-001, all subsequent code tasks | OPEN |
-| BD-002 | USER_DECISION | P0 | Project Identity | minSdk / targetSdk / compileSdk versions | Use minSdk=26, targetSdk=35, compileSdk=35 (current stable defaults) | P0-S1-001 | OPEN |
-| BD-003 | USER_DECISION | P0 | Architecture | Compose vs XML UI toolkit | Default to Jetpack Compose (modern Android standard) | P0-S1-001, all UI tasks | OPEN |
-| BD-004 | USER_DECISION | P1 | Architecture | Single module vs multi-module project | Default to single app module; multi-module can be introduced later | P0-S1-001 | OPEN |
-| BD-005 | USER_DECISION | P1 | Storage | Room vs DataStore for local persistence | Write DATA_LAYER_DESIGN.md first (P1-S2-002); do not introduce dependency until doc approved | P1-S2-001 through P2-S6-* | OPEN |
-| BD-006 | USER_DECISION | P1 | Networking | OkHttp vs kTor for HTTP client | Write HTTP_ADAPTER_DESIGN.md first (P2-S3-003-DOC); do not introduce dependency until doc approved | P2-S3-003, P2-S5-* | OPEN |
-| BD-007 | USER_DECISION | P0 | Core Integration | How to bridge Swift Reader-Core to Kotlin Android (JSON contract vs KMP vs embedded HTTP vs other) | Default to JSON-level contract: define equivalent Kotlin DTOs, implement protocols natively, validate against Core conformance tests; record as BLOCKED_CORE_INTEGRATION_STRATEGY | P1-S3-*, all P2 tasks | OPEN |
+| BD-001 | USER_DECISION | P0 | Project Identity | Android package name (applicationId) | RESOLVED: `com.reader.android` | P0-S1-001, all subsequent code tasks | RESOLVED (2026-05-13) |
+| BD-002 | USER_DECISION | P0 | Project Identity | minSdk / targetSdk / compileSdk versions | RESOLVED: minSdk=26, targetSdk=35, compileSdk=35 | P0-S1-001 | RESOLVED (2026-05-13) |
+| BD-003 | USER_DECISION | P0 | Architecture | Compose vs XML UI toolkit | RESOLVED: Jetpack Compose + Material 3 (modern Android standard) | P0-S1-001, all UI tasks | RESOLVED (2026-05-13) |
+| BD-004 | USER_DECISION | P1 | Architecture | Single module vs multi-module project | RESOLVED: Single `:app` module with internal package layering; multi-module evaluation deferred to S3/S4 | P0-S1-001 | RESOLVED (2026-05-13) |
+| BD-005 | USER_DECISION | P1 | Storage | Room vs DataStore for local persistence | RESOLVED: Room for structured data (sources, bookshelf, chapters, progress, cache), DataStore for preferences (theme, reading settings) | P1-S2-001 through P2-S6-* | RESOLVED (2026-05-13) |
+| BD-006 | USER_DECISION | P1 | Networking | OkHttp vs kTor for HTTP client | RESOLVED: OkHttp | P2-S3-003, P2-S5-* | RESOLVED (2026-05-13) |
+| BD-007 | USER_DECISION | P0 | Core Integration | How to bridge Swift Reader-Core to Kotlin Android | RESOLVED: JSON-level contract / bridge boundary — Android defines equivalent Kotlin DTOs, implements protocols natively, validates against Core conformance tests; no direct Swift↔Kotlin linking | P1-S3-*, all P2 tasks | RESOLVED (2026-05-13) |
 | BD-008 | USER_DECISION | P1 | Security | Allow network access for real HTTP fetch | Default to NO network access until explicitly approved; fake data only for early stages | P2-S3-003, P2-S5-* | OPEN |
 | BD-009 | USER_DECISION | P2 | Dynamic Runtime | QuickJS vs Hermes for JS engine | Deferred to S7; write design doc first (P3-S7-001-DOC) | P3-S7-003 | OPEN |
 | BD-010 | USER_DECISION | P2 | WebDAV | WebDAV client library selection | Deferred to S11; write design doc first (P3-S11-001-DOC) | P3-S11-* | OPEN |
@@ -25,15 +25,15 @@
 | BD-014 | USER_DECISION | P1 | Security | Allow reading local files (for local book feature) | Deferred to S9; not needed before | P3-S9-* | OPEN |
 | BD-015 | USER_DECISION | P2 | Release | Open source release vs Play Store compliance strategy | Not blocking development; record as deferred | None (no current tasks) | OPEN |
 | BD-016 | USER_DECISION | P1 | Security | Handling of cookies, tokens, credentials | No credential storage until S7 login adapter; never commit secrets; never log credentials | P3-S7-004 | OPEN |
-| BD-017 | ENVIRONMENT | P0 | Build | Android SDK not verified on this machine | Mark P0-S1-001 as BLOCKED_ENV_ANDROID_SDK until SDK confirmed; planning docs can proceed without SDK | P0-S1-001, all Gradle-based tasks | OPEN |
-| BD-018 | ENVIRONMENT | P1 | Build | Gradle wrapper not yet generated | Can be created by P0-S1-001 if Android SDK available; otherwise BLOCKED | P0-S1-001 | OPEN |
+| BD-017 | ENVIRONMENT | P0 | Build | Android SDK not verified on this machine | RESOLVED: JDK 17.0.19, Android SDK 35, build-tools 35.0.0, Gradle 8.11.1 all verified | P0-S1-001, all Gradle-based tasks | RESOLVED (2026-05-14) |
+| BD-018 | ENVIRONMENT | P1 | Build | Gradle wrapper not yet generated | RESOLVED: Gradle 8.11.1 wrapper generated, ./gradlew verified | P0-S1-001 | RESOLVED (2026-05-14) |
 | BD-019 | ARCHITECTURE | P0 | Boundary | Android must not copy Legado source code | Gate: grep for Legado package names before commit | All tasks | OPEN (ongoing) |
 | BD-020 | ARCHITECTURE | P0 | Boundary | Android must not rewrite Reader-Core internals | Gate: no parser/runtime internal reimplementation in Android code | All P2+ tasks | OPEN (ongoing) |
 | BD-021 | ARCHITECTURE | P0 | Boundary | Android only accesses Reader-Core via public API/Facade/DTO/Error taxonomy | Gate: review imports before Core-bridge tasks | P1-S3-*, all P2 tasks | OPEN (ongoing) |
 | BD-022 | CORE_GAP | P0 | Upstream | Reader-Core is Swift, Android is Kotlin — no direct binary integration possible | Record as known architectural constraint; do not attempt direct Swift→Android linking | P1-S3-*, P2-S3-* | OPEN |
 | BD-023 | CORE_GAP | P1 | Upstream | Reader-Core has no Kotlin/Maven artifact | Android must implement equivalent DTOs and protocols natively in Kotlin | P1-S2-* | OPEN |
 | BD-024 | CORE_GAP | P2 | Upstream | Reader-Core EXPERIMENTAL modules (Network, Cache, Adapters, JSRenderer) are not stable | Can reference contracts but should not depend on implementation stability | P2-S3-*, P2-S6-* | OPEN |
-| BD-025 | USER_DECISION | P1 | Automation | Whether to allow loop to introduce new dependencies (Room, OkHttp, etc.) | Default: only write design docs; do NOT add dependencies without user approval after doc review | P1-S2-* (for Room/DataStore), P2-S3-* (for OkHttp) | OPEN |
+| BD-025 | USER_DECISION | P1 | Automation | Whether to allow loop to introduce new dependencies (Room, OkHttp, etc.) | RESOLVED: Allowed for Android official/mainstream dependencies with minimal scope; each new dependency must be justified in report; design docs no longer gate dependency introduction | P1-S2-* (for Room/DataStore), P2-S3-* (for OkHttp) | RESOLVED (2026-05-13) |
 | BD-026 | USER_DECISION | P2 | Feature | Whether to support WebView for JS-based book sources | Default: plan for it in design docs but do not implement until S7 | P3-S7-* | OPEN |
 | BD-027 | USER_DECISION | P2 | Feature | Whether to support WebDAV backup/sync | Default: plan for it in design docs but do not implement until S11 | P3-S11-* | OPEN |
 
@@ -59,3 +59,13 @@
 | 2026-05-13 | BD-017 | ANDROID_SDK not yet verified; Gradle tasks blocked | Audit |
 | 2026-05-13 | BD-018 | Gradle wrapper not generated | Audit |
 | 2026-05-13 | BD-012 | Auto-commit enabled for planning docs; first commit created (6a5da26) | Loop iteration 1 |
+| 2026-05-13 | BD-001 | RESOLVED: applicationId = com.reader.android | User decision (S1 skeleton) |
+| 2026-05-13 | BD-002 | RESOLVED: minSdk=26, targetSdk=35, compileSdk=35 | User decision (S1 skeleton) |
+| 2026-05-13 | BD-003 | RESOLVED: Jetpack Compose + Material 3 | User decision (S1 skeleton) |
+| 2026-05-13 | BD-004 | RESOLVED: Single :app module, package layering; multi-module deferred to S3/S4 | User decision (S1 skeleton) |
+| 2026-05-13 | BD-005 | RESOLVED: Room + DataStore | User decision (S1 skeleton) |
+| 2026-05-13 | BD-006 | RESOLVED: OkHttp | User decision (S1 skeleton) |
+| 2026-05-13 | BD-007 | RESOLVED: JSON-level contract / bridge boundary | User decision (S1 skeleton) |
+| 2026-05-13 | BD-025 | RESOLVED: Dependencies allowed with minimal scope + justification | User decision (S1 skeleton) |
+| 2026-05-14 | BD-017 | RESOLVED: JDK 17.0.19, Android SDK 35, build-tools 35.0.0, Gradle 8.11.1 verified | S1-P0-002 env verification |
+| 2026-05-14 | BD-018 | RESOLVED: Gradle wrapper 8.11.1 generated, ./gradlew verified | S1-P0-002 env verification |

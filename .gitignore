@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# IDE
+*.iml
+.idea/
+
+# Android
+local.properties
+
+# Test artifacts
+**/test-results/
+**/test-output/
+
+# Misc
+*.log
+*.tmp

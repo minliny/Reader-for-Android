@@ -24,10 +24,10 @@
 | P0-S0-002 | Create .claude/ loop config (loop.md, commands/, settings.json) | 1 | READY |
 | P0-S0-003 | Generate initial BLOCKERS_AND_DECISIONS.md | 1 | READY |
 | P0-S0-004 | Verify git state clean, initial commit of planning docs | 1 | READY |
-| P0-S1-001 | Create Gradle Kotlin DSL empty project skeleton (settings.gradle.kts, build.gradle.kts, gradle wrapper) | 1-2 | BLOCKED (needs Android SDK + user decisions) |
-| P0-S1-002 | Create app module (app/build.gradle.kts, AndroidManifest.xml, MainActivity.kt, Theme) | 1 | BLOCKED (depends on P0-S1-001) |
-| P0-S1-003 | Create Compose App Shell (Scaffold, BottomNav, NavHost) | 1-2 | BLOCKED (depends on P0-S1-002) |
-| P0-S1-004 | Create placeholder pages (Bookshelf, Sources, Search, Settings, Reader) | 1 | BLOCKED (depends on P0-S1-003) |
+| P0-S1-001 | Create Gradle Kotlin DSL empty project skeleton (settings.gradle.kts, build.gradle.kts, gradle wrapper) | 1-2 | PARTIAL_ENV_BLOCKED (files created, compilation blocked by no JDK/SDK) |
+| P0-S1-002 | Verify Android local build environment (JDK, SDK, Gradle wrapper) | 1 | BLOCKED (requires user action) |
+| P0-S1-003 | Create Compose App Shell (Scaffold, BottomNav, NavHost) | 1-2 | DONE (ReaderAndroidApp, AppNavigation created) |
+| P0-S1-004 | Create placeholder pages (Bookshelf, Sources, Search, Settings, Reader) | 1 | DONE (4 placeholder screens created) |
 
 ---
 
@@ -35,11 +35,11 @@
 
 | ID | Task | Est. Loops | Status |
 |----|------|-----------|--------|
-| P1-S2-001 | Define Kotlin domain models matching Core DTOs (BookSource, SearchResultItem, TOCItem, ContentPage, BookInfo) | 1 | BLOCKED (depends on S1 module) |
-| P1-S2-002 | Write DATA_LAYER_DESIGN.md (Room vs DataStore decision doc, no code) | 1 | READY |
-| P1-S2-003 | Define FakeCoreBridge interface + fake implementation returning mock data | 1 | BLOCKED (depends on P1-S2-001) |
-| P1-S3-001 | Define ReaderCoreBridge contract in Kotlin | 1 | BLOCKED (depends on Core integration strategy decision) |
-| P1-S3-002 | Write CORE_BRIDGE_DESIGN.md documenting integration strategy decision and gap analysis | 1 | READY |
+| P1-S2-001 | Define Kotlin domain models matching Core DTOs (BookSource, SearchResultItem, TOCItem, ContentPage, BookInfo) | 1 | BLOCKED (env: no JDK/SDK for compilation) |
+| P1-S2-002 | Write DATA_LAYER_DESIGN.md (Room vs DataStore decision doc, no code) | 1 | DONE |
+| P1-S2-003 | Define FakeCoreBridge interface + fake implementation returning mock data | 1 | BLOCKED (env: needs compilation) |
+| P1-S3-001 | Define ReaderCoreBridge contract in Kotlin | 1 | BLOCKED (env: needs compilation) |
+| P1-S3-002 | Write CORE_BRIDGE_DESIGN.md documenting integration strategy decision and gap analysis | 1 | DONE |
 | P1-S4-001 | Create BookSourceRepository (fake) with JSON import | 1 | BLOCKED (depends on S2) |
 | P1-S4-002 | Create SourceManagementScreen (list, enable/disable, delete) | 1-2 | BLOCKED (depends on S1) |
 | P1-S5-001 | Create SearchScreen with fake search results | 1 | BLOCKED (depends on S1 + S4) |
@@ -71,7 +71,7 @@
 
 | ID | Task | Est. Loops | Status |
 |----|------|-----------|--------|
-| P3-S7-001 | Write WebView/JS platform adapter design doc | 1 | READY (doc only, deferred) |
+| P3-S7-001 | Write WebView/JS platform adapter design doc | 1 | DONE (WEBVIEW_JS_ADAPTER_DESIGN.md) |
 | P3-S7-002 | Implement Android WebView Runtime adapter | 2-3 | BLOCKED (deferred to S7) |
 | P3-S7-003 | Implement QuickJS/Hermes JS adapter | 3-4 | BLOCKED (deferred to S7) |
 | P3-S7-004 | Implement Cookie/Login adapter | 2 | BLOCKED (deferred to S7) |
@@ -80,7 +80,7 @@
 | P3-S9-001 | Implement local file picker + TXT reader | 2 | BLOCKED (deferred to S9) |
 | P3-S9-002 | Implement EPUB parser (ZIP + XML) | 3 | BLOCKED (deferred to S9) |
 | P3-S10-001 | Implement TTS adapter + playback UI | 2-3 | BLOCKED (deferred to S10) |
-| P3-S11-001 | Write WebDAV three-way design doc | 1 | READY (doc only, deferred) |
+| P3-S11-001 | Write WebDAV three-way design doc | 1 | DONE (WEBDAV_DESIGN.md) |
 | P3-S11-002 | Implement WebDAV client adapter | 3 | BLOCKED (deferred to S11) |
 | P3-S11-003 | Implement backup/restore UI + WorkManager scheduling | 2-3 | BLOCKED (deferred to S11) |
 | P3-S12-001 | Implement progress cloud sync manager | 2 | BLOCKED (deferred to S12) |
@@ -103,8 +103,5 @@ Each task must:
 
 ## Current Ready Tasks (for next loop)
 
-1. **P0-S0-004**: Verify git state, initial commit of planning docs
-2. **P1-S2-002**: Write DATA_LAYER_DESIGN.md (design doc only, no dependencies)
-3. **P1-S3-002**: Write CORE_BRIDGE_DESIGN.md (design doc only, no dependencies)
-4. **P3-S7-001**: Write WebView/JS adapter design doc (doc only, deferred)
-5. **P3-S11-001**: Write WebDAV three-way design doc (doc only, deferred)
+1. **P0-S1-002**: Verify Android local build environment (install JDK 17+, Android SDK, generate Gradle wrapper) — **requires user action**
+2. After env ready: re-validate P0-S1-001 (`./gradlew :app:assembleDebug`)

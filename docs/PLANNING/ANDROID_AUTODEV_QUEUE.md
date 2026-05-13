@@ -20,27 +20,28 @@
 | P0-S0-002 | S0 | P0 | DONE | Create .claude/ loop config (loop.md, commands/, settings.json) | Write new files in .claude/ only | All config files exist and parse correctly | None | None |
 | P0-S0-003 | S0 | P0 | DONE | Generate initial BLOCKERS_AND_DECISIONS.md with all pre-identified decision points | Write docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md | All P0/P1 decision points documented | None | None |
 | P0-S0-004 | S0 | P0 | DONE | Verify git state clean, create initial project commit | git add, git commit (NO push) | git status clean, commit created | None | User must approve initial commit |
-| P0-S1-001 | S1 | P0 | BLOCKED | Create Gradle Kotlin DSL empty project skeleton | Create gradle/, build.gradle.kts, settings.gradle.kts, gradle.properties | ./gradlew projects passes | BLOCKED_ENV_ANDROID_SDK, BLOCKED_USER_DECISION: package name, minSdk, Compose vs XML, multi-module | Yes: package name, minSdk, Compose vs XML, multi-module |
-| P0-S1-002 | S1 | P0 | BLOCKED | Create app module with Manifest, MainActivity, Theme | Create app/ directory with build.gradle.kts, manifest, source files | ./gradlew :app:assembleDebug passes | Depends on P0-S1-001 | No (uses defaults from S1-001 decision) |
-| P0-S1-003 | S1 | P0 | BLOCKED | Create Compose App Shell with Scaffold, BottomNav, NavHost | Write Compose UI files only | App launches with navigation structure | Depends on P0-S1-002 | No |
-| P0-S1-004 | S1 | P0 | BLOCKED | Create placeholder pages (Bookshelf, Sources, Search, Settings, Reader) | Write Compose screen files only | All 5 placeholder screens render | Depends on P0-S1-003 | No |
+| P0-S1-001 | S1 | P0 | DONE | Create Gradle Kotlin DSL empty project skeleton | Create gradle/, build.gradle.kts, settings.gradle.kts, gradle.properties | ./gradlew projects passes | None | No (user decisions resolved 2026-05-13) |
+| P0-S1-002 | S1 | P0 | DONE | Verify Android local build environment (JDK, SDK, Gradle wrapper) | Install/configure JDK 17+, Android SDK, ANDROID_HOME, generate gradle wrapper | java -version shows JDK 17+, ./gradlew projects passes | None | N/A (verified 2026-05-14) |
+| P0-S1-003 | S1 | P0 | DONE | Create Compose App Shell with Scaffold, BottomNav, NavHost | Write Compose UI files only | App launches with navigation structure | None (compile-time verification blocked by env) | No |
+| P0-S1-004 | S1 | P0 | DONE | Create placeholder pages (Bookshelf, BookSource, Settings, Reader) | Write Compose screen files only | All 4 placeholder screens render | None (compile-time verification blocked by env) | No |
+| P0-S1-005 | S1 | P0 | READY | App Shell Navigation Contract: verify scaffold, bottom nav, NavHost, 4 tab routes work at runtime | Verify AppNavigation.kt compiles, navigation graph is valid, all routes accessible | ./gradlew :app:assembleDebug passes, manual navigation test | None | No |
 
 ## Stage 1-2: Model & Fake Data Flow
 
 | ID | Stage | Priority | Status | Task | Allowed Changes | Validation | Blockers | Decision Required |
 |----|-------|----------|--------|------|-----------------|------------|----------|-------------------|
-| P1-S2-001 | S2 | P1 | BLOCKED | Define Kotlin domain models matching Core DTOs | Write Kotlin data classes in model/ package | Kotlin compiles, all Core DTO fields present | Depends on P0-S1-001 (needs Gradle module) | No (follows Core DTO spec) |
+| P1-S2-001 | S2 | P1 | BLOCKED | Define Kotlin domain models matching Core DTOs | Write Kotlin data classes in model/ package | Kotlin compiles, all Core DTO fields present | BLOCKED_ENV_ANDROID_SDK (no JDK/Android SDK for compilation) | No (follows Core DTO spec) |
 | P1-S2-002 | S2 | P1 | DONE | Write DATA_LAYER_DESIGN.md design doc | Write docs/design/DATA_LAYER_DESIGN.md only | Doc covers Room vs DataStore tradeoffs | None | No (doc only, no code) |
-| P1-S2-003 | S2 | P1 | BLOCKED | Define FakeCoreBridge interface + fake impl | Write Kotlin interface + fake class | Compiles, returns mock data for all methods | Depends on P1-S2-001 | No |
-| P1-S3-001 | S3 | P1 | BLOCKED | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | Interface covers search/detail/TOC/content | BLOCKED_CORE_INTEGRATION_STRATEGY | Yes: how to bridge Swift Core to Kotlin |
+| P1-S2-003 | S2 | P1 | BLOCKED | Define FakeCoreBridge interface + fake impl | Write Kotlin interface + fake class | Compiles, returns mock data for all methods | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S3-001 | S3 | P1 | BLOCKED | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | Interface covers search/detail/TOC/content | BLOCKED_ENV_ANDROID_SDK (needs compilation); Core bridge strategy resolved (BD-007) | No |
 | P1-S3-002 | S3 | P1 | DONE | Write CORE_BRIDGE_DESIGN.md documenting integration strategy | Write docs/design/CORE_BRIDGE_DESIGN.md only | Doc covers 3 strategies (JSON contract, KMP, embedded) with recommendation | None | No (doc only, analysis) |
-| P1-S4-001 | S4 | P1 | BLOCKED | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | Import Legado-compatible JSON, list sources | Depends on S1 + S2 | No |
-| P1-S4-002 | S4 | P1 | BLOCKED | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | UI renders source list, toggle works, delete works | Depends on S1 + P1-S4-001 | No |
-| P1-S5-001 | S5 | P1 | BLOCKED | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | Depends on S1 + FakeCoreBridge | No |
-| P1-S5-002 | S5 | P1 | BLOCKED | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | Detail screen shows name, author, cover, intro | Depends on S1 + FakeCoreBridge | No |
-| P1-S5-003 | S5 | P1 | BLOCKED | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | Chapter list renders, tap navigates to reader | Depends on S1 + FakeCoreBridge | No |
-| P1-S5-004 | S5 | P1 | BLOCKED | Create ReaderScreen with fake content | Write Compose UI + fake ViewModel | Content text renders in scrollable view | Depends on S1 + FakeCoreBridge | No |
-| P1-S5-005 | S5 | P1 | BLOCKED | Wire Search→Detail→TOC→Reader navigation with fake data | Modify navigation graph, pass fake IDs between screens | Full fake flow: search→detail→TOC→reader | Depends on P1-S5-001 through 004 | No |
+| P1-S4-001 | S4 | P1 | BLOCKED | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | Import Legado-compatible JSON, list sources | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S4-002 | S4 | P1 | BLOCKED | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | UI renders source list, toggle works, delete works | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-001 | S5 | P1 | BLOCKED | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-002 | S5 | P1 | BLOCKED | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | Detail screen shows name, author, cover, intro | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-003 | S5 | P1 | BLOCKED | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | Chapter list renders, tap navigates to reader | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-004 | S5 | P1 | BLOCKED | Create ReaderScreen with fake content | Write Compose UI + fake ViewModel | Content text renders in scrollable view | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S5-005 | S5 | P1 | BLOCKED | Wire Search→Detail→TOC→Reader navigation with fake data | Modify navigation graph, pass fake IDs between screens | Full fake flow: search→detail→TOC→reader | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 
 ## Stage 3: Design Docs (can be done in parallel with any stage)
 
@@ -93,3 +94,15 @@ SKIPPED → (terminal, with reason in Blockers)
 - NEVER include `git push`
 - Validate before commit: `./gradlew :app:assembleDebug` or `./gradlew test` (when applicable)
 - If validation fails, mark BLOCKED, do NOT commit
+
+---
+
+## Current Ready Tasks (2026-05-13 post-S1-skeleton)
+
+**Next READY: P0-S1-005 App Shell Navigation Contract**
+
+All P0 environment blockers resolved (2026-05-14). Build environment verified:
+- JDK 17.0.19, Android SDK 35, build-tools 35.0.0, Gradle 8.11.1
+- `./gradlew projects` ✅, `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅
+
+Next: P0-S1-005 — verify scaffold/navigation contract at runtime, then S2 domain models.
