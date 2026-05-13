@@ -55,9 +55,9 @@
 
 | ID | Stage | Priority | Status | Task | Allowed Changes | Validation | Blockers | Decision Required |
 |----|-------|----------|--------|------|-----------------|------------|----------|-------------------|
-| P2-S3-004 | S3 | P2 | BLOCKED | Implement HTTPClient adapter using OkHttp | Add OkHttp dependency, write adapter class | HTTP fetch succeeds against test URL | BLOCKED_NETWORK_DECISION, depends on OkHttp decision | Yes: network access permission |
+| P2-S3-004 | S3 | P2 | READY | Implement HTTPClient adapter using OkHttp | Add OkHttp dependency, write adapter class | HTTP fetch succeeds against test URL | None | No |
 | P2-S3-005 | S3 | P2 | BLOCKED | Implement BookSourceRepository (real: JSON + DataStore) | Add DataStore dependency, write repository | Sources persist across app restart | Depends on storage decision | No |
-| P2-S5-006 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for search | Modify SearchViewModel to use real HTTP + parse | Real search returns results from a book source | BLOCKED_CORE_BRIDGE | No |
+| P2-S5-006 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for search | Modify SearchViewModel to use real HTTP + parse | Real search returns results from a book source | Needs HTTP adapter (P2-S3-004) first | No |
 | P2-S5-007 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for detail | Modify DetailViewModel | Real detail returns book info | Depends on P2-S5-006 | No |
 | P2-S5-008 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | Real TOC returns chapter list | Depends on P2-S5-006 | No |
 | P2-S5-009 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | Depends on P2-S5-006 | No |
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**LOOP AUTO-CANCELLED — zero READY tasks (2026-05-14)**
+**Next READY: P2-S3-004 Implement HTTPClient adapter using OkHttp**
 
 All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
 1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
