@@ -36,8 +36,8 @@
 | P1-S3-001 | S3 | P1 | DONE | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | compileDebugKotlin ✅ | None (Core bridge strategy resolved BD-007) | No |
 | P1-S3-002 | S3 | P1 | DONE | Write CORE_BRIDGE_DESIGN.md documenting integration strategy | Write docs/design/CORE_BRIDGE_DESIGN.md only | Doc covers 3 strategies (JSON contract, KMP, embedded) with recommendation | None | No (doc only, analysis) |
 | P1-S4-001 | S4 | P1 | DONE | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | compileDebugKotlin ✅ | None | No |
-| P1-S4-002 | S4 | P1 | READY | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | UI renders source list, toggle works, delete works | None | No |
-| P1-S5-001 | S5 | P1 | BLOCKED | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S4-002 | S4 | P1 | DONE | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | compileDebugKotlin ✅ | None | No |
+| P1-S5-001 | S5 | P1 | READY | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | None | No |
 | P1-S5-002 | S5 | P1 | BLOCKED | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | Detail screen shows name, author, cover, intro | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S5-003 | S5 | P1 | BLOCKED | Create TOCScreen with fake chapter list | Write Compose UI + fake ViewModel | Chapter list renders, tap navigates to reader | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S5-004 | S5 | P1 | BLOCKED | Create ReaderScreen with fake content | Write Compose UI + fake ViewModel | Content text renders in scrollable view | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P1-S4-002 Create SourceManagementScreen**
+**Next READY: P1-S5-001 Create SearchScreen with fake results**
 
 S1 complete. Build environment verified. Next: S2 domain models.
 Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
