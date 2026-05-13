@@ -33,9 +33,9 @@
 | P1-S2-001 | S2 | P1 | DONE | Define Kotlin domain models matching Core DTOs | Write Kotlin data classes in model/ package | compileDebugKotlin ✅ | None | No (follows Core DTO spec) |
 | P1-S2-002 | S2 | P1 | DONE | Write DATA_LAYER_DESIGN.md design doc | Write docs/design/DATA_LAYER_DESIGN.md only | Doc covers Room vs DataStore tradeoffs | None | No (doc only, no code) |
 | P1-S2-003 | S2 | P1 | DONE | Define FakeCoreBridge interface + fake impl | Write Kotlin interface + fake class | compileDebugKotlin ✅ | None | No |
-| P1-S3-001 | S3 | P1 | READY | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | Interface covers search/detail/TOC/content | None (Core bridge strategy resolved BD-007) | No |
+| P1-S3-001 | S3 | P1 | DONE | Define ReaderCoreBridge contract in Kotlin | Write Kotlin interface only | compileDebugKotlin ✅ | None (Core bridge strategy resolved BD-007) | No |
 | P1-S3-002 | S3 | P1 | DONE | Write CORE_BRIDGE_DESIGN.md documenting integration strategy | Write docs/design/CORE_BRIDGE_DESIGN.md only | Doc covers 3 strategies (JSON contract, KMP, embedded) with recommendation | None | No (doc only, analysis) |
-| P1-S4-001 | S4 | P1 | BLOCKED | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | Import Legado-compatible JSON, list sources | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
+| P1-S4-001 | S4 | P1 | READY | Create BookSourceRepository (fake) with JSON import | Write Kotlin repository + JSON parser | Import Legado-compatible JSON, list sources | None | No |
 | P1-S4-002 | S4 | P1 | BLOCKED | Create SourceManagementScreen | Write Compose UI for source list, enable/disable, delete | UI renders source list, toggle works, delete works | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S5-001 | S5 | P1 | BLOCKED | Create SearchScreen with fake results | Write Compose UI + fake ViewModel | Search box, results list render with fake data | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
 | P1-S5-002 | S5 | P1 | BLOCKED | Create BookDetailScreen with fake info | Write Compose UI + fake ViewModel | Detail screen shows name, author, cover, intro | BLOCKED_ENV_ANDROID_SDK (needs compilation) | No |
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P1-S3-001 Define ReaderCoreBridge contract in Kotlin**
+**Next READY: P1-S4-001 Create BookSourceRepository (fake) with JSON import**
 
 S1 complete. Build environment verified. Next: S2 domain models.
 Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
