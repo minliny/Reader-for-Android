@@ -63,7 +63,7 @@
 | P2-S5-009 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | Depends on P2-S5-006 | No |
 | P2-S6-001 | S6 | P2 | DONE | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | compileDebugKotlin ✅ (KSP) | None | No |
 | P2-S6-002 | S6 | P2 | DONE | Implement reader font/theme settings | Write settings screen, DataStore prefs | compileDebugKotlin ✅ | None | No |
-| P2-S6-003 | S6 | P2 | READY | Implement chapter content cache | Write cache manager using Room/file cache | Cached chapter loads without network | None | No |
+| P2-S6-003 | S6 | P2 | DONE | Implement chapter content cache | Write cache manager using Room/file cache | compileDebugKotlin ✅ | None | No |
 
 ---
 
