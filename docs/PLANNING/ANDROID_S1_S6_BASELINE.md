@@ -147,10 +147,10 @@ app/src/main/kotlin/com/reader/android/
 
 | Priority | Gap | Impact | Target S6.5 task |
 |----------|-----|--------|-----------------|
-| P0 | SearchParser contract tests | Parser regressions break search silently | S6.5-P0-002 |
-| P0 | BookInfoParser contract tests | Parser regressions break detail silently | S6.5-P0-002 |
-| P0 | TOCParser contract tests | Parser regressions break TOC silently | S6.5-P0-002 |
-| P0 | ContentParser contract tests | Parser regressions break reader silently | S6.5-P0-002 |
+| P0 | SearchParser contract tests | Parser regressions break search silently | S6.5-P0-002 DONE (3 tests) |
+| P0 | BookInfoParser contract tests | Parser regressions break detail silently | S6.5-P0-002 DONE (4 tests) |
+| P0 | TOCParser contract tests | Parser regressions break TOC silently | S6.5-P0-002 DONE (4 tests) |
+| P0 | ContentParser contract tests | Parser regressions break reader silently | S6.5-P0-002 DONE (4 tests) |
 | P0 | ReaderCoreBridge error mapping tests | Error taxonomy not enforced | S6.5-P0-003 |
 | P1 | BookSourceRepository persistence round-trip | Data loss silently accepted | S6.5-P0-004 |
 | P1 | ThemePreferences read/write | Settings not persisted silently | S6.5-P0-004 |

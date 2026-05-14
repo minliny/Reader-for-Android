@@ -70,8 +70,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S6.5-P0-001 | S6.5 | P0 | DONE | Baseline capability matrix freeze | Create ANDROID_S1_S6_BASELINE.md | File exists, all sections populated | None |
-| S6.5-P0-002 | S6.5 | P0 | READY | Parser contract tests | Search/BookInfo/TOC/Content parser tests with HTML fixtures | ./gradlew test passes, ≥ 8 test cases | None |
-| S6.5-P0-003 | S6.5 | P0 | TODO | Bridge contract tests | BridgeResult, error codes, FakeCoreBridge method test | ./gradlew test passes | None |
+| S6.5-P0-002 | S6.5 | P0 | DONE | Parser contract tests | 15 test cases across 4 parsers | ./gradlew test: 18 tests, 0 failures ✅ | None |
+| S6.5-P0-003 | S6.5 | P0 | READY | Bridge contract tests | BridgeResult, error codes, FakeCoreBridge method test | ./gradlew test passes | None |
 | S6.5-P0-004 | S6.5 | P0 | TODO | Repository + preferences persistence tests | BookSourceRepository round-trip, ThemePreferences read/write | ./gradlew test passes | May need DataStore test setup |
 | S6.5-P0-005 | S6.5 | P0 | TODO | Room + cache tests | ReadingProgress DAO, ChapterCache TTL (Room in-memory) | ./gradlew test passes | None |
 | S6.5-P0-006 | S6.5 | P0 | TODO | Navigation route contract hardening | Route constants, URL encode/decode round-trip test | ./gradlew test passes | None |
@@ -146,6 +146,6 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6.5-P0-002 Parser contract tests**
+**Next READY: S6.5-P0-003 Bridge contract tests**
 
 S1-S6 baseline frozen. Cron/loop NOT active. S7/S9/S11 blocked by user decisions (BD-009, BD-010, BD-011, BD-014, BD-016).

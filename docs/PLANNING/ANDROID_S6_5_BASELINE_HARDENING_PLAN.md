@@ -38,7 +38,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-002 Parser contract tests
 
-**Status**: READY
+**Status**: DONE
 **Goal**: Add minimum unit tests for SearchParser, BookInfoParser, TOCParser, ContentParser using local HTML fixture strings. No network access.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/data/network/SearchParserTest.kt`
@@ -57,7 +57,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-003 Bridge contract tests
 
-**Status**: TODO
+**Status**: READY
 **Goal**: Add unit tests for BridgeResult success/failure, error code mapping, and ReaderCoreBridge interface contract. No network.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/data/bridge/BridgeContractTest.kt`
