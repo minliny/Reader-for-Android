@@ -82,8 +82,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S7-NUI-P0-001 | S7-NUI | P0 | DONE | Web runtime adapter contract | WebRuntimeAdapter + FakeWebRuntimeAdapter, 5 tests | ./gradlew test: 128 tests, 0 failures ✅ | None |
-| S7-NUI-P0-002 | S7-NUI | P0 | READY | JS execution contract tests | JS request/response/error model, fake adapter tests | ./gradlew test | None |
-| S7-NUI-P0-003 | S7-NUI | P0 | TODO | Cookie scope and storage contract | CookieScope, CookieRecord, CookieStore, Room schema, tests | ./gradlew test | None |
+| S7-NUI-P0-002 | S7-NUI | P0 | DONE | JS execution contract tests | JsRequest/JsResponse/JsError model, 5 JsErrorType values | ./gradlew test: 133 tests, 0 failures ✅ | None |
+| S7-NUI-P0-003 | S7-NUI | P0 | READY | Cookie scope and storage contract | CookieScope, CookieRecord, CookieStore, Room schema, tests | ./gradlew test | None |
 | S7-NUI-P0-004 | S7-NUI | P0 | TODO | Dynamic source capability matrix | JS/Cookie/POST/WebView capability doc | ./gradlew :app:compileDebugKotlin | None |
 
 ## Stage 8 NUI: Explore/RSS Backend (non-UI only)
