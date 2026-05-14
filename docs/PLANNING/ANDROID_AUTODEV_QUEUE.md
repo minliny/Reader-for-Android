@@ -107,7 +107,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S10-NUI-P0-001 | S10-NUI | P0 | TODO | TTS engine contract | TtsEngine, TtsUtterance, TtsPlaybackState, FakeTtsEngine, tests | ./gradlew test | None |
+| S10-NUI-P0-001 | S10-NUI | P0 | READY | TTS engine contract | TtsEngine, TtsUtterance, TtsPlaybackState, FakeTtsEngine, tests | ./gradlew test | None |
 | S10-NUI-P0-002 | S10-NUI | P0 | TODO | Android TTS adapter boundary | Platform adapter contract, no UI, tests | ./gradlew test | None |
 
 ## Stage 11 NUI: WebDAV Backend (non-UI only)
@@ -179,7 +179,7 @@
 | S9-NUI-P0-007 | S9-NUI | P0 | DONE | EPUB OPF metadata parser | OpfParser: dc metadata + cover-id extraction, 3 tests | ./gradlew test: 223 tests, 0 failures ✅ | None |
 | S9-NUI-P0-008 | S9-NUI | P0 | DONE | EPUB spine/manifest parser | OpfParser: manifest items + spine refs + resolveReadingOrder | ./gradlew test: 226 tests, 0 failures ✅ | None |
 | S9-NUI-P0-009 | S9-NUI | P0 | DONE | Local book reimport/delete semantics | LocalBookLifecycle: 3 strategies + cleanup URLs, 5 tests | ./gradlew test: 231 tests, 0 failures ✅ | None |
-| S9-NUI-P0-010 | S9-NUI | P0 | READY | Local book cache/progress compat tests | Verify local book chapters work with ReadingProgress/CachedChapter schema, tests | ./gradlew test | None |
+| S9-NUI-P0-010 | S9-NUI | P0 | DONE | Local book cache/progress compat tests | Full mapping pipeline valid: progress + cache + URI scheme, 3 tests | ./gradlew test: 234 tests, 0 failures ✅ | None |
 
 ## Stage 10 NUI extended: TTS Backend (GAP tasks — non-UI only)
 
