@@ -149,13 +149,13 @@
 | S6-NUI-SET-002 | S6-SET | P0 | DONE | Text/background/accent color model | ColorModel: ARGB decomposition, hex parse, dark/light detection, presets | ./gradlew test: 92 tests, 0 failures ✅ | None |
 | S6-NUI-SET-003 | S6-SET | P0 | DONE | Background transparency model | AlphaConfig: range validation, safe clamp, presets, percentage | ./gradlew test: 100 tests, 0 failures ✅ | None |
 | S6-NUI-SET-004 | S6-SET | P0 | DONE | Click area config model | TapZone: 9-zone grid, TapAction 7 types, ClickAreaConfig with defaults | ./gradlew test: 109 tests, 0 failures ✅ | None |
-| S6-NUI-SET-005 | S6-SET | P0 | READY | Font family/typeface config | FontConfig model, serif/sans/mono presets, system font mapping, tests | ./gradlew test | None |
+| S6-NUI-SET-005 | S6-SET | P0 | DONE | Font family/typeface config | FontConfig: 4 FontFamily presets + custom typeface, 7 tests | ./gradlew test: 116 tests, 0 failures ✅ | None |
 
 ## Stage 6-CACHE-NUI: Cache Backend (GAP — non-UI only)
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S6-NUI-CACHE-001 | S6-CACHE | P0 | TODO | Content prefetch contract | PrefetchStrategy model, next-N-chapters policy, cache key integration, tests | ./gradlew test | None |
+| S6-NUI-CACHE-001 | S6-CACHE | P0 | READY | Content prefetch contract | PrefetchStrategy model, next-N-chapters policy, cache key integration, tests | ./gradlew test | None |
 
 ## Stage 7 NUI extended: Dynamic Source Backend (GAP tasks — non-UI only)
 
@@ -257,7 +257,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6-NUI-SET-002 Color model**
+**Next READY: S6-NUI-CACHE-001 Content prefetch contract**
 
 Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
