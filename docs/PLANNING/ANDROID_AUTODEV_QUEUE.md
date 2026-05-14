@@ -77,40 +77,75 @@
 | S6.5-P0-006 | S6.5 | P0 | TODO | Navigation route contract hardening | Route constants, URL encode/decode round-trip test | ./gradlew test passes | None |
 | S6.5-P0-007 | S6.5 | P0 | TODO | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
 
-## Stage 7: WebView/JS/Cookie/Login (BLOCKED)
+## Stage 7 NUI: WebView/JS/Cookie Backend (non-UI only)
 
-| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
-|----|-------|----------|--------|------|----------|-------------------|
-| P3-S7-002 | S7 | P3 | BLOCKED_BY_DECISION | Implement Android WebView Runtime adapter | BD-009 (JS engine), BD-016 (Cookie) | Yes |
-| P3-S7-003 | S7 | P3 | BLOCKED_BY_DECISION | Implement QuickJS/Hermes JS adapter | BD-009 | Yes |
-| P3-S7-004 | S7 | P3 | BLOCKED_BY_DECISION | Implement Cookie/Login adapter | BD-016 | Yes |
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S7-NUI-P0-001 | S7-NUI | P0 | TODO | Web runtime adapter contract | WebRuntimeAdapter interface, FakeWebRuntimeAdapter, tests | ./gradlew test | None |
+| S7-NUI-P0-002 | S7-NUI | P0 | TODO | JS execution contract tests | JS request/response/error model, fake adapter tests | ./gradlew test | None |
+| S7-NUI-P0-003 | S7-NUI | P0 | TODO | Cookie scope and storage contract | CookieScope, CookieRecord, CookieStore, Room schema, tests | ./gradlew test | None |
+| S7-NUI-P0-004 | S7-NUI | P0 | TODO | Dynamic source capability matrix | JS/Cookie/POST/WebView capability doc | ./gradlew :app:compileDebugKotlin | None |
 
-## Stage 8: Explore/RSS (TODO)
+## Stage 8 NUI: Explore/RSS Backend (non-UI only)
 
-| ID | Stage | Priority | Status | Task | Blockers |
-|----|-------|----------|--------|------|----------|
-| P3-S8-001 | S8 | P3 | TODO | Implement ExploreScreen with real Explore pipeline | None |
-| P3-S8-002 | S8 | P3 | TODO | Implement RSS/Subscription management | None |
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S8-NUI-P0-001 | S8-NUI | P0 | TODO | RSS model and parser | RSSFeed, RSSItem, RSS XML parser, fixtures, tests | ./gradlew test | None |
+| S8-NUI-P0-002 | S8-NUI | P0 | TODO | Subscription update engine | Repository contract, update timestamp, fake HTTP, tests | ./gradlew test | None |
+| S8-NUI-P0-003 | S8-NUI | P0 | TODO | Explore source contract | ExploreSource model, category/feed mapping, tests | ./gradlew test | None |
 
-## Stage 9: Local Books (BLOCKED)
+## Stage 9 NUI: Local Book Backend (non-UI only)
 
-| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
-|----|-------|----------|--------|------|----------|-------------------|
-| P3-S9-001 | S9 | P3 | BLOCKED_BY_DECISION | Implement local file picker + TXT reader | BD-014 (file permissions) | Yes |
-| P3-S9-002 | S9 | P3 | BLOCKED_BY_DECISION | Implement EPUB parser (ZIP + XML) | BD-011 (EPUB library) | Yes |
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S9-NUI-P0-001 | S9-NUI | P0 | TODO | Local book import contract | LocalBookSource, LocalBookMetadata, URI abstraction, tests | ./gradlew test | None |
+| S9-NUI-P0-002 | S9-NUI | P0 | TODO | TXT parser baseline | Encoding strategy, chapter split, title detection, fixtures, tests | ./gradlew test | None |
+| S9-NUI-P0-003 | S9-NUI | P0 | TODO | EPUB inventory contract | ZIP/XML manifest, metadata extraction, synthetic fixture tests | ./gradlew test | May need ZIP lib |
+| S9-NUI-P0-004 | S9-NUI | P0 | TODO | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
 
-## Stage 10: TTS (TODO)
+## Stage 10 NUI: TTS Backend (non-UI only)
 
-| ID | Stage | Priority | Status | Task | Blockers |
-|----|-------|----------|--------|------|----------|
-| P3-S10-001 | S10 | P3 | TODO | Implement TTS adapter + playback UI | None |
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S10-NUI-P0-001 | S10-NUI | P0 | TODO | TTS engine contract | TtsEngine, TtsUtterance, TtsPlaybackState, FakeTtsEngine, tests | ./gradlew test | None |
+| S10-NUI-P0-002 | S10-NUI | P0 | TODO | Android TTS adapter boundary | Platform adapter contract, no UI, tests | ./gradlew test | None |
 
-## Stage 11: WebDAV (BLOCKED)
+## Stage 11 NUI: WebDAV Backend (non-UI only)
 
-| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
-|----|-------|----------|--------|------|----------|-------------------|
-| P3-S11-002 | S11 | P3 | BLOCKED_BY_DECISION | Implement WebDAV client adapter | BD-010 (WebDAV library) | Yes |
-| P3-S11-003 | S11 | P3 | BLOCKED_BY_DECISION | Implement backup/restore UI + WorkManager | BD-010 | Yes |
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S11-NUI-P0-001 | S11-NUI | P0 | TODO | WebDAV client contract | WebDavClient interface, PROPFIND/GET/PUT models, fake transport, tests | ./gradlew test | None |
+| S11-NUI-P0-002 | S11-NUI | P0 | TODO | Backup package model | BackupManifest, BackupEntry, checksum/version, serialization, tests | ./gradlew test | None |
+| S11-NUI-P0-003 | S11-NUI | P0 | TODO | Progress sync protocol | ProgressSyncRecord, conflict resolution, merge tests | ./gradlew test | None |
+| S11-NUI-P0-004 | S11-NUI | P0 | TODO | Remote WebDAV books contract | RemoteBookRef, download/cache policy, tests | ./gradlew test | None |
+
+## Stage 12 NUI: Cloud Sync Core (non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S12-NUI-P0-001 | S12-NUI | P0 | TODO | Sync manager state machine | SyncState, SyncOperation, retry/backoff, tests | ./gradlew test | None |
+| S12-NUI-P0-002 | S12-NUI | P0 | TODO | Conflict resolver | newer-wins, explicit conflict, mergeable progress, tests | ./gradlew test | None |
+
+## Stage 13 NUI: Remote Reading Backend (non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S13-NUI-P0-001 | S13-NUI | P0 | TODO | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
+| S13-NUI-P0-002 | S13-NUI | P0 | TODO | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
+
+## Stage 14 NUI: Compatibility Matrix (non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S14-NUI-P0-001 | S14-NUI | P0 | TODO | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
+| S14-NUI-P0-002 | S14-NUI | P0 | TODO | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
+| S14-NUI-P0-003 | S14-NUI | P0 | TODO | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
+
+## Stage 15 NUI: Release Candidate (non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S15-NUI-P0-001 | S15-NUI | P0 | TODO | Non-UI RC gate | All NUI tasks DONE, tests pass, assembleDebug pass | ./gradlew test + assembleDebug | None |
 
 ---
 
@@ -148,4 +183,6 @@ SKIPPED → (terminal, with reason in Blockers)
 
 **Next READY: S6.5-P0-003 Bridge contract tests**
 
-S1-S6 baseline frozen. Cron/loop NOT active. S7/S9/S11 blocked by user decisions (BD-009, BD-010, BD-011, BD-014, BD-016).
+Non-UI development mode. Total planned tasks: 5 (S6.5 remaining) + 4 (S7-NUI) + 3 (S8-NUI) + 4 (S9-NUI) + 2 (S10-NUI) + 4 (S11-NUI) + 2 (S12-NUI) + 2 (S13-NUI) + 3 (S14-NUI) + 1 (S15-NUI) = **30 tasks**.
+
+All UI/product decisions remain BLOCKED. Non-UI backend tasks use DEFAULT_APPROVED defaults. Loop command: `.claude/commands/loop.md`.
