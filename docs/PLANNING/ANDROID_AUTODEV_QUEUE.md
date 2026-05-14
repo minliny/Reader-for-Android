@@ -101,7 +101,7 @@
 | S9-NUI-P0-001 | S9-NUI | P0 | DONE | Local book import contract | LocalBookSource/Metadata/ImportResult + LocalChapterRef | ./gradlew test: 195 tests, 0 failures ✅ | None |
 | S9-NUI-P0-002 | S9-NUI | P0 | DONE | TXT parser baseline | TxtParser: chapter detection (Chinese/English), BOM detection | ./gradlew test: 201 tests, 0 failures ✅ | None |
 | S9-NUI-P0-003 | S9-NUI | P0 | DONE | EPUB inventory contract | EpubInventory/ManifestItem/SpineItem/Metadata + ContainerParser | ./gradlew test: 207 tests, 0 failures ✅ | None |
-| S9-NUI-P0-004 | S9-NUI | P0 | READY | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
+| S9-NUI-P0-004 | S9-NUI | P0 | DONE | Local book progress/cache integration | LocalBookProgressMapper: progress + cache mapping, 4 tests | ./gradlew test: 211 tests, 0 failures ✅ | None |
 
 ## Stage 10 NUI: TTS Backend (non-UI only)
 
@@ -174,7 +174,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S9-NUI-P0-005 | S9-NUI | P0 | TODO | TXT encoding detection | EncodingDetector (UTF-8/GBK/Big5/UTF-16), BOM handling, confidence scoring, tests | ./gradlew test | None |
+| S9-NUI-P0-005 | S9-NUI | P0 | READY | TXT encoding detection | EncodingDetector (UTF-8/GBK/Big5/UTF-16), BOM handling, confidence scoring, tests | ./gradlew test | None |
 | S9-NUI-P0-006 | S9-NUI | P0 | TODO | TXT chapter split edge cases | Multi-pattern chapter detection (第X章/Chapter X/Volume), fallback strategies, tests | ./gradlew test | None |
 | S9-NUI-P0-007 | S9-NUI | P0 | TODO | EPUB OPF metadata parser | OPF XML parser (title/author/cover/date), namespace handling, tests | ./gradlew test | None |
 | S9-NUI-P0-008 | S9-NUI | P0 | TODO | EPUB spine/manifest parser | Spine/manifest XML parser, itemref/item resolution, reading order, tests | ./gradlew test | None |
