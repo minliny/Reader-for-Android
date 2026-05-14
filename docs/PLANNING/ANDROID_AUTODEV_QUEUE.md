@@ -174,8 +174,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S9-NUI-P0-005 | S9-NUI | P0 | READY | TXT encoding detection | EncodingDetector (UTF-8/GBK/Big5/UTF-16), BOM handling, confidence scoring, tests | ./gradlew test | None |
-| S9-NUI-P0-006 | S9-NUI | P0 | TODO | TXT chapter split edge cases | Multi-pattern chapter detection (第X章/Chapter X/Volume), fallback strategies, tests | ./gradlew test | None |
+| S9-NUI-P0-005 | S9-NUI | P0 | DONE | TXT encoding detection | EncodingDetector: BOM + UTF-8 valid + GBK heuristic + confidence | ./gradlew test: 215 tests, 0 failures ✅ | None |
+| S9-NUI-P0-006 | S9-NUI | P0 | READY | TXT chapter split edge cases | Multi-pattern chapter detection (第X章/Chapter X/Volume), fallback strategies, tests | ./gradlew test | None |
 | S9-NUI-P0-007 | S9-NUI | P0 | TODO | EPUB OPF metadata parser | OPF XML parser (title/author/cover/date), namespace handling, tests | ./gradlew test | None |
 | S9-NUI-P0-008 | S9-NUI | P0 | TODO | EPUB spine/manifest parser | Spine/manifest XML parser, itemref/item resolution, reading order, tests | ./gradlew test | None |
 | S9-NUI-P0-009 | S9-NUI | P0 | TODO | Local book reimport/delete semantics | Reimport merge strategy, delete cascade (progress/cache), orphan cleanup, tests | ./gradlew test | None |
