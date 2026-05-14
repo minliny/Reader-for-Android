@@ -74,8 +74,8 @@
 | S6.5-P0-003 | S6.5 | P0 | DONE | Bridge contract tests | 10 tests: FakeCoreBridge 4 + BridgeResult 2 + error codes/stages + ReaderError | ./gradlew test: 28 tests, 0 failures ✅ | None |
 | S6.5-P0-004 | S6.5 | P0 | DONE | Repository + preferences persistence tests | 13 tests: BookSourceRepository CRUD (6) + ThemePreferences contract (7) | ./gradlew test: 48 tests, 0 failures ✅ | None |
 | S6.5-P0-005 | S6.5 | P0 | DONE | Room + cache tests | 8 tests: ReadingProgress entity, CachedChapter entity, ChapterCacheManager + FakeDao | ./gradlew test: 56 tests, 0 failures ✅ | None |
-| S6.5-P0-006 | S6.5 | P0 | TODO | Navigation route contract hardening | Route constants, URL encode/decode round-trip test | ./gradlew test passes | None |
-| S6.5-P0-007 | S6.5 | P0 | TODO | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
+| S6.5-P0-006 | S6.5 | P0 | DONE | Navigation route contract hardening | 11 tests: route uniqueness, URL encode/decode round-trip, argument names | ./gradlew test: 67 tests, 0 failures ✅ | None |
+| S6.5-P0-007 | S6.5 | P0 | READY | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
 
 ## Stage 7 NUI: WebView/JS/Cookie Backend (non-UI only)
 
@@ -257,7 +257,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6.5-P0-005 Room + cache tests**
+**Next READY: S6.5-P0-007 Fake/real mode boundary freeze**
 
 Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
