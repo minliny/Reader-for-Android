@@ -92,13 +92,13 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S8-NUI-P0-001 | S8-NUI | P0 | DONE | RSS model and parser | RssFeed/RssItem/RssSubscription + RssParser (CDATA support) | ./gradlew test: 183 tests, 0 failures ✅ | None |
 | S8-NUI-P0-002 | S8-NUI | P0 | DONE | Subscription update engine | SubscriptionRepository + Fake impl, needsUpdate with maxAge | ./gradlew test: 188 tests, 0 failures ✅ | None |
-| S8-NUI-P0-003 | S8-NUI | P0 | IN_PROGRESS | Explore source contract | ExploreSource model, category/feed mapping, tests | ./gradlew test | None |
+| S8-NUI-P0-003 | S8-NUI | P0 | DONE | Explore source contract | ExploreSource + ExploreMapping.groupByCategory, 3 tests | ./gradlew test: 191 tests, 0 failures ✅ | None |
 
 ## Stage 9 NUI: Local Book Backend (non-UI only)
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S9-NUI-P0-001 | S9-NUI | P0 | TODO | Local book import contract | LocalBookSource, LocalBookMetadata, URI abstraction, tests | ./gradlew test | None |
+| S9-NUI-P0-001 | S9-NUI | P0 | READY | Local book import contract | LocalBookSource, LocalBookMetadata, URI abstraction, tests | ./gradlew test | None |
 | S9-NUI-P0-002 | S9-NUI | P0 | TODO | TXT parser baseline | Encoding strategy, chapter split, title detection, fixtures, tests | ./gradlew test | None |
 | S9-NUI-P0-003 | S9-NUI | P0 | TODO | EPUB inventory contract | ZIP/XML manifest, metadata extraction, synthetic fixture tests | ./gradlew test | May need ZIP lib |
 | S9-NUI-P0-004 | S9-NUI | P0 | TODO | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
