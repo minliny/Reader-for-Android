@@ -141,11 +141,87 @@
 | S14-NUI-P0-002 | S14-NUI | P0 | TODO | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
 | S14-NUI-P0-003 | S14-NUI | P0 | TODO | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
 
-## Stage 15 NUI: Release Candidate (non-UI only)
+## Stage 6-SETTINGS-NUI: Theme/Settings Backend (GAP — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S6-NUI-SET-001 | S6-SET | P0 | TODO | Theme model (day/night pair) | ThemePair data class, day/night ThemeConfig, tests | ./gradlew test | None |
+| S6-NUI-SET-002 | S6-SET | P0 | TODO | Text/background/accent color model | ColorConfig model, hex/int mapping, tests | ./gradlew test | None |
+| S6-NUI-SET-003 | S6-SET | P0 | TODO | Background transparency model | AlphaConfig, preset values, range validation, tests | ./gradlew test | None |
+| S6-NUI-SET-004 | S6-SET | P0 | TODO | Click area config model | TapZone model (top/middle/bottom, left/center/right), action mapping, tests | ./gradlew test | None |
+| S6-NUI-SET-005 | S6-SET | P0 | TODO | Font family/typeface config | FontConfig model, serif/sans/mono presets, system font mapping, tests | ./gradlew test | None |
+
+## Stage 6-CACHE-NUI: Cache Backend (GAP — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S6-NUI-CACHE-001 | S6-CACHE | P0 | TODO | Content prefetch contract | PrefetchStrategy model, next-N-chapters policy, cache key integration, tests | ./gradlew test | None |
+
+## Stage 7 NUI extended: Dynamic Source Backend (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S7-NUI-P0-005 | S7-NUI | P0 | TODO | POST/API request contract | PostRequestBody model, form/JSON content types, url-encoded body, tests | ./gradlew test | None |
+| S7-NUI-P0-006 | S7-NUI | P0 | TODO | Request headers/cookie injection contract | HeaderInjector model, user-agent config, cookie header injection, tests | ./gradlew test | None |
+| S7-NUI-P0-007 | S7-NUI | P0 | TODO | Pagination/next-page content contract | PageRef model, nextPage extraction strategy, pagination state, tests | ./gradlew test | None |
+| S7-NUI-P0-008 | S7-NUI | P0 | TODO | Source validation result model | SourceValidationResult sealed class, errors/warnings, reachability test contract, tests | ./gradlew test | None |
+| S7-NUI-P0-009 | S7-NUI | P0 | TODO | Parser fixture registry integration | Register parser fixtures per source type, fixture metadata, replay test contract | ./gradlew test | None |
+| S7-NUI-P0-010 | S7-NUI | P0 | TODO | Web runtime error mapping | WebRuntimeError model, JS error ↔ ReaderErrorCode mapping, tests | ./gradlew test | None |
+| S7-NUI-P0-011 | S7-NUI | P0 | TODO | Dynamic source offline replay contract | OfflineReplayRecord, cached JS response replay, no-network validation, tests | ./gradlew test | None |
+| S7-NUI-P0-012 | S7-NUI | P0 | TODO | Per-source runtime isolation contract | RuntimeScope model, per-source JS context boundaries, cookie/key isolation, tests | ./gradlew test | None |
+
+## Stage 9 NUI extended: Local Book Backend (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S9-NUI-P0-005 | S9-NUI | P0 | TODO | TXT encoding detection | EncodingDetector (UTF-8/GBK/Big5/UTF-16), BOM handling, confidence scoring, tests | ./gradlew test | None |
+| S9-NUI-P0-006 | S9-NUI | P0 | TODO | TXT chapter split edge cases | Multi-pattern chapter detection (第X章/Chapter X/Volume), fallback strategies, tests | ./gradlew test | None |
+| S9-NUI-P0-007 | S9-NUI | P0 | TODO | EPUB OPF metadata parser | OPF XML parser (title/author/cover/date), namespace handling, tests | ./gradlew test | None |
+| S9-NUI-P0-008 | S9-NUI | P0 | TODO | EPUB spine/manifest parser | Spine/manifest XML parser, itemref/item resolution, reading order, tests | ./gradlew test | None |
+| S9-NUI-P0-009 | S9-NUI | P0 | TODO | Local book reimport/delete semantics | Reimport merge strategy, delete cascade (progress/cache), orphan cleanup, tests | ./gradlew test | None |
+| S9-NUI-P0-010 | S9-NUI | P0 | TODO | Local book cache/progress compat tests | Verify local book chapters work with ReadingProgress/CachedChapter schema, tests | ./gradlew test | None |
+
+## Stage 10 NUI extended: TTS Backend (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S10-NUI-P0-003 | S10-NUI | P0 | TODO | TTS queue model | TtsQueue, utterance ordering, priority/insert, queue events, tests | ./gradlew test | None |
+| S10-NUI-P0-004 | S10-NUI | P0 | TODO | TTS chapter integration contract | ChapterTextFeeder, boundary detection, chapter transition events, tests | ./gradlew test | None |
+| S10-NUI-P0-005 | S10-NUI | P0 | TODO | TTS error mapping tests | TtsError ↔ ReaderErrorCode mapping, platform error wrapping, tests | ./gradlew test | None |
+
+## Stage 11 NUI extended: WebDAV Backend (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S11-NUI-P0-005 | S11-NUI | P0 | TODO | WebDAV auth model | AuthMethod sealed class (Basic/Digest/Bearer), credential model, tests | ./gradlew test | None |
+| S11-NUI-P0-006 | S11-NUI | P0 | TODO | WebDAV XML response parser | MultiStatus XML parser, href/status/propstat extraction, error status mapping, tests | ./gradlew test | None |
+| S11-NUI-P0-007 | S11-NUI | P0 | TODO | WebDAV retry/error mapping | RetryPolicy, status code → error mapping, backoff, tests | ./gradlew test | None |
+
+## Stage 12 NUI extended: Cloud Sync (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S12-NUI-P0-003 | S12-NUI | P0 | TODO | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
+| S12-NUI-P0-004 | S12-NUI | P0 | TODO | Sync conflict test matrix | ConflictScenario enum, resolution strategy per scenario, matrix test suite | ./gradlew test | None |
+| S12-NUI-P0-005 | S12-NUI | P0 | TODO | Backup restore contract | BackupRestoreManager, package validation, partial restore policy, tests | ./gradlew test | None |
+
+## Stage 13 NUI extended: Remote Reading (GAP tasks — non-UI only)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S13-NUI-P0-003 | S13-NUI | P0 | TODO | Remote file listing parser | WebDAV directory listing parser, file/dir model, sorting, tests | ./gradlew test | None |
+| S13-NUI-P0-004 | S13-NUI | P0 | TODO | Remote download cache integration | DownloadCacheManager, temp file policy, cache key for remote URLs, tests | ./gradlew test | None |
+| S13-NUI-P0-005 | S13-NUI | P0 | TODO | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
+
+## Stage 15 NUI extended: Release Candidate Gate (GAP tasks — non-UI only)
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S15-NUI-P0-001 | S15-NUI | P0 | TODO | Non-UI RC gate | All NUI tasks DONE, tests pass, assembleDebug pass | ./gradlew test + assembleDebug | None |
+| S15-NUI-P0-002 | S15-NUI | P0 | TODO | Non-UI capability completion audit | Verify all 136 capabilities in COMPLETION_TARGET, generate audit report | Document exists, all gaps closed | None |
+| S15-NUI-P0-003 | S15-NUI | P0 | TODO | Backend regression suite gate | All regression fixtures pass, no skipped tests, coverage ≥ target | ./gradlew test | None |
+| S15-NUI-P0-004 | S15-NUI | P0 | TODO | No-UI parity declaration document | ANDROID_NON_UI_RELEASE_GATE.md, checklist complete, capability sign-off | Document exists | None |
+| S15-NUI-P0-005 | S15-NUI | P0 | TODO | Remaining UI-only gap list | Enumerate capabilities with ui_required=yes, map to future UI stages | Document exists | None |
 
 ---
 
@@ -183,6 +259,10 @@ SKIPPED → (terminal, with reason in Blockers)
 
 **Next READY: S6.5-P0-004 Repository + preferences persistence tests**
 
-Non-UI development mode. Total planned tasks: 5 (S6.5 remaining) + 4 (S7-NUI) + 3 (S8-NUI) + 4 (S9-NUI) + 2 (S10-NUI) + 4 (S11-NUI) + 2 (S12-NUI) + 2 (S13-NUI) + 3 (S14-NUI) + 1 (S15-NUI) = **30 tasks**.
+Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
-All UI/product decisions remain BLOCKED. Non-UI backend tasks use DEFAULT_APPROVED defaults. Loop command: `.claude/commands/loop.md`.
+Stage execution order: S6.5 → S6-SETTINGS-NUI → S6-CACHE-NUI → S7-NUI → S8-NUI → S9-NUI → S10-NUI → S11-NUI → S12-NUI → S13-NUI → S14-NUI → S15-NUI.
+
+Completion target: 136 capabilities defined in `ANDROID_NON_UI_COMPLETION_TARGET.md`. All `ui_required=no` items must be DONE.
+
+Loop command: `.claude/commands/loop.md`. S15-NUI-P0-004 (parity declaration) + S15-NUI-P0-005 (UI-only gap list) are final exit gates.

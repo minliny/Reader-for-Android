@@ -36,6 +36,10 @@
 | BD-025 | USER_DECISION | P1 | Automation | Whether to allow loop to introduce new dependencies (Room, OkHttp, etc.) | RESOLVED: Allowed for Android official/mainstream dependencies with minimal scope; each new dependency must be justified in report; design docs no longer gate dependency introduction | P1-S2-* (for Room/DataStore), P2-S3-* (for OkHttp) | RESOLVED (2026-05-13) |
 | BD-026 | USER_DECISION | P2 | Feature | Whether to support WebView for JS-based book sources | Default: plan for it in design docs but do not implement until S7 | P3-S7-* | OPEN |
 | BD-027 | USER_DECISION | P2 | Feature | Whether to support WebDAV backup/sync | Default: plan for it in design docs but do not implement until S11 | P3-S11-* | OPEN |
+| BD-028 | USER_DECISION | P2 | Dependency | Whether to allow EPUB third-party library | DEFAULT: use java.util.zip (built-in) for ZIP + XmlPullParser (built-in) for OPF XML; no third-party EPUB lib | S9-NUI-P0-003, S9-NUI-P0-007, S9-NUI-P0-008 | OPEN (NUI OK with built-ins) |
+| BD-029 | USER_DECISION | P2 | Dependency | Whether to allow XML parser library | DEFAULT: use Android built-in XmlPullParser; sufficient for RSS, OPF, WebDAV MultiStatus XML | S8-NUI-P0-001, S9-NUI-P0-007, S11-NUI-P0-006 | OPEN (NUI OK with built-ins) |
+| BD-030 | USER_DECISION | P2 | Security | Whether to allow encrypted credential storage | DEFAULT: defer encrypted storage; CookieStore uses DataStore with no encryption for now; encrypt later | S7-NUI-P0-003, S11-NUI-P0-005 | OPEN (NUI OK without encryption) |
+| BD-031 | USER_DECISION | P2 | Test | Whether to allow Android instrumentation tests (require emulator) | DEFAULT: instrumentation tests deferred; all current and planned tests are pure JUnit unit tests | S14-NUI-P0-002, S15-NUI-P0-003 | OPEN (NUI OK with unit tests only) |
 
 ---
 
