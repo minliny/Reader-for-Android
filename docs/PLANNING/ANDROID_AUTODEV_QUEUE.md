@@ -98,8 +98,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S9-NUI-P0-001 | S9-NUI | P0 | IN_PROGRESS | Local book import contract | LocalBookSource, LocalBookMetadata, URI abstraction, tests | ./gradlew test | None |
-| S9-NUI-P0-002 | S9-NUI | P0 | TODO | TXT parser baseline | Encoding strategy, chapter split, title detection, fixtures, tests | ./gradlew test | None |
+| S9-NUI-P0-001 | S9-NUI | P0 | DONE | Local book import contract | LocalBookSource/Metadata/ImportResult + LocalChapterRef | ./gradlew test: 195 tests, 0 failures ✅ | None |
+| S9-NUI-P0-002 | S9-NUI | P0 | READY | TXT parser baseline | Encoding strategy, chapter split, title detection, fixtures, tests | ./gradlew test | None |
 | S9-NUI-P0-003 | S9-NUI | P0 | TODO | EPUB inventory contract | ZIP/XML manifest, metadata extraction, synthetic fixture tests | ./gradlew test | May need ZIP lib |
 | S9-NUI-P0-004 | S9-NUI | P0 | TODO | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
 
