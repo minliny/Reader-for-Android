@@ -81,8 +81,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S7-NUI-P0-001 | S7-NUI | P0 | TODO | Web runtime adapter contract | WebRuntimeAdapter interface, FakeWebRuntimeAdapter, tests | ./gradlew test | None |
-| S7-NUI-P0-002 | S7-NUI | P0 | TODO | JS execution contract tests | JS request/response/error model, fake adapter tests | ./gradlew test | None |
+| S7-NUI-P0-001 | S7-NUI | P0 | DONE | Web runtime adapter contract | WebRuntimeAdapter + FakeWebRuntimeAdapter, 5 tests | ./gradlew test: 128 tests, 0 failures ✅ | None |
+| S7-NUI-P0-002 | S7-NUI | P0 | READY | JS execution contract tests | JS request/response/error model, fake adapter tests | ./gradlew test | None |
 | S7-NUI-P0-003 | S7-NUI | P0 | TODO | Cookie scope and storage contract | CookieScope, CookieRecord, CookieStore, Room schema, tests | ./gradlew test | None |
 | S7-NUI-P0-004 | S7-NUI | P0 | TODO | Dynamic source capability matrix | JS/Cookie/POST/WebView capability doc | ./gradlew :app:compileDebugKotlin | None |
 
@@ -156,7 +156,6 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S6-NUI-CACHE-001 | S6-CACHE | P0 | DONE | Content prefetch contract | PrefetchStrategy: chaptersAhead/Behind, wifiOnly, maxCache, 3 presets | ./gradlew test: 123 tests, 0 failures ✅ | None |
-| S7-NUI-P0-001 | S7-NUI | P0 | READY | Web runtime adapter contract | WebRuntimeAdapter interface, FakeWebRuntimeAdapter, tests | ./gradlew test | None |
 
 ## Stage 7 NUI extended: Dynamic Source Backend (GAP tasks — non-UI only)
 
