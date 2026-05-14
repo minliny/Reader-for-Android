@@ -148,8 +148,8 @@
 | S6-NUI-SET-001 | S6-SET | P0 | DONE | Theme model (day/night pair) | ThemeConfig + ThemePair data classes, 7 tests | ./gradlew test: 83 tests, 0 failures ✅ | None |
 | S6-NUI-SET-002 | S6-SET | P0 | DONE | Text/background/accent color model | ColorModel: ARGB decomposition, hex parse, dark/light detection, presets | ./gradlew test: 92 tests, 0 failures ✅ | None |
 | S6-NUI-SET-003 | S6-SET | P0 | DONE | Background transparency model | AlphaConfig: range validation, safe clamp, presets, percentage | ./gradlew test: 100 tests, 0 failures ✅ | None |
-| S6-NUI-SET-004 | S6-SET | P0 | READY | Click area config model | TapZone model (top/middle/bottom, left/center/right), action mapping, tests | ./gradlew test | None |
-| S6-NUI-SET-005 | S6-SET | P0 | TODO | Font family/typeface config | FontConfig model, serif/sans/mono presets, system font mapping, tests | ./gradlew test | None |
+| S6-NUI-SET-004 | S6-SET | P0 | DONE | Click area config model | TapZone: 9-zone grid, TapAction 7 types, ClickAreaConfig with defaults | ./gradlew test: 109 tests, 0 failures ✅ | None |
+| S6-NUI-SET-005 | S6-SET | P0 | READY | Font family/typeface config | FontConfig model, serif/sans/mono presets, system font mapping, tests | ./gradlew test | None |
 
 ## Stage 6-CACHE-NUI: Cache Backend (GAP — non-UI only)
 
