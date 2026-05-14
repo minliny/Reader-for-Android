@@ -165,8 +165,8 @@
 | S7-NUI-P0-006 | S7-NUI | P0 | DONE | Request headers/cookie injection contract | RequestHeaders: UA, Cookie, custom headers, toMap(), 6 tests | ./gradlew test: 151 tests, 0 failures ✅ | None |
 | S7-NUI-P0-007 | S7-NUI | P0 | DONE | Pagination/next-page content contract | PageRef + PaginationState, fromCurrentUrl builder, 5 tests | ./gradlew test: 156 tests, 0 failures ✅ | None |
 | S7-NUI-P0-008 | S7-NUI | P0 | DONE | Source validation result model | SourceValidationResult: Success/Warning/Error sealed class, 4 tests | ./gradlew test: 160 tests, 0 failures ✅ | None |
-| S7-NUI-P0-009 | S7-NUI | P0 | READY | Parser fixture registry integration | Register parser fixtures per source type, fixture metadata, replay test contract | ./gradlew test | None |
-| S7-NUI-P0-010 | S7-NUI | P0 | TODO | Web runtime error mapping | WebRuntimeError model, JS error ↔ ReaderErrorCode mapping, tests | ./gradlew test | None |
+| S7-NUI-P0-009 | S7-NUI | P0 | DONE | Parser fixture registry integration | FixtureRegistry: register/get/filter, FixtureEntry metadata, 5 tests | ./gradlew test: 165 tests, 0 failures ✅ | None |
+| S7-NUI-P0-010 | S7-NUI | P0 | READY | Web runtime error mapping | WebRuntimeError model, JS error ↔ ReaderErrorCode mapping, tests | ./gradlew test | None |
 | S7-NUI-P0-011 | S7-NUI | P0 | TODO | Dynamic source offline replay contract | OfflineReplayRecord, cached JS response replay, no-network validation, tests | ./gradlew test | None |
 | S7-NUI-P0-012 | S7-NUI | P0 | TODO | Per-source runtime isolation contract | RuntimeScope model, per-source JS context boundaries, cookie/key isolation, tests | ./gradlew test | None |
 
