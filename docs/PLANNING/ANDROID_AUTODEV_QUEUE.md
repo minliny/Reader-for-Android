@@ -162,8 +162,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S7-NUI-P0-005 | S7-NUI | P0 | DONE | POST/API request contract | PostRequestBody: 3 content types, form/json/raw builders, 6 tests | ./gradlew test: 145 tests, 0 failures ✅ | None |
-| S7-NUI-P0-006 | S7-NUI | P0 | READY | Request headers/cookie injection contract | HeaderInjector model, user-agent config, cookie header injection, tests | ./gradlew test | None |
-| S7-NUI-P0-007 | S7-NUI | P0 | TODO | Pagination/next-page content contract | PageRef model, nextPage extraction strategy, pagination state, tests | ./gradlew test | None |
+| S7-NUI-P0-006 | S7-NUI | P0 | DONE | Request headers/cookie injection contract | RequestHeaders: UA, Cookie, custom headers, toMap(), 6 tests | ./gradlew test: 151 tests, 0 failures ✅ | None |
+| S7-NUI-P0-007 | S7-NUI | P0 | READY | Pagination/next-page content contract | PageRef model, nextPage extraction strategy, pagination state, tests | ./gradlew test | None |
 | S7-NUI-P0-008 | S7-NUI | P0 | TODO | Source validation result model | SourceValidationResult sealed class, errors/warnings, reachability test contract, tests | ./gradlew test | None |
 | S7-NUI-P0-009 | S7-NUI | P0 | TODO | Parser fixture registry integration | Register parser fixtures per source type, fixture metadata, replay test contract | ./gradlew test | None |
 | S7-NUI-P0-010 | S7-NUI | P0 | TODO | Web runtime error mapping | WebRuntimeError model, JS error ↔ ReaderErrorCode mapping, tests | ./gradlew test | None |
