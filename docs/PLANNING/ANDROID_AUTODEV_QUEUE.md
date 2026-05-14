@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P2-S5-007 Wire real HTTP fetch for detail**
+**Next READY: P2-S5-009 Wire real HTTP fetch for content**
 
 All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
 1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
