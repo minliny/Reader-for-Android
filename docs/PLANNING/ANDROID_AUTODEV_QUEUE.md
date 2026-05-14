@@ -72,8 +72,8 @@
 | S6.5-P0-001 | S6.5 | P0 | DONE | Baseline capability matrix freeze | Create ANDROID_S1_S6_BASELINE.md | File exists, all sections populated | None |
 | S6.5-P0-002 | S6.5 | P0 | DONE | Parser contract tests | 15 test cases across 4 parsers | ./gradlew test: 18 tests, 0 failures ✅ | None |
 | S6.5-P0-003 | S6.5 | P0 | DONE | Bridge contract tests | 10 tests: FakeCoreBridge 4 + BridgeResult 2 + error codes/stages + ReaderError | ./gradlew test: 28 tests, 0 failures ✅ | None |
-| S6.5-P0-004 | S6.5 | P0 | READY | Repository + preferences persistence tests | BookSourceRepository round-trip, ThemePreferences read/write | ./gradlew test passes | May need DataStore test setup |
-| S6.5-P0-005 | S6.5 | P0 | TODO | Room + cache tests | ReadingProgress DAO, ChapterCache TTL (Room in-memory) | ./gradlew test passes | None |
+| S6.5-P0-004 | S6.5 | P0 | DONE | Repository + preferences persistence tests | 13 tests: BookSourceRepository CRUD (6) + ThemePreferences contract (7) | ./gradlew test: 48 tests, 0 failures ✅ | None |
+| S6.5-P0-005 | S6.5 | P0 | READY | Room + cache tests | ReadingProgress DAO, ChapterCache TTL (Room in-memory) | ./gradlew test passes | None |
 | S6.5-P0-006 | S6.5 | P0 | TODO | Navigation route contract hardening | Route constants, URL encode/decode round-trip test | ./gradlew test passes | None |
 | S6.5-P0-007 | S6.5 | P0 | TODO | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
 
@@ -257,7 +257,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6.5-P0-004 Repository + preferences persistence tests**
+**Next READY: S6.5-P0-005 Room + cache tests**
 
 Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
