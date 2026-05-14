@@ -107,8 +107,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S10-NUI-P0-001 | S10-NUI | P0 | READY | TTS engine contract | TtsEngine, TtsUtterance, TtsPlaybackState, FakeTtsEngine, tests | ./gradlew test | None |
-| S10-NUI-P0-002 | S10-NUI | P0 | TODO | Android TTS adapter boundary | Platform adapter contract, no UI, tests | ./gradlew test | None |
+| S10-NUI-P0-001 | S10-NUI | P0 | DONE | TTS engine contract | TtsEngine interface + FakeTtsEngine + 5 playback states | ./gradlew test: 240 tests, 0 failures ✅ | None |
+| S10-NUI-P0-002 | S10-NUI | P0 | READY | Android TTS adapter boundary | Platform adapter contract, no UI, tests | ./gradlew test | None |
 
 ## Stage 11 NUI: WebDAV Backend (non-UI only)
 
