@@ -37,10 +37,14 @@ import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.SearchQuery
 import com.reader.android.data.model.SearchResultItem
+import com.reader.android.data.network.HttpClient
+import com.reader.android.data.network.SearchParser
 import kotlinx.coroutines.launch
 
-class SearchViewModel {
+class SearchViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
+    private val httpClient = HttpClient()
+    private val parser = SearchParser()
     private val defaultSource = BookSource(
         sourceUrl = "https://www.biquge.com",
         sourceName = "笔趣阁",
@@ -55,6 +59,8 @@ class SearchViewModel {
         private set
     var hasSearched by mutableStateOf(false)
         private set
+    var error by mutableStateOf<String?>(null)
+        private set
 
     fun onQueryChange(newQuery: String) {
         query = newQuery
@@ -64,7 +70,19 @@ class SearchViewModel {
         if (query.isBlank()) return
         isSearching = true
         hasSearched = true
-        results = bridge.search(SearchQuery(query), defaultSource)
+        error = null
+        try {
+            if (useRealHttp) {
+                val url = defaultSource.searchUrl?.replace("key", query) ?: return
+                val response = httpClient.get(url)
+                results = parser.parseSearchResponse(response.body, defaultSource.sourceName)
+            } else {
+                results = bridge.search(SearchQuery(query), defaultSource)
+            }
+        } catch (e: Exception) {
+            error = e.message ?: "搜索失败"
+            results = emptyList()
+        }
         isSearching = false
     }
 }
@@ -91,6 +109,11 @@ fun SearchScreen() {
             )
 
             when {
+                viewModel.error != null -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("错误: ${viewModel.error}", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
                 viewModel.isSearching -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
