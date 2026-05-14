@@ -35,19 +35,35 @@ import androidx.compose.ui.unit.dp
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.TOCItem
+import com.reader.android.data.network.HttpClient
+import com.reader.android.data.network.TOCParser
 
-class TOCViewModel {
+class TOCViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
+    private val httpClient = HttpClient()
+    private val parser = TOCParser()
     private val source = BookSource(sourceUrl = "", sourceName = "笔趣阁")
 
     var chapters by mutableStateOf<List<TOCItem>>(emptyList())
         private set
     var isLoading by mutableStateOf(false)
         private set
+    var error by mutableStateOf<String?>(null)
+        private set
 
     suspend fun load(tocUrl: String) {
         isLoading = true
-        chapters = bridge.getTOC(tocUrl, source)
+        error = null
+        try {
+            if (useRealHttp) {
+                val response = httpClient.get(tocUrl)
+                chapters = parser.parseTOCResponse(response.body)
+            } else {
+                chapters = bridge.getTOC(tocUrl, source)
+            }
+        } catch (e: Exception) {
+            error = e.message ?: "加载失败"
+        }
         isLoading = false
     }
 }
