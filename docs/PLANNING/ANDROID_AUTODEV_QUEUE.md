@@ -167,8 +167,8 @@
 | S7-NUI-P0-008 | S7-NUI | P0 | DONE | Source validation result model | SourceValidationResult: Success/Warning/Error sealed class, 4 tests | ./gradlew test: 160 tests, 0 failures ✅ | None |
 | S7-NUI-P0-009 | S7-NUI | P0 | DONE | Parser fixture registry integration | FixtureRegistry: register/get/filter, FixtureEntry metadata, 5 tests | ./gradlew test: 165 tests, 0 failures ✅ | None |
 | S7-NUI-P0-010 | S7-NUI | P0 | DONE | Web runtime error mapping | JsErrorType → ReaderErrorCode mapper, all 5 types covered | ./gradlew test: 171 tests, 0 failures ✅ | None |
-| S7-NUI-P0-011 | S7-NUI | P0 | READY | Dynamic source offline replay contract | OfflineReplayRecord, cached JS response replay, no-network validation, tests | ./gradlew test | None |
-| S7-NUI-P0-012 | S7-NUI | P0 | TODO | Per-source runtime isolation contract | RuntimeScope model, per-source JS context boundaries, cookie/key isolation, tests | ./gradlew test | None |
+| S7-NUI-P0-011 | S7-NUI | P0 | DONE | Dynamic source offline replay contract | OfflineReplayRecord + OfflineReplayContract.validate/isValidForReplay | ./gradlew test: 176 tests, 0 failures ✅ | None |
+| S7-NUI-P0-012 | S7-NUI | P0 | READY | Per-source runtime isolation contract | RuntimeScope model, per-source JS context boundaries, cookie/key isolation, tests | ./gradlew test | None |
 
 ## Stage 9 NUI extended: Local Book Backend (GAP tasks — non-UI only)
 
