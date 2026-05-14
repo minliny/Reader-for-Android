@@ -75,7 +75,7 @@
 | S6.5-P0-004 | S6.5 | P0 | DONE | Repository + preferences persistence tests | 13 tests: BookSourceRepository CRUD (6) + ThemePreferences contract (7) | ./gradlew test: 48 tests, 0 failures ✅ | None |
 | S6.5-P0-005 | S6.5 | P0 | DONE | Room + cache tests | 8 tests: ReadingProgress entity, CachedChapter entity, ChapterCacheManager + FakeDao | ./gradlew test: 56 tests, 0 failures ✅ | None |
 | S6.5-P0-006 | S6.5 | P0 | DONE | Navigation route contract hardening | 11 tests: route uniqueness, URL encode/decode round-trip, argument names | ./gradlew test: 67 tests, 0 failures ✅ | None |
-| S6.5-P0-007 | S6.5 | P0 | READY | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
+| S6.5-P0-007 | S6.5 | P0 | DONE | Fake/real mode boundary freeze | 9 structural tests: all 4 ViewModels accept useRealHttp flag | ./gradlew test: 76 tests, 0 failures ✅ | None |
 
 ## Stage 7 NUI: WebView/JS/Cookie Backend (non-UI only)
 
@@ -145,7 +145,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S6-NUI-SET-001 | S6-SET | P0 | TODO | Theme model (day/night pair) | ThemePair data class, day/night ThemeConfig, tests | ./gradlew test | None |
+| S6-NUI-SET-001 | S6-SET | P0 | READY | Theme model (day/night pair) | ThemePair data class, day/night ThemeConfig, tests | ./gradlew test | None |
 | S6-NUI-SET-002 | S6-SET | P0 | TODO | Text/background/accent color model | ColorConfig model, hex/int mapping, tests | ./gradlew test | None |
 | S6-NUI-SET-003 | S6-SET | P0 | TODO | Background transparency model | AlphaConfig, preset values, range validation, tests | ./gradlew test | None |
 | S6-NUI-SET-004 | S6-SET | P0 | TODO | Click area config model | TapZone model (top/middle/bottom, left/center/right), action mapping, tests | ./gradlew test | None |
@@ -257,7 +257,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6.5-P0-007 Fake/real mode boundary freeze**
+**Next READY: S6-NUI-SET-001 Theme model (day/night pair)**
 
 Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
