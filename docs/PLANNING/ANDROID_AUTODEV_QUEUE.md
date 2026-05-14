@@ -100,8 +100,8 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S9-NUI-P0-001 | S9-NUI | P0 | DONE | Local book import contract | LocalBookSource/Metadata/ImportResult + LocalChapterRef | ./gradlew test: 195 tests, 0 failures ✅ | None |
 | S9-NUI-P0-002 | S9-NUI | P0 | DONE | TXT parser baseline | TxtParser: chapter detection (Chinese/English), BOM detection | ./gradlew test: 201 tests, 0 failures ✅ | None |
-| S9-NUI-P0-003 | S9-NUI | P0 | READY | EPUB inventory contract | ZIP/XML manifest, metadata extraction, synthetic fixture tests | ./gradlew test | None |
-| S9-NUI-P0-004 | S9-NUI | P0 | TODO | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
+| S9-NUI-P0-003 | S9-NUI | P0 | DONE | EPUB inventory contract | EpubInventory/ManifestItem/SpineItem/Metadata + ContainerParser | ./gradlew test: 207 tests, 0 failures ✅ | None |
+| S9-NUI-P0-004 | S9-NUI | P0 | READY | Local book progress/cache integration | Map local chapters to ReadingProgress/ChapterCache, tests | ./gradlew test | None |
 
 ## Stage 10 NUI: TTS Backend (non-UI only)
 
