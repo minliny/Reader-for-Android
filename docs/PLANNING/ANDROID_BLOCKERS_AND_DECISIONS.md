@@ -17,14 +17,14 @@
 | BD-006 | USER_DECISION | P1 | Networking | OkHttp vs kTor for HTTP client | RESOLVED: OkHttp | P2-S3-003, P2-S5-* | RESOLVED (2026-05-13) |
 | BD-007 | USER_DECISION | P0 | Core Integration | How to bridge Swift Reader-Core to Kotlin Android | RESOLVED: JSON-level contract / bridge boundary — Android defines equivalent Kotlin DTOs, implements protocols natively, validates against Core conformance tests; no direct Swift↔Kotlin linking | P1-S3-*, all P2 tasks | RESOLVED (2026-05-13) |
 | BD-008 | USER_DECISION | P1 | Security | Allow network access for real HTTP fetch | RESOLVED: Network access granted (2026-05-14) | P2-S3-003, P2-S5-* | RESOLVED (2026-05-14) |
-| BD-009 | USER_DECISION | P2 | Dynamic Runtime | QuickJS vs Hermes for JS engine | Deferred to S7; write design doc first (P3-S7-001-DOC) | P3-S7-003 | OPEN |
-| BD-010 | USER_DECISION | P2 | WebDAV | WebDAV client library selection | Deferred to S11; write design doc first (P3-S11-001-DOC) | P3-S11-* | OPEN |
-| BD-011 | USER_DECISION | P2 | Local Books | EPUB parser library selection | Deferred to S9; no decision needed now | P3-S9-002 | OPEN |
+| BD-009 | USER_DECISION | P2 | Dynamic Runtime | QuickJS vs Hermes for JS engine | DEFAULT: Android WebView-first adapter; QuickJS deferred to post-MVP | P3-S7-003 | OPEN (S7 blocked) |
+| BD-010 | USER_DECISION | P2 | WebDAV | WebDAV client library selection | DEFAULT: S11 split into Backup / Progress Sync / Remote Books phases; lib evaluation deferred | P3-S11-* | OPEN (S11 blocked) |
+| BD-011 | USER_DECISION | P2 | Local Books | EPUB parser library selection | DEFAULT: S9 TXT reader first; EPUB inventory placeholder; no production EPUB lib yet | P3-S9-002 | OPEN (S9 blocked) |
 | BD-012 | USER_DECISION | P1 | Automation | Allow automatic git commit by loop | RESOLVED: Local commit allowed; NEVER push without explicit user request | All loop tasks | RESOLVED (2026-05-14) |
 | BD-013 | USER_DECISION | P1 | Automation | Allow automatic Gradle file creation/modification | RESOLVED: Allowed with dependency justification in report (per BD-025) | P0-S1-001, P0-S1-002 | RESOLVED (2026-05-14) |
-| BD-014 | USER_DECISION | P1 | Security | Allow reading local files (for local book feature) | Deferred to S9; not needed before | P3-S9-* | OPEN |
+| BD-014 | USER_DECISION | P1 | Security | Allow reading local files (for local book feature) | DEFAULT: SAF / user-selected URI only; no full filesystem scan | P3-S9-* | OPEN (S9 blocked) |
 | BD-015 | USER_DECISION | P2 | Release | Open source release vs Play Store compliance strategy | Not blocking development; record as deferred | None (no current tasks) | OPEN |
-| BD-016 | USER_DECISION | P1 | Security | Handling of cookies, tokens, credentials | No credential storage until S7 login adapter; never commit secrets; never log credentials | P3-S7-004 | OPEN |
+| BD-016 | USER_DECISION | P1 | Security | Handling of cookies, tokens, credentials | DEFAULT: WebView CookieManager + per-source cookie scope; encrypted storage deferred | P3-S7-004 | OPEN (S7 blocked) |
 | BD-017 | ENVIRONMENT | P0 | Build | Android SDK not verified on this machine | RESOLVED: JDK 17.0.19, Android SDK 35, build-tools 35.0.0, Gradle 8.11.1 all verified | P0-S1-001, all Gradle-based tasks | RESOLVED (2026-05-14) |
 | BD-018 | ENVIRONMENT | P1 | Build | Gradle wrapper not yet generated | RESOLVED: Gradle 8.11.1 wrapper generated, ./gradlew verified | P0-S1-001 | RESOLVED (2026-05-14) |
 | BD-019 | ARCHITECTURE | P0 | Boundary | Android must not copy Legado source code | Gate: grep for Legado package names before commit | All tasks | OPEN (ongoing) |

@@ -1,6 +1,6 @@
 # Reader for Android AutoDev Queue
 
-**Date**: 2026-05-13
+**Date**: 2026-05-14
 **Purpose**: Cron loop task queue — each iteration picks the first READY task
 
 ---
@@ -51,19 +51,66 @@
 | P3-S7-001-DOC | S7 | P3 | DONE | Write WebView/JS platform adapter design doc | Write docs/design/WEBVIEW_JS_ADAPTER_DESIGN.md only | Doc covers Android WebView, QuickJS vs Hermes, security | None | No (doc only, deferred to S7) |
 | P3-S11-001-DOC | S11 | P3 | DONE | Write WebDAV three-way design doc | Write docs/design/WEBDAV_DESIGN.md only | Doc covers backup layout, client lib selection, scheduling | None | No (doc only, deferred to S11) |
 
-## Stage 6+: Real Integration (deferred)
+## Stage 3-6: Real Integration (DONE)
 
 | ID | Stage | Priority | Status | Task | Allowed Changes | Validation | Blockers | Decision Required |
 |----|-------|----------|--------|------|-----------------|------------|----------|-------------------|
-| P2-S3-004 | S3 | P2 | DONE | Implement HTTPClient adapter using OkHttp | Add OkHttp dependency, write adapter class | compileDebugKotlin ✅ | None | No |
-| P2-S3-005 | S3 | P2 | DONE | Implement BookSourceRepository (real: JSON + DataStore) | Add DataStore dependency, write repository | compileDebugKotlin ✅ | None | No |
-| P2-S5-006 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for search | Modify SearchViewModel to use real HTTP + parse | compileDebugKotlin ✅ | None | No |
-| P2-S5-007 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for detail | Modify DetailViewModel | compileDebugKotlin ✅ | None | No |
-| P2-S5-008 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | compileDebugKotlin ✅ | None | No |
-| P2-S5-009 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | compileDebugKotlin ✅ | None | No |
-| P2-S6-001 | S6 | P2 | DONE | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | compileDebugKotlin ✅ (KSP) | None | No |
-| P2-S6-002 | S6 | P2 | DONE | Implement reader font/theme settings | Write settings screen, DataStore prefs | compileDebugKotlin ✅ | None | No |
-| P2-S6-003 | S6 | P2 | DONE | Implement chapter content cache | Write cache manager using Room/file cache | compileDebugKotlin ✅ | None | No |
+| P2-S3-004 | S3 | P2 | DONE | Implement HTTPClient adapter using OkHttp | OkHttp dep + adapter class | compileDebugKotlin ✅ | None | No |
+| P2-S3-005 | S3 | P2 | DONE | Implement BookSourceRepository (real: DataStore) | DataStore repo | compileDebugKotlin ✅ | None | No |
+| P2-S5-006 | S5 | P2 | DONE | Wire real HTTP fetch + parse for search | SearchParser + SearchViewModel | compileDebugKotlin ✅ | None | No |
+| P2-S5-007 | S5 | P2 | DONE | Wire real HTTP fetch + parse for detail | BookInfoParser + DetailViewModel | compileDebugKotlin ✅ | None | No |
+| P2-S5-008 | S5 | P2 | DONE | Wire real HTTP fetch + parse for TOC | TOCParser + TOCViewModel | compileDebugKotlin ✅ | None | No |
+| P2-S5-009 | S5 | P2 | DONE | Wire real HTTP fetch + parse for content | ContentParser + ReaderViewModel | compileDebugKotlin ✅ | None | No |
+| P2-S6-001 | S6 | P2 | DONE | Implement ReadingProgressRepository | Room entity + DAO + AppDatabase | compileDebugKotlin ✅ (KSP) | None | No |
+| P2-S6-002 | S6 | P2 | DONE | Implement reader font/theme settings | DataStore prefs + SettingsScreen | compileDebugKotlin ✅ | None | No |
+| P2-S6-003 | S6 | P2 | DONE | Implement chapter content cache | CachedChapter + CacheManager | compileDebugKotlin ✅ | None | No |
+
+## Stage 6.5: Baseline Hardening (CURRENT)
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S6.5-P0-001 | S6.5 | P0 | DONE | Baseline capability matrix freeze | Create ANDROID_S1_S6_BASELINE.md | File exists, all sections populated | None |
+| S6.5-P0-002 | S6.5 | P0 | READY | Parser contract tests | Search/BookInfo/TOC/Content parser tests with HTML fixtures | ./gradlew test passes, ≥ 8 test cases | None |
+| S6.5-P0-003 | S6.5 | P0 | TODO | Bridge contract tests | BridgeResult, error codes, FakeCoreBridge method test | ./gradlew test passes | None |
+| S6.5-P0-004 | S6.5 | P0 | TODO | Repository + preferences persistence tests | BookSourceRepository round-trip, ThemePreferences read/write | ./gradlew test passes | May need DataStore test setup |
+| S6.5-P0-005 | S6.5 | P0 | TODO | Room + cache tests | ReadingProgress DAO, ChapterCache TTL (Room in-memory) | ./gradlew test passes | None |
+| S6.5-P0-006 | S6.5 | P0 | TODO | Navigation route contract hardening | Route constants, URL encode/decode round-trip test | ./gradlew test passes | None |
+| S6.5-P0-007 | S6.5 | P0 | TODO | Fake/real mode boundary freeze | Document + structural verify useRealHttp flag | ./gradlew :app:compileDebugKotlin | None |
+
+## Stage 7: WebView/JS/Cookie/Login (BLOCKED)
+
+| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
+|----|-------|----------|--------|------|----------|-------------------|
+| P3-S7-002 | S7 | P3 | BLOCKED_BY_DECISION | Implement Android WebView Runtime adapter | BD-009 (JS engine), BD-016 (Cookie) | Yes |
+| P3-S7-003 | S7 | P3 | BLOCKED_BY_DECISION | Implement QuickJS/Hermes JS adapter | BD-009 | Yes |
+| P3-S7-004 | S7 | P3 | BLOCKED_BY_DECISION | Implement Cookie/Login adapter | BD-016 | Yes |
+
+## Stage 8: Explore/RSS (TODO)
+
+| ID | Stage | Priority | Status | Task | Blockers |
+|----|-------|----------|--------|------|----------|
+| P3-S8-001 | S8 | P3 | TODO | Implement ExploreScreen with real Explore pipeline | None |
+| P3-S8-002 | S8 | P3 | TODO | Implement RSS/Subscription management | None |
+
+## Stage 9: Local Books (BLOCKED)
+
+| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
+|----|-------|----------|--------|------|----------|-------------------|
+| P3-S9-001 | S9 | P3 | BLOCKED_BY_DECISION | Implement local file picker + TXT reader | BD-014 (file permissions) | Yes |
+| P3-S9-002 | S9 | P3 | BLOCKED_BY_DECISION | Implement EPUB parser (ZIP + XML) | BD-011 (EPUB library) | Yes |
+
+## Stage 10: TTS (TODO)
+
+| ID | Stage | Priority | Status | Task | Blockers |
+|----|-------|----------|--------|------|----------|
+| P3-S10-001 | S10 | P3 | TODO | Implement TTS adapter + playback UI | None |
+
+## Stage 11: WebDAV (BLOCKED)
+
+| ID | Stage | Priority | Status | Task | Blockers | Decision Required |
+|----|-------|----------|--------|------|----------|-------------------|
+| P3-S11-002 | S11 | P3 | BLOCKED_BY_DECISION | Implement WebDAV client adapter | BD-010 (WebDAV library) | Yes |
+| P3-S11-003 | S11 | P3 | BLOCKED_BY_DECISION | Implement backup/restore UI + WorkManager | BD-010 | Yes |
 
 ---
 
@@ -97,32 +144,8 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ---
 
-## Current Ready Tasks (2026-05-13 post-S1-skeleton)
+## Current Ready Tasks
 
-**LOOP AUTO-CANCELLED — S0-S5 real pipeline complete (2026-05-14)**
+**Next READY: S6.5-P0-002 Parser contract tests**
 
-S0-S5 all done. Remaining tasks in P3 (S7-S14) are deferred.
-
-Completed this session:
-- S3 real: OkHttp adapter, DataStore BookSourceRepository
-- S5 real pipeline: Search, Detail, TOC, Content parsers + HTTP wiring
-- S6 storage: Room (progress, cache) + DataStore (settings)
-
-Next requires user to advance to S7 (WebView/JS) or other P3 stages.
-
-All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
-1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
-2. **BD-009** (JS engine) → S7 WebView/JS
-3. **BD-010** (WebDAV lib) → S11 WebDAV
-4. **BD-011** (EPUB parser) → S9 local books
-
-Progress summary through S6:
-- S0-S1: App shell, Gradle, Compose scaffold ✅
-- S2-S3: Domain models, CoreBridge, FakeCoreBridge ✅
-- S4: BookSourceRepository + SourceManagementScreen ✅
-- S5: Search → Detail → TOC → Reader full navigation ✅
-- S6: DataStore (settings) + Room (progress, cache) ✅
-- Next stage: S7 (WebView/JS/Cookie/Login) or S5 real integration (needs BD-008)
-
-S1 complete. Build environment verified. Next: S2 domain models.
-Cron loop active: `/loop 10m /reader-android-loop` (job 8d532138, every 10 min, 7-day expiry).
+S1-S6 baseline frozen. Cron/loop NOT active. S7/S9/S11 blocked by user decisions (BD-009, BD-010, BD-011, BD-014, BD-016).
