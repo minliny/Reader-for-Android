@@ -90,8 +90,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S8-NUI-P0-001 | S8-NUI | P0 | READY | RSS model and parser | RSSFeed, RSSItem, RSS XML parser, fixtures, tests | ./gradlew test | None |
-| S8-NUI-P0-002 | S8-NUI | P0 | TODO | Subscription update engine | Repository contract, update timestamp, fake HTTP, tests | ./gradlew test | None |
+| S8-NUI-P0-001 | S8-NUI | P0 | DONE | RSS model and parser | RssFeed/RssItem/RssSubscription + RssParser (CDATA support) | ./gradlew test: 183 tests, 0 failures ✅ | None |
+| S8-NUI-P0-002 | S8-NUI | P0 | READY | Subscription update engine | Repository contract, update timestamp, fake HTTP, tests | ./gradlew test | None |
 | S8-NUI-P0-003 | S8-NUI | P0 | TODO | Explore source contract | ExploreSource model, category/feed mapping, tests | ./gradlew test | None |
 
 ## Stage 9 NUI: Local Book Backend (non-UI only)
