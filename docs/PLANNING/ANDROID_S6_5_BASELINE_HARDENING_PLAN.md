@@ -57,7 +57,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-003 Bridge contract tests
 
-**Status**: READY
+**Status**: DONE
 **Goal**: Add unit tests for BridgeResult success/failure, error code mapping, and ReaderCoreBridge interface contract. No network.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/data/bridge/BridgeContractTest.kt`
@@ -73,7 +73,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-004 Repository and preferences persistence tests
 
-**Status**: TODO
+**Status**: DONE
 **Goal**: Add minimum round-trip tests for BookSourceRepository and ThemePreferences using DataStore. May use Robolectric or a simple in-memory substitute if DataStore test setup is complex.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/data/repository/BookSourceRepositoryTest.kt`
@@ -90,7 +90,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-005 Room and cache tests
 
-**Status**: TODO
+**Status**: DONE
 **Goal**: Add minimum tests for ReadingProgress DAO and ChapterCache using Room in-memory database.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/data/storage/ReadingProgressDaoTest.kt`
@@ -107,7 +107,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-006 Navigation route contract hardening
 
-**Status**: TODO
+**Status**: DONE
 **Goal**: Verify Search→Detail→TOC→Reader navigation route constants, URL encoding/decoding round-trip, and back navigation structure. No UI tests needed — route constant tests only.
 **Scope**:
 - `app/src/test/kotlin/com/reader/android/ui/NavigationRouteTest.kt`
@@ -123,7 +123,7 @@ Freeze S1-S6 MVP baseline. Close test coverage gap before advancing to S7+ featu
 
 ### S6.5-P0-007 Fake/real mode boundary freeze
 
-**Status**: TODO
+**Status**: DONE
 **Goal**: Document the fake/real switching contract for all 4 ViewModels. Record the current `useRealHttp` boolean pattern and note future DI direction. Optionally add a structural test verifying each ViewModel constructor accepts the flag.
 **Scope**:
 - Code review of SearchViewModel, BookDetailViewModel, TOCViewModel, ReaderViewModel

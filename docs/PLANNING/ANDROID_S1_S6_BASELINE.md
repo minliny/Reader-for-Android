@@ -17,9 +17,9 @@
 | Gradle | 8.11.1 |
 | AGP | 8.7.3 |
 | JDK | 17.0.19 |
-| Next stage readiness | S6.5 Baseline Hardening (test gap), NOT S7 |
+| Next stage readiness | S6.5 complete (2026-05-15). S7-S9 complete. Currently at S10-NUI (TTS). |
 
-S1-S6 code is real, compilable, and assembles to a valid APK. Test coverage is below threshold (3 unit tests for 23 source files). S6.5 must address parser contract tests, persistence tests, and navigation contract tests before advancing to S7.
+S1-S6 baseline frozen. S6.5 hardening completed (7/7 DONE). Tests expanded from 3→240 across S6.5-S9-NUI. Current stage: S10-NUI (TTS backend). 34 NUI tasks remaining to S15 gate.
 
 ## 2. Capability Matrix
 

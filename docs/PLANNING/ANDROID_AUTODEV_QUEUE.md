@@ -257,12 +257,12 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S7-NUI-P0-001 Web runtime adapter contract**
+**Next READY: S10-NUI-P0-002 Android TTS adapter boundary**
 
-Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
+Non-UI development mode. Total queue tasks: **71**. Done: 37 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1). Remaining: 34.
 
-Stage execution order: S6.5 → S6-SETTINGS-NUI → S6-CACHE-NUI → S7-NUI → S8-NUI → S9-NUI → S10-NUI → S11-NUI → S12-NUI → S13-NUI → S14-NUI → S15-NUI.
+Stage execution order: S10-NUI → S11-NUI → S12-NUI → S13-NUI → S14-NUI → S15-NUI.
 
-Completion target: 136 capabilities defined in `ANDROID_NON_UI_COMPLETION_TARGET.md`. All `ui_required=no` items must be DONE.
+Tests: 240, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅.
 
-Loop command: `.claude/commands/loop.md`. S15-NUI-P0-004 (parity declaration) + S15-NUI-P0-005 (UI-only gap list) are final exit gates.
+Completion target: 136 capabilities in ANDROID_NON_UI_COMPLETION_TARGET.md. Loop: .claude/commands/loop.md.
