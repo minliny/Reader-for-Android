@@ -33,9 +33,13 @@ import androidx.compose.ui.unit.dp
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.ContentPage
+import com.reader.android.data.network.ContentParser
+import com.reader.android.data.network.HttpClient
 
-class ReaderViewModel {
+class ReaderViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
+    private val httpClient = HttpClient()
+    private val parser = ContentParser()
     private val source = BookSource(sourceUrl = "", sourceName = "笔趣阁")
 
     var content by mutableStateOf<ContentPage?>(null)
@@ -44,11 +48,23 @@ class ReaderViewModel {
         private set
     var chapterTitle by mutableStateOf("")
         private set
+    var error by mutableStateOf<String?>(null)
+        private set
 
     suspend fun load(contentUrl: String, title: String = "") {
         isLoading = true
         chapterTitle = title
-        content = bridge.getContent(contentUrl, source)
+        error = null
+        try {
+            if (useRealHttp) {
+                val response = httpClient.get(contentUrl)
+                content = parser.parseContentResponse(response.body)
+            } else {
+                content = bridge.getContent(contentUrl, source)
+            }
+        } catch (e: Exception) {
+            error = e.message ?: "加载失败"
+        }
         isLoading = false
     }
 }

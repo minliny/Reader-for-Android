@@ -60,7 +60,7 @@
 | P2-S5-006 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for search | Modify SearchViewModel to use real HTTP + parse | compileDebugKotlin ✅ | None | No |
 | P2-S5-007 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for detail | Modify DetailViewModel | compileDebugKotlin ✅ | None | No |
 | P2-S5-008 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | compileDebugKotlin ✅ | None | No |
-| P2-S5-009 | S5 | P2 | READY | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | None | No |
+| P2-S5-009 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | compileDebugKotlin ✅ | None | No |
 | P2-S6-001 | S6 | P2 | DONE | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | compileDebugKotlin ✅ (KSP) | None | No |
 | P2-S6-002 | S6 | P2 | DONE | Implement reader font/theme settings | Write settings screen, DataStore prefs | compileDebugKotlin ✅ | None | No |
 | P2-S6-003 | S6 | P2 | DONE | Implement chapter content cache | Write cache manager using Room/file cache | compileDebugKotlin ✅ | None | No |
@@ -99,7 +99,16 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P2-S5-009 Wire real HTTP fetch for content**
+**LOOP AUTO-CANCELLED — S0-S5 real pipeline complete (2026-05-14)**
+
+S0-S5 all done. Remaining tasks in P3 (S7-S14) are deferred.
+
+Completed this session:
+- S3 real: OkHttp adapter, DataStore BookSourceRepository
+- S5 real pipeline: Search, Detail, TOC, Content parsers + HTTP wiring
+- S6 storage: Room (progress, cache) + DataStore (settings)
+
+Next requires user to advance to S7 (WebView/JS) or other P3 stages.
 
 All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
 1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
