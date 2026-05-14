@@ -155,7 +155,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S6-NUI-CACHE-001 | S6-CACHE | P0 | READY | Content prefetch contract | PrefetchStrategy model, next-N-chapters policy, cache key integration, tests | ./gradlew test | None |
+| S6-NUI-CACHE-001 | S6-CACHE | P0 | DONE | Content prefetch contract | PrefetchStrategy: chaptersAhead/Behind, wifiOnly, maxCache, 3 presets | ./gradlew test: 123 tests, 0 failures ✅ | None |
+| S7-NUI-P0-001 | S7-NUI | P0 | READY | Web runtime adapter contract | WebRuntimeAdapter interface, FakeWebRuntimeAdapter, tests | ./gradlew test | None |
 
 ## Stage 7 NUI extended: Dynamic Source Backend (GAP tasks — non-UI only)
 
@@ -257,7 +258,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S6-NUI-CACHE-001 Content prefetch contract**
+**Next READY: S7-NUI-P0-001 Web runtime adapter contract**
 
 Non-UI development mode. Total queue tasks: **71** (29 original + 42 gap fill).
 
