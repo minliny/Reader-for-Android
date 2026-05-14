@@ -146,8 +146,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S6-NUI-SET-001 | S6-SET | P0 | DONE | Theme model (day/night pair) | ThemeConfig + ThemePair data classes, 7 tests | ./gradlew test: 83 tests, 0 failures ✅ | None |
-| S6-NUI-SET-002 | S6-SET | P0 | READY | Text/background/accent color model | ColorConfig model, hex/int mapping, tests | ./gradlew test | None |
-| S6-NUI-SET-003 | S6-SET | P0 | TODO | Background transparency model | AlphaConfig, preset values, range validation, tests | ./gradlew test | None |
+| S6-NUI-SET-002 | S6-SET | P0 | DONE | Text/background/accent color model | ColorModel: ARGB decomposition, hex parse, dark/light detection, presets | ./gradlew test: 92 tests, 0 failures ✅ | None |
+| S6-NUI-SET-003 | S6-SET | P0 | READY | Background transparency model | AlphaConfig, preset values, range validation, tests | ./gradlew test | None |
 | S6-NUI-SET-004 | S6-SET | P0 | TODO | Click area config model | TapZone model (top/middle/bottom, left/center/right), action mapping, tests | ./gradlew test | None |
 | S6-NUI-SET-005 | S6-SET | P0 | TODO | Font family/typeface config | FontConfig model, serif/sans/mono presets, system font mapping, tests | ./gradlew test | None |
 
