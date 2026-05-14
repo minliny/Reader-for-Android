@@ -92,7 +92,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S8-NUI-P0-001 | S8-NUI | P0 | DONE | RSS model and parser | RssFeed/RssItem/RssSubscription + RssParser (CDATA support) | ./gradlew test: 183 tests, 0 failures ✅ | None |
 | S8-NUI-P0-002 | S8-NUI | P0 | DONE | Subscription update engine | SubscriptionRepository + Fake impl, needsUpdate with maxAge | ./gradlew test: 188 tests, 0 failures ✅ | None |
-| S8-NUI-P0-003 | S8-NUI | P0 | READY | Explore source contract | ExploreSource model, category/feed mapping, tests | ./gradlew test | None |
+| S8-NUI-P0-003 | S8-NUI | P0 | IN_PROGRESS | Explore source contract | ExploreSource model, category/feed mapping, tests | ./gradlew test | None |
 
 ## Stage 9 NUI: Local Book Backend (non-UI only)
 
