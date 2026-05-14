@@ -58,7 +58,7 @@
 | P2-S3-004 | S3 | P2 | DONE | Implement HTTPClient adapter using OkHttp | Add OkHttp dependency, write adapter class | compileDebugKotlin ✅ | None | No |
 | P2-S3-005 | S3 | P2 | DONE | Implement BookSourceRepository (real: JSON + DataStore) | Add DataStore dependency, write repository | compileDebugKotlin ✅ | None | No |
 | P2-S5-006 | S5 | P2 | DONE | Wire real HTTP fetch + Core parse for search | Modify SearchViewModel to use real HTTP + parse | compileDebugKotlin ✅ | None | No |
-| P2-S5-007 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for detail | Modify DetailViewModel | Real detail returns book info | Depends on P2-S5-006 | No |
+| P2-S5-007 | S5 | P2 | READY | Wire real HTTP fetch + Core parse for detail | Modify DetailViewModel | Real detail returns book info | None | No |
 | P2-S5-008 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for TOC | Modify TOCViewModel | Real TOC returns chapter list | Depends on P2-S5-006 | No |
 | P2-S5-009 | S5 | P2 | BLOCKED | Wire real HTTP fetch + Core parse for content | Modify ReaderViewModel | Real content returns chapter text | Depends on P2-S5-006 | No |
 | P2-S6-001 | S6 | P2 | DONE | Implement ReadingProgressRepository | Add Room/DataStore, write progress model + DAO | compileDebugKotlin ✅ (KSP) | None | No |
@@ -99,7 +99,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks (2026-05-13 post-S1-skeleton)
 
-**Next READY: P2-S5-006 Wire real HTTP fetch for search**
+**Next READY: P2-S5-007 Wire real HTTP fetch for detail**
 
 All unblocked tasks complete through S6. Remaining BLOCKED tasks need:
 1. **BD-008** (network access) → unblocks P2-S5-* real HTTP pipeline
