@@ -123,8 +123,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S12-NUI-P0-001 | S12-NUI | P0 | READY | Sync manager state machine | SyncState, SyncOperation, retry/backoff, tests | ./gradlew test | None |
-| S12-NUI-P0-002 | S12-NUI | P0 | TODO | Conflict resolver | newer-wins, explicit conflict, mergeable progress, tests | ./gradlew test | None |
+| S12-NUI-P0-001 | S12-NUI | P0 | DONE | Sync manager state machine | SyncManager: start/complete/fail/conflict/reset, 5 tests | ./gradlew test: 293 tests, 0 failures ✅ | None |
+| S12-NUI-P0-002 | S12-NUI | P0 | READY | Conflict resolver | newer-wins, explicit conflict, mergeable progress, tests | ./gradlew test | None |
 
 ## Stage 13 NUI: Remote Reading Backend (non-UI only)
 
