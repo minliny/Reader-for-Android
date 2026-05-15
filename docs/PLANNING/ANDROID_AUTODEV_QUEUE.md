@@ -219,8 +219,8 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S15-NUI-P0-001 | S15-NUI | P0 | DONE | Non-UI RC gate | All NUI tasks DONE, tests pass, assembleDebug pass | ./gradlew test + assembleDebug | None |
 | S15-NUI-P0-002 | S15-NUI | P0 | DONE | Non-UI capability completion audit | Verify all 136 capabilities in COMPLETION_TARGET, generate audit report | Document exists, all gaps closed | None |
-| S15-NUI-P0-003 | S15-NUI | P0 | READY | Backend regression suite gate | All regression fixtures pass, no skipped tests, coverage ≥ target | ./gradlew test | None |
-| S15-NUI-P0-004 | S15-NUI | P0 | TODO | No-UI parity declaration document | ANDROID_NON_UI_RELEASE_GATE.md, checklist complete, capability sign-off | Document exists | None |
+| S15-NUI-P0-003 | S15-NUI | P0 | DONE | Backend regression suite gate | All regression fixtures pass, no skipped tests, coverage ≥ target | ./gradlew test | None |
+| S15-NUI-P0-004 | S15-NUI | P0 | READY | No-UI parity declaration document | ANDROID_NON_UI_RELEASE_GATE.md, checklist complete, capability sign-off | Document exists | None |
 | S15-NUI-P0-005 | S15-NUI | P0 | TODO | Remaining UI-only gap list | Enumerate capabilities with ui_required=yes, map to future UI stages | Document exists | None |
 
 ---
