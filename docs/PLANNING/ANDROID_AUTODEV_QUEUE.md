@@ -131,7 +131,7 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S13-NUI-P0-001 | S13-NUI | P0 | DONE | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
-| S13-NUI-P0-002 | S13-NUI | P0 | READY | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
+| S13-NUI-P0-002 | S13-NUI | P0 | DONE | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
 
 ## Stage 14 NUI: Compatibility Matrix (non-UI only)
 
@@ -209,7 +209,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S13-NUI-P0-003 | S13-NUI | P0 | TODO | Remote file listing parser | WebDAV directory listing parser, file/dir model, sorting, tests | ./gradlew test | None |
+| S13-NUI-P0-003 | S13-NUI | P0 | READY | Remote file listing parser | WebDAV directory listing parser, file/dir model, sorting, tests | ./gradlew test | None |
 | S13-NUI-P0-004 | S13-NUI | P0 | TODO | Remote download cache integration | DownloadCacheManager, temp file policy, cache key for remote URLs, tests | ./gradlew test | None |
 | S13-NUI-P0-005 | S13-NUI | P0 | TODO | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
 
