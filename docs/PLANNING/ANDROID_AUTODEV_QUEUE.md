@@ -130,7 +130,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S13-NUI-P0-001 | S13-NUI | P0 | TODO | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
+| S13-NUI-P0-001 | S13-NUI | P0 | READY | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
 | S13-NUI-P0-002 | S13-NUI | P0 | TODO | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
 
 ## Stage 14 NUI: Compatibility Matrix (non-UI only)
@@ -203,7 +203,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S12-NUI-P0-003 | S12-NUI | P0 | DONE | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
 | S12-NUI-P0-004 | S12-NUI | P0 | DONE | Sync conflict test matrix | ConflictScenario enum, resolution strategy per scenario, matrix test suite | ./gradlew test | None |
-| S12-NUI-P0-005 | S12-NUI | P0 | READY | Backup restore contract | BackupRestoreManager, package validation, partial restore policy, tests | ./gradlew test | None |
+| S12-NUI-P0-005 | S12-NUI | P0 | DONE | Backup restore contract | BackupRestoreManager, package validation, partial restore policy, tests | ./gradlew test | None |
 
 ## Stage 13 NUI extended: Remote Reading (GAP tasks — non-UI only)
 
