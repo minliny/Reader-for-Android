@@ -108,7 +108,7 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S10-NUI-P0-001 | S10-NUI | P0 | DONE | TTS engine contract | TtsEngine interface + FakeTtsEngine + 5 playback states | ./gradlew test: 240 tests, 0 failures ✅ | None |
-| S10-NUI-P0-002 | S10-NUI | P0 | READY | Android TTS adapter boundary | Platform adapter contract, no UI, tests | ./gradlew test | None |
+| S10-NUI-P0-002 | S10-NUI | P0 | DONE | Android TTS adapter boundary | AndroidTtsAdapter + Fake impl + TtsInitResult, 4 tests | ./gradlew test: 244 tests, 0 failures ✅ | None |
 
 ## Stage 11 NUI: WebDAV Backend (non-UI only)
 
@@ -185,7 +185,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S10-NUI-P0-003 | S10-NUI | P0 | TODO | TTS queue model | TtsQueue, utterance ordering, priority/insert, queue events, tests | ./gradlew test | None |
+| S10-NUI-P0-003 | S10-NUI | P0 | READY | TTS queue model | TtsQueue, utterance ordering, priority/insert, queue events, tests | ./gradlew test | None |
 | S10-NUI-P0-004 | S10-NUI | P0 | TODO | TTS chapter integration contract | ChapterTextFeeder, boundary detection, chapter transition events, tests | ./gradlew test | None |
 | S10-NUI-P0-005 | S10-NUI | P0 | TODO | TTS error mapping tests | TtsError ↔ ReaderErrorCode mapping, platform error wrapping, tests | ./gradlew test | None |
 
