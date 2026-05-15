@@ -124,7 +124,7 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S12-NUI-P0-001 | S12-NUI | P0 | DONE | Sync manager state machine | SyncManager: start/complete/fail/conflict/reset, 5 tests | ./gradlew test: 293 tests, 0 failures ✅ | None |
-| S12-NUI-P0-002 | S12-NUI | P0 | READY | Conflict resolver | newer-wins, explicit conflict, mergeable progress, tests | ./gradlew test | None |
+| S12-NUI-P0-002 | S12-NUI | P0 | DONE | Conflict resolver | 6 scenario tests: NEWER_WINS/local/remote/null/both-null/identical | ./gradlew test: 299 tests, 0 failures ✅ | None |
 
 ## Stage 13 NUI: Remote Reading Backend (non-UI only)
 
@@ -201,7 +201,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S12-NUI-P0-003 | S12-NUI | P0 | TODO | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
+| S12-NUI-P0-003 | S12-NUI | P0 | READY | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
 | S12-NUI-P0-004 | S12-NUI | P0 | TODO | Sync conflict test matrix | ConflictScenario enum, resolution strategy per scenario, matrix test suite | ./gradlew test | None |
 | S12-NUI-P0-005 | S12-NUI | P0 | TODO | Backup restore contract | BackupRestoreManager, package validation, partial restore policy, tests | ./gradlew test | None |
 
