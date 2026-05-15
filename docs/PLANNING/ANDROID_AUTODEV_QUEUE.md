@@ -130,8 +130,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S13-NUI-P0-001 | S13-NUI | P0 | READY | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
-| S13-NUI-P0-002 | S13-NUI | P0 | TODO | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
+| S13-NUI-P0-001 | S13-NUI | P0 | DONE | Remote content provider contract | RemoteContentProvider, streaming/download, cache key, tests | ./gradlew test | None |
+| S13-NUI-P0-002 | S13-NUI | P0 | READY | Offline availability manager | Cache manifest, eviction policy, tests | ./gradlew test | None |
 
 ## Stage 14 NUI: Compatibility Matrix (non-UI only)
 
