@@ -137,7 +137,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S14-NUI-P0-001 | S14-NUI | P0 | TODO | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
+| S14-NUI-P0-001 | S14-NUI | P0 | READY | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
 | S14-NUI-P0-002 | S14-NUI | P0 | TODO | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
 | S14-NUI-P0-003 | S14-NUI | P0 | TODO | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
 
@@ -211,7 +211,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S13-NUI-P0-003 | S13-NUI | P0 | DONE | Remote file listing parser | WebDAV directory listing parser, file/dir model, sorting, tests | ./gradlew test | None |
 | S13-NUI-P0-004 | S13-NUI | P0 | DONE | Remote download cache integration | DownloadCacheManager, temp file policy, cache key for remote URLs, tests | ./gradlew test | None |
-| S13-NUI-P0-005 | S13-NUI | P0 | READY | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
+| S13-NUI-P0-005 | S13-NUI | P0 | DONE | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
 
 ## Stage 15 NUI extended: Release Candidate Gate (GAP tasks — non-UI only)
 
