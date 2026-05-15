@@ -115,8 +115,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S11-NUI-P0-001 | S11-NUI | P0 | DONE | WebDAV client contract | WebDavClient + FakeWebDavClient, 5 methods, 5 tests | ./gradlew test: 264 tests, 0 failures ✅ | None |
-| S11-NUI-P0-002 | S11-NUI | P0 | READY | Backup package model | BackupManifest, BackupEntry, checksum/version, serialization, tests | ./gradlew test | None |
-| S11-NUI-P0-003 | S11-NUI | P0 | TODO | Progress sync protocol | ProgressSyncRecord, conflict resolution, merge tests | ./gradlew test | None |
+| S11-NUI-P0-002 | S11-NUI | P0 | DONE | Backup package model | BackupManifest + BackupEntry + JSON serialization, 3 tests | ./gradlew test: 267 tests, 0 failures ✅ | None |
+| S11-NUI-P0-003 | S11-NUI | P0 | READY | Progress sync protocol | ProgressSyncRecord, conflict resolution, merge tests | ./gradlew test | None |
 | S11-NUI-P0-004 | S11-NUI | P0 | TODO | Remote WebDAV books contract | RemoteBookRef, download/cache policy, tests | ./gradlew test | None |
 
 ## Stage 12 NUI: Cloud Sync Core (non-UI only)
