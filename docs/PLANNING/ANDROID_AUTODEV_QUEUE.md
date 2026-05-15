@@ -194,8 +194,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S11-NUI-P0-005 | S11-NUI | P0 | DONE | WebDAV auth model | AuthMethod (Basic/Digest/Bearer) + WebDavCredential, 3 tests | ./gradlew test: 279 tests, 0 failures ✅ | None |
-| S11-NUI-P0-006 | S11-NUI | P0 | READY | WebDAV XML response parser | MultiStatus XML parser, href/status/propstat extraction, error status mapping, tests | ./gradlew test | None |
-| S11-NUI-P0-007 | S11-NUI | P0 | TODO | WebDAV retry/error mapping | RetryPolicy, status code → error mapping, backoff, tests | ./gradlew test | None |
+| S11-NUI-P0-006 | S11-NUI | P0 | DONE | WebDAV XML response parser | WebDavXmlParser: MultiStatus + resources + collection detection | ./gradlew test: 282 tests, 0 failures ✅ | None |
+| S11-NUI-P0-007 | S11-NUI | P0 | READY | WebDAV retry/error mapping | RetryPolicy, status code → error mapping, backoff, tests | ./gradlew test | None |
 
 ## Stage 12 NUI extended: Cloud Sync (GAP tasks — non-UI only)
 
