@@ -123,7 +123,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S12-NUI-P0-001 | S12-NUI | P0 | TODO | Sync manager state machine | SyncState, SyncOperation, retry/backoff, tests | ./gradlew test | None |
+| S12-NUI-P0-001 | S12-NUI | P0 | READY | Sync manager state machine | SyncState, SyncOperation, retry/backoff, tests | ./gradlew test | None |
 | S12-NUI-P0-002 | S12-NUI | P0 | TODO | Conflict resolver | newer-wins, explicit conflict, mergeable progress, tests | ./gradlew test | None |
 
 ## Stage 13 NUI: Remote Reading Backend (non-UI only)
@@ -195,7 +195,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S11-NUI-P0-005 | S11-NUI | P0 | DONE | WebDAV auth model | AuthMethod (Basic/Digest/Bearer) + WebDavCredential, 3 tests | ./gradlew test: 279 tests, 0 failures ✅ | None |
 | S11-NUI-P0-006 | S11-NUI | P0 | DONE | WebDAV XML response parser | WebDavXmlParser: MultiStatus + resources + collection detection | ./gradlew test: 282 tests, 0 failures ✅ | None |
-| S11-NUI-P0-007 | S11-NUI | P0 | READY | WebDAV retry/error mapping | RetryPolicy, status code → error mapping, backoff, tests | ./gradlew test | None |
+| S11-NUI-P0-007 | S11-NUI | P0 | DONE | WebDAV retry/error mapping | RetryPolicy (exp backoff) + WebDavErrorMapper, 6 tests | ./gradlew test: 288 tests, 0 failures ✅ | None |
 
 ## Stage 12 NUI extended: Cloud Sync (GAP tasks — non-UI only)
 
