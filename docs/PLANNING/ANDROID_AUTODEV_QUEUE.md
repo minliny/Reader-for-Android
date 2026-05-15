@@ -114,7 +114,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S11-NUI-P0-001 | S11-NUI | P0 | TODO | WebDAV client contract | WebDavClient interface, PROPFIND/GET/PUT models, fake transport, tests | ./gradlew test | None |
+| S11-NUI-P0-001 | S11-NUI | P0 | READY | WebDAV client contract | WebDavClient interface, PROPFIND/GET/PUT models, fake transport, tests | ./gradlew test | None |
 | S11-NUI-P0-002 | S11-NUI | P0 | TODO | Backup package model | BackupManifest, BackupEntry, checksum/version, serialization, tests | ./gradlew test | None |
 | S11-NUI-P0-003 | S11-NUI | P0 | TODO | Progress sync protocol | ProgressSyncRecord, conflict resolution, merge tests | ./gradlew test | None |
 | S11-NUI-P0-004 | S11-NUI | P0 | TODO | Remote WebDAV books contract | RemoteBookRef, download/cache policy, tests | ./gradlew test | None |
@@ -187,7 +187,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S10-NUI-P0-003 | S10-NUI | P0 | DONE | TTS queue model | TtsQueue: priority enqueue/dequeue, state tracking, 5 tests | ./gradlew test: 249 tests, 0 failures ✅ | None |
 | S10-NUI-P0-004 | S10-NUI | P0 | DONE | TTS chapter integration contract | ChapterTextFeeder: paragraph split, boundary events, reset | ./gradlew test: 255 tests, 0 failures ✅ | None |
-| S10-NUI-P0-005 | S10-NUI | P0 | READY | TTS error mapping tests | TtsError ↔ ReaderErrorCode mapping, platform error wrapping, tests | ./gradlew test | None |
+| S10-NUI-P0-005 | S10-NUI | P0 | DONE | TTS error mapping tests | TtsErrorMapper: 4 error types → ReaderErrorCode, 4 tests | ./gradlew test: 259 tests, 0 failures ✅ | None |
 
 ## Stage 11 NUI extended: WebDAV Backend (GAP tasks — non-UI only)
 
