@@ -117,7 +117,7 @@
 | S11-NUI-P0-001 | S11-NUI | P0 | DONE | WebDAV client contract | WebDavClient + FakeWebDavClient, 5 methods, 5 tests | ./gradlew test: 264 tests, 0 failures ✅ | None |
 | S11-NUI-P0-002 | S11-NUI | P0 | DONE | Backup package model | BackupManifest + BackupEntry + JSON serialization, 3 tests | ./gradlew test: 267 tests, 0 failures ✅ | None |
 | S11-NUI-P0-003 | S11-NUI | P0 | DONE | Progress sync protocol | ProgressSyncRecord + ConflictResolver (4 strategies), 6 tests | ./gradlew test: 273 tests, 0 failures ✅ | None |
-| S11-NUI-P0-004 | S11-NUI | P0 | READY | Remote WebDAV books contract | RemoteBookRef, download/cache policy, tests | ./gradlew test | None |
+| S11-NUI-P0-004 | S11-NUI | P0 | DONE | Remote WebDAV books contract | RemoteBookRef + DownloadPolicy + CachePolicy, 3 tests | ./gradlew test: 276 tests, 0 failures ✅ | None |
 
 ## Stage 12 NUI: Cloud Sync Core (non-UI only)
 
@@ -193,7 +193,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S11-NUI-P0-005 | S11-NUI | P0 | TODO | WebDAV auth model | AuthMethod sealed class (Basic/Digest/Bearer), credential model, tests | ./gradlew test | None |
+| S11-NUI-P0-005 | S11-NUI | P0 | READY | WebDAV auth model | AuthMethod sealed class (Basic/Digest/Bearer), credential model, tests | ./gradlew test | None |
 | S11-NUI-P0-006 | S11-NUI | P0 | TODO | WebDAV XML response parser | MultiStatus XML parser, href/status/propstat extraction, error status mapping, tests | ./gradlew test | None |
 | S11-NUI-P0-007 | S11-NUI | P0 | TODO | WebDAV retry/error mapping | RetryPolicy, status code → error mapping, backoff, tests | ./gradlew test | None |
 
