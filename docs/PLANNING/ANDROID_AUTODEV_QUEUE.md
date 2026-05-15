@@ -210,8 +210,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S13-NUI-P0-003 | S13-NUI | P0 | DONE | Remote file listing parser | WebDAV directory listing parser, file/dir model, sorting, tests | ./gradlew test | None |
-| S13-NUI-P0-004 | S13-NUI | P0 | READY | Remote download cache integration | DownloadCacheManager, temp file policy, cache key for remote URLs, tests | ./gradlew test | None |
-| S13-NUI-P0-005 | S13-NUI | P0 | TODO | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
+| S13-NUI-P0-004 | S13-NUI | P0 | DONE | Remote download cache integration | DownloadCacheManager, temp file policy, cache key for remote URLs, tests | ./gradlew test | None |
+| S13-NUI-P0-005 | S13-NUI | P0 | READY | Offline availability tests | Offline read verification, stale content eviction, re-download trigger, tests | ./gradlew test | None |
 
 ## Stage 15 NUI extended: Release Candidate Gate (GAP tasks — non-UI only)
 
