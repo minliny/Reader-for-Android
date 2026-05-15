@@ -139,7 +139,7 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S14-NUI-P0-001 | S14-NUI | P0 | DONE | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
 | S14-NUI-P0-002 | S14-NUI | P0 | DONE | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
-| S14-NUI-P0-003 | S14-NUI | P0 | READY | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
+| S14-NUI-P0-003 | S14-NUI | P0 | DONE | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
 
 ## Stage 6-SETTINGS-NUI: Theme/Settings Backend (GAP — non-UI only)
 
@@ -217,7 +217,7 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S15-NUI-P0-001 | S15-NUI | P0 | TODO | Non-UI RC gate | All NUI tasks DONE, tests pass, assembleDebug pass | ./gradlew test + assembleDebug | None |
+| S15-NUI-P0-001 | S15-NUI | P0 | READY | Non-UI RC gate | All NUI tasks DONE, tests pass, assembleDebug pass | ./gradlew test + assembleDebug | None |
 | S15-NUI-P0-002 | S15-NUI | P0 | TODO | Non-UI capability completion audit | Verify all 136 capabilities in COMPLETION_TARGET, generate audit report | Document exists, all gaps closed | None |
 | S15-NUI-P0-003 | S15-NUI | P0 | TODO | Backend regression suite gate | All regression fixtures pass, no skipped tests, coverage ≥ target | ./gradlew test | None |
 | S15-NUI-P0-004 | S15-NUI | P0 | TODO | No-UI parity declaration document | ANDROID_NON_UI_RELEASE_GATE.md, checklist complete, capability sign-off | Document exists | None |
