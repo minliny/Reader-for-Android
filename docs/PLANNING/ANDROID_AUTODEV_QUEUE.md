@@ -201,8 +201,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S12-NUI-P0-003 | S12-NUI | P0 | READY | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
-| S12-NUI-P0-004 | S12-NUI | P0 | TODO | Sync conflict test matrix | ConflictScenario enum, resolution strategy per scenario, matrix test suite | ./gradlew test | None |
+| S12-NUI-P0-003 | S12-NUI | P0 | DONE | Sync operation persistence | SyncOperationLog Room entity, last-sync timestamp, operation history, tests | ./gradlew test | None |
+| S12-NUI-P0-004 | S12-NUI | P0 | READY | Sync conflict test matrix | ConflictScenario enum, resolution strategy per scenario, matrix test suite | ./gradlew test | None |
 | S12-NUI-P0-005 | S12-NUI | P0 | TODO | Backup restore contract | BackupRestoreManager, package validation, partial restore policy, tests | ./gradlew test | None |
 
 ## Stage 13 NUI extended: Remote Reading (GAP tasks — non-UI only)

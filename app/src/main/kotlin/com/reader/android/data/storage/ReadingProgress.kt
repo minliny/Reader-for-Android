@@ -41,8 +41,9 @@ interface ReadingProgressDao {
     suspend fun delete(bookUrl: String)
 }
 
-@Database(entities = [ReadingProgress::class, CachedChapter::class], version = 2, exportSchema = false)
+@Database(entities = [ReadingProgress::class, CachedChapter::class, SyncOperationLog::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao
     abstract fun cachedChapterDao(): CachedChapterDao
+    abstract fun syncOperationLogDao(): SyncOperationLogDao
 }
