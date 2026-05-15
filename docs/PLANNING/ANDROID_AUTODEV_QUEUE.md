@@ -186,8 +186,8 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S10-NUI-P0-003 | S10-NUI | P0 | DONE | TTS queue model | TtsQueue: priority enqueue/dequeue, state tracking, 5 tests | ./gradlew test: 249 tests, 0 failures ✅ | None |
-| S10-NUI-P0-004 | S10-NUI | P0 | READY | TTS chapter integration contract | ChapterTextFeeder, boundary detection, chapter transition events, tests | ./gradlew test | None |
-| S10-NUI-P0-005 | S10-NUI | P0 | TODO | TTS error mapping tests | TtsError ↔ ReaderErrorCode mapping, platform error wrapping, tests | ./gradlew test | None |
+| S10-NUI-P0-004 | S10-NUI | P0 | DONE | TTS chapter integration contract | ChapterTextFeeder: paragraph split, boundary events, reset | ./gradlew test: 255 tests, 0 failures ✅ | None |
+| S10-NUI-P0-005 | S10-NUI | P0 | READY | TTS error mapping tests | TtsError ↔ ReaderErrorCode mapping, platform error wrapping, tests | ./gradlew test | None |
 
 ## Stage 11 NUI extended: WebDAV Backend (GAP tasks — non-UI only)
 
