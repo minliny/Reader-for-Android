@@ -137,8 +137,8 @@
 
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
-| S14-NUI-P0-001 | S14-NUI | P0 | READY | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
-| S14-NUI-P0-002 | S14-NUI | P0 | TODO | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
+| S14-NUI-P0-001 | S14-NUI | P0 | DONE | Legado capability matrix model | Capability enum/model, ownership, status, tests | ./gradlew test | None |
+| S14-NUI-P0-002 | S14-NUI | P0 | READY | Regression fixture registry | Fixture metadata, local-only, parser/source registry, tests | ./gradlew test | None |
 | S14-NUI-P0-003 | S14-NUI | P0 | TODO | Non-UI release gate checklist | test/build/doc checklist | ./gradlew :app:assembleDebug | None |
 
 ## Stage 6-SETTINGS-NUI: Theme/Settings Backend (GAP — non-UI only)
