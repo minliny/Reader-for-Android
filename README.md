@@ -50,12 +50,18 @@ Single `:app` module, internal package layering:
 - `data/network/` — OkHttp client + HTML/XML parsers
 - `data/storage/` — ThemePreferences (DataStore) + AppDatabase (Room v3)
 
-## Remaining work
+## Next phase: UI-only development
 
-21 UI-only gaps listed in `docs/PLANNING/ANDROID_UI_ONLY_GAP_LIST.md`. All backend contracts complete.
+Non-UI RC1 tagged as `android-non-ui-rc1`. 21 UI-only gaps. 23 UI tasks planned across 12 stages.
+
+- **UI queue**: `docs/PLANNING/ANDROID_UI_ONLY_AUTODEV_QUEUE.md`
+- **UI plan**: `docs/PLANNING/ANDROID_UI_ONLY_DEVELOPMENT_PLAN.md`
+- **UI loop**: `.claude/commands/ui-loop.md` → `/ui-loop`
+
+UI stage does NOT add backend capabilities.
 
 ## Docs
 
 - `docs/RELEASE/ANDROID_NON_UI_RC1_FREEZE.md` — RC1 freeze document
 - `docs/HANDOFF/ANDROID_UI_HANDOFF_FROM_NON_UI_RC1.md` — UI handoff guide
-- `docs/PLANNING/` — Planning, queue, blockers, capability matrix
+- `docs/PLANNING/` — Planning, queue, blockers, capability matrix, UI gap list
