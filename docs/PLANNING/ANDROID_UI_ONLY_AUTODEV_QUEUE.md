@@ -1,6 +1,10 @@
-# Reader for Android UI-only AutoDev Queue
+# Deprecated: Android UI-only Autodev Queue
 
-**Date**: 2026-05-16
+**Date**: 2026-05-16 (deprecated 2026-05-16)
+**Status**: DEPRECATED — UI implementation is external. Queue retained for handoff reference only.
+
+This queue must NOT be consumed by loop. Remaining UI gaps are tracked only for external handoff.
+Local model may only update handoff contracts. See `docs/HANDOFF/ANDROID_EXTERNAL_UI_TOOL_HANDOFF.md`.
 **Based on**: Non-UI RC1 (tag: android-non-ui-rc1)
 **Separate from**: ANDROID_AUTODEV_QUEUE.md (Non-UI queue, frozen)
 

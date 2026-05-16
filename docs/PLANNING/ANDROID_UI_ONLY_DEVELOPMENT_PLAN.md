@@ -1,6 +1,10 @@
-# Reader for Android UI-only Development Plan
+# Reader for Android UI-only Development Plan (Retired)
 
-**Date**: 2026-05-16
+**Date**: 2026-05-16 (retired 2026-05-16)
+**Status**: RETIRED — UI is external. Plan retained for handoff reference only.
+
+Local model does NOT execute this plan. UI implementation is handled by external UI tools.
+See `docs/HANDOFF/ANDROID_EXTERNAL_UI_TOOL_HANDOFF.md` for the integration contracts.
 **Based on**: Non-UI RC1 (tag: android-non-ui-rc1, commit 0fb0d54)
 
 ## 1. Mission

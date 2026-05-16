@@ -50,18 +50,16 @@ Single `:app` module, internal package layering:
 - `data/network/` — OkHttp client + HTML/XML parsers
 - `data/storage/` — ThemePreferences (DataStore) + AppDatabase (Room v3)
 
-## Next phase: UI-only development
+## Next phase: External UI Handoff
 
-Non-UI RC1 tagged as `android-non-ui-rc1`. 21 UI-only gaps. 23 UI tasks planned across 12 stages.
+Non-UI RC1 tagged as `android-non-ui-rc1`. UI development is by **external UI tools**.
 
-- **UI queue**: `docs/PLANNING/ANDROID_UI_ONLY_AUTODEV_QUEUE.md`
-- **UI plan**: `docs/PLANNING/ANDROID_UI_ONLY_DEVELOPMENT_PLAN.md`
-- **UI loop**: `.claude/commands/ui-loop.md` → `/ui-loop`
-
-UI stage does NOT add backend capabilities.
+- **Handoff**: `docs/HANDOFF/ANDROID_EXTERNAL_UI_TOOL_HANDOFF.md` (integration contracts)
+- **UI queue/plan/loop**: DEPRECATED — local model does NOT implement UI
 
 ## Docs
 
-- `docs/RELEASE/ANDROID_NON_UI_RC1_FREEZE.md` — RC1 freeze document
-- `docs/HANDOFF/ANDROID_UI_HANDOFF_FROM_NON_UI_RC1.md` — UI handoff guide
-- `docs/PLANNING/` — Planning, queue, blockers, capability matrix, UI gap list
+- `docs/RELEASE/ANDROID_NON_UI_RC1_FREEZE.md` — RC1 freeze
+- `docs/HANDOFF/ANDROID_EXTERNAL_UI_TOOL_HANDOFF.md` — External UI handoff
+- `docs/HANDOFF/ANDROID_UI_HANDOFF_FROM_NON_UI_RC1.md` — Backend capability handoff
+- `docs/PLANNING/` — Planning, queue, blockers, matrix, gap list
