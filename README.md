@@ -4,13 +4,17 @@ Android reading app — Compose + Material 3. Consumer of Reader-Core public API
 
 ## Status
 
+**Non-UI RC1** — Backend complete. UI integration remains.
+
 | Metric | Value |
 |--------|-------|
-| Stage | S6.5 Baseline Hardening |
-| `./gradlew test` | BUILD SUCCESSFUL |
+| Stage | Non-UI RC1 (backend frozen) |
+| `./gradlew test` | BUILD SUCCESSFUL, 331 tests, 0 failures |
 | `./gradlew :app:assembleDebug` | BUILD SUCCESSFUL |
-| Test count | 3 (needs expansion) |
-| Next milestone | S6.5-P0-002 Parser contract tests |
+| Commits | 112 |
+| Main Kotlin files | 72 |
+| Non-UI queue tasks | 71/71 DONE |
+| Next phase | UI integration (21 UI-only gaps) |
 
 ## Quick start
 
@@ -22,28 +26,36 @@ cd "/Users/minliny/Documents/Reader for Android"
 
 ## Capability summary
 
-- **S1**: Gradle Kotlin DSL + Compose Scaffold + 4-tab navigation
-- **S2**: 6 Kotlin domain DTOs (BookInfo, BookSource, SearchQuery, SearchResultItem, TOCItem, ContentPage)
-- **S3**: ReaderCoreBridge contract + FakeCoreBridge + OkHttp 4.12 adapter + DataStore BookSourceRepository
-- **S4**: Book source management (list, enable/disable, delete)
-- **S5**: Search → Detail → TOC → Reader full flow (fake + real HTTP dual mode)
-- **S6**: DataStore reading prefs + Room database (progress, chapter cache)
+- **S1-S6**: App Shell, Navigation, DTOs, CoreBridge, OkHttp, Room v3, DataStore, Search→Detail→TOC→Reader flow (fake/real dual mode)
+- **S6.5**: Baseline hardening (7/7)
+- **S6-SETTINGS**: Theme, Color, Alpha, TapZone, Font config
+- **S7-NUI**: WebView/JS/Cookie/POST backend (12 adapters/contracts)
+- **S8-NUI**: RSS parser + subscription engine
+- **S9-NUI**: TXT/EPUB local book backend (10 parsers/contracts)
+- **S10-NUI**: TTS engine/adapter/queue/feeder
+- **S11-NUI**: WebDAV client/backup/sync/auth
+- **S12-NUI**: Sync manager/conflict/persistence
+- **S13-NUI**: Remote content/cache/listing/offline
+- **S14-NUI**: Capability matrix/fixture registry
+- **S15-NUI**: RC gate/audit/parity/UI gap list
 
 ## Architecture
 
 Single `:app` module, internal package layering:
-- `ui/` — Compose screens (bookshelf, booksource, search, detail, toc, reader, settings)
-- `data/model/` — Kotlin DTOs matching Reader-Core public contract
-- `data/bridge/` — CoreBridge interface + error taxonomy
+- `ui/` — Compose screens
+- `data/model/` — Kotlin DTOs
+- `data/bridge/` — CoreBridge contract + error taxonomy
+- `data/adapter/` — Platform adapters (WebView, TTS, WebDAV, RSS, local book)
 - `data/repository/` — BookSourceRepository (fake + DataStore)
-- `data/network/` — OkHttp client + HTML parsers (Search, BookInfo, TOC, Content)
-- `data/storage/` — ThemePreferences (DataStore) + AppDatabase (Room v2)
+- `data/network/` — OkHttp client + HTML/XML parsers
+- `data/storage/` — ThemePreferences (DataStore) + AppDatabase (Room v3)
 
-## Blocked stages
+## Remaining work
 
-| Stage | Blocker |
-|-------|---------|
-| S7 WebView/JS | BD-009 (JS engine choice) |
-| S7 Cookie/Login | BD-016 (credential strategy) |
-| S9 TXT/EPUB | BD-011 (EPUB lib), BD-014 (file permissions) |
-| S11 WebDAV | BD-010 (client library) |
+21 UI-only gaps listed in `docs/PLANNING/ANDROID_UI_ONLY_GAP_LIST.md`. All backend contracts complete.
+
+## Docs
+
+- `docs/RELEASE/ANDROID_NON_UI_RC1_FREEZE.md` — RC1 freeze document
+- `docs/HANDOFF/ANDROID_UI_HANDOFF_FROM_NON_UI_RC1.md` — UI handoff guide
+- `docs/PLANNING/` — Planning, queue, blockers, capability matrix
