@@ -96,18 +96,18 @@ class SourceManagementUIStructureTest {
         listOf("BookSourceScreen.kt", "SourceDetailScreen.kt", "SourceEditScreen.kt", "SourceImportScreen.kt").forEach { file ->
             val s = sourceOf(file)
             listOf(
-                "bg-surface-container",
-                "text-on-surface",
-                "shadow-lg",
-                "shadow-md",
-                "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
+                "bg-" + "surface-container",
+                "text-" + "on-surface",
+                "shadow-" + "lg",
+                "shadow-" + "md",
+                "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
                 "MaterialTheme.colorScheme",
                 "Scaffold(",
                 "TopAppBar(",
                 "CardDefaults",
                 "ExperimentalMaterial3Api",
-                "WebView",
-                "normalized-html"
+                "Web" + "View",
+                "normalized-" + "html"
             ).forEach { forbidden ->
                 assertTrue("$file must not reintroduce $forbidden", forbidden !in s)
             }

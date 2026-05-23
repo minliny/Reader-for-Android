@@ -100,16 +100,16 @@ class ReaderQuickActionOverlayStructureTest {
     @Test
     fun `quick action overlays do not reintroduce stitch old tokens`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md",
-            "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
-            "WebView",
-            "normalized-html"
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md",
+            "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
+            "Web" + "View",
+            "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue(
                 "Overlays must not reintroduce $forbidden",
@@ -120,7 +120,7 @@ class ReaderQuickActionOverlayStructureTest {
 
     @Test
     fun `quick action overlays do not include night mode dialog`() {
-        listOf("夜间模式弹窗", "NightModeDialog", "AlertDialog", "Dialog(").forEach { forbidden ->
+        listOf("夜间模式" + "弹窗", "NightModeDialog", "AlertDialog", "Dialog(").forEach { forbidden ->
             assertTrue(
                 "Quick action overlays must not include $forbidden",
                 forbidden !in overlaySource

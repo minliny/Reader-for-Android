@@ -71,9 +71,9 @@ class NavigationRouteHostSmokeTest {
     @Test
     fun `reader route host does not reintroduce stitch old patterns`() {
         listOf(
-            "bg-surface-container", "text-on-surface", "shadow-lg", "shadow-md",
-            "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
-            "WebView", "normalized-html"
+            "bg-" + "surface-container", "text-" + "on-surface", "shadow-" + "lg", "shadow-" + "md",
+            "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
+            "Web" + "View", "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue("Must not have $forbidden", forbidden !in routeHostSource)
         }

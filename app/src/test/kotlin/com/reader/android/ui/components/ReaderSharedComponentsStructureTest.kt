@@ -87,20 +87,20 @@ class ReaderSharedComponentsStructureTest {
         val source = componentSource()
 
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md",
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md",
             "FDF6EC",
             "EAE1DA",
             "F5ECE6",
             "EFE7E0",
             "8B5000",
-            "WebView",
-            "normalized-html"
+            "Web" + "View",
+            "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue("Forbidden Slice 2 token must not appear: $forbidden", forbidden !in source)
         }

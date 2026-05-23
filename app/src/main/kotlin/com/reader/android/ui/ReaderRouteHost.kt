@@ -1,12 +1,47 @@
 package com.reader.android.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.reader.android.ui.bookshelf.BookshelfScreen
+import com.reader.android.ui.booksource.BookSourceScreen
+import com.reader.android.ui.booksource.SourceDetailData
+import com.reader.android.ui.booksource.SourceDetailScreen
+import com.reader.android.ui.booksource.SourceEditScreen
+import com.reader.android.ui.booksource.SourceImportScreen
+import com.reader.android.ui.components.ReaderEmptyState
+import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderOfflineState
+import com.reader.android.ui.components.ReaderPermissionRequiredState
+import com.reader.android.ui.detail.BookDetailScreen
+import com.reader.android.ui.discover.DiscoverScreen
+import com.reader.android.ui.discover.RssListScreen
+import com.reader.android.ui.reader.ReaderScreen
+import com.reader.android.ui.search.SearchScreen
+import com.reader.android.ui.settings.SettingsScreen
+import com.reader.android.ui.settings.WebDavConfigScreen
+import com.reader.android.ui.toc.TOCScreen
+import java.net.URLDecoder
 
 object ReaderRoutes {
     // Tab roots
@@ -95,12 +130,14 @@ fun rememberDeepLinkState(): DeepLinkState {
 fun handleDeepLink(uri: String, navController: NavHostController, backStack: ReaderBackStack) {
     when {
         uri.contains("detail") -> {
-            navController.navigate(ReaderRoutes.DETAIL)
-            backStack.push(ReaderRoutes.DETAIL)
+            val route = ReaderRoutes.detail(uri)
+            navController.navigate(route)
+            backStack.push(route)
         }
         uri.contains("reader") -> {
-            navController.navigate(ReaderRoutes.READER_CONTENT)
-            backStack.push(ReaderRoutes.READER_CONTENT)
+            val route = ReaderRoutes.readerContent(uri, "深链章节")
+            navController.navigate(route)
+            backStack.push(route)
         }
         else -> {
             navController.navigate(ReaderRoutes.BOOKSHELF)
@@ -108,3 +145,196 @@ fun handleDeepLink(uri: String, navController: NavHostController, backStack: Rea
         }
     }
 }
+
+@Composable
+fun ReaderRouteHost(
+    navController: NavHostController = rememberNavController(),
+    backStack: ReaderBackStack = rememberReaderBackStack()
+) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                appScreens.forEach { screen ->
+                    NavigationBarItem(
+                        icon = { Icon(screen.icon, contentDescription = screen.label) },
+                        label = { Text(screen.label) },
+                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                        onClick = {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                            backStack.push(screen.route)
+                        }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = ReaderRoutes.BOOKSHELF,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(ReaderRoutes.BOOKSHELF) {
+                BookshelfScreen(onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) })
+            }
+            composable(ReaderRoutes.BOOKSOURCE) { BookSourceScreen() }
+            composable(ReaderRoutes.READER) { ReaderScreen() }
+            composable(ReaderRoutes.SETTINGS) { SettingsScreen() }
+
+            composable(ReaderRoutes.SEARCH) { SearchScreen() }
+            composable(
+                route = ReaderRoutes.DETAIL,
+                arguments = listOf(navArgument("detailUrl") { type = NavType.StringType })
+            ) { entry ->
+                val detailUrl = entry.encodedArg("detailUrl")
+                BookDetailScreen(
+                    detailUrl = detailUrl,
+                    onBack = { navController.popBackStack() },
+                    onTOC = { navController.navigateAndTrack(ReaderRoutes.toc(it), backStack) }
+                )
+            }
+            composable(
+                route = ReaderRoutes.TOC,
+                arguments = listOf(navArgument("tocUrl") { type = NavType.StringType })
+            ) { entry ->
+                TOCScreen(
+                    tocUrl = entry.encodedArg("tocUrl"),
+                    onBack = { navController.popBackStack() },
+                    onChapterClick = { contentUrl, title ->
+                        navController.navigateAndTrack(ReaderRoutes.readerContent(contentUrl, title), backStack)
+                    }
+                )
+            }
+            composable(
+                route = ReaderRoutes.READER_CONTENT,
+                arguments = listOf(
+                    navArgument("contentUrl") { type = NavType.StringType },
+                    navArgument("chapterTitle") { type = NavType.StringType }
+                )
+            ) { entry ->
+                ReaderScreen(
+                    contentUrl = entry.encodedArg("contentUrl"),
+                    chapterTitle = entry.encodedArg("chapterTitle"),
+                    onBack = { navController.popBackStack() },
+                    onNextChapter = { nextUrl, nextTitle ->
+                        navController.navigateAndTrack(ReaderRoutes.readerContent(nextUrl, nextTitle), backStack)
+                    }
+                )
+            }
+
+            composable(
+                route = ReaderRoutes.SOURCE_DETAIL,
+                arguments = listOf(navArgument("sourceId") { type = NavType.StringType })
+            ) { entry ->
+                SourceDetailScreen(
+                    source = SourceDetailData(
+                        sourceName = entry.encodedArg("sourceId").ifBlank { "示例书源" },
+                        sourceUrl = "https://example.com/source",
+                        sourceGroup = "示例",
+                        enabled = true
+                    ),
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = ReaderRoutes.SOURCE_EDIT,
+                arguments = listOf(navArgument("sourceId") { type = NavType.StringType })
+            ) { entry ->
+                SourceEditScreen(
+                    initialName = entry.encodedArg("sourceId").ifBlank { "示例书源" },
+                    initialUrl = "https://example.com/source",
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.SOURCE_IMPORT) {
+                SourceImportScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(ReaderRoutes.DISCOVER) {
+                DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
+            }
+            composable(ReaderRoutes.RSS_LIST) {
+                RssListScreen(
+                    onBack = { navController.popBackStack() },
+                    onSourceClick = { navController.navigateAndTrack("rss_detail/$it", backStack) }
+                )
+            }
+            composable(
+                route = ReaderRoutes.RSS_DETAIL,
+                arguments = listOf(navArgument("rssId") { type = NavType.StringType })
+            ) { entry ->
+                ReaderEmptyState(
+                    title = "RSS 详情",
+                    message = "订阅 ${entry.encodedArg("rssId")} 的详情入口已注册，使用静态状态占位。",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            composable(ReaderRoutes.RSS_SUBSCRIPTION) {
+                ReaderEmptyState(
+                    title = "RSS 订阅管理",
+                    message = "订阅管理入口已注册，使用静态状态占位。",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            composable(ReaderRoutes.WEBDAV_CONFIG) {
+                WebDavConfigScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.BACKUP_SETTINGS) {
+                ReaderEmptyState(
+                    title = "备份设置",
+                    message = "备份设置入口已注册，使用静态状态占位。",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            composable(ReaderRoutes.PROGRESS_SYNC) {
+                ReaderEmptyState(
+                    title = "进度同步",
+                    message = "同步状态入口已注册，等待真实同步能力接入。",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            composable(
+                route = ReaderRoutes.STATE_ERROR,
+                arguments = listOf(navArgument("message") { type = NavType.StringType })
+            ) { entry ->
+                ReaderErrorState(
+                    title = "加载失败",
+                    message = entry.encodedArg("message"),
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            composable(ReaderRoutes.STATE_OFFLINE) {
+                ReaderOfflineState(modifier = Modifier.fillMaxSize())
+            }
+            composable(
+                route = ReaderRoutes.DEEP_LINK,
+                arguments = listOf(navArgument("uri") { type = NavType.StringType })
+            ) { entry ->
+                val uri = entry.encodedArg("uri")
+                ReaderPermissionRequiredState(
+                    title = "深链待处理",
+                    message = uri.ifBlank { "未提供深链" },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+private fun NavHostController.navigateAndTrack(route: String, backStack: ReaderBackStack) {
+    navigate(route)
+    backStack.push(route)
+}
+
+private fun androidx.navigation.NavBackStackEntry.encodedArg(name: String): String =
+    URLDecoder.decode(arguments?.getString(name).orEmpty(), "UTF-8")

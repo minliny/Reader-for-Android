@@ -21,13 +21,13 @@ class ComposeUIRegressionScanTest {
     @Test
     fun `no stitch old classes in compose ui`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md"
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md"
         ).forEach { forbidden ->
             assertTrue(
                 "UI must not contain Stitch class '$forbidden'",
@@ -39,11 +39,11 @@ class ComposeUIRegressionScanTest {
     @Test
     fun `no stitch old colors in compose ui`() {
         listOf(
-            "#fdf6ec", "#FDF6EC",
-            "#eae1da", "#EAE1DA",
-            "#f5ece6", "#F5ECE6",
-            "#efe7e0", "#EFE7E0",
-            "#8b5000", "#8B5000"
+            "#" + "fdf6ec", "#" + "FDF6EC",
+            "#" + "eae1da", "#" + "EAE1DA",
+            "#" + "f5ece6", "#" + "F5ECE6",
+            "#" + "efe7e0", "#" + "EFE7E0",
+            "#" + "8b5000", "#" + "8B5000"
         ).forEach { forbidden ->
             assertTrue(
                 "UI must not contain old color '$forbidden'",
@@ -54,7 +54,7 @@ class ComposeUIRegressionScanTest {
 
     @Test
     fun `no chapter skip semantics in reader ui`() {
-        listOf("skip_previous", "skip_next", "上一章", "下一章").forEach { forbidden ->
+        listOf("skip_" + "previous", "skip_" + "next", "上一章", "下一章").forEach { forbidden ->
             assertTrue(
                 "Reader UI must not use chapter skip '$forbidden'",
                 forbidden !in allUiKotlinSource
@@ -64,7 +64,7 @@ class ComposeUIRegressionScanTest {
 
     @Test
     fun `no webview runtime in compose ui`() {
-        listOf("WebView", "normalized-html").forEach { forbidden ->
+        listOf("Web" + "View", "normalized-" + "html").forEach { forbidden ->
             assertTrue(
                 "UI must not contain '$forbidden'",
                 forbidden !in allUiKotlinSource

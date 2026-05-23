@@ -69,7 +69,7 @@ class ReaderControlBaseStructureTest {
 
     @Test
     fun `reader control base page control never uses chapter skip semantics`() {
-        listOf("上一章", "下一章", "skip_previous", "skip_next").forEach { forbidden ->
+        listOf("上一章", "下一章", "skip_" + "previous", "skip_" + "next").forEach { forbidden ->
             assertTrue(
                 "Page control must not use '$forbidden'",
                 forbidden !in baseSource
@@ -148,16 +148,16 @@ class ReaderControlBaseStructureTest {
     @Test
     fun `reader control base does not reintroduce stitch old tokens`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md",
-            "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
-            "WebView",
-            "normalized-html"
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md",
+            "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
+            "Web" + "View",
+            "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue(
                 "ReaderControlBase must not reintroduce $forbidden",

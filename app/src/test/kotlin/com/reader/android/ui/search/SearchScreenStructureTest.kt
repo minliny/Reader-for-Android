@@ -56,20 +56,20 @@ class SearchScreenStructureTest {
     @Test
     fun `search screen does not reintroduce stitch old tokens`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md",
-            "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md",
+            "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
             "MaterialTheme",
             "Scaffold",
             "TopAppBar",
             "CircularProgressIndicator",
-            "WebView",
-            "normalized-html"
+            "Web" + "View",
+            "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue(
                 "SearchScreen must not reintroduce $forbidden",

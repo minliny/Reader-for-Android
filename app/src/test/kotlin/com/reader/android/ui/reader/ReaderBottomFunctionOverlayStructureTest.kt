@@ -90,7 +90,7 @@ class ReaderBottomFunctionOverlayStructureTest {
 
     @Test
     fun `tts overlay has no chapter navigation semantics`() {
-        listOf("上一章", "下一章", "skip_previous", "skip_next", "onPrevChapter", "onNextChapter").forEach { forbidden ->
+        listOf("上一章", "下一章", "skip_" + "previous", "skip_" + "next", "onPrevChapter", "onNextChapter").forEach { forbidden ->
             assertTrue(
                 "TTS overlay must not use '$forbidden'",
                 forbidden !in overlaySource
@@ -120,16 +120,16 @@ class ReaderBottomFunctionOverlayStructureTest {
     @Test
     fun `bottom function overlays do not reintroduce stitch old tokens`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md",
-            "#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000",
-            "WebView",
-            "normalized-html"
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md",
+            "#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000",
+            "Web" + "View",
+            "normalized-" + "html"
         ).forEach { forbidden ->
             assertTrue(
                 "Overlays must not reintroduce $forbidden",
