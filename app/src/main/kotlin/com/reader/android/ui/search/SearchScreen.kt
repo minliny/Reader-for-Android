@@ -1,44 +1,31 @@
 package com.reader.android.ui.search
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.SearchQuery
 import com.reader.android.data.model.SearchResultItem
 import com.reader.android.data.network.HttpClient
 import com.reader.android.data.network.SearchParser
+import com.reader.android.ui.components.ReaderAppTopBar
+import com.reader.android.ui.components.ReaderEmptyState
+import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.ReaderSearchBox
+import com.reader.android.ui.components.SearchResultItem as SearchResultItemCard
+import com.reader.android.ui.state.ReaderUiState
+import com.reader.android.ui.theme.ReaderTheme
 import kotlinx.coroutines.launch
 
 class SearchViewModel(private val useRealHttp: Boolean = false) {
@@ -87,110 +74,49 @@ class SearchViewModel(private val useRealHttp: Boolean = false) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen() {
+fun SearchScreen(
+    uiState: ReaderUiState? = null
+) {
     val viewModel = remember { SearchViewModel() }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("搜索") })
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            OutlinedTextField(
-                value = viewModel.query,
-                onValueChange = { viewModel.onQueryChange(it) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                placeholder = { Text("输入书名或作者") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true
+    ReaderTheme {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ReaderAppTopBar(title = "搜索")
+            ReaderSearchBox(
+                query = viewModel.query,
+                onQueryChange = { viewModel.onQueryChange(it) },
+                modifier = Modifier.padding(horizontal = ReaderTheme.spacing.screenPadding, vertical = ReaderTheme.spacing.xs)
             )
 
-            when {
-                viewModel.error != null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("错误: ${viewModel.error}", style = MaterialTheme.typography.bodyLarge)
+            when (uiState) {
+                null -> when {
+                    viewModel.error != null -> {
+                        ReaderErrorState(title = "搜索失败", message = viewModel.error, modifier = Modifier.weight(1f), onRetryClick = { scope.launch { viewModel.search() } })
                     }
-                }
-                viewModel.isSearching -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+                    viewModel.isSearching -> {
+                        ReaderLoadingState(modifier = Modifier.weight(1f), message = "搜索中")
                     }
-                }
-                viewModel.hasSearched && viewModel.results.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("未找到结果", style = MaterialTheme.typography.bodyLarge)
+                    viewModel.hasSearched && viewModel.results.isEmpty() -> {
+                        ReaderEmptyState(title = "未找到结果", message = "请尝试其他关键词", modifier = Modifier.weight(1f))
                     }
-                }
-                viewModel.results.isNotEmpty() -> {
-                    LazyColumn {
-                        items(viewModel.results, key = { it.detailUrl ?: it.name }) { item ->
-                            SearchResultItemCard(item)
+                    viewModel.results.isNotEmpty() -> {
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(viewModel.results, key = { it.detailUrl ?: it.name }) { item ->
+                                SearchResultItemCard(title = item.name, sourceName = item.author, author = item.kind, latestChapter = item.latestChapter, intro = item.intro, onClick = null)
+                            }
                         }
                     }
-                }
-                else -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("输入关键词开始搜索", style = MaterialTheme.typography.bodyLarge)
+                    else -> {
+                        ReaderEmptyState(title = "搜索书籍", message = "输入关键词开始搜索", modifier = Modifier.weight(1f))
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchResultItemCard(item: SearchResultItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(modifier = Modifier.padding(12.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${item.author} · ${item.kind ?: ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                item.wordCount?.let { wc ->
-                    Text(text = wc, style = MaterialTheme.typography.bodySmall)
-                }
-                item.latestChapter?.let { ch ->
-                    Text(
-                        text = ch,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                item.intro?.let { intro ->
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = intro,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                is ReaderUiState.Loading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "搜索中")
+                is ReaderUiState.Error -> ReaderErrorState(title = "搜索失败", message = uiState.message, modifier = Modifier.weight(1f), onRetryClick = if (uiState.retryable) {{ scope.launch { viewModel.search() } }} else null)
+                is ReaderUiState.Empty -> ReaderEmptyState(title = "未找到结果", message = "请尝试其他关键词", modifier = Modifier.weight(1f))
+                is ReaderUiState.Offline -> com.reader.android.ui.components.ReaderOfflineState(modifier = Modifier.weight(1f))
+                else -> {}
             }
         }
     }

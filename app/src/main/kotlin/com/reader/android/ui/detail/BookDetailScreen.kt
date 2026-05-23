@@ -1,6 +1,5 @@
 package com.reader.android.ui.detail
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,38 +7,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookInfo
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.network.BookInfoParser
 import com.reader.android.data.network.HttpClient
+import com.reader.android.ui.components.ReaderAppTopBar
+import com.reader.android.ui.components.ReaderCard
+import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.ReaderPrimaryButton
+import com.reader.android.ui.state.ReaderUiState
+import com.reader.android.ui.theme.ReaderTheme
 
 class BookDetailViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
@@ -71,101 +62,58 @@ class BookDetailViewModel(private val useRealHttp: Boolean = false) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BookDetailScreen(detailUrl: String, onBack: () -> Unit, onTOC: (String) -> Unit) {
+fun BookDetailScreen(
+    detailUrl: String,
+    onBack: () -> Unit,
+    onTOC: (String) -> Unit,
+    uiState: ReaderUiState? = null
+) {
     val viewModel = remember { BookDetailViewModel() }
 
     LaunchedEffect(detailUrl) {
         viewModel.load(detailUrl)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(viewModel.bookInfo?.name ?: "书籍详情") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
+    ReaderTheme {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ReaderAppTopBar(
+                title = viewModel.bookInfo?.name ?: "书籍详情",
+                onNavigateBack = onBack
             )
-        }
-    ) { padding ->
-        when {
-            viewModel.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-            viewModel.bookInfo != null -> {
-                val info = viewModel.bookInfo!!
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
-                ) {
-                    Text(info.name, style = MaterialTheme.typography.headlineMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
 
-                    Row {
-                        Text("作者：${info.author}", style = MaterialTheme.typography.bodyLarge)
-                        info.kind?.let { kind ->
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text("分类：$kind", style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-
-                    info.wordCount?.let { wc ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("字数：$wc", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    info.latestChapter?.let { ch ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("最新：$ch", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    info.updateTime?.let { time ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("更新：$time", style = MaterialTheme.typography.bodyMedium)
-                    }
-
-                    info.intro?.let { intro ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Text(
-                                text = intro,
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    info.tocUrl?.let { tocUrl ->
-                        Button(
-                            onClick = { onTOC(tocUrl) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.List,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("查看目录")
+            when (uiState) {
+                null -> when {
+                    viewModel.isLoading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "加载中")
+                    viewModel.bookInfo != null -> {
+                        val info = viewModel.bookInfo!!
+                        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(ReaderTheme.spacing.screenPadding)) {
+                            Text(info.name, style = ReaderTheme.typography.pageTitle, color = ReaderTheme.colors.controlInk)
+                            Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
+                            Row {
+                                Text("作者：${info.author}", style = ReaderTheme.typography.bookTitle, color = ReaderTheme.colors.controlInk)
+                                info.kind?.let { kind ->
+                                    Spacer(modifier = Modifier.width(ReaderTheme.spacing.md))
+                                    Text("分类：$kind", style = ReaderTheme.typography.bookTitle, color = ReaderTheme.colors.controlInk)
+                                }
+                            }
+                            info.wordCount?.let { wc -> Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs)); Text("字数：$wc", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText) }
+                            info.latestChapter?.let { ch -> Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs)); Text("最新：$ch", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText) }
+                            info.updateTime?.let { time -> Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs)); Text("更新：$time", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText) }
+                            info.intro?.let { intro ->
+                                Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
+                                ReaderCard { Text(text = intro, style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText) }
+                            }
+                            Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
+                            info.tocUrl?.let { tocUrl ->
+                                ReaderPrimaryButton(text = "查看目录", onClick = { onTOC(tocUrl) }, modifier = Modifier.fillMaxWidth(), contentDescription = "查看目录")
+                            }
                         }
                     }
                 }
+                is ReaderUiState.Loading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "加载中")
+                is ReaderUiState.Error -> com.reader.android.ui.components.ReaderErrorState(title = "加载失败", message = uiState.message, modifier = Modifier.weight(1f))
+                else -> {}
             }
         }
     }
