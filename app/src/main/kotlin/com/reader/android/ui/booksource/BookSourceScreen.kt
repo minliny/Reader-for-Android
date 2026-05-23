@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.reader.android.data.model.BookSource
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.ui.components.ReaderAppTopBar
@@ -71,7 +70,7 @@ class SourceManagementViewModel(
 @Composable
 fun BookSourceScreen(uiState: ReaderUiState? = null) {
     val viewModel = remember { SourceManagementViewModel() }
-    val sources = viewModel.sources
+    val sourceState = SourceManagementMapper.fromSources(viewModel.sources)
 
     ReaderTheme {
         when (uiState) {
@@ -81,19 +80,19 @@ fun BookSourceScreen(uiState: ReaderUiState? = null) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 ReaderAppTopBar(title = "书源管理")
-                if (sources.isEmpty()) {
+                if (sourceState.isEmpty) {
                     ReaderEmptyState(
                         title = "暂无书源",
-                        message = "点击右下角按钮导入书源",
+                        message = sourceState.emptyMessage,
                         modifier = Modifier.weight(1f)
                     )
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(sources, key = { it.sourceUrl }) { source ->
+                        items(sourceState.sources, key = { it.id }) { source ->
                             SourceItem(
                                 source = source,
-                                onToggle = { viewModel.toggleEnabled(source.sourceUrl) },
-                                onDelete = { viewModel.delete(source.sourceUrl) }
+                                onToggle = { viewModel.toggleEnabled(source.url) },
+                                onDelete = { viewModel.delete(source.url) }
                             )
                         }
                     }
@@ -115,7 +114,7 @@ fun BookSourceScreen(uiState: ReaderUiState? = null) {
 
 @Composable
 private fun SourceItem(
-    source: BookSource,
+    source: SourceUiModel,
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -127,21 +126,19 @@ private fun SourceItem(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = source.sourceName,
+                text = source.name,
                 color = ReaderTheme.colors.controlInk,
                 style = ReaderTheme.typography.bookTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            source.sourceGroup?.takeIf { it.isNotBlank() }?.let { group ->
-                Text(
-                    text = group,
-                    color = ReaderTheme.colors.bodyText,
-                    style = ReaderTheme.typography.bookMeta
-                )
-            }
             Text(
-                text = source.sourceUrl,
+                text = "${source.group} · ${source.status.label}",
+                color = ReaderTheme.colors.bodyText,
+                style = ReaderTheme.typography.bookMeta
+            )
+            Text(
+                text = source.url,
                 color = ReaderTheme.colors.bodyText,
                 style = ReaderTheme.typography.bookMeta,
                 maxLines = 1,
@@ -162,7 +159,7 @@ private fun SourceItem(
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "删除${source.sourceName}",
+                contentDescription = "删除${source.name}",
                 tint = ReaderTheme.colors.controlInk
             )
         }
