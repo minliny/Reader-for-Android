@@ -18,6 +18,7 @@ class ReaderRouteReachabilityTest {
             "BookSourceScreen",
             "ReaderScreen",
             "SettingsScreen",
+            "MineScreen",
             "SearchScreen",
             "BookDetailScreen",
             "TOCScreen",
@@ -33,9 +34,16 @@ class ReaderRouteReachabilityTest {
     }
 
     @Test
-    fun `routes without direct runtime data have explicit state stubs`() {
-        listOf("RSS 详情", "RSS 订阅管理", "备份设置", "进度同步", "深链待处理").forEach { title ->
-            assertTrue("Stub route must render $title", title in routeHostSource)
+    fun `rss backup and sync routes use state driven screens`() {
+        listOf(
+            "RssDetailScreen",
+            "RssSubscriptionManagementScreen",
+            "BackupSettingsScreen",
+            "ProgressSyncStatusScreen",
+            "RemoteWebDavBooksScreen",
+            "深链待处理"
+        ).forEach { token ->
+            assertTrue("Route host must render $token", token in routeHostSource)
         }
     }
 

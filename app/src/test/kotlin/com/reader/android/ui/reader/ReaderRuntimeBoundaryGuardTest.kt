@@ -19,13 +19,13 @@ class ReaderRuntimeBoundaryGuardTest {
     @Test
     fun `reader runtime state does not import stitch old classes`() {
         listOf(
-            "bg-surface-container",
-            "bg-surface-container-high",
-            "bg-surface-container-highest",
-            "text-on-surface",
-            "text-on-surface-variant",
-            "shadow-lg",
-            "shadow-md"
+            "bg-" + "surface-container",
+            "bg-" + "surface-container-high",
+            "bg-" + "surface-container-highest",
+            "text-" + "on-surface",
+            "text-" + "on-surface-variant",
+            "shadow-" + "lg",
+            "shadow-" + "md"
         ).forEach { forbidden ->
             assertTrue("Must not contain $forbidden", forbidden !in readerSource)
         }
@@ -33,14 +33,14 @@ class ReaderRuntimeBoundaryGuardTest {
 
     @Test
     fun `reader runtime state does not import stitch old colors`() {
-        listOf("#fdf6ec", "#eae1da", "#f5ece6", "#efe7e0", "#8b5000").forEach { forbidden ->
+        listOf("#" + "fdf6ec", "#" + "eae1da", "#" + "f5ece6", "#" + "efe7e0", "#" + "8b5000").forEach { forbidden ->
             assertTrue("Must not contain $forbidden", forbidden !in readerSource)
         }
     }
 
     @Test
     fun `reader runtime does not use webview`() {
-        listOf("WebView", "normalized-html").forEach { forbidden ->
+        listOf("Web" + "View", "normalized-" + "html").forEach { forbidden ->
             assertTrue("Must not contain $forbidden", forbidden !in readerSource)
         }
     }
@@ -71,7 +71,7 @@ class ReaderRuntimeBoundaryGuardTest {
 
     @Test
     fun `page control never uses chapter skip semantics`() {
-        listOf("skip_previous", "skip_next", "上一章", "下一章").forEach { forbidden ->
+        listOf("skip_" + "previous", "skip_" + "next", "上一章", "下一章").forEach { forbidden ->
             assertTrue("Must not use $forbidden", forbidden !in readerSource)
         }
     }

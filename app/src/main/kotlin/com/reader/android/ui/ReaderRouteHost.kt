@@ -23,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.reader.android.BuildConfig
 import com.reader.android.ui.bookshelf.BookshelfScreen
 import com.reader.android.ui.booksource.BookSourceScreen
 import com.reader.android.ui.booksource.SourceDetailData
@@ -35,9 +36,16 @@ import com.reader.android.ui.components.ReaderOfflineState
 import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.detail.BookDetailScreen
 import com.reader.android.ui.discover.DiscoverScreen
+import com.reader.android.ui.discover.RssDetailScreen
 import com.reader.android.ui.discover.RssListScreen
+import com.reader.android.ui.discover.RssSubscriptionManagementScreen
+import com.reader.android.ui.prototype.ReaderPrototypeGallery
 import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.search.SearchScreen
+import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.settings.MineScreen
+import com.reader.android.ui.settings.ProgressSyncStatusScreen
+import com.reader.android.ui.settings.RemoteWebDavBooksScreen
 import com.reader.android.ui.settings.SettingsScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
 import com.reader.android.ui.toc.TOCScreen
@@ -46,9 +54,12 @@ import java.net.URLDecoder
 object ReaderRoutes {
     // Tab roots
     const val BOOKSHELF = "bookshelf"
-    const val BOOKSOURCE = "booksource"
+    const val DISCOVER = "discover"
+    const val SOURCES = "sources"
+    const val MINE = "mine"
+
+    // Secondary reading entry
     const val READER = "reader"
-    const val SETTINGS = "settings"
 
     // S5 flow
     const val SEARCH = "search"
@@ -62,15 +73,18 @@ object ReaderRoutes {
     const val SOURCE_IMPORT = "source_import"
 
     // Discover / RSS
-    const val DISCOVER = "discover"
     const val RSS_LIST = "rss_list"
     const val RSS_DETAIL = "rss_detail/{rssId}"
     const val RSS_SUBSCRIPTION = "rss_subscription"
 
-    // Settings subscreens
+    // Mine subscreens
+    const val GLOBAL_SETTINGS = "global_settings"
     const val WEBDAV_CONFIG = "webdav_config"
     const val BACKUP_SETTINGS = "backup_settings"
     const val PROGRESS_SYNC = "progress_sync"
+    const val REMOTE_WEBDAV_BOOKS = "remote_webdav_books"
+    const val ABOUT = "about"
+    const val PROTOTYPE_GALLERY = "prototype_gallery"
 
     // State screens
     const val STATE_ERROR = "state/error/{message}"
@@ -153,41 +167,77 @@ fun ReaderRouteHost(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val mainTabRoutes = appScreens.map { it.route }.toSet()
+    val currentRoute = currentDestination?.route
+    val showMainBottomBar = currentRoute in mainTabRoutes
+    val startDestination = if (BuildConfig.DEBUG) {
+        ReaderRoutes.PROTOTYPE_GALLERY
+    } else {
+        ReaderRoutes.BOOKSHELF
+    }
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                appScreens.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (showMainBottomBar) {
+                NavigationBar {
+                    appScreens.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon, contentDescription = screen.label) },
+                            label = { Text(screen.label) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
+                                backStack.push(screen.route)
                             }
-                            backStack.push(screen.route)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = ReaderRoutes.BOOKSHELF,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(ReaderRoutes.BOOKSHELF) {
                 BookshelfScreen(onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) })
             }
-            composable(ReaderRoutes.BOOKSOURCE) { BookSourceScreen() }
+            composable(ReaderRoutes.DISCOVER) {
+                DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
+            }
+            composable(ReaderRoutes.SOURCES) { BookSourceScreen() }
+            composable(ReaderRoutes.MINE) {
+                MineScreen(
+                    onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
+                    onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
+                    onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },
+                    onProgressSyncClick = { navController.navigateAndTrack(ReaderRoutes.PROGRESS_SYNC, backStack) },
+                    onRemoteBooksClick = { navController.navigateAndTrack(ReaderRoutes.REMOTE_WEBDAV_BOOKS, backStack) },
+                    onAboutClick = { navController.navigateAndTrack(ReaderRoutes.ABOUT, backStack) },
+                    onPrototypeGalleryClick = if (BuildConfig.DEBUG) {
+                        { navController.navigateAndTrack(ReaderRoutes.PROTOTYPE_GALLERY, backStack) }
+                    } else {
+                        null
+                    }
+                )
+            }
             composable(ReaderRoutes.READER) { ReaderScreen() }
-            composable(ReaderRoutes.SETTINGS) { SettingsScreen() }
+            composable(ReaderRoutes.GLOBAL_SETTINGS) {
+                SettingsScreen(
+                    onPrototypeGalleryClick = if (BuildConfig.DEBUG) {
+                        { navController.navigateAndTrack(ReaderRoutes.PROTOTYPE_GALLERY, backStack) }
+                    } else {
+                        null
+                    }
+                )
+            }
 
             composable(ReaderRoutes.SEARCH) { SearchScreen() }
             composable(
@@ -258,9 +308,6 @@ fun ReaderRouteHost(
                 SourceImportScreen(onBack = { navController.popBackStack() })
             }
 
-            composable(ReaderRoutes.DISCOVER) {
-                DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
-            }
             composable(ReaderRoutes.RSS_LIST) {
                 RssListScreen(
                     onBack = { navController.popBackStack() },
@@ -270,37 +317,36 @@ fun ReaderRouteHost(
             composable(
                 route = ReaderRoutes.RSS_DETAIL,
                 arguments = listOf(navArgument("rssId") { type = NavType.StringType })
-            ) { entry ->
-                ReaderEmptyState(
-                    title = "RSS 详情",
-                    message = "订阅 ${entry.encodedArg("rssId")} 的详情入口已注册，使用静态状态占位。",
-                    modifier = Modifier.fillMaxSize()
-                )
+            ) {
+                RssDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ReaderRoutes.RSS_SUBSCRIPTION) {
-                ReaderEmptyState(
-                    title = "RSS 订阅管理",
-                    message = "订阅管理入口已注册，使用静态状态占位。",
-                    modifier = Modifier.fillMaxSize()
-                )
+                RssSubscriptionManagementScreen(onBack = { navController.popBackStack() })
             }
 
             composable(ReaderRoutes.WEBDAV_CONFIG) {
                 WebDavConfigScreen(onBack = { navController.popBackStack() })
             }
             composable(ReaderRoutes.BACKUP_SETTINGS) {
+                BackupSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.PROGRESS_SYNC) {
+                ProgressSyncStatusScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.REMOTE_WEBDAV_BOOKS) {
+                RemoteWebDavBooksScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.ABOUT) {
                 ReaderEmptyState(
-                    title = "备份设置",
-                    message = "备份设置入口已注册，使用静态状态占位。",
+                    title = "关于 Reader",
+                    message = "版本信息、开源许可、隐私与权限入口。",
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            composable(ReaderRoutes.PROGRESS_SYNC) {
-                ReaderEmptyState(
-                    title = "进度同步",
-                    message = "同步状态入口已注册，等待真实同步能力接入。",
-                    modifier = Modifier.fillMaxSize()
-                )
+            if (BuildConfig.DEBUG) {
+                composable(ReaderRoutes.PROTOTYPE_GALLERY) {
+                    ReaderPrototypeGallery()
+                }
             }
 
             composable(

@@ -33,7 +33,7 @@ class ReaderRouteHostSmokeTest {
         val declaredRoutes = routeHostSource.lines().count { it.trimStart().startsWith("const val ") }
         val registeredRoutes = routeHostSource.lines().count { it.trimStart().startsWith("composable(") }
 
-        assertEquals("ReaderRoutes must still declare 21 routes", 21, declaredRoutes)
-        assertEquals("ReaderRouteHost must register 21 composable destinations", 21, registeredRoutes)
+        assertEquals("ReaderRoutes must declare 24 production routes plus 1 debug prototype route", 25, declaredRoutes)
+        assertEquals("ReaderRouteHost must register 24 production destinations plus 1 debug prototype destination", 25, registeredRoutes)
     }
 }

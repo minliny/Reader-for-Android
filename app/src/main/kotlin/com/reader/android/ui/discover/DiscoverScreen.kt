@@ -18,11 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.reader.android.ui.components.BookCard
 import com.reader.android.ui.components.ReaderAppTopBar
+import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.components.ReaderSettingsRow
 import com.reader.android.ui.state.ReaderUiState
+import com.reader.android.ui.sync.DiscoverRssWebDavMapper
+import com.reader.android.ui.sync.DiscoverUiState
 import com.reader.android.ui.theme.ReaderTheme
 
 data class DiscoverBook(
@@ -37,6 +40,16 @@ fun DiscoverScreen(
         DiscoverBook("深空信号", "科幻 · 本地书籍", 0.25f),
         DiscoverBook("深空信号", "科幻 · 本地书籍", 0.25f),
         DiscoverBook("深空信号", "科幻 · 本地书籍", 0.25f)
+    ),
+    discoverState: DiscoverUiState = DiscoverRssWebDavMapper.discover(
+        books.mapIndexed { index, book ->
+            com.reader.android.ui.sync.DiscoverItemUiModel(
+                id = "discover-$index",
+                title = book.title,
+                subtitle = book.author,
+                progress = book.progress
+            )
+        }
     ),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
@@ -67,27 +80,34 @@ fun DiscoverScreen(
             ) {
                 ReaderSectionHeader(title = "推荐")
 
-                // Book grid: rows of 3
-                val rows = books.chunked(3)
-                rows.forEach { rowBooks ->
+                if (discoverState.isLoading) {
+                    ReaderLoadingState(message = "正在加载推荐", modifier = Modifier.fillMaxWidth())
+                } else if (discoverState.error != null) {
+                    ReaderErrorState(title = discoverState.error.title, message = discoverState.error.message, modifier = Modifier.fillMaxWidth())
+                } else if (discoverState.isEmpty) {
+                    ReaderEmptyState(title = "暂无推荐", message = discoverState.emptyMessage, modifier = Modifier.fillMaxWidth())
+                } else {
+                val rows = discoverState.items.chunked(3)
+                rows.forEach { rowItems ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
                     ) {
-                        rowBooks.forEachIndexed { index, book ->
+                        rowItems.forEach { item ->
                             BookCard(
-                                title = book.title,
-                                author = book.author,
-                                progress = book.progress,
-                                onClick = { onBookClick(books.indexOf(book)) },
+                                title = item.title,
+                                author = item.subtitle,
+                                progress = item.progress,
+                                onClick = { onBookClick(discoverState.items.indexOf(item)) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                         // Fill remaining cells
-                        repeat(3 - rowBooks.size) {
+                        repeat(3 - rowItems.size) {
                             androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
                         }
                     }
+                }
                 }
 
                 ReaderSettingsRow(

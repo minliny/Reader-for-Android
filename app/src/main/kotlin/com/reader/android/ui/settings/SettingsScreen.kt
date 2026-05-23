@@ -16,15 +16,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.reader.android.BuildConfig
 import com.reader.android.data.storage.ThemePreferences
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderSettingsGroup
+import com.reader.android.ui.components.ReaderSettingsRow
 import com.reader.android.ui.components.ReaderSettingsSwitchRow
 import com.reader.android.ui.theme.ReaderTheme
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onPrototypeGalleryClick: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val prefs = ThemePreferences(context)
     val scope = rememberCoroutineScope()
@@ -106,6 +110,16 @@ fun SettingsScreen() {
                             inactiveTrackColor = ReaderTheme.colors.mutedTrack
                         )
                     )
+                }
+
+                if (BuildConfig.DEBUG && onPrototypeGalleryClick != null) {
+                    ReaderSettingsGroup(title = "调试") {
+                        ReaderSettingsRow(
+                            title = "UI 原型预览",
+                            subtitle = "打开 Reader UI Prototype Gallery",
+                            onClick = onPrototypeGalleryClick
+                        )
+                    }
                 }
             }
         }

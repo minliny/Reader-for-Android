@@ -20,11 +20,17 @@ import androidx.compose.ui.Modifier
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderCard
 import com.reader.android.ui.components.ReaderDivider
+import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderListItem
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderSettingsSwitchRow
 import com.reader.android.ui.state.ReaderUiState
+import com.reader.android.ui.sync.DiscoverRssWebDavMapper
+import com.reader.android.ui.sync.RssArticleUiModel
+import com.reader.android.ui.sync.RssFeedUiModel
+import com.reader.android.ui.sync.RssListUiState
+import com.reader.android.ui.sync.RssSubscriptionUiState
 import com.reader.android.ui.theme.ReaderTheme
 
 data class RssSource(
@@ -44,6 +50,11 @@ fun RssListScreen(
         RssSource("订阅源 2", 3),
         RssSource("订阅源 3", 4),
         RssSource("订阅源 4", 5)
+    ),
+    rssState: RssListUiState = DiscoverRssWebDavMapper.rssList(
+        feeds = sources.mapIndexed { index, source ->
+            RssFeedUiModel("rss-source-$index", source.name, source.updateCount, enabled = true)
+        }
     ),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
@@ -66,24 +77,33 @@ fun RssListScreen(
                     }
                 }
             )
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                itemsIndexed(sources) { index, source ->
+            when {
+                rssState.isLoading -> ReaderLoadingState(message = "正在刷新 RSS", modifier = Modifier.weight(1f))
+                rssState.offline -> ReaderErrorState(title = "当前离线", message = rssState.error?.message, modifier = Modifier.weight(1f))
+                rssState.error != null -> ReaderErrorState(title = rssState.error.title, message = rssState.error.message, modifier = Modifier.weight(1f))
+                rssState.isEmpty -> ReaderEmptyState(title = "暂无 RSS", message = rssState.emptyMessage, modifier = Modifier.weight(1f))
+                else -> LazyColumn(modifier = Modifier.weight(1f)) {
+                itemsIndexed(rssState.feeds) { index, source ->
                     ReaderListItem(
-                        title = source.name,
+                        title = source.title,
                         subtitle = "今日更新 ${source.updateCount} 篇",
                         onClick = { onSourceClick(index) }
                     )
                     ReaderDivider()
+                }
                 }
             }
             }
         }
     }
 }
+}
 
 @Composable
 fun RssDetailScreen(
     detail: RssDetail = RssDetail("深空信号更新", "来自订阅源的章节更新与说明。"),
+    article: RssArticleUiModel = DiscoverRssWebDavMapper.rssList().articles.firstOrNull()
+        ?: RssArticleUiModel("rss-detail-empty", "rss-feed-empty", detail.title, detail.description, "UI fixture"),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
     onBack: () -> Unit = {},
@@ -112,15 +132,21 @@ fun RssDetailScreen(
             ) {
                 ReaderCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        detail.title,
+                        article.title,
                         color = ReaderTheme.colors.controlInk,
                         style = ReaderTheme.typography.pageTitle
                     )
                     Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
                     Text(
-                        detail.description,
+                        article.description,
                         color = ReaderTheme.colors.bodyText,
                         style = ReaderTheme.typography.stateMessage
+                    )
+                    Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                    Text(
+                        article.publishedAt,
+                        color = ReaderTheme.colors.bodyText,
+                        style = ReaderTheme.typography.bookMeta
                     )
                 }
             }
@@ -142,6 +168,11 @@ fun RssSubscriptionManagementScreen(
         RssSubscription("订阅源 2"),
         RssSubscription("订阅源 3"),
         RssSubscription("订阅源 4")
+    ),
+    subscriptionState: RssSubscriptionUiState = DiscoverRssWebDavMapper.subscriptions(
+        subscriptions.mapIndexed { index, subscription ->
+            RssFeedUiModel("rss-subscription-$index", subscription.name, 0, subscription.enabled)
+        }
     ),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
@@ -165,9 +196,9 @@ fun RssSubscriptionManagementScreen(
                 }
             )
             LazyColumn(modifier = Modifier.weight(1f)) {
-                itemsIndexed(subscriptions) { index, sub ->
+                itemsIndexed(subscriptionState.feeds) { index, sub ->
                     ReaderSettingsSwitchRow(
-                        title = sub.name,
+                        title = sub.title,
                         checked = sub.enabled,
                         onCheckedChange = { onSubscriptionToggle(index, it) }
                     )
@@ -177,5 +208,4 @@ fun RssSubscriptionManagementScreen(
             }
         }
     }
-}
 }

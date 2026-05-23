@@ -2,9 +2,9 @@ package com.reader.android.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.net.URLEncoder
@@ -16,17 +16,54 @@ sealed class AppScreen(
     val icon: ImageVector
 ) {
     data object Bookshelf : AppScreen("bookshelf", "书架", Icons.Filled.Book)
-    data object BookSource : AppScreen("booksource", "书源", Icons.Filled.Search)
-    data object Reader : AppScreen("reader", "阅读", Icons.Filled.MenuBook)
-    data object Settings : AppScreen("settings", "设置", Icons.Filled.Settings)
+    data object Discover : AppScreen("discover", "发现", Icons.Filled.Explore)
+    data object Sources : AppScreen("sources", "书源", Icons.Filled.Hub)
+    data object Mine : AppScreen("mine", "我的", Icons.Filled.Person)
 }
 
 val appScreens = listOf(
     AppScreen.Bookshelf,
-    AppScreen.BookSource,
-    AppScreen.Reader,
-    AppScreen.Settings
+    AppScreen.Discover,
+    AppScreen.Sources,
+    AppScreen.Mine
 )
+
+object AppRouteGroups {
+    val bookshelf = setOf(
+        ReaderRoutes.BOOKSHELF,
+        Routes.SEARCH,
+        Routes.DETAIL,
+        Routes.TOC,
+        Routes.READER_CONTENT,
+        ReaderRoutes.READER
+    )
+
+    val discover = setOf(
+        ReaderRoutes.DISCOVER,
+        ReaderRoutes.RSS_LIST,
+        ReaderRoutes.RSS_DETAIL,
+        ReaderRoutes.RSS_SUBSCRIPTION
+    )
+
+    val sources = setOf(
+        ReaderRoutes.SOURCES,
+        ReaderRoutes.SOURCE_DETAIL,
+        ReaderRoutes.SOURCE_EDIT,
+        ReaderRoutes.SOURCE_IMPORT
+    )
+
+    val mine = setOf(
+        ReaderRoutes.MINE,
+        ReaderRoutes.GLOBAL_SETTINGS,
+        ReaderRoutes.WEBDAV_CONFIG,
+        ReaderRoutes.BACKUP_SETTINGS,
+        ReaderRoutes.PROGRESS_SYNC,
+        ReaderRoutes.REMOTE_WEBDAV_BOOKS,
+        ReaderRoutes.ABOUT,
+        ReaderRoutes.STATE_ERROR,
+        ReaderRoutes.STATE_OFFLINE
+    )
+}
 
 object Routes {
     const val SEARCH = "search"

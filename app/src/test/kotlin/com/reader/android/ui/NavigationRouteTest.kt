@@ -15,7 +15,7 @@ class NavigationRouteTest {
     fun `all tab routes are unique`() {
         val routes = appScreens.map { it.route }.toSet()
         assertEquals(4, routes.size)
-        assertEquals(setOf("bookshelf", "booksource", "reader", "settings"), routes)
+        assertEquals(setOf("bookshelf", "discover", "sources", "mine"), routes)
     }
 
     @Test
