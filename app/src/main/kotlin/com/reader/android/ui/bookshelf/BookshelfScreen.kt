@@ -2,16 +2,28 @@ package com.reader.android.ui.bookshelf
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.reader.android.ui.components.BookCard
+import com.reader.android.ui.components.BookListItem
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
@@ -23,12 +35,41 @@ import com.reader.android.ui.theme.ReaderTheme
 @Composable
 fun BookshelfScreen(
     onSearchClick: () -> Unit = {},
-    uiState: ReaderUiState? = null
+    uiState: ReaderUiState? = null,
+    bookshelfState: BookshelfUiState = BookshelfMapper.empty(),
+    onLayoutModeChange: (BookshelfLayoutMode) -> Unit = {},
+    onBookClick: (BookshelfBookUiModel) -> Unit = {},
+    onBookMoreClick: (BookshelfBookUiModel) -> Unit = {}
 ) {
     ReaderTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                ReaderAppTopBar(title = "书架")
+                ReaderAppTopBar(
+                    title = "书架",
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                onLayoutModeChange(
+                                    if (bookshelfState.layoutMode == BookshelfLayoutMode.Cover) {
+                                        BookshelfLayoutMode.List
+                                    } else {
+                                        BookshelfLayoutMode.Cover
+                                    }
+                                )
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (bookshelfState.layoutMode == BookshelfLayoutMode.Cover) {
+                                    Icons.AutoMirrored.Filled.ViewList
+                                } else {
+                                    Icons.Filled.GridView
+                                },
+                                contentDescription = "切换书架布局",
+                                tint = ReaderTheme.colors.controlInk
+                            )
+                        }
+                    }
+                )
                 when (uiState) {
                     is ReaderUiState.Loading -> ReaderLoadingState(modifier = Modifier.weight(1f))
                     is ReaderUiState.Error -> ReaderErrorState(
@@ -38,9 +79,10 @@ fun BookshelfScreen(
                         onRetryClick = if (uiState.retryable) ({}) else null
                     )
                     is ReaderUiState.Offline -> ReaderOfflineState(modifier = Modifier.weight(1f))
-                    else -> ReaderEmptyState(
-                        title = "书架为空",
-                        message = "点击右下角按钮搜索书籍",
+                    else -> BookshelfContent(
+                        state = bookshelfState,
+                        onBookClick = onBookClick,
+                        onBookMoreClick = onBookMoreClick,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -52,6 +94,109 @@ fun BookshelfScreen(
                     .padding(16.dp)
             ) {
                 Icon(Icons.Filled.Search, contentDescription = "搜索")
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookshelfContent(
+    state: BookshelfUiState,
+    onBookClick: (BookshelfBookUiModel) -> Unit,
+    onBookMoreClick: (BookshelfBookUiModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when {
+        state.isLoading -> ReaderLoadingState(modifier = modifier)
+        state.errorMessage != null -> ReaderErrorState(
+            title = "加载失败",
+            message = state.errorMessage,
+            modifier = modifier
+        )
+        state.isEmpty -> ReaderEmptyState(
+            title = "书架为空",
+            message = state.emptyMessage.ifBlank { "点击右下角按钮搜索书籍" },
+            modifier = modifier
+        )
+        state.layoutMode == BookshelfLayoutMode.Cover -> BookshelfCoverMode(
+            books = state.books,
+            onBookClick = onBookClick,
+            onBookMoreClick = onBookMoreClick,
+            modifier = modifier
+        )
+        else -> BookshelfListMode(
+            books = state.books,
+            onBookClick = onBookClick,
+            onBookMoreClick = onBookMoreClick,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun BookshelfCoverMode(
+    books: List<BookshelfBookUiModel>,
+    onBookClick: (BookshelfBookUiModel) -> Unit,
+    onBookMoreClick: (BookshelfBookUiModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier = modifier.padding(horizontal = ReaderTheme.spacing.screenPadding)) {
+        items(books.chunked(2)) { rowBooks ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                rowBooks.forEach { book ->
+                    Column(modifier = Modifier.weight(1f).padding(vertical = ReaderTheme.spacing.xs)) {
+                        BookCard(
+                            title = book.title,
+                            author = listOfNotNull(book.author, book.sourceName, book.cacheState.label).joinToString(" · "),
+                            progress = book.progress,
+                            onClick = { onBookClick(book) }
+                        )
+                        IconButton(onClick = { onBookMoreClick(book) }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = "更多，${book.title}",
+                                tint = ReaderTheme.colors.controlInk
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(ReaderTheme.spacing.sm))
+                }
+                if (rowBooks.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookshelfListMode(
+    books: List<BookshelfBookUiModel>,
+    onBookClick: (BookshelfBookUiModel) -> Unit,
+    onBookMoreClick: (BookshelfBookUiModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier = modifier) {
+        items(books, key = { it.id }) { book ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = ReaderTheme.spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BookListItem(
+                    title = book.title,
+                    author = book.author,
+                    latestChapter = "${book.currentChapterTitle} · ${book.sourceName} · ${book.cacheState.label}",
+                    progress = book.progress,
+                    onClick = { onBookClick(book) },
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { onBookMoreClick(book) }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "更多，${book.title}",
+                        tint = ReaderTheme.colors.controlInk
+                    )
+                }
             }
         }
     }
