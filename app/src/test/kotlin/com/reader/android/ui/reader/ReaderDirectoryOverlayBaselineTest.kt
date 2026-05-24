@@ -59,9 +59,10 @@ class ReaderDirectoryOverlayBaselineTest {
     }
 
     @Test
-    fun `toc entry has level badge text`() {
-        // Level indicator like "L1", "L2"
-        assertTrue("TOC must show level badge", "L${"$"}{entry.level}" in overlaySource)
+    fun `toc entry uses level for indentation`() {
+        // Level drives indentation: (entry.level - 1) * 10
+        assertTrue("TOC must use level for indent", "entry.level" in overlaySource)
+        assertTrue("TOC must compute indent from level", "(entry.level - 1)" in overlaySource)
     }
 
     @Test

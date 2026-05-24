@@ -53,7 +53,9 @@ data class SearchMatch(
 
 data class ReplaceRule(
     val name: String,
-    val description: String,
+    val pattern: String,
+    val replacement: String,
+    val scope: String,
     val enabled: Boolean
 )
 
@@ -336,36 +338,49 @@ fun ReaderReplaceOverlay(
             verticalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.xs)
         ) {
             rules.forEachIndexed { index, rule ->
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(ReaderTheme.shapes.small)
                         .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
-                        .padding(horizontal = ReaderTheme.spacing.sm, vertical = ReaderTheme.spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(ReaderTheme.spacing.sm)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            rule.name,
-                            color = ReaderTheme.colors.controlInk,
-                            style = ReaderTheme.typography.bookTitle
-                        )
-                        Text(
-                            rule.description,
-                            color = ReaderTheme.colors.bodyText,
-                            style = ReaderTheme.typography.bookMeta
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                rule.name,
+                                color = ReaderTheme.colors.controlInk,
+                                style = ReaderTheme.typography.bookTitle
+                            )
+                            Text(
+                                "范围：${rule.scope}",
+                                color = ReaderTheme.colors.bodyText,
+                                style = ReaderTheme.typography.bookMeta
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(ReaderTheme.spacing.sm))
+                        Switch(
+                            checked = rule.enabled,
+                            onCheckedChange = { onRuleToggle(index, it) },
+                            modifier = Modifier.size(40.dp, 24.dp),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = ReaderTheme.colors.paperBg,
+                                checkedTrackColor = ReaderTheme.colors.primary,
+                                uncheckedThumbColor = ReaderTheme.colors.controlInk,
+                                uncheckedTrackColor = ReaderTheme.colors.mutedTrack
+                            )
                         )
                     }
-                    Spacer(modifier = Modifier.width(ReaderTheme.spacing.sm))
-                    Switch(
-                        checked = rule.enabled,
-                        onCheckedChange = { onRuleToggle(index, it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = ReaderTheme.colors.paperBg,
-                            checkedTrackColor = ReaderTheme.colors.primary,
-                            uncheckedThumbColor = ReaderTheme.colors.controlInk,
-                            uncheckedTrackColor = ReaderTheme.colors.mutedTrack
-                        )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "匹配：${rule.pattern}",
+                        color = ReaderTheme.colors.bodyText,
+                        style = ReaderTheme.typography.bookMeta
+                    )
+                    Text(
+                        "替换：${rule.replacement}",
+                        color = ReaderTheme.colors.primary,
+                        style = ReaderTheme.typography.bookMeta
                     )
                 }
             }

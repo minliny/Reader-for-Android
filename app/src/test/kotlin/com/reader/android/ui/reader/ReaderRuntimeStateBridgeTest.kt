@@ -43,8 +43,12 @@ class ReaderRuntimeStateBridgeTest {
     fun `replace overlay shows current book rules only`() {
         val state = ReaderRuntimeFixture.createReplaceOverlay()
         assertEquals(3, state.replaceRules.size)
-        assertTrue(state.replaceRules.any { it.name == "净化广告段落" })
-        // All rules belong to the current book context
+        assertTrue(state.replaceRules.any { it.name == "去除章节尾广告" })
+        // Rules must have specific pattern/replacement/scope, not just description
+        val firstRule = state.replaceRules.first()
+        assertTrue(firstRule.pattern.isNotBlank())
+        assertTrue(firstRule.replacement.isNotBlank())
+        assertTrue(firstRule.scope.isNotBlank())
     }
 
     @Test

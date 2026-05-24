@@ -27,9 +27,27 @@ object ReaderRuntimeFixture {
     )
 
     val sampleReplaceRules = listOf(
-        ReaderReplaceRuleUiModel("净化广告段落", "移除章节中异常推广段", enabled = true),
-        ReaderReplaceRuleUiModel("合并异常断行", "修复不自然换行", enabled = true),
-        ReaderReplaceRuleUiModel("修正常见乱码", "替换缺失或错码字符", enabled = false)
+        ReaderReplaceRuleUiModel(
+            name = "去除章节尾广告",
+            pattern = "请收藏本站.*\$",
+            replacement = "空",
+            scope = "当前书籍",
+            enabled = true
+        ),
+        ReaderReplaceRuleUiModel(
+            name = "清理发布页提示",
+            pattern = "本章由.*?整理",
+            replacement = "空",
+            scope = "当前章节",
+            enabled = true
+        ),
+        ReaderReplaceRuleUiModel(
+            name = "统一省略号",
+            pattern = "\\.{3,}",
+            replacement = "……",
+            scope = "正文内容",
+            enabled = false
+        )
     )
 
     val sampleTocEntries = listOf(

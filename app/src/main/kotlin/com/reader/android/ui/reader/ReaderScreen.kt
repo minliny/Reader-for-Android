@@ -255,7 +255,7 @@ private fun OverlayContent(
                     modifier = Modifier.fillMaxSize(),
                     bookName = state.book.bookTitle,
                     rules = state.replaceRules.map {
-                        ReplaceRule(it.name, it.description, it.enabled)
+                        ReplaceRule(it.name, it.pattern, it.replacement, it.scope, it.enabled)
                     },
                     onDismiss = onOverlayDismiss
                 )

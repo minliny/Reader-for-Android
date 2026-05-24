@@ -67,7 +67,9 @@ enum class ReaderAutoScrollState {
 
 data class ReaderReplaceRuleUiModel(
     val name: String,
-    val description: String,
+    val pattern: String,
+    val replacement: String,
+    val scope: String,
     val enabled: Boolean
 )
 

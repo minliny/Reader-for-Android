@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -109,25 +110,23 @@ fun ReaderDirectoryOverlay(
 
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
 
-        // TOC list
+        // TOC list — clean, no card-style borders
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             itemsIndexed(tocEntries) { index, entry ->
                 val indentStart = (entry.level - 1) * 10
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(ReaderTheme.shapes.small)
                         .then(
-                            if (entry.isCurrent) Modifier.background(ReaderTheme.colors.primary.copy(alpha = 0.12f))
+                            if (entry.isCurrent) Modifier.background(ReaderTheme.colors.primary.copy(alpha = 0.10f))
                             else Modifier
                         )
-                        .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
                         .clickable(role = Role.Button) { onTocEntryClick(index) }
                         .semantics { contentDescription = "目录条目，${entry.title}" + if (entry.isCurrent) "，当前" else "" }
-                        .padding(start = (14 + indentStart).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
+                        .padding(start = (10 + indentStart).dp, top = 8.dp, bottom = 8.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Bookmark indicator
@@ -136,10 +135,10 @@ fun ReaderDirectoryOverlay(
                             Icons.Filled.ChevronRight,
                             contentDescription = "书签",
                             tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     } else {
-                        Spacer(modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.size(14.dp))
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     // Current reading indicator
@@ -148,23 +147,15 @@ fun ReaderDirectoryOverlay(
                             Icons.Filled.MyLocation,
                             contentDescription = "当前阅读位置",
                             tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     } else {
-                        Spacer(modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.size(14.dp))
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    // Level badge
-                    Text(
-                        text = "L${entry.level}",
-                        color = ReaderTheme.colors.bodyText,
-                        style = ReaderTheme.typography.bookMeta,
-                        modifier = Modifier.width(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = entry.title,
-                        color = ReaderTheme.colors.controlInk,
+                        color = if (entry.isCurrent) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
                         style = ReaderTheme.typography.bookTitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -172,11 +163,11 @@ fun ReaderDirectoryOverlay(
                     )
                     // Right-side progress bar
                     if (entry.progress != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         LinearProgressIndicator(
                             progress = { entry.progress.coerceIn(0f, 1f) },
                             modifier = Modifier
-                                .width(36.dp)
+                                .width(40.dp)
                                 .height(4.dp)
                                 .clip(CircleShape)
                                 .semantics { contentDescription = "章节进度，${(entry.progress * 100).toInt()}%" },
@@ -339,10 +330,9 @@ private fun TtsSettingRow(label: String, currentValue: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(ReaderTheme.shapes.chip)
+            .heightIn(min = SettingRowMinHeight)
             .clickable(role = Role.Button) { }
-            .semantics { contentDescription = "$label，当前$currentValue" }
-            .padding(vertical = ReaderTheme.spacing.xs),
+            .semantics { contentDescription = "$label，当前$currentValue" },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -350,7 +340,7 @@ private fun TtsSettingRow(label: String, currentValue: String) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(currentValue, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta)
             Spacer(modifier = Modifier.width(4.dp))
-            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(SettingRowIconSize))
         }
     }
 }
@@ -424,13 +414,18 @@ private fun AppSettingRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = ReaderTheme.spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .heightIn(min = 44.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.bookTitle)
         Text(value, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta)
     }
 }
+
+// Unified setting row dimensional tokens
+private val SettingRowIconSize = 20.dp
+private val SettingRowMinHeight = 44.dp
 
 // ── Settings overlay (reading behavior only!) ──
 
@@ -470,8 +465,8 @@ fun ReaderSettingsOverlay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "${item.name}，${item.value}" }
-                        .padding(vertical = ReaderTheme.spacing.xs),
+                        .heightIn(min = SettingRowMinHeight)
+                        .semantics { contentDescription = "${item.name}，${item.value}" },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -483,8 +478,8 @@ fun ReaderSettingsOverlay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "${sw.name}，${if (sw.checked) "已开启" else "已关闭"}" }
-                        .padding(vertical = ReaderTheme.spacing.xs),
+                        .heightIn(min = SettingRowMinHeight)
+                        .semantics { contentDescription = "${sw.name}，${if (sw.checked) "已开启" else "已关闭"}" },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -492,6 +487,7 @@ fun ReaderSettingsOverlay(
                     Switch(
                         checked = sw.checked,
                         onCheckedChange = { onSwitchChange(index, it) },
+                        modifier = Modifier.size(40.dp, 24.dp),
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = ReaderTheme.colors.paperBg,
                             checkedTrackColor = ReaderTheme.colors.primary,

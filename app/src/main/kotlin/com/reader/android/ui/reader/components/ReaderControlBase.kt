@@ -103,7 +103,11 @@ fun ReaderControlBase(
     val pageControlBottomInset = bottomBarHeight + bottomSafeGap
     val bottomOverlayBottomInset = bottomBarHeight + bottomSafeGap
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ReaderTheme.colors.paperBg)
+    ) {
         // Reading content behind all controls
         content()
 
