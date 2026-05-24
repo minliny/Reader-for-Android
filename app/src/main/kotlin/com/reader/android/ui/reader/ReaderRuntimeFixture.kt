@@ -51,11 +51,13 @@ object ReaderRuntimeFixture {
     )
 
     val sampleTocEntries = listOf(
-        ReaderTocEntryUiModel("第一章：阿长与《山海经》", level = 1, isCurrent = false, hasBookmark = false, progress = 1f),
-        ReaderTocEntryUiModel("深空信号", level = 2, isCurrent = true, hasBookmark = true, progress = 0.25f),
-        ReaderTocEntryUiModel("第二节：寂静航线", level = 2, isCurrent = false, hasBookmark = false, progress = 0f),
-        ReaderTocEntryUiModel("未知频段", level = 3, isCurrent = false, hasBookmark = false, progress = 0f),
-        ReaderTocEntryUiModel("求救信号", level = 4, isCurrent = false, hasBookmark = true, progress = 0f)
+        ReaderTocEntryUiModel("第一章：阿长与《山海经》", level = 2, isCurrent = false, hasBookmark = true, progress = 1f),
+        ReaderTocEntryUiModel("第二节：深空信号", level = 2, isCurrent = true, hasBookmark = true, progress = 0.35f),
+        ReaderTocEntryUiModel("第三节：寂静航线", level = 2, isCurrent = false, hasBookmark = false, progress = 0f),
+        ReaderTocEntryUiModel("第四节：未知频段", level = 2, isCurrent = false, hasBookmark = false, progress = 0f),
+        ReaderTocEntryUiModel("第五节：求救信号", level = 2, isCurrent = false, hasBookmark = true, progress = 0f),
+        ReaderTocEntryUiModel("第二章：旧地球的遗产", level = 2, isCurrent = false, hasBookmark = false, progress = 0f),
+        ReaderTocEntryUiModel("第三章：星门之外", level = 2, isCurrent = false, hasBookmark = false, progress = 0f)
     )
 
     val searchResults = listOf(
@@ -97,7 +99,7 @@ object ReaderRuntimeFixture {
         controlLayerState = ReaderControlLayerState.BottomFunctionOverlay(ReaderOverlayType.DIRECTORY),
         tocBookmarkState = ReaderTocBookmarkState(
             entries = sampleTocEntries,
-            volumeInfo = "第一本 / 第一卷",
+            volumeInfo = "深空信号 · 共 3 卷 7 章",
             activeTab = "目录"
         )
     )

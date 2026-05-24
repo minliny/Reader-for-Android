@@ -89,10 +89,12 @@ class ReaderRuntimeStateBridgeTest {
     @Test
     fun `directory overlay has toc entries`() {
         val state = ReaderRuntimeFixture.createDirectoryOverlay()
-        assertEquals(5, state.tocBookmarkState.entries.size)
+        assertEquals(7, state.tocBookmarkState.entries.size)
         assertEquals("目录", state.tocBookmarkState.activeTab)
         assertTrue(state.tocBookmarkState.entries.any { it.isCurrent })
         assertTrue(state.tocBookmarkState.entries.any { it.hasBookmark })
+        // All entries at level 2 (flat chapters, no deep nesting)
+        assertTrue(state.tocBookmarkState.entries.all { it.level == 2 })
     }
 
     @Test
