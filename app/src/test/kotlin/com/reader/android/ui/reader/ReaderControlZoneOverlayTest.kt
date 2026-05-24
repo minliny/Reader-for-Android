@@ -39,13 +39,11 @@ class ReaderControlZoneOverlayTest {
     }
 
     @Test
-    fun `quick action overlays do not use fillMaxSize opaque full screen`() {
-        // The overlayContent lambda is rendered inside a zoned Box in ReaderControlBase,
-        // NOT as fillMaxSize in ReaderScreen
+    fun `quick action overlays receive fillMaxSize within zone box`() {
+        // Overlays use fillMaxSize() to fill the zone Box which constrains them via padding
         val screenOverlaySection = screenSource.substringAfter("OverlayContent").take(3000)
-        // Overlay composables inside OverlayContent should NOT receive fillMaxSize modifier
-        assertFalse(
-            "Quick action overlay composables must not receive fillMaxSize",
+        assertTrue(
+            "Quick action overlay composables must receive fillMaxSize to fill zone",
             "ReaderSearchOverlay(" in screenOverlaySection &&
                 "Modifier.fillMaxSize()" in screenOverlaySection.take(
                     screenOverlaySection.indexOf("ReaderSearchOverlay") + 500
@@ -54,15 +52,14 @@ class ReaderControlZoneOverlayTest {
     }
 
     @Test
-    fun `bottom function overlays do not use fillMaxSize opaque full screen`() {
+    fun `bottom function overlays receive fillMaxSize within zone box`() {
         val screenOverlaySection = screenSource.substringAfter("BottomFunctionOverlay").take(3000)
-        // Overlay composables must not receive fillMaxSize
-        val hasFullScreen = listOf("Modifier.fillMaxSize()", "modifier = Modifier.fillMaxSize()").any {
+        val hasFillMaxSize = listOf("Modifier.fillMaxSize()", "modifier = Modifier.fillMaxSize()").any {
             it in screenOverlaySection
         }
-        assertFalse(
-            "Bottom overlay composables must not receive fillMaxSize",
-            hasFullScreen
+        assertTrue(
+            "Bottom overlay composables must receive fillMaxSize to fill zone",
+            hasFillMaxSize
         )
     }
 

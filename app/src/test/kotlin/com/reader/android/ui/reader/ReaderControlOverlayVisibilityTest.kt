@@ -92,13 +92,13 @@ class ReaderControlOverlayVisibilityTest {
             "chapterTitle" in screenSource)
     }
 
-    // ── No fillMaxSize pass-through ──
+    // ── fillMaxSize passed within zone ──
 
     @Test
-    fun `overlay composables inside OverlayContent do not receive fillMaxSize`() {
+    fun `overlay composables inside OverlayContent receive fillMaxSize constrained by zone`() {
         val overlaySection = screenSource.substringAfter("fun OverlayContent").take(2000)
-        assertFalse(
-            "Overlay composables must not use fillMaxSize",
+        assertTrue(
+            "Overlay composables must use fillMaxSize to fill zone Box",
             "Modifier.fillMaxSize()" in overlaySection
         )
     }

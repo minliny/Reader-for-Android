@@ -235,6 +235,7 @@ private fun OverlayContent(
         is ReaderControlLayerState.QuickActionOverlay -> {
             when (overlayState.type) {
                 ReaderOverlayType.SEARCH -> ReaderSearchOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     query = state.searchState.query,
                     resultCount = state.searchState.resultCount,
                     results = state.searchState.results.map {
@@ -244,12 +245,14 @@ private fun OverlayContent(
                     onDismiss = onOverlayDismiss
                 )
                 ReaderOverlayType.AUTO_SCROLL -> ReaderAutoScrollOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     isRunning = state.autoScrollState == ReaderAutoScrollState.RUNNING,
                     speed = AutoScrollSpeed.Medium,
                     mode = AutoScrollMode.Scroll,
                     onDismiss = onOverlayDismiss
                 )
                 ReaderOverlayType.REPLACE -> ReaderReplaceOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     bookName = state.book.bookTitle,
                     rules = state.replaceRules.map {
                         ReplaceRule(it.name, it.description, it.enabled)
@@ -262,6 +265,7 @@ private fun OverlayContent(
         is ReaderControlLayerState.BottomFunctionOverlay -> {
             when (overlayState.type) {
                 ReaderOverlayType.DIRECTORY -> ReaderDirectoryOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     tocEntries = state.tocBookmarkState.entries.map {
                         TocEntry(it.title, it.level, it.isCurrent, it.hasBookmark, it.progress)
                     },
@@ -270,6 +274,7 @@ private fun OverlayContent(
                     onDismiss = onOverlayDismiss
                 )
                 ReaderOverlayType.TTS -> ReaderTtsOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     isPlaying = state.ttsState == ReaderTtsState.PLAYING,
                     currentTime = "00:00",
                     totalTime = "08:12",
@@ -280,6 +285,7 @@ private fun OverlayContent(
                     onDismiss = onOverlayDismiss
                 )
                 ReaderOverlayType.APPEARANCE -> ReaderAppearanceOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     fontName = "默认",
                     fontSize = "18",
                     letterSpacing = "标准",
@@ -293,6 +299,7 @@ private fun OverlayContent(
                     onDismiss = onOverlayDismiss
                 )
                 ReaderOverlayType.SETTINGS -> ReaderSettingsOverlay(
+                    modifier = Modifier.fillMaxSize(),
                     items = listOf(
                         AppSettingItem("屏幕方向", "跟随系统"),
                         AppSettingItem("屏幕超时", "5 分钟"),
