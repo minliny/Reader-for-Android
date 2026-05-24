@@ -10,7 +10,11 @@ data class SearchResultUiModel(
     val category: String,
     val latestChapter: String,
     val intro: String,
-    val detailTarget: String
+    val detailTarget: String,
+    val cover: String = "",
+    val status: String = "",
+    val isInBookshelf: Boolean = false,
+    val actionLabel: String = "查看详情"
 )
 
 data class SearchUiState(
