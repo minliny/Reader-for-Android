@@ -17,7 +17,7 @@ import com.reader.android.data.model.BookSource
 object ReaderDirectoryAdapterShell {
 
     private val bridge: CoreBridge by lazy { FakeCoreBridge() }
-    private val localState = ReaderTocLocalStateJoiner()
+    private val localState = ReaderLocalStateProvider.Empty
 
     enum class Mode { FAKE, REAL }
 
@@ -48,7 +48,7 @@ object ReaderDirectoryAdapterShell {
             if (tocItems.isEmpty()) return ReaderTocFacadeErrorMapper.emptyToc()
 
             val entries = CoreTocToReaderTocMapper.map(tocItems)
-            val joined = localState.join(entries)
+            val joined = localState.joinToc(entries)
 
             ReaderTocBookmarkState(
                 entries = joined,
