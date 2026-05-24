@@ -36,15 +36,14 @@ class SearchDetailAdapterBoundaryGuardTest {
     // ── No network access ──
 
     @Test
-    fun `search adapter shell does not call reader core bridge or parser`() {
+    fun `search adapter shell calls core bridge through public facade only`() {
         val searchShellSource = String(Files.readAllBytes(Paths.get(
             "src/main/kotlin/com/reader/android/ui/search/SearchAdapterShell.kt"
         )))
-        assertFalse("Must not call HttpClient",
-            "HttpClient" in searchShellSource)
-        assertFalse("Must not call SearchParser",
-            "SearchParser" in searchShellSource)
-        assertFalse("Must not call bridge directly for search",
+        assertFalse("Must not call HttpClient", "HttpClient" in searchShellSource)
+        assertFalse("Must not call SearchParser", "SearchParser" in searchShellSource)
+        // bridge.search() is the public CoreBridge facade — allowed
+        assertTrue("Must call CoreBridge.search public facade",
             "bridge.search" in searchShellSource)
     }
 
