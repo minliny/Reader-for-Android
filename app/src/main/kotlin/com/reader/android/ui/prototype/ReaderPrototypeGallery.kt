@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -153,15 +155,15 @@ fun ReaderPrototypeSurface(entry: ReaderPrototypeEntry) {
         "bookshelf-cover" -> BookshelfScreen(bookshelfState = ReaderPrototypeFixtures.bookshelfCover)
         "bookshelf-list" -> BookshelfScreen(bookshelfState = ReaderPrototypeFixtures.bookshelfList)
         "bookshelf-empty" -> BookshelfScreen(bookshelfState = ReaderPrototypeFixtures.bookshelfEmpty)
-        "reader-base" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[0])
-        "reader-search" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[1])
-        "reader-auto-scroll" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[2])
-        "reader-replace" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[3])
-        "reader-night" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[4])
-        "reader-directory" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[5])
-        "reader-tts" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[6])
-        "reader-appearance" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[7])
-        "reader-settings" -> ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[8])
+        "reader-base" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[0]) }
+        "reader-search" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[1]) }
+        "reader-auto-scroll" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[2]) }
+        "reader-replace" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[3]) }
+        "reader-night" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[4]) }
+        "reader-directory" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[5]) }
+        "reader-tts" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[6]) }
+        "reader-appearance" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[7]) }
+        "reader-settings" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[8]) }
         "discover-home" -> DiscoverScreen(discoverState = ReaderPrototypeFixtures.discover)
         "rss-list" -> RssListScreen(rssState = ReaderPrototypeFixtures.rssList)
         "rss-detail" -> RssDetailScreen(article = ReaderPrototypeFixtures.rssList.articles.first())
@@ -176,6 +178,17 @@ fun ReaderPrototypeSurface(entry: ReaderPrototypeEntry) {
         "state-offline" -> ReaderOfflineState(retryText = "重试", onRetryClick = {})
         "state-permission" -> ReaderPermissionRequiredState(title = "需要权限", message = "授权后才能继续读取本地文件", onActionClick = {})
         else -> ReaderPrototypeCard(entry)
+    }
+}
+
+@Composable
+private fun ReaderPreview(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 600.dp)
+    ) {
+        content()
     }
 }
 
