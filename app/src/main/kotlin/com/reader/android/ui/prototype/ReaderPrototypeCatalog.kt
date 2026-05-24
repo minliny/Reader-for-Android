@@ -69,6 +69,19 @@ object ReaderPrototypeCatalog {
             id = id,
             title = title,
             group = group,
-            description = "Prototype fixture only"
+            description = descriptionFor(group)
         )
+
+    private fun descriptionFor(group: ReaderPrototypeGroup): String =
+        when (group) {
+            ReaderPrototypeGroup.APP_NAVIGATION -> "正式主导航预览"
+            ReaderPrototypeGroup.BOOKSHELF -> "书架模块 UI fixture"
+            ReaderPrototypeGroup.SEARCH_DETAIL -> "二级搜索与详情状态"
+            ReaderPrototypeGroup.READER -> "阅读页控制层状态"
+            ReaderPrototypeGroup.SOURCE_MANAGEMENT -> "书源管理状态预览"
+            ReaderPrototypeGroup.DISCOVER_RSS -> "发现与 RSS 状态预览"
+            ReaderPrototypeGroup.WEBDAV_SYNC -> "同步与备份状态预览"
+            ReaderPrototypeGroup.SETTINGS -> "我的与全局设置入口"
+            ReaderPrototypeGroup.GLOBAL_STATES -> "全局状态页预览"
+        }
 }

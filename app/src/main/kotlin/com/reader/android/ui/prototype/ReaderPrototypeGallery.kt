@@ -1,6 +1,8 @@
 package com.reader.android.ui.prototype
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.reader.android.ui.appScreens
 import com.reader.android.ui.bookshelf.BookshelfScreen
 import com.reader.android.ui.components.ReaderAppTopBar
@@ -48,25 +51,28 @@ fun ReaderPrototypeGallery() {
 
     ReaderTheme {
         Column(modifier = Modifier.fillMaxSize()) {
-            ReaderAppTopBar(title = "Reader UI Prototype Gallery")
+            ReaderAppTopBar(title = "UI 原型预览")
             LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = ReaderTheme.spacing.screenPadding)
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = ReaderTheme.spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.xs)
             ) {
+                item {
+                    PrototypeGalleryIntro(selectedEntry)
+                }
                 ReaderPrototypeCatalog.groupedEntries.forEach { (group, entries) ->
                     item { ReaderSectionHeader(title = group.title) }
                     items(entries, key = { it.id }) { entry ->
-                        ReaderListItem(
-                            title = entry.title,
-                            subtitle = entry.description,
+                        PrototypeEntryRow(
+                            entry = entry,
+                            selected = entry.id == selectedEntry.id,
                             onClick = { selectedEntry = entry }
                         )
                     }
                 }
                 item {
                     Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
-                    ReaderSectionHeader(title = "Selected Prototype")
+                    ReaderSectionHeader(title = "当前预览")
                     ReaderPrototypeSurface(selectedEntry)
                     Spacer(modifier = Modifier.height(ReaderTheme.spacing.lg))
                 }
@@ -84,6 +90,61 @@ fun ReaderPrototypeGallery() {
 @Composable
 fun ReaderPrototypeGalleryPreview() {
     ReaderPrototypeGallery()
+}
+
+@Composable
+private fun PrototypeGalleryIntro(selectedEntry: ReaderPrototypeEntry) {
+    ReaderCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ReaderTheme.spacing.screenPadding, vertical = ReaderTheme.spacing.sm)
+    ) {
+        Text("原型目录", color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+        Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+        Text(
+            "共 ${ReaderPrototypeCatalog.entries.size} 个页面，全部使用 UI fixture，不接真实网络。",
+            color = ReaderTheme.colors.bodyText,
+            style = ReaderTheme.typography.stateMessage
+        )
+        Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
+        ReaderChip(text = "当前：${selectedEntry.title}", selected = true)
+    }
+}
+
+@Composable
+private fun PrototypeEntryRow(
+    entry: ReaderPrototypeEntry,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    if (selected) {
+        ReaderCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ReaderTheme.spacing.screenPadding),
+            onClick = onClick,
+            contentDescription = "当前选中原型，${entry.title}"
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(entry.title, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.bookTitle)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(entry.description, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta)
+                }
+                ReaderChip(text = "已选", selected = true)
+            }
+        }
+    } else {
+        ReaderListItem(
+            title = entry.title,
+            subtitle = entry.description,
+            contentDescription = "打开原型，${entry.title}",
+            onClick = onClick
+        )
+    }
 }
 
 @Composable
@@ -110,10 +171,10 @@ fun ReaderPrototypeSurface(entry: ReaderPrototypeEntry) {
         "progress-sync" -> ProgressSyncStatusScreen(progressSyncState = ReaderPrototypeFixtures.progressSyncConflict)
         "remote-webdav-books" -> RemoteWebDavBooksScreen(remoteState = ReaderPrototypeFixtures.remoteBooks)
         "state-loading" -> ReaderLoadingState(message = "加载中")
-        "state-empty" -> ReaderEmptyState(title = "暂无内容", message = "这是 prototype empty 状态")
-        "state-error" -> ReaderErrorState(title = "加载失败", message = "这是 prototype error 状态")
-        "state-offline" -> ReaderOfflineState()
-        "state-permission" -> ReaderPermissionRequiredState(title = "需要权限", message = "请授权后继续")
+        "state-empty" -> ReaderEmptyState(title = "暂无内容", message = "请选择导入本地书或搜索书籍", actionText = "去搜索", onActionClick = {})
+        "state-error" -> ReaderErrorState(title = "加载失败", message = "这是原型错误状态", retryText = "重试", onRetryClick = {})
+        "state-offline" -> ReaderOfflineState(retryText = "重试", onRetryClick = {})
+        "state-permission" -> ReaderPermissionRequiredState(title = "需要权限", message = "授权后才能继续读取本地文件", onActionClick = {})
         else -> ReaderPrototypeCard(entry)
     }
 }
@@ -139,7 +200,7 @@ private fun ReaderPrototypeCard(entry: ReaderPrototypeEntry) {
             "source-test-disabled-error" -> SourcePrototype("书源测试/禁用/错误状态", "loading / success / failure / disabled")
             "sync-error" -> SyncErrorPrototype()
             "global-settings" -> GlobalSettingsPrototype()
-            else -> Text("Prototype fixture only", color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.stateMessage)
+            else -> Text("仅使用 UI fixture", color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.stateMessage)
         }
     }
 }
@@ -161,7 +222,10 @@ private fun AppShellPrototype() {
             onTabSelected = {}
         )
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.xs)
+        ) {
             appScreens.forEach { screen ->
                 ReaderChip(text = screen.label, selected = screen.label == "书架")
             }
