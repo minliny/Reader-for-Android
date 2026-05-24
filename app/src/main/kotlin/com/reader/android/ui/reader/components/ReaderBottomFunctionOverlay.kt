@@ -129,30 +129,7 @@ fun ReaderDirectoryOverlay(
                         .padding(start = (10 + indentStart).dp, top = 8.dp, bottom = 8.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Bookmark indicator
-                    if (entry.hasBookmark) {
-                        Icon(
-                            Icons.Filled.ChevronRight,
-                            contentDescription = "书签",
-                            tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.size(14.dp))
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    // Current reading indicator
-                    if (entry.isCurrent) {
-                        Icon(
-                            Icons.Filled.MyLocation,
-                            contentDescription = "当前阅读位置",
-                            tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.size(14.dp))
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
+                    // Chapter title — left-aligned, main area
                     Text(
                         text = entry.title,
                         color = if (entry.isCurrent) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
@@ -161,7 +138,25 @@ fun ReaderDirectoryOverlay(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    // Right-side progress bar
+                    // Right-side indicators: bookmark → current → progress
+                    if (entry.hasBookmark) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Filled.ChevronRight,
+                            contentDescription = "书签",
+                            tint = ReaderTheme.colors.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    if (entry.isCurrent) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Filled.MyLocation,
+                            contentDescription = "当前阅读位置",
+                            tint = ReaderTheme.colors.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                     if (entry.progress != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         LinearProgressIndicator(
