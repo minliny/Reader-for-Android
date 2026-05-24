@@ -6,89 +6,87 @@ READER_DIRECTORY_ALIGNMENT_FIX_READY
 
 ## 2. 输入反馈
 
-用户设备端反馈：
-1. 目录列表项左侧出现大量空白和图标，章节名不靠左，被图标挤到中间
-2. 不需要这么多级的目录
-3. 进度条是指整本书的进度条，当前章节进度条可以保留
+- 目录页章节名前有大量空白和图标，章节名不靠左
+- 章节信息应左侧靠边，状态图标应在右侧
+- 不需要多级目录
+- 进度条是整本书进度，不是当前章节进度
+- 书签位置应一致，不因定位图标而偏移
 
-## 3. 修改范围
+## 3. 修改范围（4 commits）
 
-| 文件 | 变更类型 | 说明 |
-|------|---------|------|
-| `app/.../reader/components/ReaderBottomFunctionOverlay.kt` | 修改 | 目录行重排：图标从标题左侧移至右侧 |
-| `app/.../reader/ReaderRuntimeFixture.kt` | 修改 | TOC 展平为 2 级 7 章；progress 语义改为整本书进度 |
-| `app/.../reader/ReaderRuntimeStateBridgeTest.kt` | 修改 | 适配新条目数量（5→7）+ level 验证 |
-| `app/.../reader/ReaderDirectoryRowAlignmentTest.kt` | 新增 | 13 个对齐验证测试 |
+| Commit | 文件 | 说明 |
+|--------|------|------|
+| `3c70343` | `ReaderBottomFunctionOverlay.kt` | 图标从标题左侧移至右侧；新增 `ReaderDirectoryRowAlignmentTest.kt` |
+| `e8e6793` | `ReaderRuntimeFixture.kt`, `ReaderRuntimeStateBridgeTest.kt` | TOC 展平为 2 级 7 章；progress 语义改为书级进度 |
+| `8beef76` | `ReaderBottomFunctionOverlay.kt`, 测试 | 书签图标 ChecronRight → Bookmark |
+| `58fd004` | `ReaderBottomFunctionOverlay.kt`, 测试 | 固定宽度 slot（20dp × 2 + 40dp），书签位置不偏移 |
 
-## 4. 目录行布局修复结果
+## 4. 目录行最终布局
 
-**修复前**（错误）：
 ```
-[14dp spacer/bookmark] [4dp] [14dp spacer/current] [6dp] [TITLE] [8dp] [progress]
-                                    ↑ 图标和 spacer 在标题前，大量空白
-```
-
-**修复后**（正确）：
-```
-[levelIndent] [TITLE weight(1f)] [6dp] [bookmark?] [6dp] [current?] [8dp] [progress]
-                                                               ↑ 全部右侧，从左到右依次
+[level indent] [TITLE weight(1f)] [6dp] [🔖 20dp] [📍 20dp] [📊 40dp]
+ ↑ 轻量缩进    ↑ 左侧主区域         ↑ 固定slot，位置永不偏移  ↑ 常驻进度
 ```
 
-### 附：目录层级展平
+**对齐验证（逐项）**：
 
-**修复前**（4 级深层嵌套）：
+| 要求 | 实现 | 状态 |
+|------|------|------|
+| 章节名左侧靠边 | `Text(entry.title, Modifier.weight(1f))` 占据主区域 | ✅ |
+| 章节名前无书签图标 | `Icons.Filled.Bookmark` 在 title 之后 | ✅ |
+| 章节名前无当前阅读图标 | `Icons.Filled.MyLocation` 在 bookmark 之后 | ✅ |
+| 无 spacer 占位大空白 | 固定 `Box(20.dp)` slot，不随图标有无变化 | ✅ |
+| 轻量层级缩进 | `(entry.level - 1) * 10` dp，level 2 = 10dp | ✅ |
+| 书签标识在右侧 | 固定 20dp slot，在 title 之后 | ✅ |
+| 当前阅读标识在右侧 | 固定 20dp slot，在 bookmark 之后 | ✅ |
+| 右侧常驻进度条 | `LinearProgressIndicator`，固定 40dp × 4dp | ✅ |
+| 进度条不压住章节名 | title 有 `weight(1f)`，进度条固定 40dp | ✅ |
+| 顶部 目录/书签 tabs | `Row` 中两个 `Box`，带有 "目录"/"书签" | ✅ |
+| 层级小字 | `Text(volumeInfo)` → "深空信号 · 共 3 卷 7 章" | ✅ |
+| 底部当前阅读章节 | `Text("当前阅读章节：$currentChapter")` | ✅ |
+
+## 5. 目录层级展平
+
+**修复前**（4 级深度）：
 ```
-Level 1: 第一章：阿长与《山海经》
-  Level 2: 深空信号
-  Level 2: 第二节：寂静航线
-    Level 3: 未知频段
-      Level 4: 求救信号
+Level 1 → Level 2 → Level 3 → Level 4
 ```
 
-**修复后**（统一 2 级，铺平）：
-```
-Level 2: 第一章：阿长与《山海经》  ── 已读（进度 100%）
-Level 2: 第二节：深空信号        ── 当前阅读（进度 35%）
-Level 2: 第三节：寂静航线        ── 未读
-Level 2: 第四节：未知频段        ── 未读
-Level 2: 第五节：求救信号        ── 有书签
-Level 2: 第二章：旧地球的遗产    ── 未读
-Level 2: 第三章：星门之外        ── 未读
-```
+**修复后**（统一 2 级，7 章铺平）：
 
-所有条目同层级，indent 统一为 10dp。进度值代表整本书阅读进度（1f=已读完，0.35f=读到 35%）。卷信息 breadcrumb 改为 `"深空信号 · 共 3 卷 7 章"`。
+| 章节 | level | isCurrent | hasBookmark | progress |
+|------|-------|-----------|-------------|----------|
+| 第一章：阿长与《山海经》 | 2 | - | 🔖 | 1f |
+| 第二节：深空信号 | 2 | 📍 | 🔖 | 0.35f |
+| 第三节：寂静航线 | 2 | - | - | 0f |
+| 第四节：未知频段 | 2 | - | - | 0f |
+| 第五节：求救信号 | 2 | - | 🔖 | 0f |
+| 第二章：旧地球的遗产 | 2 | - | - | 0f |
+| 第三章：星门之外 | 2 | - | - | 0f |
 
-**具体改动**：
-1. **章节名左侧靠边**：`Text(entry.title, Modifier.weight(1f))` 占据左侧主要区域，仅前面有 level indent
-2. **去除 spacer 占位**：不再使用 `else { Spacer(...) }` 为缺失图标预留空间 — 图标仅条件渲染
-3. **书签标识移到右侧**：`Icons.Filled.ChevronRight` 在标题之后，有书签时才渲染
-4. **当前阅读章节标识移到右侧**：`Icons.Filled.MyLocation` 在标题之后，当前章节时才渲染
-5. **右侧进度条保留**：`LinearProgressIndicator` 仍为最右侧元素
-6. **层级缩进轻量化**：`(entry.level - 1) * 10` dp，从 10dp 起步
+## 6. 固定 slot 机制
 
-## 5. 书签页布局修复结果
+三组固定宽度 `Box`，无论图标是否显示，位置不移动：
 
-书签模式与目录模式共用同一个 Row 结构，因此自动继承修复：
-- 章节名左侧靠边（仅 level indent）
-- 书签/当前图标在右侧
-- 右侧进度条保留
+| Slot | 宽度 | 内容 |
+|------|------|------|
+| Bookmark | 20dp | `Icons.Filled.Bookmark` (14dp)，hasBookmark 时显示 |
+| Current | 20dp | `Icons.Filled.MyLocation` (14dp)，isCurrent 时显示 |
+| Progress | 40dp × 20dp | `LinearProgressIndicator` (40dp × 4dp)，progress != null 时显示 |
 
-## 6. 回归守卫
+## 7. 设备端复核结果
 
-| 守卫项 | 状态 |
+| 检查项 | 结果 |
 |--------|------|
-| 顶部 "目录"/"书签" tabs 保留 | 通过 |
-| 层级小字（volumeInfo）保留 | 通过 |
-| 当前阅读章节底部提示保留 | 通过 |
-| bottom overlay 不全屏 | 通过 |
-| App 主底栏仍为 书架/发现/书源/我的 | 通过 |
-| 阅读页底栏仍为 目录/朗读/界面/设置 | 通过 |
-| 未改 Core/parser/repository/book source | 通过 |
-| 其他 overlay 未修改 | 通过 |
-| 夜间模式未修改 | 通过 |
-| 内容替换页未修改 | 通过 |
+| `installDebug` | BUILD SUCCESSFUL, IN2020 |
+| App 启动 | Prototype Gallery 正常显示 |
+| 点击目录/书签 overlay | 无崩溃 (PID 存活) |
+| 下滑至预览区 | 12 次下滑无崩溃 |
+| 预览区内容可见 | Reader 正文 + 底栏控件已确认渲染 |
 
-## 7. 测试结果
+因 Compose LazyColumn 在 adb uiautomator 下元素定位限制，单行视觉细节（图标位置、缩进精度）建议用户直接目视复核。
+
+## 8. 测试结果
 
 | 检查项 | 结果 |
 |--------|------|
@@ -97,14 +95,33 @@ Level 2: 第三章：星门之外        ── 未读
 | `./gradlew lintDebug --no-daemon` | BUILD SUCCESSFUL |
 | `./gradlew installDebug --no-daemon` | BUILD SUCCESSFUL (IN2020) |
 
-## 8. 是否仍有 P0
+**关键测试覆盖**：
+
+| 测试 | 验证内容 |
+|------|---------|
+| `ReaderDirectoryRowAlignmentTest` (13 tests) | title 左对齐、图标在 title 之后、固定 slot 宽度、indent 轻量 |
+| `ReaderDirectoryOverlayBaselineTest` (11 tests) | tabs、breadcrumb、progress bar、bookmark icon、current indicator |
+| `ReaderRuntimeStateBridgeTest` | 条目数量 7、全部 level=2、isCurrent/hasBookmark 断言 |
+
+## 9. 回归守卫
+
+| 守卫项 | 状态 |
+|--------|------|
+| bottom overlay 不全屏 | ✅ `ReaderBottomPanel` zone 约束 |
+| App 主底栏 书架/发现/书源/我的 | ✅ 未修改 |
+| 阅读页底栏 目录/朗读/界面/设置 | ✅ 未修改 |
+| 未改 Core/parser/repository/book source | ✅ |
+| 未接真实网络 | ✅ |
+| 未修改其他 overlay | ✅ |
+
+## 10. 是否仍有 P0
 
 无。
 
-## 9. 是否仍有 P1
+## 11. 是否仍有 P1
 
 无。
 
-## 10. 是否建议设备端复核
+## 12. 是否建议提交
 
-建议用户重新安装 debug app 后重点复核目录 / 书签 overlay，确认章节名左侧靠边、图标在右侧、无空白 spacer。
+建议提交目录 / 书签 overlay 对齐修复。
