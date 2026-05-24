@@ -80,7 +80,8 @@ data class ReaderTocEntryUiModel(
     val level: Int = 1,
     val isCurrent: Boolean = false,
     val hasBookmark: Boolean = false,
-    val progress: Float? = null
+    val progress: Float? = null,
+    val url: String = ""
 )
 
 data class ReaderTocBookmarkState(

@@ -30,7 +30,8 @@ object CoreTocToReaderTocMapper {
                 level = level,
                 isCurrent = false,   // joined later by ReaderTocLocalStateJoiner
                 hasBookmark = false,  // joined later
-                progress = null      // joined later
+                progress = null,     // joined later
+                url = item.url       // used for TOC→Content bridge
             )
             result.add(entry)
             walk(item.children, level, path, result, index)
