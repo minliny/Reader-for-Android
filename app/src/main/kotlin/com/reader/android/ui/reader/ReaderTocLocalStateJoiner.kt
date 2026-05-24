@@ -2,24 +2,22 @@ package com.reader.android.ui.reader
 
 /**
  * Joins local reading state (current chapter, bookmarks, progress) into TOC entries.
- * All state is in-memory only — no repository/database access in this slice.
- *
- * TODO: Replace with real ReadingProgress / BookmarkStorage repository when available.
+ * Uses [ReaderProgressLocalStateAdapter] for progress matching.
+ * TODO: Connect to Room DAOs and BookmarkStorage when DI/runtime available.
  */
 data class ReaderTocLocalStateJoiner(
-    val currentChapterUrl: String? = null,
-    val bookmarkedUrls: Set<String> = emptySet(),
-    val chapterProgress: Map<String, Float> = emptyMap()
+    val progress: ReaderProgressLocalStateAdapter = ReaderProgressLocalStateAdapter.Empty,
+    val bookmarkedUrls: Set<String> = emptySet()
 ) {
     fun join(entries: List<ReaderTocEntryUiModel>): List<ReaderTocEntryUiModel> =
         entries.map { entry -> joinOne(entry) }
 
     private fun joinOne(entry: ReaderTocEntryUiModel): ReaderTocEntryUiModel {
-        // TODO: match by chapterUrl when ReaderTocEntryUiModel has a url field
+        val url = entry.url
         return entry.copy(
-            isCurrent = false,  // default — real match needs chapterUrl field
-            hasBookmark = false, // default — real match needs chapterUrl field
-            progress = null      // default — real lookup needs chapterUrl field
+            isCurrent = url.isNotBlank() && progress.isCurrentChapter(url),
+            hasBookmark = url.isNotBlank() && url in bookmarkedUrls,
+            progress = if (url.isNotBlank()) progress.progressFor(url) else null
         )
     }
 }
