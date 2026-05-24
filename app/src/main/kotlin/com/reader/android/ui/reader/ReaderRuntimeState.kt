@@ -104,6 +104,18 @@ data class ReaderSearchResultUiModel(
     val snippet: String
 )
 
+// ── Content state ──
+
+sealed interface ReaderContentState {
+    data object Loading : ReaderContentState
+    data class Ready(
+        val content: ReaderContentUiModel,
+        val chapter: ReaderChapterUiModel
+    ) : ReaderContentState
+    data class Empty(val message: String = "本章暂无正文") : ReaderContentState
+    data class Error(val message: String, val retryable: Boolean = true) : ReaderContentState
+}
+
 // ── Comprehensive runtime state ──
 
 data class ReaderRuntimeUiState(
@@ -120,5 +132,6 @@ data class ReaderRuntimeUiState(
     val tocBookmarkState: ReaderTocBookmarkState = ReaderTocBookmarkState(),
     val searchState: ReaderSearchUiModel = ReaderSearchUiModel(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val contentState: ReaderContentState = ReaderContentState.Loading
 )

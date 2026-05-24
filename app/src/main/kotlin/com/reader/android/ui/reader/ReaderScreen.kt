@@ -23,6 +23,8 @@ import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.ContentPage
 import com.reader.android.data.network.ContentParser
 import com.reader.android.data.network.HttpClient
+import com.reader.android.ui.components.ReaderEmptyState
+import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.reader.components.BrightnessDock
 import com.reader.android.ui.reader.components.ReaderControlBase
@@ -184,13 +186,46 @@ private fun StateDrivenReaderScreen(
                 OverlayContent(state = state, onOverlayDismiss = onOverlayDismiss)
             }
         ) {
-            // Reading content with chapter title
-            if (state.content != null) {
-                ContentArea(
-                    chapterTitle = state.chapter.chapterTitle,
-                    bodyText = state.content.text
-                )
-            }
+            // Reading content with state-driven rendering
+            ContentAreaForState(state)
+        }
+    }
+}
+
+@Composable
+private fun ContentAreaForState(state: ReaderRuntimeUiState) {
+    when (val cs = state.contentState) {
+        is ReaderContentState.Loading -> {
+            ReaderLoadingState(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = topZoneHeight + 16.dp, bottom = bottomZoneInset),
+                message = "加载中"
+            )
+        }
+        is ReaderContentState.Ready -> {
+            ContentArea(
+                chapterTitle = cs.chapter.chapterTitle,
+                bodyText = cs.content.text
+            )
+        }
+        is ReaderContentState.Empty -> {
+            ReaderEmptyState(
+                title = cs.message,
+                message = "请选择其他章节",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = topZoneHeight + 16.dp, bottom = bottomZoneInset)
+            )
+        }
+        is ReaderContentState.Error -> {
+            ReaderErrorState(
+                title = cs.message,
+                message = if (cs.retryable) "请重试" else "",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = topZoneHeight + 16.dp, bottom = bottomZoneInset)
+            )
         }
     }
 }
