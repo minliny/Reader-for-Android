@@ -48,16 +48,17 @@ class SearchDetailAdapterBoundaryGuardTest {
     }
 
     @Test
-    fun `book detail adapter shell does not call reader core bridge or parser`() {
+    fun `book detail adapter shell calls core bridge through public facade only`() {
         val detailShellSource = String(Files.readAllBytes(Paths.get(
             "src/main/kotlin/com/reader/android/ui/detail/BookDetailAdapterShell.kt"
         )))
-        assertFalse("Must not call HttpClient",
-            "HttpClient" in detailShellSource)
-        assertFalse("Must not call BookInfoParser",
-            "BookInfoParser" in detailShellSource)
-        assertFalse("Must not call bridge.getBookInfo",
+        assertFalse("Must not call HttpClient", "HttpClient" in detailShellSource)
+        assertFalse("Must not call BookInfoParser", "BookInfoParser" in detailShellSource)
+        // bridge.getBookInfo and bridge.getTOC are public CoreBridge facade — allowed
+        assertTrue("Must call CoreBridge.getBookInfo public facade",
             "bridge.getBookInfo" in detailShellSource)
+        assertTrue("Must call CoreBridge.getTOC public facade",
+            "bridge.getTOC" in detailShellSource)
     }
 
     // ── No secrets leaked ──
