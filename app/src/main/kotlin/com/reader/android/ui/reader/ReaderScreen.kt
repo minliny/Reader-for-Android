@@ -2,7 +2,10 @@ package com.reader.android.ui.reader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +41,10 @@ import com.reader.android.ui.reader.components.TocEntry
 import com.reader.android.ui.reader.components.AppSettingItem
 import com.reader.android.ui.reader.components.AppSwitchItem
 import com.reader.android.ui.theme.ReaderTheme
+
+// Zone metrics — must stay in sync with ReaderControlBase
+private val topZoneHeight = 92.dp   // topBarHeight + metaRowHeight
+private val bottomZoneInset = 156.dp // bottomBar + safeGap + pageControl + quickActions + gaps
 
 class ReaderViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
@@ -107,29 +114,19 @@ fun ReaderScreen(
                 ReaderLoadingState(modifier = Modifier.fillMaxSize(), message = "加载中")
             }
             viewModel.content != null -> {
+                val title = viewModel.chapterTitle.ifBlank { chapterTitle.ifBlank { "阅读" } }
                 val text = viewModel.content!!.content
                 ReaderControlBase(
-                    chapterTitle = viewModel.chapterTitle.ifBlank { chapterTitle.ifBlank { "阅读" } },
-                    bookTitle = viewModel.chapterTitle.ifBlank { chapterTitle },
+                    chapterTitle = title,
+                    bookTitle = title,
                     sourceName = "本地书籍",
                     chapterProgress = 0.25f,
                     brightnessDock = BrightnessDock.Left,
                     onBackClick = { onBack?.invoke() },
                     onNightModeClick = { isNight = !isNight }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp, vertical = 128.dp)
-                    ) {
-                        Text(
-                            text = text,
-                            color = ReaderTheme.colors.bodyText,
-                            style = ReaderTheme.typography.readerBody,
-                            lineHeight = ReaderTheme.typography.readerBody.lineHeight
-                        )
-                    }
+                    // Content area with chapter title + body text
+                    ContentArea(chapterTitle = title, bodyText = text)
                 }
             }
             contentUrl == null -> {
@@ -164,128 +161,156 @@ private fun StateDrivenReaderScreen(
     val baseParams = ReaderRuntimeMapper.toControlBaseParams(state)
 
     ReaderNightState(isNight = state.isNightMode) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Reading content
-            if (state.content != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 128.dp)
-                ) {
-                    Text(
-                        text = state.content.text,
-                        color = ReaderTheme.colors.bodyText,
-                        style = ReaderTheme.typography.readerBody,
-                        lineHeight = ReaderTheme.typography.readerBody.lineHeight
-                    )
-                }
+        ReaderControlBase(
+            chapterTitle = baseParams.chapterTitle,
+            bookTitle = baseParams.bookTitle,
+            sourceName = baseParams.sourceName,
+            chapterProgress = baseParams.chapterProgress,
+            brightnessDock = baseParams.brightnessDock,
+            overlayState = state.controlLayerState,
+            brightnessValue = state.brightnessDockState.brightnessValue,
+            onBackClick = { onBack?.invoke() },
+            onNightModeClick = onNightModeToggle,
+            onSearchClick = { },
+            onAutoScrollClick = { },
+            onReplaceClick = { },
+            onDirectoryClick = { },
+            onTtsClick = { },
+            onAppearanceClick = { },
+            onSettingsClick = { },
+            onBrightnessChange = { },
+            overlayContent = {
+                // Zone-based overlay content — sized by ReaderControlBase's zone
+                OverlayContent(state = state, onOverlayDismiss = onOverlayDismiss)
             }
-
-            // Control base overlay
-            ReaderControlBase(
-                chapterTitle = baseParams.chapterTitle,
-                bookTitle = baseParams.bookTitle,
-                sourceName = baseParams.sourceName,
-                chapterProgress = baseParams.chapterProgress,
-                brightnessDock = baseParams.brightnessDock,
-                onBackClick = { onBack?.invoke() },
-                onNightModeClick = onNightModeToggle,
-                onSearchClick = { /* state change handled externally */ },
-                onAutoScrollClick = { },
-                onReplaceClick = { },
-                onDirectoryClick = { },
-                onTtsClick = { },
-                onAppearanceClick = { },
-                onSettingsClick = { }
-            ) { /* content rendered above */ }
-
-            // Overlays based on control layer state
-            when (val overlayState = state.controlLayerState) {
-                is ReaderControlLayerState.QuickActionOverlay -> {
-                    when (overlayState.type) {
-                        ReaderOverlayType.SEARCH -> ReaderSearchOverlay(
-                            query = state.searchState.query,
-                            resultCount = state.searchState.resultCount,
-                            results = state.searchState.results.map { com.reader.android.ui.reader.components.SearchMatch(it.title, it.snippet) },
-                            currentIndex = state.searchState.currentIndex,
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        ReaderOverlayType.AUTO_SCROLL -> ReaderAutoScrollOverlay(
-                            isRunning = state.autoScrollState == ReaderAutoScrollState.RUNNING,
-                            speed = AutoScrollSpeed.Medium,
-                            mode = AutoScrollMode.Scroll,
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        ReaderOverlayType.REPLACE -> ReaderReplaceOverlay(
-                            bookName = state.book.bookTitle,
-                            rules = state.replaceRules.map { ReplaceRule(it.name, it.description, it.enabled) },
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        else -> {}
-                    }
-                }
-                is ReaderControlLayerState.BottomFunctionOverlay -> {
-                    when (overlayState.type) {
-                        ReaderOverlayType.DIRECTORY -> ReaderDirectoryOverlay(
-                            tocEntries = state.tocBookmarkState.entries.map {
-                                TocEntry(it.title, it.level, it.isCurrent, it.hasBookmark)
-                            },
-                            volumeInfo = state.tocBookmarkState.volumeInfo,
-                            currentChapter = state.chapter.chapterTitle,
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        ReaderOverlayType.TTS -> ReaderTtsOverlay(
-                            isPlaying = state.ttsState == ReaderTtsState.PLAYING,
-                            currentTime = "00:00",
-                            totalTime = "08:12",
-                            progress = 0f,
-                            speed = 1f,
-                            volume = 0.7f,
-                            currentChapterTitle = state.chapter.chapterTitle,
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        ReaderOverlayType.APPEARANCE -> ReaderAppearanceOverlay(
-                            fontName = "默认",
-                            fontSize = "18",
-                            letterSpacing = "标准",
-                            scriptMode = "简体",
-                            indent = "2 字符",
-                            lineSpacing = "标准",
-                            paragraphSpacing = "标准",
-                            infoDisplay = "四角信息",
-                            pageFlipAnimation = "覆盖",
-                            themeName = "米色纸张",
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        ReaderOverlayType.SETTINGS -> ReaderSettingsOverlay(
-                            items = listOf(
-                                AppSettingItem("屏幕方向", "跟随系统"),
-                                AppSettingItem("屏幕超时", "5 分钟"),
-                                AppSettingItem("单双页", "自动"),
-                                AppSettingItem("进度条行为", "控制层显示")
-                            ),
-                            switches = listOf(
-                                AppSwitchItem("隐藏状态栏", true),
-                                AppSwitchItem("文字两端对齐", true),
-                                AppSwitchItem("文字底部对齐", false),
-                                AppSwitchItem("音量键翻页", true),
-                                AppSwitchItem("单手翻页", false)
-                            ),
-                            modifier = Modifier.fillMaxSize(),
-                            onDismiss = onOverlayDismiss
-                        )
-                        else -> {}
-                    }
-                }
-                is ReaderControlLayerState.BaseControlVisible -> { /* base controls already shown */ }
+        ) {
+            // Reading content with chapter title
+            if (state.content != null) {
+                ContentArea(
+                    chapterTitle = state.chapter.chapterTitle,
+                    bodyText = state.content.text
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun ContentArea(chapterTitle: String, bodyText: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = 24.dp,
+                end = 24.dp,
+                top = topZoneHeight + 16.dp,
+                bottom = bottomZoneInset
+            )
+    ) {
+        if (chapterTitle.isNotBlank()) {
+            Text(
+                text = chapterTitle,
+                color = ReaderTheme.colors.controlInk,
+                style = ReaderTheme.typography.sectionTitle,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        Text(
+            text = bodyText,
+            color = ReaderTheme.colors.bodyText,
+            style = ReaderTheme.typography.readerBody,
+            lineHeight = ReaderTheme.typography.readerBody.lineHeight
+        )
+    }
+}
+
+@Composable
+private fun OverlayContent(
+    state: ReaderRuntimeUiState,
+    onOverlayDismiss: () -> Unit
+) {
+    when (val overlayState = state.controlLayerState) {
+        is ReaderControlLayerState.QuickActionOverlay -> {
+            when (overlayState.type) {
+                ReaderOverlayType.SEARCH -> ReaderSearchOverlay(
+                    query = state.searchState.query,
+                    resultCount = state.searchState.resultCount,
+                    results = state.searchState.results.map {
+                        com.reader.android.ui.reader.components.SearchMatch(it.title, it.snippet)
+                    },
+                    currentIndex = state.searchState.currentIndex,
+                    onDismiss = onOverlayDismiss
+                )
+                ReaderOverlayType.AUTO_SCROLL -> ReaderAutoScrollOverlay(
+                    isRunning = state.autoScrollState == ReaderAutoScrollState.RUNNING,
+                    speed = AutoScrollSpeed.Medium,
+                    mode = AutoScrollMode.Scroll,
+                    onDismiss = onOverlayDismiss
+                )
+                ReaderOverlayType.REPLACE -> ReaderReplaceOverlay(
+                    bookName = state.book.bookTitle,
+                    rules = state.replaceRules.map {
+                        ReplaceRule(it.name, it.description, it.enabled)
+                    },
+                    onDismiss = onOverlayDismiss
+                )
+                else -> {}
+            }
+        }
+        is ReaderControlLayerState.BottomFunctionOverlay -> {
+            when (overlayState.type) {
+                ReaderOverlayType.DIRECTORY -> ReaderDirectoryOverlay(
+                    tocEntries = state.tocBookmarkState.entries.map {
+                        TocEntry(it.title, it.level, it.isCurrent, it.hasBookmark, it.progress)
+                    },
+                    volumeInfo = state.tocBookmarkState.volumeInfo,
+                    currentChapter = state.chapter.chapterTitle,
+                    onDismiss = onOverlayDismiss
+                )
+                ReaderOverlayType.TTS -> ReaderTtsOverlay(
+                    isPlaying = state.ttsState == ReaderTtsState.PLAYING,
+                    currentTime = "00:00",
+                    totalTime = "08:12",
+                    progress = 0f,
+                    speed = 1f,
+                    volume = 0.7f,
+                    currentChapterTitle = state.chapter.chapterTitle,
+                    onDismiss = onOverlayDismiss
+                )
+                ReaderOverlayType.APPEARANCE -> ReaderAppearanceOverlay(
+                    fontName = "默认",
+                    fontSize = "18",
+                    letterSpacing = "标准",
+                    scriptMode = "简体",
+                    indent = "2 字符",
+                    lineSpacing = "标准",
+                    paragraphSpacing = "标准",
+                    infoDisplay = "四角信息",
+                    pageFlipAnimation = "覆盖",
+                    themeName = "米色纸张",
+                    onDismiss = onOverlayDismiss
+                )
+                ReaderOverlayType.SETTINGS -> ReaderSettingsOverlay(
+                    items = listOf(
+                        AppSettingItem("屏幕方向", "跟随系统"),
+                        AppSettingItem("屏幕超时", "5 分钟"),
+                        AppSettingItem("单双页", "自动"),
+                        AppSettingItem("进度条行为", "控制层显示")
+                    ),
+                    switches = listOf(
+                        AppSwitchItem("隐藏状态栏", true),
+                        AppSwitchItem("文字两端对齐", true),
+                        AppSwitchItem("文字底部对齐", false),
+                        AppSwitchItem("音量键翻页", true),
+                        AppSwitchItem("单手翻页", false)
+                    ),
+                    onDismiss = onOverlayDismiss
+                )
+                else -> {}
+            }
+        }
+        is ReaderControlLayerState.BaseControlVisible -> { /* no overlay */ }
     }
 }

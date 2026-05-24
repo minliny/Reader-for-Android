@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,9 +47,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.reader.android.ui.reader.ReaderControlLayerState
 import com.reader.android.ui.theme.ReaderTheme
 
 enum class BrightnessDock { Left, Right }
+
+// Zone metrics — single source of truth for control layer vertical layout
+private val topBarHeight = 56.dp
+private val metaRowHeight = 36.dp
+private val topZoneHeight = topBarHeight + metaRowHeight // 92.dp
+private val floatingPageControlHeight = 52.dp
+private val bottomBarHeight = 68.dp
+private val bottomSafeGap = 8.dp
+private val quickCircleSize = 48.dp
 
 @Composable
 fun ReaderControlBase(
@@ -58,6 +69,8 @@ fun ReaderControlBase(
     chapterProgress: Float,
     brightnessDock: BrightnessDock,
     modifier: Modifier = Modifier,
+    overlayState: ReaderControlLayerState? = null,
+    brightnessValue: Float = 0.5f,
     onBackClick: () -> Unit = {},
     onRefreshClick: () -> Unit = {},
     onSourceChangeClick: () -> Unit = {},
@@ -72,13 +85,29 @@ fun ReaderControlBase(
     onTtsClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBrightnessChange: (Float) -> Unit = {},
+    overlayContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
+    // ── Visibility rules ──
+    val isQuickOverlay = overlayState is ReaderControlLayerState.QuickActionOverlay
+    val isBottomOverlay = overlayState is ReaderControlLayerState.BottomFunctionOverlay
+
+    val showBrightness = !isQuickOverlay && !isBottomOverlay
+    val showQuickActions = !isBottomOverlay
+    val showPageControl = !isBottomOverlay
+
+    // Compute quick-action and page-control bottom insets so overlays don't cover them
+    val quickActionsBottomInset = bottomBarHeight + bottomSafeGap + floatingPageControlHeight +
+        ReaderTheme.spacing.controlGap + quickCircleSize + ReaderTheme.spacing.controlGap
+    val pageControlBottomInset = bottomBarHeight + bottomSafeGap
+    val bottomOverlayBottomInset = bottomBarHeight + bottomSafeGap
+
     Box(modifier = modifier.fillMaxSize()) {
         // Reading content behind all controls
         content()
 
-        // Top area
+        // Top area — always visible
         ReaderTopArea(
             bookTitle = bookTitle,
             chapterTitle = chapterTitle,
@@ -90,36 +119,45 @@ fun ReaderControlBase(
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
-        // Brightness dock (left or right)
-        ReaderFloatingBrightness(
-            dock = brightnessDock,
-            modifier = Modifier.align(
-                if (brightnessDock == BrightnessDock.Left) Alignment.CenterStart else Alignment.CenterEnd
+        // Brightness dock — hidden during any overlay
+        if (showBrightness) {
+            ReaderFloatingBrightness(
+                dock = brightnessDock,
+                brightnessValue = brightnessValue,
+                onBrightnessChange = onBrightnessChange,
+                modifier = Modifier.align(
+                    if (brightnessDock == BrightnessDock.Left) Alignment.CenterStart
+                    else Alignment.CenterEnd
+                )
             )
-        )
+        }
 
-        // Floating quick actions (centered bottom, above page control)
-        ReaderFloatingQuickActions(
-            onSearchClick = onSearchClick,
-            onAutoScrollClick = onAutoScrollClick,
-            onReplaceClick = onReplaceClick,
-            onNightModeClick = onNightModeClick,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = ReaderTheme.spacing.floatingPageControlHeight + ReaderTheme.spacing.controlGap + ReaderTheme.spacing.xs)
-        )
+        // Quick actions — hidden during bottom overlays
+        if (showQuickActions) {
+            ReaderFloatingQuickActions(
+                onSearchClick = onSearchClick,
+                onAutoScrollClick = onAutoScrollClick,
+                onReplaceClick = onReplaceClick,
+                onNightModeClick = onNightModeClick,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = pageControlBottomInset + floatingPageControlHeight + ReaderTheme.spacing.controlGap)
+            )
+        }
 
-        // Floating page control
-        ReaderFloatingPageControl(
-            progress = chapterProgress,
-            onPrevPageClick = onPrevPageClick,
-            onNextPageClick = onNextPageClick,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = ReaderTheme.spacing.bottomBarHeight + ReaderTheme.spacing.bottomSafeGap)
-        )
+        // Page control — hidden during bottom overlays
+        if (showPageControl) {
+            ReaderFloatingPageControl(
+                progress = chapterProgress,
+                onPrevPageClick = onPrevPageClick,
+                onNextPageClick = onNextPageClick,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = pageControlBottomInset)
+            )
+        }
 
-        // Bottom bar
+        // Bottom bar — always visible
         ReaderControlBottomBar(
             onDirectoryClick = onDirectoryClick,
             onTtsClick = onTtsClick,
@@ -127,6 +165,37 @@ fun ReaderControlBase(
             onSettingsClick = onSettingsClick,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        // ── Zone-based overlay panels ──
+        if (isQuickOverlay) {
+            // Covers zone from below meta-row down to above quick actions
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = topZoneHeight,
+                        bottom = quickActionsBottomInset
+                    )
+                    .padding(horizontal = 18.dp)
+            ) {
+                overlayContent()
+            }
+        }
+
+        if (isBottomOverlay) {
+            // Covers zone from below meta-row down to above bottom bar
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = topZoneHeight,
+                        bottom = bottomOverlayBottomInset
+                    )
+                    .padding(horizontal = 18.dp)
+            ) {
+                overlayContent()
+            }
+        }
     }
 }
 
@@ -146,7 +215,7 @@ private fun ReaderTopArea(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(topBarHeight)
                 .background(ReaderTheme.colors.softTopBg)
                 .padding(horizontal = ReaderTheme.spacing.screenPadding),
             verticalAlignment = Alignment.CenterVertically
@@ -182,7 +251,7 @@ private fun ReaderTopArea(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                .height(metaRowHeight)
                 .background(ReaderTheme.colors.metaBg)
                 .padding(horizontal = ReaderTheme.spacing.screenPadding),
             verticalAlignment = Alignment.CenterVertically,
@@ -220,7 +289,12 @@ private fun ReaderTopIcon(icon: ImageVector, contentDescription: String, onClick
 }
 
 @Composable
-private fun ReaderFloatingBrightness(dock: BrightnessDock, modifier: Modifier = Modifier) {
+private fun ReaderFloatingBrightness(
+    dock: BrightnessDock,
+    brightnessValue: Float,
+    onBrightnessChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .width(40.dp)
@@ -238,7 +312,7 @@ private fun ReaderFloatingBrightness(dock: BrightnessDock, modifier: Modifier = 
             tint = ReaderTheme.colors.controlInk,
             modifier = Modifier.size(20.dp)
         )
-        // Brightness track
+        // Vertical brightness track — proportional fill conveys slider state
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -248,7 +322,8 @@ private fun ReaderFloatingBrightness(dock: BrightnessDock, modifier: Modifier = 
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .fillMaxHeight(brightnessValue.coerceIn(0f, 1f))
                     .clip(CircleShape)
                     .background(ReaderTheme.colors.primary)
             )
@@ -285,7 +360,7 @@ private fun ReaderFloatingQuickActions(
 private fun ReaderQuickCircle(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(ReaderTheme.spacing.quickCircleSize)
+            .size(quickCircleSize)
             .clip(CircleShape)
             .background(ReaderTheme.colors.quickButtonBg)
             .border(1.dp, ReaderTheme.colors.controlBorder, CircleShape)
@@ -308,7 +383,7 @@ private fun ReaderFloatingPageControl(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .height(ReaderTheme.spacing.floatingPageControlHeight)
+            .height(floatingPageControlHeight)
             .clip(ReaderTheme.shapes.floatingControl)
             .background(ReaderTheme.colors.floatingControlBg)
             .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.floatingControl)
@@ -362,7 +437,7 @@ private fun ReaderControlBottomBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(ReaderTheme.spacing.bottomBarHeight)
+            .height(bottomBarHeight)
             .background(ReaderTheme.colors.bottomBarBg)
             .border(1.dp, ReaderTheme.colors.controlBorder)
             .semantics { contentDescription = "阅读控制底栏" },

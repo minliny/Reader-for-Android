@@ -9,7 +9,8 @@ object ReaderRuntimeMapper {
         bookTitle = state.book.bookTitle,
         sourceName = state.book.sourceName,
         chapterProgress = state.pageProgress.progress,
-        brightnessDock = state.brightnessDockState.dock
+        brightnessDock = state.brightnessDockState.dock,
+        brightnessValue = state.brightnessDockState.brightnessValue
     )
 
     fun overlayType(state: ReaderRuntimeUiState): ReaderOverlayType = when (val s = state.controlLayerState) {
@@ -35,6 +36,7 @@ object ReaderRuntimeMapper {
         val bookTitle: String,
         val sourceName: String,
         val chapterProgress: Float,
-        val brightnessDock: BrightnessDock
+        val brightnessDock: BrightnessDock,
+        val brightnessValue: Float = 0.5f
     )
 }

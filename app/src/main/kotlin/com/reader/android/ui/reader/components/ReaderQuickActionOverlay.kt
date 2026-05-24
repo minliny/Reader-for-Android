@@ -396,7 +396,6 @@ private fun ReaderQuickActionPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp)
             .clip(ReaderTheme.shapes.readerOverlay)
             .background(ReaderTheme.colors.floatingControlBg)
             .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)

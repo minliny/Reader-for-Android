@@ -49,7 +49,8 @@ data class TocEntry(
     val title: String,
     val level: Int,
     val isCurrent: Boolean = false,
-    val hasBookmark: Boolean = false
+    val hasBookmark: Boolean = false,
+    val progress: Float? = null
 )
 
 data class AppSettingItem(
@@ -103,6 +104,7 @@ fun ReaderDirectoryOverlay(
         }
 
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+        // Volume / level small text
         Text(volumeInfo, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta)
 
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
@@ -152,13 +154,37 @@ fun ReaderDirectoryOverlay(
                         Spacer(modifier = Modifier.size(16.dp))
                     }
                     Spacer(modifier = Modifier.width(6.dp))
+                    // Level badge
+                    Text(
+                        text = "L${entry.level}",
+                        color = ReaderTheme.colors.bodyText,
+                        style = ReaderTheme.typography.bookMeta,
+                        modifier = Modifier.width(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = entry.title,
                         color = ReaderTheme.colors.controlInk,
                         style = ReaderTheme.typography.bookTitle,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
+                    // Right-side progress bar
+                    if (entry.progress != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        LinearProgressIndicator(
+                            progress = { entry.progress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(4.dp)
+                                .clip(CircleShape)
+                                .semantics { contentDescription = "章节进度，${(entry.progress * 100).toInt()}%" },
+                            color = ReaderTheme.colors.primary,
+                            trackColor = ReaderTheme.colors.mutedTrack,
+                            drawStopIndicator = {}
+                        )
+                    }
                 }
             }
         }
@@ -490,7 +516,6 @@ private fun ReaderBottomPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
             .clip(ReaderTheme.shapes.readerOverlay)
             .background(ReaderTheme.colors.floatingControlBg)
             .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
