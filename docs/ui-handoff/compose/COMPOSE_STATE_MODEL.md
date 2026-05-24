@@ -19,6 +19,15 @@ sealed interface ReaderUiState {
 }
 ```
 
+Slice 16 hardening adds a pure UI-layer state adapter:
+
+- `ReaderGlobalStateKey`: the canonical 12-state key set.
+- `ReaderStateMapper.toPageState`: maps `ReaderUiState` to StatePage-ready copy and action metadata.
+- `ReaderStateFixtures`: fixture-only examples for all 12 states.
+- `ReaderModuleStateCoverage`: module coverage matrix for bookshelf, search, detail, reader, source management, discover/RSS, WebDAV/sync, and mine/settings.
+
+The mapper is not allowed to call Reader-Core, parser, repository, database, WebDAV, RSS, or network code.
+
 ## 2. Reader Control State
 
 ```kotlin
@@ -46,3 +55,16 @@ Additional flags:
 - `BottomFunctionOverlay` hides brightness, quick actions, and page control; top area and bottom bar remain visible.
 - `NightState` is not an overlay and must not create a dialog.
 - `ReaderSettingsOverlay` is only reading behavior; global settings remain separate.
+
+## 4. Slice 16 Module Coverage
+
+| Module | Required State Coverage |
+|---|---|
+| Bookshelf | loading / empty / error / offline / local file error |
+| Search | loading / empty / error / network source error / offline |
+| BookDetail | loading / error / network source error / offline |
+| Reader | content loading / error / offline / local file error |
+| SourceManagement | disabled / import success / import failure / network source error / error |
+| Discover/RSS | loading / empty / error / offline / disabled subscription |
+| WebDAV/Sync | auth error / sync conflict / offline / error / empty |
+| Mine/Settings | permission required / WebDAV auth error / sync conflict / disabled / error |
