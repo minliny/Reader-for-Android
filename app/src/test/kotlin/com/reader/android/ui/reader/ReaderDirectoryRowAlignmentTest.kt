@@ -27,7 +27,7 @@ class ReaderDirectoryRowAlignmentTest {
         assertTrue("Chapter title must use weight(1f)", "Modifier.weight(1f)" in tocRowSection)
         // Title must appear before any icon in the composable tree
         val titleIndex = tocRowSection.indexOf("entry.title")
-        val bookmarkIconIndex = tocRowSection.indexOf("Icons.Filled.ChevronRight")
+        val bookmarkIconIndex = tocRowSection.indexOf("Icons.Filled.Bookmark")
         val locationIconIndex = tocRowSection.indexOf("Icons.Filled.MyLocation")
         assertTrue("Chapter title must be rendered before bookmark icon",
             titleIndex < bookmarkIconIndex || bookmarkIconIndex == -1)
@@ -39,7 +39,7 @@ class ReaderDirectoryRowAlignmentTest {
     fun `toc row does not place bookmark icon before chapter title`() {
         // Bookmark icon must appear AFTER the title, not before it
         val titleIndex = tocRowSection.indexOf("entry.title")
-        val bookmarkIndex = tocRowSection.indexOf("Icons.Filled.ChevronRight")
+        val bookmarkIndex = tocRowSection.indexOf("Icons.Filled.Bookmark")
         if (bookmarkIndex > 0) {
             assertTrue("Bookmark icon must be after chapter title",
                 bookmarkIndex > titleIndex)

@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
@@ -142,7 +143,7 @@ fun ReaderDirectoryOverlay(
                     if (entry.hasBookmark) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Icon(
-                            Icons.Filled.ChevronRight,
+                            Icons.Filled.Bookmark,
                             contentDescription = "书签",
                             tint = ReaderTheme.colors.primary,
                             modifier = Modifier.size(14.dp)

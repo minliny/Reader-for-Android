@@ -70,7 +70,7 @@ class ReaderDirectoryOverlayBaselineTest {
         assertTrue("TocEntry must have hasBookmark field",
             "hasBookmark" in overlaySource)
         assertTrue("Bookmark must be rendered with icon",
-            "Icons.Filled.ChevronRight" in overlaySource && "书签" in overlaySource)
+            "Icons.Filled.Bookmark" in overlaySource && "书签" in overlaySource)
     }
 
     @Test
