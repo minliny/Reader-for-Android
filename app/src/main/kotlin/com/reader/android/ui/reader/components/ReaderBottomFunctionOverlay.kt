@@ -139,38 +139,54 @@ fun ReaderDirectoryOverlay(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    // Right-side indicators: bookmark → current → progress
-                    if (entry.hasBookmark) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            Icons.Filled.Bookmark,
-                            contentDescription = "书签",
-                            tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
+                    // Right-side indicator area — fixed-width slots, positions never shift
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // Bookmark slot
+                    Box(
+                        modifier = Modifier.size(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (entry.hasBookmark) {
+                            Icon(
+                                Icons.Filled.Bookmark,
+                                contentDescription = "书签",
+                                tint = ReaderTheme.colors.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
-                    if (entry.isCurrent) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            Icons.Filled.MyLocation,
-                            contentDescription = "当前阅读位置",
-                            tint = ReaderTheme.colors.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
+                    // Current-chapter slot
+                    Box(
+                        modifier = Modifier.size(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (entry.isCurrent) {
+                            Icon(
+                                Icons.Filled.MyLocation,
+                                contentDescription = "当前阅读位置",
+                                tint = ReaderTheme.colors.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
-                    if (entry.progress != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        LinearProgressIndicator(
-                            progress = { entry.progress.coerceIn(0f, 1f) },
-                            modifier = Modifier
-                                .width(40.dp)
-                                .height(4.dp)
-                                .clip(CircleShape)
-                                .semantics { contentDescription = "章节进度，${(entry.progress * 100).toInt()}%" },
-                            color = ReaderTheme.colors.primary,
-                            trackColor = ReaderTheme.colors.mutedTrack,
-                            drawStopIndicator = {}
-                        )
+                    // Progress bar slot
+                    Box(
+                        modifier = Modifier.size(40.dp, 20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (entry.progress != null) {
+                            LinearProgressIndicator(
+                                progress = { entry.progress.coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                                    .semantics { contentDescription = "章节进度，${(entry.progress * 100).toInt()}%" },
+                                color = ReaderTheme.colors.primary,
+                                trackColor = ReaderTheme.colors.mutedTrack,
+                                drawStopIndicator = {}
+                            )
+                        }
                     }
                 }
             }

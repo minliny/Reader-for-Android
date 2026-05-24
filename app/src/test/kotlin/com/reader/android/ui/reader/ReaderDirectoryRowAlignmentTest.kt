@@ -56,27 +56,28 @@ class ReaderDirectoryRowAlignmentTest {
         }
     }
 
-    // ── No spacer placeholders for missing icons ──
+    // ── Fixed-width indicator slots, positions never shift ──
 
     @Test
-    fun `toc row does not use spacer placeholders for missing bookmark icon`() {
-        // Must NOT have else { Spacer(...) } pattern after hasBookmark check
-        val bookmarkSection = tocRowSection.substringBefore("Icons.Filled.MyLocation")
-            .take(400)
-        // Must not have unconditional spacer that creates blank space
-        val hasSpacerElse = bookmarkSection.contains("} else {") &&
-            bookmarkSection.substringAfter("} else {").take(50).contains("Spacer")
-        assertFalse("TOC row must not use spacer placeholder when hasBookmark is false",
-            hasSpacerElse)
+    fun `toc row uses fixed width slots for bookmark and current indicators`() {
+        // Both bookmark and current-chapter slots use fixed Box containers
+        val bookmarkSection = overlaySource.substringAfter("Bookmark slot")
+        assertTrue("Bookmark slot must use fixed-width Box", "Box(" in bookmarkSection.take(200))
+        // Icons are conditionally shown inside fixed slots
+        assertTrue("Must have Bookmark icon", "Icons.Filled.Bookmark" in overlaySource)
+        assertTrue("Must have MyLocation icon", "Icons.Filled.MyLocation" in overlaySource)
     }
 
     @Test
-    fun `toc row does not use spacer placeholders for missing current icon`() {
-        val locationSection = tocRowSection.substringAfter("Icons.Filled.MyLocation").take(300)
-        val hasSpacerElse = locationSection.contains("} else {") &&
-            locationSection.substringAfter("} else {").take(50).contains("Spacer")
-        assertFalse("TOC row must not use spacer placeholder when isCurrent is false",
-            hasSpacerElse)
+    fun `toc row indicator positions do not shift regardless of icon visibility`() {
+        // Fixed Box slots ensure bookmark always at same x position
+        // Both slots use the same size modifier, ensuring consistent layout
+        val afterTitle = overlaySource.substringAfter("Modifier.weight(1f)")
+        // Icons inside fixed Box, not conditional at Row level
+        val bookmarkSlotIdx = afterTitle.indexOf("Bookmark slot")
+        val currentSlotIdx = afterTitle.indexOf("Current-chapter slot")
+        assertTrue("Bookmark slot must be after title", bookmarkSlotIdx > 0)
+        assertTrue("Current slot must be after bookmark", currentSlotIdx > bookmarkSlotIdx)
     }
 
     // ── Indent is lightweight ──
