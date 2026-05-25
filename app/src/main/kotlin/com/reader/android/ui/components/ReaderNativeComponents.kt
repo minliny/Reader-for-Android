@@ -110,9 +110,9 @@ fun ReaderQuickCircle(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(ReaderTheme.colors.quickButtonBg)
-            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(14.dp))
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(6.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
