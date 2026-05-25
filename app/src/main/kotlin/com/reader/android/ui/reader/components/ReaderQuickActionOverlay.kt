@@ -92,7 +92,7 @@ fun ReaderSearchOverlay(
                     .weight(1f)
                     .clip(ReaderTheme.shapes.chip)
                     .background(ReaderTheme.colors.metaBg)
-                    .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
+                    .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
                     .semantics { contentDescription = "搜索本章内容" }
                     .padding(horizontal = ReaderTheme.spacing.sm, vertical = 10.dp)
             ) {
@@ -205,7 +205,7 @@ fun ReaderAutoScrollOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(ReaderTheme.shapes.small)
-                .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
+                .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
                 .padding(ReaderTheme.spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -264,7 +264,7 @@ fun ReaderAutoScrollOverlay(
                         .weight(1f)
                         .clip(ReaderTheme.shapes.chip)
                         .background(if (m == mode) ReaderTheme.colors.primary else ReaderTheme.colors.floatingControlBg)
-                        .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
+                        .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
                         .clickable(role = Role.Button) { onModeChange(m) }
                         .semantics { contentDescription = label }
                         .padding(vertical = ReaderTheme.spacing.xs),
@@ -311,7 +311,7 @@ fun ReaderReplaceOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(ReaderTheme.shapes.small)
-                .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
+                .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
                 .padding(ReaderTheme.spacing.sm)
         ) {
             Column {
@@ -342,7 +342,7 @@ fun ReaderReplaceOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(ReaderTheme.shapes.small)
-                        .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
+                        .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
                         .padding(ReaderTheme.spacing.sm)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -413,7 +413,7 @@ private fun ReaderQuickActionPanel(
             .fillMaxWidth()
             .clip(ReaderTheme.shapes.readerOverlay)
             .background(ReaderTheme.colors.floatingControlBg)
-            .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
             .semantics { contentDescription = "${title}弹窗" }
             .padding(ReaderTheme.spacing.sm)
     ) {

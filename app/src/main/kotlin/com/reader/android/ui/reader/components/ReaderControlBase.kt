@@ -369,7 +369,6 @@ private fun ReaderFloatingPageControl(
             .height(floatingPageControlHeight)
             .clip(ReaderTheme.shapes.floatingControl)
             .background(ReaderTheme.colors.floatingControlBg)
-            .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.floatingControl)
             .semantics { contentDescription = "本章内翻页控制" }
             .padding(horizontal = ReaderTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -411,7 +410,6 @@ private fun ReaderControlBottomBar(
             .fillMaxWidth()
             .height(bottomBarHeight)
             .background(ReaderTheme.colors.bottomBarBg)
-            .border(1.dp, ReaderTheme.colors.controlBorder)
             .semantics { contentDescription = "阅读控制底栏" },
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically

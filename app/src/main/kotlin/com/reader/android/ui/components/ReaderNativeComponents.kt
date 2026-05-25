@@ -60,7 +60,6 @@ fun ReaderPanel(
         modifier = modifier
             .clip(RoundedCornerShape(panelCornerRadius))
             .background(ReaderTheme.colors.floatingControlBg)
-            .border(panelBorderWidth, ReaderTheme.colors.controlBorder, RoundedCornerShape(panelCornerRadius))
             .padding(ReaderTheme.spacing.sm)
     ) {
         content()
@@ -113,7 +112,6 @@ fun ReaderQuickCircle(
             .size(width, height)
             .clip(RoundedCornerShape(6.dp))
             .background(ReaderTheme.colors.quickButtonBg)
-            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(6.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

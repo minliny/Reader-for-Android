@@ -90,7 +90,7 @@ fun ReaderDirectoryOverlay(
                         .weight(1f)
                         .clip(ReaderTheme.shapes.chip)
                         .background(if (active) ReaderTheme.colors.primary else ReaderTheme.colors.floatingControlBg)
-                        .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
+                        .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.chip)
                         .semantics { contentDescription = label }
                         .padding(vertical = ReaderTheme.spacing.xs),
                     contentAlignment = Alignment.Center
@@ -228,7 +228,7 @@ fun ReaderTtsOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(ReaderTheme.shapes.small)
-                    .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
+                    .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
                     .background(ReaderTheme.colors.paperBg.copy(alpha = 0.28f))
                     .padding(ReaderTheme.spacing.sm),
                 verticalAlignment = Alignment.CenterVertically
@@ -301,7 +301,7 @@ private fun TtsGroup(title: String? = null, content: @Composable ColumnScope.() 
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .clip(ReaderTheme.shapes.small)
-            .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.small)
             .padding(ReaderTheme.spacing.sm)
     ) {
         if (title != null) {
@@ -405,7 +405,7 @@ private fun AppGroup(title: String, content: @Composable ColumnScope.() -> Unit)
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .clip(ReaderTheme.shapes.readerOverlay)
-            .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
             .padding(ReaderTheme.spacing.sm)
     ) {
         Text(
@@ -519,7 +519,7 @@ private fun ReaderBottomPanel(
             .fillMaxWidth()
             .clip(ReaderTheme.shapes.readerOverlay)
             .background(ReaderTheme.colors.floatingControlBg)
-            .border(1.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, ReaderTheme.shapes.readerOverlay)
             .semantics { this.contentDescription = contentDescription }
             .padding(ReaderTheme.spacing.sm)
     ) {

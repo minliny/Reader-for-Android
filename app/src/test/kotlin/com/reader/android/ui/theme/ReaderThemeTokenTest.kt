@@ -13,19 +13,19 @@ import kotlin.streams.asSequence
 class ReaderThemeTokenTest {
 
     @Test
-    fun `reader day colors match normalized css tokens`() {
+    fun `reader day colors match stitch design system tokens`() {
         val colors = ReaderColors.Day
 
-        assertEquals(0xFFFFF8F4.toInt(), colors.paperBg.toArgb())
-        assertEquals(0xFF53433F.toInt(), colors.bodyText.toArgb())
-        assertEquals(0xFF3F4D52.toInt(), colors.controlInk.toArgb())
-        assertEquals(0xFF366179.toInt(), colors.primary.toArgb())
-        assertEquals(0xFFE9DED6.toInt(), colors.bottomBarBg.toArgb())
-        assertEquals(0xFFEFE2D8.toInt(), colors.floatingControlBg.toArgb())
-        assertEquals(0xFFEADBD0.toInt(), colors.floatingControlBgAlt.toArgb())
-        assertEquals(0xFFF7EBE1.toInt(), colors.quickButtonBg.toArgb())
-        assertEquals(0x1F3F4D52, colors.controlBorder.toArgb())
-        assertEquals(0x2E3F4D52, colors.handoffBoundary.toArgb())
+        assertEquals(0xFFF8F9FF.toInt(), colors.paperBg.toArgb())
+        assertEquals(0xFF181C22.toInt(), colors.bodyText.toArgb())
+        assertEquals(0xFF404752.toInt(), colors.controlInk.toArgb())
+        assertEquals(0xFF0061A4.toInt(), colors.primary.toArgb())
+        assertEquals(0xFFF1F3FC.toInt(), colors.bottomBarBg.toArgb())
+        assertEquals(0xFFFFFFFF.toInt(), colors.floatingControlBg.toArgb())
+        assertEquals(0xFFEBEEF6.toInt(), colors.floatingControlBgAlt.toArgb())
+        assertEquals(0xFFF1F3FC.toInt(), colors.quickButtonBg.toArgb())
+        assertEquals(0xFFBFC7D4.toInt(), colors.controlBorder.toArgb())
+        assertEquals(0x18707883, colors.handoffBoundary.toArgb())
     }
 
     @Test
