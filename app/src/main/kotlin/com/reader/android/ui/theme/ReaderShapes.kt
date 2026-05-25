@@ -1,11 +1,11 @@
 package com.reader.android.ui.theme
 
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
+// Stitch-aligned: standard UI radius 4dp, chips 2dp, never full pills
 @Immutable
 data class ReaderShapes(
     val small: Shape,
@@ -20,15 +20,15 @@ data class ReaderShapes(
 ) {
     companion object {
         val Default = ReaderShapes(
-            small = RoundedCornerShape(8.dp),
-            medium = RoundedCornerShape(12.dp),
-            large = RoundedCornerShape(16.dp),
-            card = RoundedCornerShape(16.dp),
-            chip = RoundedCornerShape(50),
-            bottomSheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            floatingControl = RoundedCornerShape(50),
-            quickCircle = CircleShape,
-            readerOverlay = RoundedCornerShape(22.dp)
+            small = RoundedCornerShape(4.dp),
+            medium = RoundedCornerShape(6.dp),
+            large = RoundedCornerShape(8.dp),
+            card = RoundedCornerShape(4.dp),
+            chip = RoundedCornerShape(2.dp),
+            bottomSheet = RoundedCornerShape(8.dp),
+            floatingControl = RoundedCornerShape(6.dp),
+            quickCircle = RoundedCornerShape(6.dp),
+            readerOverlay = RoundedCornerShape(8.dp)
         )
     }
 }

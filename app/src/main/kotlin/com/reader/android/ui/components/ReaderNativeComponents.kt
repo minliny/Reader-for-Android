@@ -44,7 +44,7 @@ import com.reader.android.ui.theme.ReaderTheme
 
 // ── Shared style constants ──
 
-private val panelCornerRadius = 12.dp
+private val panelCornerRadius = 4.dp
 private val panelBorderWidth = 0.5.dp
 private val controlRowHeight = 44.dp
 private val iconSize = 20.dp
@@ -103,13 +103,14 @@ fun ReaderQuickCircle(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 48.dp,
-    iconSize: Dp = 22.dp,
+    width: Dp = 52.dp,
+    height: Dp = 40.dp,
+    iconSize: Dp = 20.dp,
     tint: Color = ReaderTheme.colors.controlInk
 ) {
     Box(
         modifier = modifier
-            .size(size)
+            .size(width, height)
             .clip(RoundedCornerShape(6.dp))
             .background(ReaderTheme.colors.quickButtonBg)
             .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(6.dp))
@@ -138,9 +139,9 @@ fun ReaderActionButton(
     Box(
         modifier = modifier
             .height(40.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(if (primary) ReaderTheme.colors.primary else ReaderTheme.colors.floatingControlBg)
-            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(8.dp))
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(4.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = text }
             .padding(horizontal = 14.dp),
@@ -258,9 +259,9 @@ fun ReaderChip(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(2.dp))
             .background(if (selected) ReaderTheme.colors.primary.copy(alpha = 0.12f) else ReaderTheme.colors.floatingControlBg)
-            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(8.dp))
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(2.dp))
             .semantics { contentDescription = text }
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {

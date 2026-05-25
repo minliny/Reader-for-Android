@@ -283,7 +283,7 @@ private fun ReaderTopArea(
 
 @Composable
 private fun ReaderTopIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    ReaderIconButton(icon = icon, contentDescription = contentDescription, onClick = onClick)
+    ReaderIconButton(icon = icon, contentDescription = contentDescription, onClick = onClick, size = 32.dp, iconSize = 18.dp)
 }
 
 @Composable
