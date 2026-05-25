@@ -67,7 +67,7 @@ fun ReaderPanel(
     }
 }
 
-// ── ReaderIconButton ──
+// ── ReaderIconButton (soft touch target, no circle, no Material shape) ──
 
 @Composable
 fun ReaderIconButton(
@@ -76,13 +76,43 @@ fun ReaderIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
-    iconSize: Dp = 20.dp,
+    iconSize: Dp = 22.dp,
     tint: Color = ReaderTheme.colors.controlInk
 ) {
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
+    }
+}
+
+// ── ReaderQuickCircle (floating soft circle, distinct from Material FAB) ──
+
+@Composable
+fun ReaderQuickCircle(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    iconSize: Dp = 22.dp,
+    tint: Color = ReaderTheme.colors.controlInk
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(14.dp))
+            .background(ReaderTheme.colors.quickButtonBg)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

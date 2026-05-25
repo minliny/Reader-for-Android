@@ -37,15 +37,15 @@ class ReaderControlBaseStructureTest {
 
     @Test
     fun `reader control base quick buttons have no visible text labels`() {
-        // ReaderQuickCircle must NOT contain Text composable — icons only
-        val quickCircleStart = baseSource.indexOf("private fun ReaderQuickCircle")
-        val nextFun = baseSource.indexOf("private fun", quickCircleStart + 1)
-        val quickCircleBody = if (nextFun > 0) baseSource.substring(quickCircleStart, nextFun) else baseSource.substring(quickCircleStart)
-
-        assertTrue(
-            "Quick circle buttons must not have visible text labels",
-            "Text(" !in quickCircleBody
-        )
+        // ReaderQuickCircle moved to ReaderNativeComponents — must NOT contain Text
+        val componentSource = String(Files.readAllBytes(Paths.get(
+            "src/main/kotlin/com/reader/android/ui/components/ReaderNativeComponents.kt"
+        )))
+        val quickCircleStart = componentSource.indexOf("fun ReaderQuickCircle(")
+        val nextFun = componentSource.indexOf("@Composable", quickCircleStart + 1)
+        val quickCircleBody = if (nextFun > 0) componentSource.substring(quickCircleStart, nextFun)
+            else componentSource.substring(quickCircleStart)
+        assertTrue("Quick circle must not have Text", "Text(" !in quickCircleBody)
     }
 
     @Test

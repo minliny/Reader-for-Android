@@ -25,9 +25,13 @@ class ReaderAccessibilitySemanticsScanTest {
 
     @Test
     fun `quick action buttons have no visible text labels`() {
-        val quickCircleStart = readerSource.indexOf("fun ReaderQuickCircle")
-        val nextFun = readerSource.indexOf("private fun", quickCircleStart + 1)
-        val quickCircleBody = if (nextFun > 0) readerSource.substring(quickCircleStart, nextFun) else readerSource.substring(quickCircleStart)
+        val componentSource = String(Files.readAllBytes(Paths.get(
+            "src/main/kotlin/com/reader/android/ui/components/ReaderNativeComponents.kt"
+        )))
+        val quickCircleStart = componentSource.indexOf("fun ReaderQuickCircle(")
+        val nextFun = componentSource.indexOf("@Composable", quickCircleStart + 1)
+        val quickCircleBody = if (nextFun > 0) componentSource.substring(quickCircleStart, nextFun)
+            else componentSource.substring(quickCircleStart)
         assertTrue("Quick circle must not have Text", "Text(" !in quickCircleBody)
     }
 

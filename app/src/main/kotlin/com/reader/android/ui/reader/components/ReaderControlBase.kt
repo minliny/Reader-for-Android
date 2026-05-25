@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import com.reader.android.ui.components.ReaderIconButton
 import com.reader.android.ui.components.ReaderProgressRail
+import com.reader.android.ui.components.ReaderQuickCircle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -353,21 +354,6 @@ private fun ReaderFloatingQuickActions(
     }
 }
 
-@Composable
-private fun ReaderQuickCircle(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(quickCircleSize)
-            .clip(CircleShape)
-            .background(ReaderTheme.colors.quickButtonBg)
-            .border(1.dp, ReaderTheme.colors.controlBorder, CircleShape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, contentDescription = null, tint = ReaderTheme.colors.controlInk)
-    }
-}
 
 @Composable
 private fun ReaderFloatingPageControl(
