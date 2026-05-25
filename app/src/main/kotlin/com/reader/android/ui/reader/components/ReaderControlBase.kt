@@ -32,9 +32,9 @@ import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderProgressRail
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -224,16 +224,11 @@ private fun ReaderTopArea(
                 .padding(horizontal = ReaderTheme.spacing.screenPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = ReaderTheme.colors.controlInk
-                )
-            }
+            ReaderIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "返回",
+                onClick = onBackClick
+            )
             Text(
                 text = bookTitle,
                 modifier = Modifier
@@ -287,9 +282,7 @@ private fun ReaderTopArea(
 
 @Composable
 private fun ReaderTopIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
-        Icon(icon, contentDescription = contentDescription, tint = ReaderTheme.colors.controlInk)
-    }
+    ReaderIconButton(icon = icon, contentDescription = contentDescription, onClick = onClick)
 }
 
 @Composable
@@ -396,37 +389,26 @@ private fun ReaderFloatingPageControl(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.md)
     ) {
-        IconButton(
+        ReaderIconButton(
+            icon = Icons.Filled.ChevronLeft,
+            contentDescription = "本章内上一页",
             onClick = onPrevPageClick,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Filled.ChevronLeft,
-                contentDescription = "本章内上一页",
-                tint = ReaderTheme.colors.primary
-            )
-        }
-        LinearProgressIndicator(
-            progress = { progress.coerceIn(0f, 1f) },
+            size = 32.dp, iconSize = 18.dp,
+            tint = ReaderTheme.colors.primary
+        )
+        ReaderProgressRail(
+            progress = progress.coerceIn(0f, 1f),
             modifier = Modifier
                 .weight(1f)
-                .height(6.dp)
-                .clip(CircleShape)
-                .semantics { contentDescription = "本章阅读进度，${(progress * 100).toInt()}%" },
-            color = ReaderTheme.colors.primary,
-            trackColor = ReaderTheme.colors.mutedTrack,
-            drawStopIndicator = {}
+                .semantics { contentDescription = "本章阅读进度，${(progress * 100).toInt()}%" }
         )
-        IconButton(
+        ReaderIconButton(
+            icon = Icons.Filled.ChevronRight,
+            contentDescription = "本章内下一页",
             onClick = onNextPageClick,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Filled.ChevronRight,
-                contentDescription = "本章内下一页",
-                tint = ReaderTheme.colors.primary
-            )
-        }
+            size = 32.dp, iconSize = 18.dp,
+            tint = ReaderTheme.colors.primary
+        )
     }
 }
 

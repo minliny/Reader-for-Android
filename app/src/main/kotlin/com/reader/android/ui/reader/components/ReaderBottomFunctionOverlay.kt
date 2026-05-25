@@ -28,8 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import com.reader.android.ui.components.ReaderSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -496,16 +495,10 @@ fun ReaderSettingsOverlay(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(sw.name, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.bookTitle, modifier = Modifier.weight(1f))
-                    Switch(
+                    ReaderSwitch(
                         checked = sw.checked,
                         onCheckedChange = { onSwitchChange(index, it) },
-                        modifier = Modifier.size(40.dp, 24.dp),
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = ReaderTheme.colors.paperBg,
-                            checkedTrackColor = ReaderTheme.colors.primary,
-                            uncheckedThumbColor = ReaderTheme.colors.controlInk,
-                            uncheckedTrackColor = ReaderTheme.colors.mutedTrack
-                        )
+                        modifier = Modifier.size(40.dp, 24.dp)
                     )
                 }
             }
