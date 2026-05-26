@@ -5,24 +5,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -31,12 +27,8 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -49,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -59,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.ui.booksource.BookSourceAdapterShell
 import com.reader.android.ui.discover.DiscoverAdapterShell
-import com.reader.android.ui.discover.RssLocalAdapter
 import com.reader.android.ui.theme.ReaderTheme
 
 // ── Stitch Bottom Nav ──
@@ -75,32 +67,20 @@ val stitchTabs = listOf(
 @Composable
 fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(ReaderTheme.colors.bottomBarBg)
-            .padding(vertical = 6.dp),
+        modifier = modifier.fillMaxWidth().background(ReaderTheme.colors.bottomBarBg).padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         stitchTabs.forEachIndexed { index, tab ->
             val isSelected = index == selectedIndex
             Column(
                 modifier = Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null, role = Role.Tab,
-                        onClick = { onTabSelected(index) }
-                    )
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab, onClick = { onTabSelected(index) })
                     .semantics { contentDescription = tab.label }
                     .padding(vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(tab.icon, null,
-                    tint = if (isSelected) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
-                    modifier = Modifier.size(22.dp))
-                Text(tab.label,
-                    color = if (isSelected) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
-                    fontSize = 11.sp,
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal)
+                Icon(tab.icon, null, tint = if (isSelected) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk, modifier = Modifier.size(22.dp))
+                Text(tab.label, color = if (isSelected) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal)
             }
         }
     }
@@ -112,7 +92,7 @@ fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: 
 fun StitchAppShell(onSearchClick: () -> Unit = {}, onSettingsClick: () -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
     Column(modifier = Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
-        Column(modifier = Modifier.fillMaxWidth(0.7f)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f, fill = true)) {
             when (selectedTab) {
                 0 -> StitchBookshelfPage(onSearchClick = onSearchClick)
                 1 -> StitchDiscoverPage()
@@ -130,44 +110,51 @@ fun StitchAppShell(onSearchClick: () -> Unit = {}, onSettingsClick: () -> Unit =
 private fun StitchBookshelfPage(onSearchClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // Header
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.fillMaxWidth(0.7f)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f, fill = true)) {
                 Text("Reader", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("静默阅读空间", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
             }
-            Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.metaBg)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onSearchClick)
-                .semantics { contentDescription = "搜索" },
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.metaBg)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onSearchClick)
+                    .semantics { contentDescription = "搜索" },
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.Filled.Search, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp)) }
         }
 
         // 最近阅读 section
         SectionHeader("最近阅读")
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            RecentBookCard("深空信号", "第三章 回声 · 35%", "已缓存", Icons.Filled.Cached)
-            RecentBookCard("林间航线", "第一章 启程 · 12%", "未缓存", Icons.Filled.Schedule)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            val cardWidth = (maxWidth - 8.dp) / 2
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RecentBookCard("深空信号", "第三章 回声 · 35%", "已缓存", Icons.Filled.Cached, width = cardWidth)
+                RecentBookCard("林间航线", "第一章 启程 · 12%", "未缓存", Icons.Filled.Schedule, width = cardWidth)
+            }
         }
 
         // 我的书架 section
         Spacer(modifier = Modifier.height(12.dp))
         SectionHeader("我的书架")
-        val books = listOf(
+        listOf(
             Triple("深空信号", "林间 · 42 万字", "35%"),
             Triple("夜航档案", "南溪 · 18 万字", "100%"),
             Triple("云端旧书", "匿名 · 8 万字", "0%")
-        )
-        books.forEach { (title, author, progress) ->
-            BookshelfItemRow(title, author, progress)
-        }
+        ).forEach { (title, author, progress) -> BookshelfItemRow(title, author, progress) }
 
         // 今日状态 section
         Spacer(modifier = Modifier.height(12.dp))
         SectionHeader("今日状态")
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip("32 已读分钟", Icons.Filled.Timer)
-            StatusChip("4 书签条数", Icons.Filled.BookmarkBorder)
-            StatusChip("12 离线缓存", Icons.Filled.CloudDownload)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            val chipWidth = (maxWidth - 16.dp) / 3
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusChip("32 已读分钟", Icons.Filled.Timer, width = chipWidth)
+                StatusChip("4 书签条数", Icons.Filled.BookmarkBorder, width = chipWidth)
+                StatusChip("12 离线缓存", Icons.Filled.CloudDownload, width = chipWidth)
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -178,21 +165,20 @@ private fun StitchBookshelfPage(onSearchClick: () -> Unit) {
 @Composable
 private fun StitchDiscoverPage() {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("发现", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp).semantics { heading() })
-
+        Text("发现", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp).semantics { heading() })
         SectionHeader("今日推荐")
         DiscoverAdapterShell.articles().take(2).forEach { article ->
-            StitchPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Text(article.title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${article.source} · ${article.publishedAt}", color = ReaderTheme.colors.bodyText, fontSize = 11.sp)
-                Text(article.snippet, color = ReaderTheme.colors.bodyText, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(10.dp)) {
+                Column {
+                    Text(article.title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${article.source} · ${article.publishedAt}", color = ReaderTheme.colors.bodyText, fontSize = 11.sp)
+                    Text(article.snippet, color = ReaderTheme.colors.bodyText, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
-
         SectionHeader("RSS 订阅")
         DiscoverAdapterShell.subscriptions().forEach { sub ->
-            StitchListItem(title = sub.title, subtitle = "${sub.articleCount} 篇更新")
+            StitchListItemRow(title = sub.title, subtitle = "${sub.articleCount} 篇更新", modifier = Modifier.padding(horizontal = 12.dp))
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -203,15 +189,10 @@ private fun StitchDiscoverPage() {
 @Composable
 private fun StitchBookSourcePage() {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("书源", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp).semantics { heading() })
+        Text("书源", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp).semantics { heading() })
         SectionHeader("已启用 (${BookSourceAdapterShell.sourceList().count { it.enabled }})")
         BookSourceAdapterShell.sourceList().forEach { src ->
-            StitchListItem(
-                title = src.sourceName,
-                subtitle = if (src.enabled) "已启用" else "已禁用",
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
+            StitchListItemRow(title = src.sourceName, subtitle = if (src.enabled) "已启用" else "已禁用", modifier = Modifier.padding(horizontal = 12.dp))
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -222,20 +203,16 @@ private fun StitchBookSourcePage() {
 @Composable
 private fun StitchMinePage(onSettingsClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("我的", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp).semantics { heading() })
-
+        Text("我的", color = ReaderTheme.colors.controlInk, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp).semantics { heading() })
         SectionHeader("阅读空间")
-        StitchListItem("WebDAV 配置", "未配置", modifier = Modifier.padding(horizontal = 12.dp))
-        StitchListItem("备份导出", "上次：-", modifier = Modifier.padding(horizontal = 12.dp))
-        StitchListItem("备份导入", "从本地恢复", modifier = Modifier.padding(horizontal = 12.dp))
-        StitchListItem("阅读进度同步", "未同步", modifier = Modifier.padding(horizontal = 12.dp))
-        StitchListItem("远程 WebDAV 书籍", "不可用", modifier = Modifier.padding(horizontal = 12.dp))
-
+        StitchListItemRow("WebDAV 配置", "未配置", modifier = Modifier.padding(horizontal = 12.dp))
+        StitchListItemRow("备份导出", "上次：-", modifier = Modifier.padding(horizontal = 12.dp))
+        StitchListItemRow("备份导入", "从本地恢复", modifier = Modifier.padding(horizontal = 12.dp))
+        StitchListItemRow("阅读进度同步", "未同步", modifier = Modifier.padding(horizontal = 12.dp))
+        StitchListItemRow("远程 WebDAV 书籍", "不可用", modifier = Modifier.padding(horizontal = 12.dp))
         SectionHeader("关于")
-        StitchListItem("关于 Reader", "版本 1.0", modifier = Modifier.padding(horizontal = 12.dp))
-        StitchListItem("隐私与权限", "", modifier = Modifier.padding(horizontal = 12.dp))
-
+        StitchListItemRow("关于 Reader", "版本 1.0", modifier = Modifier.padding(horizontal = 12.dp))
+        StitchListItemRow("隐私与权限", "", modifier = Modifier.padding(horizontal = 12.dp))
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
@@ -244,13 +221,12 @@ private fun StitchMinePage(onSettingsClick: () -> Unit) {
 
 @Composable
 private fun SectionHeader(title: String) {
-    Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() })
+    Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() })
 }
 
 @Composable
-private fun RecentBookCard(title: String, subtitle: String, tag: String, icon: ImageVector) {
-    Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(10.dp)) {
+private fun RecentBookCard(title: String, subtitle: String, tag: String, icon: ImageVector, width: androidx.compose.ui.unit.Dp) {
+    Box(modifier = Modifier.width(width).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(10.dp)) {
         Column {
             Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = ReaderTheme.colors.bodyText, fontSize = 11.sp)
@@ -271,7 +247,7 @@ private fun BookshelfItemRow(title: String, author: String, progress: String) {
             Icon(Icons.Filled.AutoStories, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.fillMaxWidth(0.7f)) {
+        Column(modifier = Modifier.weight(1f, fill = true)) {
             Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Text(author, color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
         }
@@ -280,12 +256,25 @@ private fun BookshelfItemRow(title: String, author: String, progress: String) {
 }
 
 @Composable
-private fun StatusChip(text: String, icon: ImageVector) {
-    Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(10.dp)) {
+private fun StatusChip(text: String, icon: ImageVector, width: androidx.compose.ui.unit.Dp) {
+    Box(modifier = Modifier.width(width).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = ReaderTheme.colors.primary, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(text, color = ReaderTheme.colors.controlInk, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun StitchListItemRow(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = 10.dp).semantics { contentDescription = title },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f, fill = true)) {
+            Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotBlank()) Text(subtitle, color = ReaderTheme.colors.bodyText, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
