@@ -90,18 +90,7 @@ fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: 
 
 @Composable
 fun StitchAppShell(onSearchClick: () -> Unit = {}, onSettingsClick: () -> Unit = {}) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    Column(modifier = Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f, fill = true)) {
-            when (selectedTab) {
-                0 -> StitchBookshelfPage(onSearchClick = onSearchClick)
-                1 -> StitchDiscoverPage()
-                2 -> StitchBookSourcePage()
-                3 -> StitchMinePage(onSettingsClick = onSettingsClick)
-            }
-        }
-        StitchBottomNav(selectedIndex = selectedTab, onTabSelected = { selectedTab = it })
-    }
+    StitchBookshelfPage(onSearchClick = onSearchClick)
 }
 
 // ── Bookshelf Tab ──
