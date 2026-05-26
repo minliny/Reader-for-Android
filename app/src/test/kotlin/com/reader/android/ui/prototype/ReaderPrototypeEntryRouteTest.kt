@@ -17,22 +17,22 @@ class ReaderPrototypeEntryRouteTest {
     }
 
     @Test
-    fun `prototype gallery debug route is registered`() {
+    fun `prototype gallery route is registered as dev entry`() {
         listOf(
             "PROTOTYPE_GALLERY",
             "prototype_gallery",
             "ReaderPrototypeGallery",
-            "BuildConfig.DEBUG",
-            "startDestination"
+            "startDestination",
+            "StitchBottomNav"
         ).forEach { token ->
             assertTrue("Route host must contain $token", token in routeHostSource)
         }
     }
 
     @Test
-    fun `debug app starts directly at prototype gallery`() {
-        assertTrue("Debug start destination must use prototype gallery", "ReaderRoutes.PROTOTYPE_GALLERY" in routeHostSource.substringAfter("val startDestination = if (BuildConfig.DEBUG)"))
-        assertTrue("Release fallback must stay bookshelf", "ReaderRoutes.BOOKSHELF" in routeHostSource.substringAfter("} else {").substringBefore("Scaffold("))
+    fun `app starts at bookshelf with prototype gallery retained as dev route`() {
+        assertTrue("Start destination must be BOOKSHELF", "startDestination = ReaderRoutes.BOOKSHELF" in routeHostSource)
+        assertTrue("Prototype gallery route must still be registered", "PROTOTYPE_GALLERY" in routeHostSource)
     }
 
     @Test

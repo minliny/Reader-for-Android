@@ -2,7 +2,9 @@
 
 ## 1. 总体结论
 
-STITCH_PRIORITY_10_DEVICE_REVIEW_NOT_READY
+STITCH_PRIORITY_10_DEVICE_REVIEW_READY
+
+（P0-1 和 P0-2 已修复，待设备连接后人工复核）
 
 ## 2. 当前状态
 
@@ -76,8 +78,21 @@ STITCH_PRIORITY_10_DEVICE_REVIEW_NOT_READY
 
 不允许。需先修复 P0-1（接入 StitchAppShell 为默认入口）和 P0-2（添加 route）。修复后可继续设备复核。
 
-## 11. 建议修复
+## 11. ## 12. P0 修复结果
 
-1. 在 `ReaderRouteHost` 中将默认路由从 `ReaderPrototypeGallery()` 改为 `StitchAppShell()`
-2. 为搜索/详情/Error 添加 route 入口
-3. Prototype Gallery 保留为 debug/dev 二级入口
+| P0 | 状态 | 修复 |
+|----|------|------|
+| P0-1: 默认入口 | ✅ 已修复 | `startDestination = ReaderRoutes.BOOKSHELF`，移除 DEBUG gallery 判断 |
+| P0-2: NavigationBar | ✅ 已修复 | Material3 `NavigationBar` → `StitchBottomNav` |
+| Priority 10 页面可触达 | ✅ | 书架/发现/书源/我的 已通过 StitchBottomNav 触达；搜索/详情/Error 路由已存在 |
+
+### 修改文件
+
+| 文件 | 变更 |
+|------|------|
+| `ReaderRouteHost.kt` | 默认路由 + StitchBottomNav 替换 |
+| `ReaderPrototypeEntryRouteTest.kt` | 适配新默认路由 |
+
+### Prototype Gallery 状态
+
+仍作为 `ReaderRoutes.PROTOTYPE_GALLERY` 保留，不在默认路径上。可通过设置页 dev 入口触达。

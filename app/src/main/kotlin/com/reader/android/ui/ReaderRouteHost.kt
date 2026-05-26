@@ -43,6 +43,7 @@ import com.reader.android.ui.prototype.ReaderPrototypeGallery
 import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.stitch.StitchBottomNav
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
@@ -170,34 +171,27 @@ fun ReaderRouteHost(
     val mainTabRoutes = appScreens.map { it.route }.toSet()
     val currentRoute = currentDestination?.route
     val showMainBottomBar = currentRoute in mainTabRoutes
-    val startDestination = if (BuildConfig.DEBUG) {
-        ReaderRoutes.PROTOTYPE_GALLERY
-    } else {
-        ReaderRoutes.BOOKSHELF
-    }
+    val startDestination = ReaderRoutes.BOOKSHELF
 
     Scaffold(
         bottomBar = {
             if (showMainBottomBar) {
-                NavigationBar {
-                    appScreens.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.label) },
-                            label = { Text(screen.label) },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                                backStack.push(screen.route)
+                val selectedIndex = appScreens.indexOfFirst { it.route == currentRoute }
+                    .coerceAtLeast(0)
+                StitchBottomNav(
+                    selectedIndex = selectedIndex,
+                    onTabSelected = { index ->
+                        val route = appScreens.getOrNull(index)?.route ?: return@StitchBottomNav
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
                             }
-                        )
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                        backStack.push(route)
                     }
-                }
+                )
             }
         }
     ) { innerPadding ->
