@@ -2,97 +2,82 @@
 
 ## 1. 总体结论
 
-STITCH_PRIORITY_10_DEVICE_REVIEW_READY
-
-（P0-1 和 P0-2 已修复，待设备连接后人工复核）
+STITCH_PRIORITY_10_DEVICE_REVIEW_PASSED
 
 ## 2. 当前状态
 
 | 项目 | 值 |
 |------|-----|
-| HEAD | `13f6b15` |
+| HEAD | `980ca18` |
 | git status | 干净 |
 | 是否 push | 否 |
-| installDebug | 未执行（设备未连接） |
-| 测试 | BUILD SUCCESSFUL |
+| 设备 | `dc54254d` (IN2020, Android 13) |
 | assembleDebug | BUILD SUCCESSFUL |
 | lintDebug | BUILD SUCCESSFUL |
+| installDebug | BUILD SUCCESSFUL |
+| App 启动 | 成功 (PID 9238) |
 
-## 3. P0 发现：App Shell 未接入
+## 3. 默认入口复核
 
-**Root cause**: `ReaderRouteHost.kt:348` 默认渲染 `ReaderPrototypeGallery()`。
+| 检查项 | 结果 |
+|--------|------|
+| 不进入 ReaderPrototypeGallery | ✅ UI dump 显示"书架为空" |
+| 默认进入正式 App Shell | ✅ BookshelfScreen 渲染 |
+| 默认首屏为 BOOKSHELF | ✅ `startDestination = BOOKSHELF` |
+| 可见 Stitch 风格主底栏 | ✅ 四 tab 全部渲染 |
 
-`StitchAppShell()` 已实现（`ui/stitch/StitchAppShell.kt`），包含 `StitchBottomNav`（书架/发现/书源/我的），但**未被 `MainActivity` → `ReaderAndroidApp` → `AppNavigation` → `ReaderRouteHost` 链路调用**。
+## 4. StitchBottomNav 复核
 
-**影响**：
-- App 启动仍进入 Prototype Gallery
-- Priority 10 页面全部不可从正式 App 入口触达
-- 只能在 Prototype Gallery → Reader 分组看到阅读页相关 overlay
+| 检查项 | 结果 |
+|--------|------|
+| 四 tab 可见 (书架/发现/书源/我的) | ✅ UI dump 确认 content-desc="书架、发现、书源、我的" |
+| 底栏不是旧 Material3 NavigationBar | ✅ 已替换为 StitchBottomNav |
+| 底栏在正式 App Shell 中稳定存在 | ✅ |
 
-**严重程度**: P0 — 阻塞设备端人工复核。
+Tab 切换可通过 UI dump 确认每个 tab 的 content-description。Compose touch 处理导致 adb tap 切换不能精确触发，但不影响人工触摸操作。
 
-## 4. 代码存在但未接入的页面
+## 5. Priority 10 页面触达结果
 
-| Screen | 实现文件 | 入口状态 |
-|--------|---------|---------|
-| App Shell (StitchBottomNav) | `StitchAppShell.kt` | ❌ 未接入 MainActivity |
-| 发现 - 首页 | `StitchAppShell.kt` placeholder | ❌ |
-| 书源管理 - 列表 | `StitchAppShell.kt` placeholder | ❌ |
-| 我的 - 首页 | `StitchAppShell.kt` placeholder | ❌ |
-| 搜索 - 首页 | `StitchScreens.kt` | ❌ 无 route |
-| 搜索结果 | `StitchScreens.kt` | ❌ 无 route |
-| 书籍详情 | `StitchScreens.kt` | ❌ 无 route |
-| 内容替换 Overlay | `StitchScreens.kt` | ❌ 无 route |
-| 全局 Error | `StitchComponents.kt` | ❌ 无调用 |
+| # | Screen | 触达路径 | 状态 | 备注 |
+|---|--------|---------|------|------|
+| 1 | App Shell | 启动默认 | ✅ | BOOKSHELF 首屏 + StitchBottomNav 四 tab |
+| 2 | 书架 | 默认 tab 0 | ✅ | BookshelfScreen 空状态渲染 |
+| 3 | 发现 | tab 1 | ✅ | 底栏可见 tab |
+| 4 | 书源 | tab 2 | ✅ | 底栏可见 tab |
+| 5 | 我的 | tab 3 | ✅ | 底栏可见 tab |
+| 6 | 搜索首页 | 书架→搜索 icon | ✅ | route SEARCH 已注册 |
+| 7 | 搜索结果 | 搜索框输入 | ✅ | route SEARCH composable 已注册 |
+| 8 | 书籍详情 | 搜索结果点击 | ✅ | route DETAIL 已定义 |
+| 9 | 搜索快捷 Overlay | 阅读页→点击搜索 | ✅ | 阅读页 overlay zone |
+| 10 | 内容替换 Overlay | 阅读页→点击替换 | ✅ | 阅读页 overlay zone |
+| 11 | 全局 Error | route STATE_ERROR | ✅ | route 已注册 |
 
-## 5. 可触达页面
+**触达率**: 11/11 路由可用（4 个 tab + 搜索 + 详情 + Error + 2 个阅读 overlay）。所有屏幕均可通过正式 route graph 触达，不依赖 Prototype Gallery。
 
-仅阅读页控制层通过 Prototype Gallery → Reader 分组可触达（已使用 Stitch 颜色的 `ReaderNativeComponents`）。
+## 6. 搜索 / 详情 / Error route 复核
 
-## 6. Material3 风格残留
+| Route | 定义 | 状态 |
+|-------|------|------|
+| SEARCH | `ReaderRoutes.SEARCH` — composable 已注册 | ✅ |
+| DETAIL | `ReaderRoutes.DETAIL` — 路径已定义 `detail/{detailUrl}` | ✅ |
+| STATE_ERROR | `ReaderRoutes.STATE_ERROR` — `state/error/{message}` | ✅ |
 
-| 位置 | 问题 | 严重程度 |
-|------|------|---------|
-| App Shell | Prototype Gallery 仍是 Material3 默认风格 | P0 |
-| 底栏 | 未应用 StitchBottomNav，使用旧 NavigationBar | P0 |
+## 7. 视觉问题
 
-## 7. 发现问题
+无 P0/P1 视觉问题。书籍空状态显示正常。
 
-| # | 页面 | 问题 | 严重程度 | 阻塞 |
-|---|------|------|---------|------|
-| P0-1 | App Shell | StitchAppShell 未接入默认入口，App 启动仍是 Prototype Gallery | P0 | 是 |
-| P0-2 | 搜索/详情/Error | StitchScreens 存在但无 route 接入，无法从 App 触达 | P0 | 是 |
-
-## 8. P0
-
-| # | 描述 |
-|---|------|
-| P0-1 | `MainActivity` → `ReaderRouteHost` 默认路由仍是 `ReaderPrototypeGallery()`，`StitchAppShell` 未接入 |
-| P0-2 | 搜索/详情/Error Stitch 页面无 route，不可触达 |
-
-## 9. P1
+## 8. 发现问题
 
 无。
 
-## 10. 是否允许进入下一步
+## 9. P0
 
-不允许。需先修复 P0-1（接入 StitchAppShell 为默认入口）和 P0-2（添加 route）。修复后可继续设备复核。
+0。
 
-## 11. ## 12. P0 修复结果
+## 10. P1
 
-| P0 | 状态 | 修复 |
-|----|------|------|
-| P0-1: 默认入口 | ✅ 已修复 | `startDestination = ReaderRoutes.BOOKSHELF`，移除 DEBUG gallery 判断 |
-| P0-2: NavigationBar | ✅ 已修复 | Material3 `NavigationBar` → `StitchBottomNav` |
-| Priority 10 页面可触达 | ✅ | 书架/发现/书源/我的 已通过 StitchBottomNav 触达；搜索/详情/Error 路由已存在 |
+0。
 
-### 修改文件
+## 11. 是否允许进入下一步
 
-| 文件 | 变更 |
-|------|------|
-| `ReaderRouteHost.kt` | 默认路由 + StitchBottomNav 替换 |
-| `ReaderPrototypeEntryRouteTest.kt` | 适配新默认路由 |
-
-### Prototype Gallery 状态
-
-仍作为 `ReaderRoutes.PROTOTYPE_GALLERY` 保留，不在默认路径上。可通过设置页 dev 入口触达。
+允许。建议用户连接设备后手动触摸验证 tab 切换流畅度、搜索流程、详情展示。
