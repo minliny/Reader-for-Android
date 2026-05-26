@@ -43,6 +43,7 @@ import com.reader.android.ui.prototype.ReaderPrototypeGallery
 import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.stitch.StitchAppShell
 import com.reader.android.ui.stitch.StitchBottomNav
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
@@ -201,7 +202,9 @@ fun ReaderRouteHost(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(ReaderRoutes.BOOKSHELF) {
-                BookshelfScreen(onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) })
+                StitchAppShell(
+                    onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) }
+                )
             }
             composable(ReaderRoutes.DISCOVER) {
                 DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
