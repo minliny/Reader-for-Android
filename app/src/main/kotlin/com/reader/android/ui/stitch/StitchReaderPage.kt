@@ -104,7 +104,7 @@ fun StitchReaderPage(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = ReaderTheme.colors.controlInk,
                     modifier = Modifier.size(24.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onBack() })
                 Text(bookTitle, color = ReaderTheme.colors.controlInk, fontSize = 24.sp, fontWeight = FontWeight.Bold,
-                    lineHeight = 32.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
+                    lineHeight = 32.sp, modifier = Modifier.weight(1f),
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(Icons.Filled.Refresh, Icons.Filled.SwapHoriz, Icons.Filled.MoreVert).forEach { icon ->
@@ -126,19 +126,18 @@ fun StitchReaderPage(
             }
         }
 
-        // ── Brightness Dock (left sidebar, rounded-full) ──
+        // ── Brightness Dock: h-40 track, fixed 200dp pill ──
         Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 8.dp).width(48.dp)
+            Modifier.align(Alignment.CenterStart).padding(start = 8.dp).width(48.dp).height(200.dp)
                 .clip(RoundedCornerShape(999.dp)).background(ReaderTheme.colors.floatingControlBg)
-                .padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(Icons.Filled.BrightnessAuto, "自动亮度", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
-            // Vertical track (h-40 = 160dp, w-1.5 = 6dp)
-            Box(Modifier.weight(1f).width(6.dp).clip(CircleShape).background(ReaderTheme.colors.mutedTrack.copy(alpha = 0.3f))) {
-                Box(Modifier.fillMaxWidth().fillMaxHeight(brightness).clip(CircleShape).background(ReaderTheme.colors.primary))
+            Icon(Icons.Filled.BrightnessAuto, "自动亮度", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
+            Box(Modifier.weight(1f).width(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.mutedTrack)) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(brightness).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.primary))
             }
-            Icon(Icons.Filled.ChevronRight, "右移", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
+            Icon(Icons.Filled.ChevronRight, "右移", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
         }
 
         // ── Bottom Panel (fixed, rounded-t-xl, shadow-lg) ──
