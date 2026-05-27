@@ -1,8 +1,10 @@
 package com.reader.android.ui.stitch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,204 +17,212 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.reader.android.ui.detail.BookDetailUiModel
-import com.reader.android.ui.reader.components.ReplaceRule
-import com.reader.android.ui.search.SearchResultUiModel
 import com.reader.android.ui.theme.ReaderTheme
 
-// ── Stitch Search Screen ──
+// ── 1. 导入本地书籍 (zip1/_4) ──
 
 @Composable
-fun StitchSearchScreen(onBack: () -> Unit = {}) {
-    var query by remember { mutableStateOf("") }
-    Column(modifier = Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            StitchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack, size = 36.dp)
-            Spacer(modifier = Modifier.width(8.dp))
-            StitchSearchField(query, { query = it }, Modifier.weight(1f))
+fun StitchImportBookPage(onBack: () -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
+        Row(Modifier.fillMaxWidth().height(48.dp).background(ReaderTheme.colors.paperBg)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = ReaderTheme.colors.controlInk,
+                modifier = Modifier.size(24.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onBack() })
+            Spacer(Modifier.weight(1f))
+            Text("导入本地书籍", color = ReaderTheme.colors.controlInk, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f)); Spacer(Modifier.size(24.dp))
         }
-        // History / recommendations
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text("搜索历史", color = ReaderTheme.colors.bodyText, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
-            Spacer(modifier = Modifier.height(8.dp))
-            listOf("深空信号", "一剑独尊", "科幻世界").forEach { term ->
-                StitchChip(text = term, modifier = Modifier.padding(end = 8.dp, bottom = 4.dp))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("推荐搜索", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            listOf("仙侠", "都市", "历史").forEach { term ->
-                StitchChip(text = term, modifier = Modifier.padding(end = 8.dp, bottom = 4.dp))
-            }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ImportOption("从文件管理器选择", "支持 TXT, EPUB 格式", Icons.Filled.FileOpen)
+            ImportOption("从文件夹导入", "批量导入整个文件夹的书籍", Icons.Filled.Folder)
+            ImportOption("从其他应用分享", "接收其他 App 分享的书籍文件", Icons.Filled.Add)
         }
     }
 }
 
-// ── Stitch Search Results ──
+@Composable
+private fun ImportOption(title: String, subtitle: String, icon: ImageVector) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.metaBg), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = ReaderTheme.colors.primary, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
+        }
+    }
+}
+
+// ── 2. 更多菜单 (zip1/_6) ──
 
 @Composable
-fun StitchSearchResultsScreen(
-    query: String,
-    results: List<SearchResultUiModel>,
-    onBack: () -> Unit = {},
-    onResultClick: (SearchResultUiModel) -> Unit = {}
-) {
-    Column(modifier = Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            StitchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack, size = 36.dp)
-            Spacer(modifier = Modifier.width(8.dp))
-            StitchSearchField(query, {}, Modifier.weight(1f))
-        }
-        Text("共 ${results.size} 条结果", color = ReaderTheme.colors.bodyText, fontSize = 12.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(results) { item ->
-                StitchPanel(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                    Text(item.title, color = ReaderTheme.colors.controlInk, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row { Text("${item.author} · ${item.sourceName}", color = ReaderTheme.colors.bodyText, fontSize = 12.sp) }
-                    Text("最新：${item.latestChapter}", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-                    item.intro.takeIf { it.isNotBlank() }?.let {
-                        Text(it, color = ReaderTheme.colors.bodyText, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+fun StitchBookMoreMenu(onDismiss: () -> Unit = {}, onAction: (String) -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg.copy(alpha = 0.3f))
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+        verticalArrangement = Arrangement.Bottom) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            .background(ReaderTheme.colors.paperBg)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }.padding(vertical = 8.dp)) {
+            listOf("继续阅读" to Icons.Filled.Book, "查看详情" to Icons.Filled.Search, "移出书架" to Icons.Filled.Delete, "缓存本书" to Icons.Filled.FileOpen)
+                .forEach { (label, icon) ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onAction(label); onDismiss() }
+                        .semantics { contentDescription = label }, verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Text(label, color = ReaderTheme.colors.controlInk, fontSize = 16.sp)
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    StitchActionButton("查看详情", { onResultClick(item) }, primary = true)
+                }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ── 3. 分组管理 (zip1/_7) ──
+
+@Composable
+fun StitchGroupManagementPage(onBack: () -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
+        Row(Modifier.fillMaxWidth().height(48.dp).background(ReaderTheme.colors.paperBg)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onBack() })
+            Spacer(Modifier.weight(1f))
+            Text("书架分组管理", color = ReaderTheme.colors.controlInk, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Filled.Add, "新增", tint = ReaderTheme.colors.primary, modifier = Modifier.size(24.dp))
+        }
+        LazyColumn(Modifier.weight(1f)) {
+            items(listOf("全部", "默认", "本地书", "哲学", "科幻")) { group ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Folder, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(group, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Icon(Icons.Filled.Edit, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Icon(Icons.Filled.Delete, null, tint = ReaderTheme.colors.controlInk.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
                 }
             }
         }
     }
 }
 
-// ── Stitch BookDetail Screen ──
+// ── 4. 朗读控制 (zip2/_2) ──
 
 @Composable
-fun StitchBookDetailScreen(
-    detail: BookDetailUiModel,
-    onBack: () -> Unit = {},
-    onStartReading: () -> Unit = {},
-    onTOC: () -> Unit = {}
-) {
-    Column(modifier = Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            StitchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack, size = 36.dp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(detail.title, color = ReaderTheme.colors.controlInk, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { heading() })
-        }
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("${detail.author} · ${detail.sourceName}", color = ReaderTheme.colors.bodyText, fontSize = 13.sp)
-            StitchChip(text = detail.category, modifier = Modifier.padding(vertical = 4.dp))
-            StitchChip(detail.cacheStatus, modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp))
-            if (detail.readingProgress > 0f) {
-                StitchChip("进度 ${(detail.readingProgress * 100).toInt()}%", modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp))
-            }
-            Text(detail.currentChapter.ifBlank { "" }, color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(detail.intro.ifBlank { "" }, color = ReaderTheme.colors.bodyText, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            // TOC Preview
-            val toc = detail.tocPreview
-            Text("目录 (${toc.chapterCount}章)", color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text("${toc.firstChapterTitle} — ${toc.latestChapterTitle}", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Row {
-                val actionLabel = if (detail.readingProgress > 0f) "继续阅读" else "开始阅读"
-                StitchActionButton(actionLabel, onStartReading, primary = true, modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(8.dp))
-                StitchActionButton("查看目录", onTOC, modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-// ── Stitch Replace Overlay Content ──
-
-@Composable
-fun StitchReplaceOverlayContent(rules: List<ReplaceRule>, onRuleToggle: (Int, Boolean) -> Unit = { _, _ -> }) {
-    Column {
-        Text("内容替换", color = ReaderTheme.colors.controlInk, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-            modifier = Modifier.semantics { heading() })
-        Text("仅显示当前书籍匹配规则", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-        rules.forEachIndexed { index, rule ->
-            StitchPanel(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(rule.name, color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("范围：${rule.scope} · 匹配：${rule.pattern}", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
-                        Text("替换：${rule.replacement}", color = ReaderTheme.colors.primary, fontSize = 12.sp)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier.size(36.dp, 22.dp).clip(RoundedCornerShape(11.dp))
-                            .background(if (rule.enabled) ReaderTheme.colors.primary else ReaderTheme.colors.mutedTrack)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(18.dp).clip(RoundedCornerShape(9.dp))
-                                .background(ReaderTheme.colors.paperBg)
-                                .align(if (rule.enabled) Alignment.CenterEnd else Alignment.CenterStart)
-                                .padding(1.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Helpers ──
-
-@Composable
-private fun StitchIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 40.dp) {
-    Box(
-        modifier = Modifier.size(size)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = desc },
-        contentAlignment = Alignment.Center
-    ) { Icon(icon, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp)) }
-}
-
-@Composable
-private fun StitchChip(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(2.dp))
+fun StitchTtsOverlay(onDismiss: () -> Unit = {}) {
+    var isPlaying by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg.copy(alpha = 0.3f))
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+        verticalArrangement = Arrangement.Bottom) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .background(ReaderTheme.colors.floatingControlBg)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text, color = ReaderTheme.colors.controlInk, fontSize = 12.sp)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+            .shadow(2.dp, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("朗读控制", color = ReaderTheme.colors.controlInk, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).semantics { heading() })
+                Icon(Icons.Filled.Close, "关闭", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() })
+            }
+            Text("第一章 深空信号", color = ReaderTheme.colors.bodyText, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Icon(if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow, "播放", tint = ReaderTheme.colors.primary,
+                    modifier = Modifier.size(40.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { isPlaying = !isPlaying })
+            }
+            Spacer(Modifier.height(16.dp))
+            StitchSliderRow("语速", 1f, 0.5f..3f)
+            StitchSliderRow("音量", 0.7f, 0f..1f)
+            StitchSettingRow("定时关闭", "不开启")
+            StitchSettingRow("朗读音色", "温和女声")
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun StitchSliderRow(label: String, value: Float, range: ClosedFloatingPointRange<Float>) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = ReaderTheme.colors.controlInk, fontSize = 14.sp)
+            Text("${(value * 100).toInt()}%", color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
+        }
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.mutedTrack)) {
+            Box(Modifier.fillMaxWidth(value.coerceIn(range)).height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.primary))
+        }
+    }
+}
+
+@Composable
+private fun StitchSettingRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = ReaderTheme.colors.controlInk, fontSize = 14.sp)
+        Text(value, color = ReaderTheme.colors.bodyText, fontSize = 12.sp)
+    }
+}
+
+// ── 5. 阅读设置 (zip2/_8) ──
+
+@Composable
+fun StitchReaderSettingsOverlay(onDismiss: () -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg.copy(alpha = 0.3f))
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+        verticalArrangement = Arrangement.Bottom) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            .background(ReaderTheme.colors.floatingControlBg)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+            .shadow(2.dp, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("阅读设置", color = ReaderTheme.colors.controlInk, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).semantics { heading() })
+                Icon(Icons.Filled.Close, "关闭", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() })
+            }
+            Spacer(Modifier.height(12.dp))
+            Text("文字", color = ReaderTheme.colors.controlInk, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+            StitchSettingRow("字体", "默认"); StitchSettingRow("字号", "18"); StitchSettingRow("字距", "标准")
+            Text("段落", color = ReaderTheme.colors.controlInk, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            StitchSettingRow("缩进", "2 字符"); StitchSettingRow("行距", "标准")
+            Text("界面", color = ReaderTheme.colors.controlInk, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            StitchSettingRow("翻页动画", "覆盖"); StitchSettingRow("主题", "米色纸张")
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
