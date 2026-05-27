@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
@@ -224,5 +225,102 @@ fun StitchReaderSettingsOverlay(onDismiss: () -> Unit = {}) {
             StitchSettingRow("翻页动画", "覆盖"); StitchSettingRow("主题", "米色纸张")
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+// ── 6. 下载/缓存管理 (zip1/_8) ──
+
+@Composable
+fun StitchDownloadPage(onBack: () -> Unit = {}) {
+    Column(Modifier.fillMaxSize().background(ReaderTheme.colors.paperBg)) {
+        // Header: arrow_back | "下载 / 缓存" | more_vert
+        Row(Modifier.fillMaxWidth().height(48.dp).background(ReaderTheme.colors.paperBg)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onBack() })
+            Text("下载 / 缓存", color = ReaderTheme.colors.controlInk, fontSize = 28.sp, fontWeight = FontWeight.SemiBold,
+                lineHeight = 36.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            Icon(Icons.Filled.MoreVert, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
+            // Storage Summary Card: bg-surface-container-low rounded-xl p-md mb-lg
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(ReaderTheme.colors.floatingControlBg).border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(12.dp))
+                .padding(24.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("存储空间", color = ReaderTheme.colors.controlInk, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp)
+                        Text("已使用 12.4 GB / 总计 128 GB", color = ReaderTheme.colors.bodyText, fontSize = 16.sp, lineHeight = 26.sp)
+                    }
+                    Text("10%", color = ReaderTheme.colors.primary, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                }
+                // Progress bar: h-base=4dp, rounded-full
+                Spacer(Modifier.height(12.dp))
+                Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.mutedTrack)) {
+                    Box(Modifier.fillMaxWidth(0.1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.primary))
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Reader 缓存 1.2 GB · 其他文件 11.2 GB", color = ReaderTheme.colors.bodyText, fontSize = 14.sp, lineHeight = 20.sp)
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Download List Header
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("已下载书籍", color = ReaderTheme.colors.controlInk, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                Text("共 12 本", color = ReaderTheme.colors.bodyText, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Book items: flex items-center gap-md, rounded-xl border, p-2
+            DownloadBookItem("三体：死神永生", "已下载 128/128 章节 · 4.2 MB", 1f)
+            DownloadBookItem("百年孤独", "已下载 12/45 章节 · 1.1 MB", 0.26f)
+            DownloadBookItem("万历十五年", "已下载 34/34 章节 · 2.8 MB", 1f)
+            DownloadBookItem("卡拉马佐夫兄弟", "等待下载... · 8.5 MB", 0f, pending = true)
+        }
+        // Bottom Action Bar
+        Row(Modifier.fillMaxWidth().background(ReaderTheme.colors.floatingControlBg)
+            .border(0.5.dp, ReaderTheme.colors.controlBorder.copy(alpha = 0.3f)).padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(12.dp))
+                .background(ReaderTheme.colors.floatingControlBgAlt)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                .semantics { contentDescription = "一键离线全本" }, contentAlignment = Alignment.Center) {
+                Text("一键离线全本", color = ReaderTheme.colors.controlInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+            Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(12.dp))
+                .background(ReaderTheme.colors.primary)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                .semantics { contentDescription = "完成" }, contentAlignment = Alignment.Center) {
+                Text("完成", color = ReaderTheme.colors.paperBg, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadBookItem(title: String, info: String, progress: Float, pending: Boolean = false) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        .clip(RoundedCornerShape(12.dp)).background(ReaderTheme.colors.paperBg)
+        .border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(12.dp)).padding(8.dp)
+        .then(if (pending) Modifier else Modifier),
+        verticalAlignment = Alignment.CenterVertically) {
+        // Cover: w-16 h-20 = 64x80dp
+        Box(Modifier.size(64.dp, 80.dp).clip(RoundedCornerShape(8.dp)).background(ReaderTheme.colors.metaBg),
+            contentAlignment = Alignment.Center) {
+            Text(title.first().toString(), color = ReaderTheme.colors.primary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = ReaderTheme.colors.controlInk, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(info, color = ReaderTheme.colors.bodyText, fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.mutedTrack)) {
+                Box(Modifier.fillMaxWidth(progress).height(4.dp).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.primary))
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.Filled.Delete, "删除", tint = ReaderTheme.colors.controlInk.copy(if (pending) 0.3f else 1f), modifier = Modifier.size(24.dp))
     }
 }
