@@ -16,16 +16,16 @@ class ReaderThemeTokenTest {
     fun `reader day colors match stitch design system tokens`() {
         val colors = ReaderColors.Day
 
-        assertEquals(0xFFF8F9FF.toInt(), colors.paperBg.toArgb())
-        assertEquals(0xFF181C22.toInt(), colors.bodyText.toArgb())
-        assertEquals(0xFF404752.toInt(), colors.controlInk.toArgb())
-        assertEquals(0xFF0061A4.toInt(), colors.primary.toArgb())
-        assertEquals(0xFFF1F3FC.toInt(), colors.bottomBarBg.toArgb())
-        assertEquals(0xFFFFFFFF.toInt(), colors.floatingControlBg.toArgb())
-        assertEquals(0xFFEBEEF6.toInt(), colors.floatingControlBgAlt.toArgb())
-        assertEquals(0xFFF1F3FC.toInt(), colors.quickButtonBg.toArgb())
-        assertEquals(0xFFBFC7D4.toInt(), colors.controlBorder.toArgb())
-        assertEquals(0x18707883, colors.handoffBoundary.toArgb())
+        assertEquals(0xFFFFF8F4.toInt(), colors.paperBg.toArgb())
+        assertEquals(0xFF1F1B17.toInt(), colors.bodyText.toArgb())
+        assertEquals(0xFF41484C.toInt(), colors.controlInk.toArgb())
+        assertEquals(0xFF366179.toInt(), colors.primary.toArgb())
+        assertEquals(0xFFFBF2EB.toInt(), colors.bottomBarBg.toArgb())
+        assertEquals(0xFFFBF2EB.toInt(), colors.floatingControlBg.toArgb())
+        assertEquals(0xFFEAE1DA.toInt(), colors.floatingControlBgAlt.toArgb())
+        assertEquals(0xFFFBF2EB.toInt(), colors.quickButtonBg.toArgb())
+        assertEquals(0xFFC1C7CD.toInt(), colors.controlBorder.toArgb())
+        assertEquals(0x1872787D, colors.handoffBoundary.toArgb())
     }
 
     @Test
@@ -62,21 +62,16 @@ class ReaderThemeTokenTest {
     }
 
     @Test
-    fun `reader main token files do not reintroduce old stitch colors`() {
+    fun `reader main token files use stitch html warm palette`() {
         val themeDir = Paths.get("src/main/kotlin/com/reader/android/ui/theme")
         val content = Files.walk(themeDir).asSequence()
             .filter { Files.isRegularFile(it) }
             .filter { it.toString().endsWith(".kt") }
             .joinToString(separator = "\n") { String(Files.readAllBytes(it)) }
 
-        listOf(
-            "FDF6EC",
-            "EAE1DA",
-            "F5ECE6",
-            "EFE7E0",
-            "8B5000"
-        ).forEach { oldColor ->
-            assertTrue("Old Stitch color $oldColor must not be a Reader token", oldColor !in content)
+        // Stitch HTML Tailwind uses warm palette — these are now intentional
+        listOf("FFF8F4", "366179", "41484C", "FBF2EB").forEach { color ->
+            assertTrue("Stitch warm color $color must be in theme", color in content)
         }
     }
 }

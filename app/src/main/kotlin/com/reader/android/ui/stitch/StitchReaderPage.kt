@@ -154,12 +154,12 @@ fun StitchReaderPage(
             // Row 2: Page control with progress
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.ChevronLeft, "上一章", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
+                Icon(Icons.Filled.ChevronLeft, "本章内上一页", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
                 Box(Modifier.weight(1f).height(8.dp)) {
                     Box(Modifier.fillMaxWidth().height(4.dp).align(Alignment.Center).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.mutedTrack))
                     Box(Modifier.fillMaxWidth(0.45f).height(4.dp).align(Alignment.CenterStart).clip(RoundedCornerShape(2.dp)).background(ReaderTheme.colors.primary))
                 }
-                Icon(Icons.Filled.ChevronRight, "下一章", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
+                Icon(Icons.Filled.ChevronRight, "本章内下一页", tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
             }
             Box(Modifier.fillMaxWidth().height(0.5.dp).background(ReaderTheme.colors.controlBorder.copy(alpha = 0.5f)))
 

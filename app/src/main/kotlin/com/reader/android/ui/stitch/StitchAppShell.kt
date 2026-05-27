@@ -69,12 +69,14 @@ fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: 
 }
 
 @Composable
-fun StitchAppShell(onSearchClick: () -> Unit = {}) { StitchBookshelfPage(onSearchClick) }
+fun StitchAppShell(onSearchClick: () -> Unit = {}, onBookClick: (String, String) -> Unit = { _, _ -> }) {
+    StitchBookshelfPage(onSearchClick, onBookClick)
+}
 
 // ── Bookshelf: dual List/Cover mode from Stitch HTML ──
 
 @Composable
-fun StitchBookshelfPage(onSearchClick: () -> Unit) {
+fun StitchBookshelfPage(onSearchClick: () -> Unit = {}, onBookClick: (String, String) -> Unit = { _, _ -> }) {
     var isListMode by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("全部", "默认", "本地书", "哲学")
@@ -112,11 +114,11 @@ fun StitchBookshelfPage(onSearchClick: () -> Unit) {
             // List mode from Stitch "Bookshelf List Mode" HTML: flex-col gap-6
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp, 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                BookListItem("人类简史", "尤瓦尔·赫拉利", 0.45f, "已读 45%", "上次阅读: 第十章 农业革命")
-                BookListItem("沉思录", "马可·奥勒留", 0.12f, "已读 12%", "上次阅读: 卷三")
-                BookListItem("哥德尔、艾舍尔、巴赫", "侯世达", 0.89f, "已读 89%", "上次阅读: 第六章")
-                BookListItem("三体：地球往事", "刘慈欣", 0.65f, "已读 65%", "上次阅读: 第28章")
-                BookListItem("设计心理学", "唐纳德·诺曼", 1f, "已读完", "上次阅读: 完")
+                BookListItem("人类简史", "尤瓦尔·赫拉利", 0.45f, "已读 45%", "上次阅读: 第十章 农业革命", onClick = { onBookClick("人类简史", "尤瓦尔·赫拉利") })
+                BookListItem("沉思录", "马可·奥勒留", 0.12f, "已读 12%", "上次阅读: 卷三", onClick = { onBookClick("沉思录", "马可·奥勒留") })
+                BookListItem("哥德尔、艾舍尔、巴赫", "侯世达", 0.89f, "已读 89%", "上次阅读: 第六章", onClick = { onBookClick("哥德尔、艾舍尔、巴赫", "侯世达") })
+                BookListItem("三体：地球往事", "刘慈欣", 0.65f, "已读 65%", "上次阅读: 第28章", onClick = { onBookClick("三体：地球往事", "刘慈欣") })
+                BookListItem("设计心理学", "唐纳德·诺曼", 1f, "已读完", "上次阅读: 完", onClick = { onBookClick("设计心理学", "唐纳德·诺曼") })
             }
         } else {
             // Cover mode from Stitch "Bookshelf Cover Mode" HTML: grid-cols-2 gap-x-4 gap-y-8
@@ -138,8 +140,10 @@ fun StitchBookshelfPage(onSearchClick: () -> Unit) {
 // ── List Item: from Stitch <article class="flex items-start gap-4"> ──
 
 @Composable
-private fun BookListItem(title: String, author: String, prog: Float, progText: String, lastRead: String) {
-    Row(Modifier.fillMaxWidth().semantics { contentDescription = "$title, $author" }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+private fun BookListItem(title: String, author: String, prog: Float, progText: String, lastRead: String, onClick: () -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().semantics { contentDescription = "$title, $author" }
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         // Cover: w-[72px] h-[104px], rounded-DEFAULT, shadow
         Box(Modifier.size(72.dp, 104.dp).clip(RoundedCornerShape(4.dp)).background(ReaderTheme.colors.floatingControlBg)
             .shadow(6.dp, RoundedCornerShape(4.dp), ambientColor = Color(0x18444444), spotColor = Color(0x18444444)),

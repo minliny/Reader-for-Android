@@ -45,6 +45,7 @@ import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.stitch.StitchAppShell
 import com.reader.android.ui.stitch.StitchBottomNav
+import com.reader.android.ui.stitch.StitchReaderPage
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
@@ -203,8 +204,17 @@ fun ReaderRouteHost(
         ) {
             composable(ReaderRoutes.BOOKSHELF) {
                 StitchAppShell(
-                    onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) }
+                    onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) },
+                    onBookClick = { _, _ ->
+                        navController.navigate(ReaderRoutes.READER)
+                        backStack.push(ReaderRoutes.READER)
+                    }
                 )
+            }
+            composable(ReaderRoutes.READER_CONTENT) { backStackEntry ->
+                val contentUrl = backStackEntry.arguments?.getString("contentUrl") ?: ""
+                val chapterTitle = backStackEntry.arguments?.getString("chapterTitle") ?: ""
+                StitchReaderPage(bookTitle = chapterTitle, chapterTitle = chapterTitle, onBack = { navController.popBackStack() })
             }
             composable(ReaderRoutes.DISCOVER) {
                 DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
@@ -225,7 +235,9 @@ fun ReaderRouteHost(
                     }
                 )
             }
-            composable(ReaderRoutes.READER) { ReaderScreen() }
+            composable(ReaderRoutes.READER) {
+                StitchReaderPage(bookTitle = "深空信号", chapterTitle = "第一章：阿长与《山海经》", onBack = { navController.popBackStack() })
+            }
             composable(ReaderRoutes.GLOBAL_SETTINGS) {
                 SettingsScreen(
                     onPrototypeGalleryClick = if (BuildConfig.DEBUG) {
