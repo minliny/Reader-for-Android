@@ -13,7 +13,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Real network smoke test: biquge.com search.
+ * Real network smoke test: bqgz.cc (笔趣阁 new domain) search.
  * This test accesses the real internet.
  * First smoke captures the response for fixture creation.
  */
@@ -27,7 +27,7 @@ class RealCoreBridgeSmokeTest {
         AppProvider.initForTesting()
         AppProvider.enableNetworkForTestingOnly()
         bridge = RealCoreBridge(OkHttpTransport())
-        // 星星小说网 (xingxingxsw.com) — accessible from shuyuan-api.yiove.com book source collection
+        // 星星小说网 (xingxingxsw.com) — only confirmed reachable source
         source = BookSource(
             sourceUrl = "https://www.xingxingxsw.com",
             sourceName = "星星小说网",
