@@ -232,7 +232,7 @@
 | ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
 |----|-------|----------|--------|------|-------|------------|----------|
 | S16-NUI-P0-001 | S16-NUI | P0 | DONE | BookSource import/enable verification | Verify BookSourceRepository correctly imports/enables biquge.com JSON | BookSourceRepositoryTest passes | None |
-| S16-NUI-P0-002 | S16-NUI | P0 | READY | Gap-1: AdapterShell network gate fix | RealCoreBridge checks AppProvider.isNetworkAllowed on init | REAL mode + gate=false → IllegalStateException | None |
+| S16-NUI-P0-002 | S16-NUI | P0 | DONE | Gap-1: AdapterShell network gate fix | RealCoreBridge checks AppProvider.isNetworkAllowed on init | REAL mode + gate=false → IllegalStateException | None |
 | S16-NUI-P0-003 | S16-NUI | P0 | BLOCKED_BY_NETWORK | Search smoke with real network | Controlled smoke: biquge.com search "剑来" | Returns results or明确错误码 | Gap-1 + network gate enabled |
 | S16-NUI-P0-004 | S16-NUI | P0 | BLOCKED | Search fixture capture | Save search response to fixtures/real-source/biquge-com/search/ | Fixture files exist | S16-NUI-P0-003 |
 | S16-NUI-P0-005 | S16-NUI | P0 | BLOCKED | Detail smoke + fixture capture | Get BookInfo from search result detailUrl | Fixture replay works | S16-NUI-P0-003 |
@@ -276,14 +276,14 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S16-NUI-P0-002 Gap-1: AdapterShell network gate fix**
+**Next READY: S16-NUI-P0-003 Search smoke with real network**
 
-Real Source Closure mode (S16). Sequential: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 → S16-NUI-P0-003 → S16-NUI-P0-004~010.
+Real Source Closure mode (S16). Sequential: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 ✅ → S16-NUI-P0-003 → S16-NUI-P0-004~010.
 
-Total queue tasks: **81**. Done: 38 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 1). Remaining S16 tasks: 9 (S16-NUI-P0-002~010).
+Total queue tasks: **81**. Done: 39 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 2). Remaining S16 tasks: 8 (S16-NUI-P0-003~010).
 
-Execution order: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 → [S16-NUI-P0-003 (smoke)] → S16-NUI-P0-004~010.
+Execution order: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 ✅ → [S16-NUI-P0-003 (smoke)] → S16-NUI-P0-004~010.
 
-Tests: 240, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅ (when JAVA_HOME=/Applications/Android\ Studio.app/Contents/jbr/Contents/Home).
+Tests: 240+, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅ (when JAVA_HOME=/Applications/Android\ Studio.app/Contents/jbr/Contents/Home).
 
 Real source closure plan: `docs/PLANNING/ANDROID_REAL_SOURCE_CLOSURE_PLAN.md`. Task queue: `docs/PLANNING/ANDROID_REAL_SOURCE_TASK_QUEUE.md`.
