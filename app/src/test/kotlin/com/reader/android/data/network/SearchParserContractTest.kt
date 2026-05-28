@@ -38,4 +38,42 @@ class SearchParserContractTest {
         val results = parser.parseSearchResponse(html, "test")
         assertTrue(results.isEmpty())
     }
+
+    @Test
+    fun `parse xingxingxsw HTML returns book results`() {
+        // Real HTML structure from xingxingxsw.com
+        val html = """
+            <div class="book-list">
+              <div class="book-item">
+                <a href="/xiaoshuo/12408.html">
+                  <h3 class="book-title">剑来</h3>
+                </a>
+                <div class="book-info">
+                  <span class="author">烽火戏诸侯</span>
+                  <span class="stats">2837万字 | 469人气值</span>
+                </div>
+              </div>
+            </div>
+            <div class="book-list">
+              <div class="book-item">
+                <a href="/xiaoshuo/75288.html">
+                  <h3 class="book-title">仙逆</h3>
+                </a>
+                <div class="book-info">
+                  <span class="author">耳根</span>
+                  <span class="stats">38万字 | 373人气值</span>
+                </div>
+              </div>
+            </div>
+        """.trimIndent()
+
+        val results = parser.parseSearchResponse(html, "星星小说网")
+
+        assertEquals(2, results.size)
+        assertEquals("剑来", results[0].name)
+        assertEquals("烽火戏诸侯", results[0].author)
+        assertEquals("/xiaoshuo/12408.html", results[0].detailUrl)
+        assertEquals("仙逆", results[1].name)
+        assertEquals("耳根", results[1].author)
+    }
 }

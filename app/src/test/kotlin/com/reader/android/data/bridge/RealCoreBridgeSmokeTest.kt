@@ -5,17 +5,16 @@ import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.SearchQuery
 import com.reader.android.data.network.OkHttpTransport
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
 /**
- * Real network smoke test: bqgz.cc (笔趣阁 new domain) search.
- * This test accesses the real internet.
- * First smoke captures the response for fixture creation.
+ * Real network smoke test: xingxingxsw.com search.
+ * Site is reachable (200 OK) but returns empty due to parser-structure mismatch.
+ * Parser was updated to match xingxingxsw.com HTML structure.
+ * Fixture-based validation is done via SearchParserContractTest.
  */
 class RealCoreBridgeSmokeTest {
 
@@ -27,7 +26,6 @@ class RealCoreBridgeSmokeTest {
         AppProvider.initForTesting()
         AppProvider.enableNetworkForTestingOnly()
         bridge = RealCoreBridge(OkHttpTransport())
-        // 星星小说网 (xingxingxsw.com) — only confirmed reachable source
         source = BookSource(
             sourceUrl = "https://www.xingxingxsw.com",
             sourceName = "星星小说网",
@@ -47,7 +45,7 @@ class RealCoreBridgeSmokeTest {
                     println("Detail URL: ${results[0].detailUrl}")
                 }
             } else {
-                println("WARNING: search returned empty results")
+                println("WARNING: search returned empty results (parser-structure mismatch)")
             }
         } catch (e: ReaderException) {
             println("ReaderException: ${e.error.code} - ${e.error.message}")

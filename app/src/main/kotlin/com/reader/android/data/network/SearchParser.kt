@@ -10,6 +10,11 @@ class SearchParser {
 
         // Attempt to find book list items in common Chinese novel site formats
         val itemPatterns = listOf(
+            // xingxingxsw.com: <div class="book-item"><a href="/xiaoshuo/ID.html"><h3 class="book-title">NAME</h3></a><span class="author">AUTHOR</span>
+            Regex(
+                """<a[^>]*href="(/xiaoshuo/[^"]+)"[^>]*>\s*<h3[^>]*class="book-title"[^>]*>([^<]+)</h3>\s*</a>.*?<span[^>]*class="author"[^>]*>([^<]+)</span>""",
+                setOf(RegexOption.DOT_MATCHES_ALL)
+            ),
             // <li> or <div> with book info: name, author, chapter
             Regex(
                 """<a[^>]*href="([^"]*)"[^>]*>\s*([^<]{2,40})\s*</a>.*?作者[：:]\s*([^<\n]{1,30})""",
