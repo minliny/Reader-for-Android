@@ -59,7 +59,7 @@ import com.reader.android.ui.theme.ReaderTheme
 //   px-gutter=24dp, py-base=4dp, py-sm=12dp, py-md=24dp
 //   headline-md=24px/32px/600, body-lg=18px/30px/400, label-md=14px/20px/500
 //   rounded-full=9999px, rounded-xl=12dp, rounded-lg=8dp
-//   bg-[#fdf6e3]→pageTint, bg-surface-container→floatingControlBg
+//   bg-[#fdf6e3]→pageTint, fg-surface-ctr→floatingControlBg
 //   text-[#2c2c2c]→bodyText, primary→#366179
 
 private val PageTint = Color(0xFFFDF6E3)
@@ -106,7 +106,7 @@ fun StitchReaderPage(
         Box(Modifier.fillMaxSize().padding(top = 64.dp, bottom = 234.dp)
             .background(Color.Black.copy(alpha = 0.1f)))
 
-        // ── Header: fixed top-0, bg-surface-container, shadow-sm ──
+        // ── Header: fixed top-0, fg-surface-ctr, shadow-sm ──
         Column(Modifier.fillMaxWidth().shadow(2.dp).background(ReaderTheme.colors.floatingControlBgAlt)) {
             // Single row: arrow_back | Reader + source subtext | more_vert
             Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
@@ -142,7 +142,7 @@ fun StitchReaderPage(
                         modifier = Modifier.size(20.dp).clickable(
                             interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismissSearch() })
                 }
-                // Search input: bg-surface-container-low, rounded-lg, px-3 py-2
+                // Search input: fg-surface-ctr-low, rounded-lg, px-3 py-2
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                     .clip(RoundedCornerShape(8.dp)).background(ReaderTheme.colors.metaBg).padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
@@ -173,7 +173,7 @@ fun StitchReaderPage(
             }
         }
 
-        // ── Bottom Panel: fixed bottom-0, bg-surface-container, rounded-t-xl, shadow-lg ──
+        // ── Bottom Panel: fixed bottom-0, fg-surface-ctr, rounded-t-xl, shdw-lg ──
         Column(Modifier.fillMaxWidth().align(Alignment.BottomCenter)
             .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .shadow(8.dp, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))

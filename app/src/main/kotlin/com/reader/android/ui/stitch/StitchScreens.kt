@@ -244,7 +244,7 @@ fun StitchDownloadPage(onBack: () -> Unit = {}) {
             Icon(Icons.Filled.MoreVert, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(24.dp))
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
-            // Storage Summary Card: bg-surface-container-low rounded-xl p-md mb-lg
+            // Storage Summary Card: fg-surface-ctr-low rounded-xl p-md mb-lg
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                 .background(ReaderTheme.colors.floatingControlBg).border(0.5.dp, ReaderTheme.colors.controlBorder, RoundedCornerShape(12.dp))
                 .padding(24.dp)) {

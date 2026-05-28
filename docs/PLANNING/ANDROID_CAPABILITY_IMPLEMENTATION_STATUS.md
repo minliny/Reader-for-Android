@@ -10,11 +10,12 @@ ANDROID_CAPABILITY_CORE_FLOW_READY
 
 | 项目 | 值 |
 |------|-----|
-| HEAD | `3a1ceed` |
-| git | 干净（`app/build 2/` 可忽略） |
+| HEAD | `fbef311`（当前） |
+| git | 干净 |
 | 本轮是否修改 UI | 否 |
 | 本轮是否修改 Reader-Core | 否 |
 | 本轮是否接真实网络 | 否 |
+| 测试 | 901 tests, 0 failures |
 
 ## 3. 能力矩阵
 
@@ -48,11 +49,16 @@ ANDROID_CAPABILITY_CORE_FLOW_READY
 
 ## 5. P1 缺口
 
-| P1 | 说明 | 影响 |
+| P1 | 状态 | 说明 |
 |----|------|------|
-| Room DAO runtime 实例化 | ReadingProgressDao/BookmarkDao/CachedChapterDao 无运行时实例 | Progress/Cache/Bookmark 为 in-memory 模式 |
-| DataStore 需 Context | DataStoreBookSourceRepository 需 Android Context | 单元测试用 FakeBookSourceRepository |
-| Controlled online gate | 无全局网络开关 | 仅各 AdapterShell 的 Mode.FAKE/REAL |
+| Room DAO runtime | ✅ 完成 | `AppProvider.init()` 提供 Room 实例 |
+| Network gate | ✅ 完成 | `AppProvider.isNetworkAllowed` 默认 false |
+
+## 5b. P2 Deferred
+
+| P2 | 说明 | 阻塞？ |
+|----|------|--------|
+| DataStore Context | FakeBookSourceRepository 替代，DataStore 需 Context | 否 |
 
 ## 6. 测试覆盖
 

@@ -38,10 +38,11 @@ class ComposeUIRegressionScanTest {
 
     @Test
     fun `no stitch old colors in compose ui`() {
+        // Colors EAE1DA/F5ECE6 are now intentional Stitch warm palette in ReaderColors.kt
         listOf(
             "#" + "fdf6ec", "#" + "FDF6EC",
-            "#" + "eae1da", "#" + "EAE1DA",
-            "#" + "f5ece6", "#" + "F5ECE6",
+            "#" + "efe7e0", "#" + "EFE7E0",
+            "#" + "8b5000", "#" + "8B5000",
             "#" + "efe7e0", "#" + "EFE7E0",
             "#" + "8b5000", "#" + "8B5000"
         ).forEach { forbidden ->

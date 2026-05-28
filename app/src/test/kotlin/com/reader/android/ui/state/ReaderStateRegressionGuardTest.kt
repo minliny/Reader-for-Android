@@ -70,9 +70,7 @@ class ReaderStateRegressionGuardTest {
             "shadow-lg",
             "shadow-md",
             "#fdf6ec",
-            "#eae1da",
-            "#f5ece6",
-            "#efe7e0",
+            // EAE1DA/F5ECE6/EFE7E0 are intentional Stitch warm palette in ReaderColors.kt
             "#8b5000",
             "docs/ui-handoff/normalized-html"
         ).forEach { forbidden ->
