@@ -276,12 +276,14 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**ALL S16-NUI DONE — loop complete**
+**S16-NUI 完成，除了 S16-NUI-P0-004~007 阻塞**
 
-Real Source Closure mode (S16). Status: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅ (biquge unreachable), S16-NUI-P0-004~007 BLOCKED_SOURCE_UNREACHABLE, S16-NUI-P0-008 ✅, S16-NUI-P0-009 ✅. S16-NUI-P0-010 READY.
+Real Source Closure mode (S16). Done: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅ (biquge unreachable), S16-NUI-P0-008 ✅, S16-NUI-P0-009 ✅, S16-NUI-P0-010 ✅. BLOCKED: S16-NUI-P0-004~007 (BLOCKED_SOURCE_UNREACHABLE).
 
-Total queue tasks: **81**. Done: 42 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 5).
+Total queue tasks: **81**. Done: 43 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 6).
 
 Tests: 240+, 0 failures. `./gradlew test` ✅.
+
+**Loop 完成条件**: 需要人工确认一个可用的中文小说书源，才能解锁 S16-NUI-P0-004~007。
 
 Real source closure plan: `docs/PLANNING/ANDROID_REAL_SOURCE_CLOSURE_PLAN.md`. Task queue: `docs/PLANNING/ANDROID_REAL_SOURCE_TASK_QUEUE.md`.
