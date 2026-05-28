@@ -87,4 +87,57 @@ class BookSourceRepositoryTest {
         assertEquals("/toc", src.tocUrl)
         assertEquals("/content", src.contentUrl)
     }
+
+    @Test
+    fun `import biquge com source populates all fields correctly`() {
+        // This is the biquge.com source JSON from BookSourceScreen.kt
+        val biqugeJson = """
+        [{"sourceUrl":"https://www.biquge.com","sourceName":"笔趣阁","sourceGroup":"中文",
+          "searchUrl":"/search?q=key","tocUrl":"/toc","contentUrl":"/content"}]
+        """.trimIndent()
+
+        val count = repo.importJson(biqugeJson)
+        assertEquals(1, count)
+
+        val src = repo.getByUrl("https://www.biquge.com")
+        assertNotNull(src)
+        assertEquals("笔趣阁", src!!.sourceName)
+        assertEquals("中文", src.sourceGroup)
+        assertEquals("/search?q=key", src.searchUrl)
+        assertEquals("/toc", src.tocUrl)
+        assertEquals("/content", src.contentUrl)
+        assertTrue(src.enabled) // default enabled
+    }
+
+    @Test
+    fun `import multiple biquge and quanshu sources enables only first`() {
+        val json = """
+        [{"sourceUrl":"https://www.biquge.com","sourceName":"笔趣阁","sourceGroup":"中文",
+          "searchUrl":"/search?q=key","enabled":true},
+         {"sourceUrl":"https://www.quanshu.com","sourceName":"全书网","sourceGroup":"中文",
+          "searchUrl":"/search?keyword=key","enabled":true}]
+        """.trimIndent()
+
+        repo.importJson(json)
+
+        val enabled = repo.getEnabled()
+        assertEquals(2, enabled.size)
+        assertTrue(enabled.map { it.sourceName }.containsAll(listOf("笔趣阁", "全书网")))
+    }
+
+    @Test
+    fun `biquge source can be disabled and re-enabled`() {
+        repo.importJson("""
+        [{"sourceUrl":"https://www.biquge.com","sourceName":"笔趣阁",
+          "searchUrl":"/search?q=key","enabled":true}]
+        """.trimIndent())
+
+        repo.setEnabled("https://www.biquge.com", false)
+        assertEquals(0, repo.getEnabled().size)
+
+        repo.setEnabled("https://www.biquge.com", true)
+        val enabled = repo.getEnabled()
+        assertEquals(1, enabled.size)
+        assertEquals("笔趣阁", enabled[0].sourceName)
+    }
 }

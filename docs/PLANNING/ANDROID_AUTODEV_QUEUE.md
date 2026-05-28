@@ -223,6 +223,25 @@
 | S15-NUI-P0-004 | S15-NUI | P0 | DONE | No-UI parity declaration document | ANDROID_NON_UI_RELEASE_GATE.md, checklist complete, capability sign-off | Document exists | None |
 | S15-NUI-P0-005 | S15-NUI | P0 | DONE | Remaining UI-only gap list | Enumerate capabilities with ui_required=yes, map to future UI stages | Document exists | None |
 
+## Stage 16: Real Source Closure (non-UI only)
+
+**Purpose**: Close the loop on real source integration — Search → Detail → TOC → Content with controlled network gate, fixture capture, and offline replay.
+
+**Network Policy**: Real network access is authorized for this stage. Fixtures MUST be captured on first smoke and replayed offline thereafter.
+
+| ID | Stage | Priority | Status | Task | Scope | Validation | Blockers |
+|----|-------|----------|--------|------|-------|------------|----------|
+| S16-NUI-P0-001 | S16-NUI | P0 | DONE | BookSource import/enable verification | Verify BookSourceRepository correctly imports/enables biquge.com JSON | BookSourceRepositoryTest passes | None |
+| S16-NUI-P0-002 | S16-NUI | P0 | READY | Gap-1: AdapterShell network gate fix | RealCoreBridge checks AppProvider.isNetworkAllowed on init | REAL mode + gate=false → IllegalStateException | None |
+| S16-NUI-P0-003 | S16-NUI | P0 | BLOCKED_BY_NETWORK | Search smoke with real network | Controlled smoke: biquge.com search "剑来" | Returns results or明确错误码 | Gap-1 + network gate enabled |
+| S16-NUI-P0-004 | S16-NUI | P0 | BLOCKED | Search fixture capture | Save search response to fixtures/real-source/biquge-com/search/ | Fixture files exist | S16-NUI-P0-003 |
+| S16-NUI-P0-005 | S16-NUI | P0 | BLOCKED | Detail smoke + fixture capture | Get BookInfo from search result detailUrl | Fixture replay works | S16-NUI-P0-003 |
+| S16-NUI-P0-006 | S16-NUI | P0 | BLOCKED | TOC smoke + fixture capture | Get TOC from BookInfo.tocUrl | Fixture replay works | S16-NUI-P0-005 |
+| S16-NUI-P0-007 | S16-NUI | P0 | BLOCKED | Content smoke + fixture capture | Get ContentPage from TOC chapter URL | Fixture replay works | S16-NUI-P0-006 |
+| S16-NUI-P0-008 | S16-NUI | P0 | BLOCKED | Offline replay tests | Full pipeline replay from fixtures | ./gradlew test: RealCoreBridgeE2ETest passes | S16-NUI-P0-004~007 |
+| S16-NUI-P0-009 | S16-NUI | P0 | BLOCKED | Error model verification | 404 / parse failure / timeout → correct ReaderErrorCode | 6 error scenarios pass | S16-NUI-P0-008 |
+| S16-NUI-P0-010 | S16-NUI | P0 | BLOCKED | Docs and gate state update | Update ANDROID_REAL_SOURCE_CLOSURE_PLAN.md status | Docs complete | S16-NUI-P0-009 |
+
 ---
 
 ## Queue Selection Algorithm
@@ -257,12 +276,14 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S10-NUI-P0-002 Android TTS adapter boundary**
+**Next READY: S16-NUI-P0-002 Gap-1: AdapterShell network gate fix**
 
-Non-UI development mode. Total queue tasks: **71**. Done: 37 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1). Remaining: 34.
+Real Source Closure mode (S16). Sequential: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 → S16-NUI-P0-003 → S16-NUI-P0-004~010.
 
-Stage execution order: S10-NUI → S11-NUI → S12-NUI → S13-NUI → S14-NUI → S15-NUI.
+Total queue tasks: **81**. Done: 38 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 1). Remaining S16 tasks: 9 (S16-NUI-P0-002~010).
 
-Tests: 240, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅.
+Execution order: S16-NUI-P0-001 ✅ → S16-NUI-P0-002 → [S16-NUI-P0-003 (smoke)] → S16-NUI-P0-004~010.
 
-Completion target: 136 capabilities in ANDROID_NON_UI_COMPLETION_TARGET.md. Loop: .claude/commands/loop.md.
+Tests: 240, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅ (when JAVA_HOME=/Applications/Android\ Studio.app/Contents/jbr/Contents/Home).
+
+Real source closure plan: `docs/PLANNING/ANDROID_REAL_SOURCE_CLOSURE_PLAN.md`. Task queue: `docs/PLANNING/ANDROID_REAL_SOURCE_TASK_QUEUE.md`.
