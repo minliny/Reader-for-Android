@@ -264,11 +264,12 @@ class FixtureHttpTransport {
 
 ## 9. 错误模型
 
+**注意**: RealCoreBridge 当前将所有 HTTP 非 200 响应映射为 `NETWORK`，暂不使用 `NOT_FOUND`。
+
 | 错误类型 | ReaderErrorCode | ReaderFailureStage | 触发条件 | 诊断方式 |
 |---------|----------------|-------------------|---------|---------|
 | 网络拒绝 | NETWORK | 任意 | AppProvider.isNetworkAllowed=false | 检查环境变量 |
-| HTTP 404 | NOT_FOUND | 任意 | 资源不存在 | 检查 URL |
-| HTTP 5xx | NETWORK | 任意 | 服务器错误 | 重试 + exponential backoff |
+| HTTP 非 200 | NETWORK | 任意 | 404/500 等 | 检查 URL 和服务端状态 |
 | 解析失败 | PARSE | 任意 | HTML 结构不匹配 | 对比 snapshot |
 | 超时 | TIMEOUT | 任意 | 响应超过 30s | 检查网络 |
 | 空搜索结果 | PARSE | SEARCH | 搜索返回空 | 可能是 query 问题 |
@@ -284,18 +285,18 @@ class FixtureHttpTransport {
 
 ## 11. 任务拆分 RSC-001 ~ RSC-010
 
-| ID | 目标 | 修改范围 | 验证方式 | 风险 | 是否需要真实网络 | 是否阻塞后续 |
-|----|------|---------|---------|------|---------------|------------|
-| RSC-001 | 真实源候选审计 | docs | 代码审计报告 | 无 | ❌ | ❌ |
-| RSC-002 | BookSource import/enable 验证 | BookSourceRepository + 测试 | 导入笔趣阁 JSON，验证 getEnabled 返回 | 无 | ❌ | ❌ |
-| RSC-003 | controlledOnline Search smoke | RealCoreBridge + AppProvider | 用笔趣阁搜索 "剑来"，验证返回非空或明确错误 | 需人工确认源可用性 | ⚠️ 一次性 | ✅ |
-| RSC-004 | Search snapshot 保存 | fixture 目录 + FixtureHttpTransport | 保存 search response 到 fixtures/real-source/biquge-com/search/ | 无 | ⚠️ 一次性 | ❌ |
-| RSC-005 | Detail smoke + snapshot | RealCoreBridge | 用搜索结果的 detailUrl 获取 BookInfo，保存 snapshot | 需 RSC-003 成功 | ⚠️ 一次性 | ❌ |
-| RSC-006 | TOC smoke + snapshot | RealCoreBridge | 获取 TOC，保存 snapshot | 需 RSC-005 成功 | ⚠️ 一次性 | ❌ |
-| RSC-007 | Content smoke + snapshot | RealCoreBridge | 获取 Content，保存 snapshot | 需 RSC-006 成功 | ⚠️ 一次性 | ❌ |
-| RSC-008 | 离线 replay 测试 | FixtureHttpTransport | 用保存的 fixture replay 完整 pipeline，验证 CI 通过 | 无 | ❌ | ❌ |
-| RSC-009 | 错误模型和诊断报告 | RealCoreBridge | 验证 404 / parse failure / timeout 返回正确 ReaderErrorCode | 无 | ❌ | ❌ |
-| RSC-010 | 文档和 gate 状态更新 | docs | 更新本文档 + capability status | 无 | ❌ | ❌ |
+| ID | 目标 | 状态 | 验证方式 | 风险 | 需要真实网络 |
+|----|------|------|---------|------|------------|
+| RSC-001 | 真实源候选审计 | ✅ DONE | 代码审计报告 | 无 | ❌ |
+| RSC-002 | BookSource import/enable 验证 | ✅ DONE | BookSourceRepositoryTest 3 tests pass | 无 | ❌ |
+| RSC-003 | Search smoke | ✅ DONE | biquge.com returns NETWORK error (unreachable) | 源不可达 | ⚠️ 一次性 |
+| RSC-004 | Search snapshot | ⏸️ BLOCKED | fixture 目录 | 无 | ⚠️ 一次性 |
+| RSC-005 | Detail snapshot | ⏸️ BLOCKED | fixture replay | 需 RSC-003 成功 | ⚠️ 一次性 |
+| RSC-006 | TOC snapshot | ⏸️ BLOCKED | fixture replay | 需 RSC-005 成功 | ⚠️ 一次性 |
+| RSC-007 | Content snapshot | ⏸️ BLOCKED | fixture replay | 需 RSC-006 成功 | ⚠️ 一次性 |
+| RSC-008 | 离线 replay | ✅ DONE | RealCoreBridgeE2ETest 8/8 pass | 无 | ❌ |
+| RSC-009 | 错误模型验证 | ✅ DONE | ReaderErrorModelTest 10/10 pass | 无 | ❌ |
+| RSC-010 | 文档更新 | ✅ DONE | 本文档已更新 | 无 | ❌ |
 
 ## 12. 验证命令
 
@@ -323,34 +324,31 @@ READER_ALLOW_REAL_NETWORK=true ./gradlew testDebugUnitTest --tests "com.reader.a
 
 ## 13. 风险和阻塞项
 
-| 风险 | 级别 | 缓解 |
-|------|------|------|
-| AdapterShell 的 Mode.FAKE/REAL 不检查 AppProvider.isNetworkAllowed | P0 | RSC-003 前必须修复，否则 gate 无意义 |
-| 无外部 fixture 文件系统 | P1 | 先以内联 HTML 测试，后续 RSC-004 建立目录 |
-| 笔趣阁 biquge.com 可能域名更换/不可访问 | P2 | RSC-003 前人工确认；备选全书网 |
-| 页面结构变化导致 parser 失效 | P2 | fixture 捕获后离线 replay，不依赖实时解析 |
-| JDK 编译问题（jlink missing）阻塞本地测试 | P1 | 使用 cached Kotlin compile；或在 CI 环境验证 |
+| 风险 | 级别 | 状态 | 缓解 |
+|------|------|------|------|
+| AdapterShell 不检查 isNetworkAllowed | P0 | ✅ 已修复 | S16-NUI-P0-002 |
+| 无外部 fixture 文件系统 | P1 | ⏸️ 暂缓 | 内联 fixture 足够开发测试 |
+| biquge.com 不可达 | P2 | ⚠️ 已确认 | smoke 返回 NETWORK error；等待可用源 |
+| 页面结构变化 | P2 | ⏸️ 缓议 | 内联 fixture replay 可隔离 |
+| JDK jlink missing | P1 | ✅ 已解决 | JAVA_HOME 指向 Android Studio JBR |
 
 ## 14. 下一轮执行建议
 
-### 前提条件（需人工确认）
+### 当前状态
 
-1. **授权真实网络 smoke**：RSC-003 需要连接 biquge.com
-2. **确认源可用性**：人工访问 biquge.com/search 测试是否可访问
-3. **确认版权/法律合规**：笔趣阁为第三方镜像，本规划仅技术验证用途
+S16-NUI-P0-001~002, 003, 008, 009, 010 全部 DONE。
+S16-NUI-P0-004~007 BLOCKED_SOURCE_UNREACHABLE。
 
-### 推荐执行顺序
+### 阻塞项
 
-```
-Step 1: RSC-001 → RSC-002  （可立即执行，无需真实网络）
-Step 2: Gap 修复（AdapterShell 检查 isNetworkAllowed）  ← UI 暂停状态下可做
-Step 3: RSC-003（需授权真实网络）
-Step 4: RSC-004 → RSC-005 → RSC-006 → RSC-007（需授权，顺序执行）
-Step 5: RSC-008（离线 replay）
-Step 6: RSC-009 → RSC-010
-```
+- **biquge.com 不可达**: 需要人工确认一个可用的中文小说书源
+- **无可用真实源**: S16-NUI-P0-004~007 无法执行
 
-### 明确要求
+### 建议
+
+1. **人工确认可用书源**: quanshu.com 或其他中文小说站
+2. **如果确认可用**: 重新执行 S16-NUI-P0-003~007
+3. **如果无法确认**: S16-NUI-P0-004~007 标记为 SKIPPED，循环完成
 
 - RSC-003 之前必须修复 **Gap 1**（AdapterShell gate 不生效问题）
 - 第一次真实网络访问必须**人工确认**并**保存完整 fixture**
