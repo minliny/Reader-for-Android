@@ -238,7 +238,7 @@
 | S16-NUI-P0-005 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Detail smoke + fixture capture | Get BookInfo from search result detailUrl | Fixture replay works | biquge.com unreachable |
 | S16-NUI-P0-006 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | TOC smoke + fixture capture | Get TOC from BookInfo.tocUrl | Fixture replay works | biquge.com unreachable |
 | S16-NUI-P0-007 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Content smoke + fixture capture | Get ContentPage from TOC chapter URL | Fixture replay works | biquge.com unreachable |
-| S16-NUI-P0-008 | S16-NUI | P0 | READY | Offline replay tests | Full pipeline replay from existing inline fixtures | ./gradlew test: RealCoreBridgeE2ETest passes | Uses existing inline HTML fixtures |
+| S16-NUI-P0-008 | S16-NUI | P0 | DONE | Offline replay tests | Full pipeline replay from existing inline fixtures | ./gradlew test: 53 tests pass, RealCoreBridgeE2ETest 8/8 pass | Uses existing inline HTML fixtures |
 | S16-NUI-P0-009 | S16-NUI | P0 | BLOCKED | Error model verification | 404 / parse failure / timeout → correct ReaderErrorCode | 6 error scenarios pass | S16-NUI-P0-008 |
 | S16-NUI-P0-010 | S16-NUI | P0 | BLOCKED | Docs and gate state update | Update ANDROID_REAL_SOURCE_CLOSURE_PLAN.md status | Docs complete | S16-NUI-P0-009 |
 
@@ -276,11 +276,11 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S16-NUI-P0-008 Offline replay tests**
+**Next READY: S16-NUI-P0-009 Error model verification**
 
-Real Source Closure mode (S16). Status: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅ (smoke done — biquge.com unreachable). S16-NUI-P0-004~007 BLOCKED_SOURCE_UNREACHABLE. S16-NUI-P0-008 READY.
+Real Source Closure mode (S16). Status: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅, S16-NUI-P0-008 ✅. S16-NUI-P0-004~007 BLOCKED_SOURCE_UNREACHABLE.
 
-Total queue tasks: **81**. Done: 40 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 3).
+Total queue tasks: **81**. Done: 41 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 4).
 
 Tests: 240+, 0 failures. `./gradlew test` ✅, `./gradlew :app:assembleDebug` ✅ (when JAVA_HOME=/Applications/Android\ Studio.app/Contents/jbr/Contents/Home).
 
