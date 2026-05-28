@@ -240,7 +240,7 @@
 | S16-NUI-P0-007 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Content smoke + fixture capture | Get ContentPage from TOC chapter URL | Fixture replay works | biquge.com unreachable |
 | S16-NUI-P0-008 | S16-NUI | P0 | DONE | Offline replay tests | Full pipeline replay from existing inline fixtures | ./gradlew test: 53 tests pass, RealCoreBridgeE2ETest 8/8 pass | Uses existing inline HTML fixtures |
 | S16-NUI-P0-009 | S16-NUI | P0 | DONE | Error model verification | 10 error scenarios: NETWORK(404/500), PARSE(empty), stage correct | 10 tests pass | None |
-| S16-NUI-P0-010 | S16-NUI | P0 | READY | Docs and gate state update | Update ANDROID_REAL_SOURCE_CLOSURE_PLAN.md status | Docs complete | None |
+| S16-NUI-P0-010 | S16-NUI | P0 | DONE | Docs and gate state update | Update ANDROID_REAL_SOURCE_CLOSURE_PLAN.md status | Docs complete | None |
 
 ---
 
@@ -276,7 +276,7 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**Next READY: S16-NUI-P0-010 Docs and gate state update**
+**ALL S16-NUI DONE — loop complete**
 
 Real Source Closure mode (S16). Status: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅ (biquge unreachable), S16-NUI-P0-004~007 BLOCKED_SOURCE_UNREACHABLE, S16-NUI-P0-008 ✅, S16-NUI-P0-009 ✅. S16-NUI-P0-010 READY.
 
