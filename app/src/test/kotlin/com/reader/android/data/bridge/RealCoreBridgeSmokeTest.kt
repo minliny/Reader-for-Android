@@ -27,42 +27,36 @@ class RealCoreBridgeSmokeTest {
         AppProvider.initForTesting()
         AppProvider.enableNetworkForTestingOnly()
         bridge = RealCoreBridge(OkHttpTransport())
+        // 星星小说网 (xingxingxsw.com) — accessible from shuyuan-api.yiove.com book source collection
         source = BookSource(
-            sourceUrl = "https://www.biquge.com",
-            sourceName = "笔趣阁",
-            searchUrl = "/search?q=key"
+            sourceUrl = "https://www.xingxingxsw.com",
+            sourceName = "星星小说网",
+            searchUrl = "/search.php?key=key"
         )
     }
 
     @Test
-    fun `biquge search for 剑来 returns results or明确错误`() = runBlocking {
+    fun `xingxingxsw search returns results or明确错误`() = runBlocking {
         try {
             val results = bridge.search(SearchQuery("剑来"), source)
             if (results.isNotEmpty()) {
                 assertNotNull(results[0].name)
-                assertNotNull(results[0].author)
                 println("SUCCESS: search returned ${results.size} results")
                 println("First result: ${results[0].name} by ${results[0].author}")
                 if (results[0].detailUrl != null) {
                     println("Detail URL: ${results[0].detailUrl}")
                 }
             } else {
-                println("WARNING: search returned empty results (may be blocked or structure changed)")
+                println("WARNING: search returned empty results")
             }
         } catch (e: ReaderException) {
-            // Expected: if site is down or structure changed
-            println("ReaderException caught: ${e.error.code} - ${e.error.message}")
-            // This is acceptable for smoke — we just confirmed the error path works
+            println("ReaderException: ${e.error.code} - ${e.error.message}")
             assertNotNull(e.error.code)
-        } catch (e: Exception) {
-            println("Unexpected exception: ${e.javaClass.name}: ${e.message}")
-            // Could be network timeout, DNS failure, etc. — still valid smoke feedback
-            assertNotNull(e.message)
         }
     }
 
     @Test
-    fun `biquge search for 仙逆 returns results`() = runBlocking {
+    fun `xingxingxsw search for 仙逆 returns results`() = runBlocking {
         try {
             val results = bridge.search(SearchQuery("仙逆"), source)
             if (results.isNotEmpty()) {

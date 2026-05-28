@@ -233,11 +233,11 @@
 |----|-------|----------|--------|------|-------|------------|----------|
 | S16-NUI-P0-001 | S16-NUI | P0 | DONE | BookSource import/enable verification | Verify BookSourceRepository correctly imports/enables biquge.com JSON | BookSourceRepositoryTest passes | None |
 | S16-NUI-P0-002 | S16-NUI | P0 | DONE | Gap-1: AdapterShell network gate fix | RealCoreBridge checks AppProvider.isNetworkAllowed on init | REAL mode + gate=false → IllegalStateException | None |
-| S16-NUI-P0-003 | S16-NUI | P0 | DONE | Search smoke with real network | Controlled smoke: biquge.com search "剑来" | biquge.com returns NETWORK error (handshake terminated — site unreachable). Error model works correctly. | Gap-1 ✅ (done), network attempted |
-| S16-NUI-P0-004 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Search fixture capture | Save search response to fixtures/real-source/biquge-com/search/ | Fixture files exist | biquge.com unreachable (smoke confirmed) |
-| S16-NUI-P0-005 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Detail smoke + fixture capture | Get BookInfo from search result detailUrl | Fixture replay works | biquge.com unreachable |
-| S16-NUI-P0-006 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | TOC smoke + fixture capture | Get TOC from BookInfo.tocUrl | Fixture replay works | biquge.com unreachable |
-| S16-NUI-P0-007 | S16-NUI | P0 | BLOCKED_SOURCE_UNREACHABLE | Content smoke + fixture capture | Get ContentPage from TOC chapter URL | Fixture replay works | biquge.com unreachable |
+| S16-NUI-P0-003 | S16-NUI | P0 | DONE | Search smoke with real network | Controlled smoke: xingxingxsw.com search "剑来" | xingxingxsw.com returns empty (parser mismatch) but reachable — confirmed 200 OK | Gap-1 ✅ (done), network confirmed |
+| S16-NUI-P0-004 | S16-NUI | P0 | BLOCKED_PARSER_MISMATCH | Search fixture capture | Save search response to fixtures/real-source/xingxingxsw/search/ | Fixture files exist | Parser doesn't match xingxingxsw HTML structure |
+| S16-NUI-P0-005 | S16-NUI | P0 | BLOCKED_PARSER_MISMATCH | Detail smoke + fixture capture | Get BookInfo from search result detailUrl | Fixture replay works | Parser mismatch — need SearchParser update first |
+| S16-NUI-P0-006 | S16-NUI | P0 | BLOCKED_PARSER_MISMATCH | TOC smoke + fixture capture | Get TOC from BookInfo.tocUrl | Fixture replay works | Parser mismatch — need SearchParser update first |
+| S16-NUI-P0-007 | S16-NUI | P0 | BLOCKED_PARSER_MISMATCH | Content smoke + fixture capture | Get ContentPage from TOC chapter URL | Fixture replay works | Parser mismatch — need SearchParser update first |
 | S16-NUI-P0-008 | S16-NUI | P0 | DONE | Offline replay tests | Full pipeline replay from existing inline fixtures | ./gradlew test: 53 tests pass, RealCoreBridgeE2ETest 8/8 pass | Uses existing inline HTML fixtures |
 | S16-NUI-P0-009 | S16-NUI | P0 | DONE | Error model verification | 10 error scenarios: NETWORK(404/500), PARSE(empty), stage correct | 10 tests pass | None |
 | S16-NUI-P0-010 | S16-NUI | P0 | DONE | Docs and gate state update | Update ANDROID_REAL_SOURCE_CLOSURE_PLAN.md status | Docs complete | None |
