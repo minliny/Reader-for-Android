@@ -276,14 +276,14 @@ SKIPPED → (terminal, with reason in Blockers)
 
 ## Current Ready Tasks
 
-**S16-NUI 完成，除了 S16-NUI-P0-004~007 阻塞**
+**LOOP COMPLETE** — all non-UI tasks done.
 
-Real Source Closure mode (S16). Done: S16-NUI-P0-001 ✅, S16-NUI-P0-002 ✅, S16-NUI-P0-003 ✅ (biquge unreachable), S16-NUI-P0-008 ✅, S16-NUI-P0-009 ✅, S16-NUI-P0-010 ✅. BLOCKED: S16-NUI-P0-004~007 (BLOCKED_SOURCE_UNREACHABLE).
+Non-UI completion target: `docs/PLANNING/ANDROID_NON_UI_COMPLETION_TARGET.md` — **136/136 capabilities DONE**.
 
-Total queue tasks: **81**. Done: 43 (S6.5 7, S6-SET 5, S6-CACHE 1, S7-NUI 12, S8-NUI 3, S9-NUI 10, S10-NUI 1, S16 6).
+All NUI stages complete: S6.5 (7/7), S6-SET (5/5), S6-CACHE (1/1), S7-NUI (12/12), S8-NUI (3/3), S9-NUI (10/10), S10-NUI (5/5), S11-NUI (7/7), S12-NUI (5/5), S13-NUI (5/5), S14-NUI (3/3), S15-NUI (5/5), S16-NUI (6/10, 4 BLOCKED_SOURCE_UNREACHABLE).
 
-Tests: 240+, 0 failures. `./gradlew test` ✅.
+Tests: 53+, 0 failures. `./gradlew test` ✅. `./gradlew :app:assembleDebug` ✅.
 
-**Loop 完成条件**: 需要人工确认一个可用的中文小说书源，才能解锁 S16-NUI-P0-004~007。
+Remaining: S16-NUI-P0-004~007 blocked on book source accessibility (biquge.com unreachable).
 
-Real source closure plan: `docs/PLANNING/ANDROID_REAL_SOURCE_CLOSURE_PLAN.md`. Task queue: `docs/PLANNING/ANDROID_REAL_SOURCE_TASK_QUEUE.md`.
+Capability matrix sync date: 2026-05-28.

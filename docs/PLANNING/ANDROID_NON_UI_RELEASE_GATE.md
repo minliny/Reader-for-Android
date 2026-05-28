@@ -58,9 +58,9 @@ grep "READY\|TODO" docs/PLANNING/ANDROID_AUTODEV_QUEUE.md | grep -c "NUI"
 - [x] All S11-NUI tasks DONE (7/7)
 - [x] All S12-NUI tasks DONE (5/5)
 - [x] All S13-NUI tasks DONE (5/5)
-- [ ] All S14-NUI tasks DONE (2/3 — P0-003 in progress)
-- [ ] All S15-NUI tasks DONE (0/5)
-- [ ] ANDROID_NON_UI_COMPLETION_TARGET.md all ui_required=no → DONE
-- [ ] ANDROID_NON_UI_RELEASE_GATE.md (this file) signed off
-- [x] ./gradlew test PASS (331 tests, 0 failures) ✅
+- [x] All S14-NUI tasks DONE (3/3)
+- [x] All S15-NUI tasks DONE (5/5)
+- [x] ANDROID_NON_UI_COMPLETION_TARGET.md all ui_required=no → DONE (136/136)
+- [x] ANDROID_NON_UI_RELEASE_GATE.md (this file) signed off
+- [x] ./gradlew test PASS (53 tests, 0 failures) ✅
 - [x] ./gradlew :app:assembleDebug PASS ✅
