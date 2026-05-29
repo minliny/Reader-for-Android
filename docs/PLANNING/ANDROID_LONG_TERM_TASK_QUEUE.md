@@ -12,7 +12,7 @@
 
 | ID | Title | Priority | Status | Modifies | Forbidden | Verification | Human Confirm? |
 |----|-------|----------|--------|----------|-----------|-------------|----------------|
-| ANDROID-LT-A-001 | Fix or defer StitchAppShell hardcoded sizes (P1-4) | P1 | READY | StitchAppShell.kt | Reader-Core, network, CoreBridge | compileDebugKotlin | No (unless design change) |
+| ANDROID-LT-A-001 | Fix or defer StitchAppShell hardcoded sizes (P1-4) | P1 | DONE | StitchAppShell.kt | Reader-Core, network, CoreBridge | compileDebugKotlin | No (unless design change) |
 | ANDROID-LT-A-002 | Resolve or defer component duplication (P1-6) | P2 | READY | ReaderNativeComponents.kt, CommonComponents.kt | Reader-Core, network, CoreBridge | testDebugUnitTest | No |
 | ANDROID-LT-A-003 | Phase A closure report | P1 | BLOCKED (A-001, A-002) | docs/ | Code | doc exists | No |
 
