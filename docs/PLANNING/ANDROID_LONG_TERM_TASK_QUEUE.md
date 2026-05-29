@@ -22,7 +22,7 @@
 |----|-------|----------|--------|----------|-----------|-------------|----------------|
 | ANDROID-LT-B-001 | Audit all ViewModel FakeCoreBridge() instantiation points | P1 | DONE | None (read-only) | UI visuals | grep report | No |
 | ANDROID-LT-B-002 | Add CoreBridge provider to AppProvider | P1 | DONE | AppProvider.kt | Reader-Core, network | compileDebugKotlin | No |
-| ANDROID-LT-B-003 | Wire SearchViewModel through AppProvider | P1 | READY | SearchScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
+| ANDROID-LT-B-003 | Wire SearchViewModel through AppProvider | P1 | DONE | SearchScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
 | ANDROID-LT-B-004 | Wire BookDetailViewModel through AppProvider | P1 | READY | BookDetailScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
 | ANDROID-LT-B-005 | Wire TOCViewModel through AppProvider | P1 | READY | TOCScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
 | ANDROID-LT-B-006 | Wire ReaderViewModel through AppProvider | P1 | READY | ReaderScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
