@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.reader.android.AppProvider
+import com.reader.android.data.bridge.CoreBridge
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.ContentPage
@@ -49,7 +51,7 @@ private val topZoneHeight = 92.dp   // topBarHeight + metaRowHeight
 private val bottomZoneInset = 156.dp // bottomBar + safeGap + pageControl + quickActions + gaps
 
 class ReaderViewModel(private val useRealHttp: Boolean = false) {
-    private val bridge = FakeCoreBridge()
+    private val bridge: CoreBridge = AppProvider.coreBridge
     private val httpClient = HttpClient()
     private val parser = ContentParser()
     private val source = BookSource(sourceUrl = "", sourceName = "笔趣阁")
