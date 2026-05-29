@@ -89,15 +89,19 @@
 
 ## Current Ready Tasks
 
-Device connected + network authorized. Ready tasks:
+Phase A ✅ COMPLETE（3/3 DONE）
+Phase B ✅ COMPLETE（7/7 DONE）
+
+当前可执行任务：
 
 | ID | Phase | Title | Needs Device? | Needs Network? |
 |----|-------|-------|---------------|----------------|
-| ANDROID-LT-A-001 | A | Fix or defer StitchAppShell hardcoded sizes | No | No |
-| ANDROID-LT-A-002 | A | Resolve or defer component duplication | No | No |
-| ANDROID-LT-B-001 | B | Audit ViewModel FakeCoreBridge() instantiation | No | No |
+| ANDROID-LT-E-001 | E | Audit reader UX gaps | No | No |
 | ANDROID-LT-C-001 | C | Verify installDebug succeeds | **Yes** | No |
 | ANDROID-LT-D-002 | D | Single-pass search smoke on live source | No | **Yes** |
-| ANDROID-LT-E-001 | E | Audit reader UX gaps | No | No |
 
-**Recommended start**: C-001 (installDebug) — device is now available, unblocks the entire Phase C chain. Or D-002 if prefer to capture live smoke first.
+**Recommended next**: E-001（Reader UX gaps audit）— 只读，无风险，unblocks E-002..E-006
+
+**阻塞项**：
+- C-001：jlink env issue（DevEco-Studio路径问题）
+- D-002：需要用户确认 smoke 参数（source URL + query）
