@@ -76,6 +76,8 @@ fun StitchAppShell(onSearchClick: () -> Unit = {}, onBookClick: (String, String)
 }
 
 // ── Bookshelf: dual List/Cover mode from Stitch HTML ──
+// Note: font sizes (24sp/18sp/14sp/12sp/10sp) are Stitch design spec values,
+// intentionally not mapped to ReaderTheme.typography tokens.
 
 @Composable
 fun StitchBookshelfPage(onSearchClick: () -> Unit = {}, onBookClick: (String, String) -> Unit = { _, _ -> }) {
