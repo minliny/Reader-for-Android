@@ -20,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.reader.android.AppProvider
+import com.reader.android.data.bridge.CoreBridge
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookInfo
 import com.reader.android.data.model.BookSource
@@ -33,7 +35,7 @@ import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.theme.ReaderTheme
 
 class BookDetailViewModel(private val useRealHttp: Boolean = false) {
-    private val bridge = FakeCoreBridge()
+    private val bridge: CoreBridge = AppProvider.coreBridge
     private val httpClient = HttpClient()
     private val parser = BookInfoParser()
     private val source = BookSource(sourceUrl = "", sourceName = "笔趣阁")
