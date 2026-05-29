@@ -2,6 +2,10 @@ package com.reader.android
 
 import android.content.Context
 import androidx.room.Room
+import com.reader.android.data.bridge.CoreBridge
+import com.reader.android.data.bridge.FakeCoreBridge
+import com.reader.android.data.bridge.RealCoreBridge
+import com.reader.android.data.network.OkHttpTransport
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.data.storage.AppDatabase
@@ -22,8 +26,30 @@ object AppProvider {
     // ── Runtime state ──
     private var db: AppDatabase? = null
     private var _bookSourceRepo: BookSourceRepository? = null
+    private var _coreBridge: CoreBridge? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
+
+    // ── Core Bridge ──
+
+    /**
+     * Provides [CoreBridge] based on network state.
+     * - Network disabled: returns [FakeCoreBridge] (deterministic, no I/O)
+     * - Network enabled: returns [RealCoreBridge] (live network, respects [isNetworkAllowed] guard)
+     *
+     * Tests can inject a custom bridge via [initForBridge].
+     */
+    val coreBridge: CoreBridge
+        get() = _coreBridge ?: if (_networkAllowed) {
+            RealCoreBridge(OkHttpTransport())
+        } else {
+            FakeCoreBridge()
+        }
+
+    /** Inject a custom bridge for tests. Overrides network-state default. */
+    fun initForBridge(bridge: CoreBridge) {
+        _coreBridge = bridge
+    }
 
     // ── Network gate ──
 
@@ -79,6 +105,7 @@ object AppProvider {
         db?.close()
         db = null
         _bookSourceRepo = null
+        _coreBridge = null
         _networkAllowed = false
         initialized = false
     }
