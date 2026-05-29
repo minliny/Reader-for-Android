@@ -54,9 +54,9 @@
 | ANDROID-LT-E-002 | Reading progress save/restore verification | P2 | DONE | ReaderScreen, progress adapters | Reader-Core, network | ReaderProgressLocalStateAdapter tests | No |
 | ANDROID-LT-E-003 | Chapter cache verification | P2 | DONE | Cache adapters | Reader-Core, network | ReaderCacheLocalStateAdapter tests | No |
 | ANDROID-LT-E-004 | Bookmark flow verification | P2 | DONE | Bookmark adapters | Reader-Core, network | ReaderBookmarkActionAdapter tests | No |
-| ANDROID-LT-E-005 | TOC navigation polish | P2 | READY | TOCScreen, ReaderTocLocalStateJoiner | Reader-Core, network, UI visual redesign | UiCapabilitySmokeTest | No |
-| ANDROID-LT-E-006 | Error recovery UX | P2 | READY | Error mappers, error states | Reader-Core, network | ReaderErrorModelTest | No |
-| ANDROID-LT-E-007 | Phase E closure report | P2 | BLOCKED (E-002..006) | docs/ | Code | doc exists | No |
+| ANDROID-LT-E-005 | TOC navigation polish | P2 | DONE | TOCScreen, ReaderTocLocalStateJoiner | Reader-Core, network, UI visual redesign | UiCapabilitySmokeTest | No |
+| ANDROID-LT-E-006 | Error recovery UX | P2 | DONE | Error mappers, error states | Reader-Core, network | ReaderErrorModelTest | No |
+| ANDROID-LT-E-007 | Phase E closure report | P2 | DONE | docs/ | Code | doc exists | No |
 
 ### Phase F: Pre-Release Hardening
 
@@ -91,22 +91,19 @@
 
 Phase A ✅ COMPLETE（3/3 DONE）
 Phase B ✅ COMPLETE（7/7 DONE）
-Phase E: E-001 DONE，E-002..E-006 READY
+Phase E ✅ COMPLETE（7/7 DONE — E-001..E-007 DONE）
+Phase F: F-001 READY（Phase C BLOCKED，等待 C-001 jlink 修复）
 
 当前可执行任务：
 
 | ID | Phase | Title | Needs Device? | Needs Network? |
 |----|-------|-------|---------------|----------------|
-| ANDROID-LT-E-002 | E | Reading progress save/restore verification | No | No |
-| ANDROID-LT-E-003 | E | Chapter cache verification | No | No |
-| ANDROID-LT-E-004 | E | Bookmark flow verification | No | No |
-| ANDROID-LT-E-005 | E | TOC navigation polish | No | No |
-| ANDROID-LT-E-006 | E | Error recovery UX | No | No |
+| ANDROID-LT-F-001 | F | Release checklist audit | No | No |
 | ANDROID-LT-C-001 | C | Verify installDebug succeeds | **Yes** | No |
 | ANDROID-LT-D-002 | D | Single-pass search smoke on live source | No | **Yes** |
 
-**Recommended next**: E-002（Reading progress save/restore verification）— 只读测试验证，无风险
+**Recommended next**: F-001（Release checklist audit）— 只读检查清单，无风险
 
 **阻塞项**：
-- C-001：jlink env issue（DevEco-Studio路径问题）
+- C-001：jlink env issue（DevEco-Studio路径问题）— F-001 依赖 Phase C 完成
 - D-002：需要用户确认 smoke 参数（source URL + query）
