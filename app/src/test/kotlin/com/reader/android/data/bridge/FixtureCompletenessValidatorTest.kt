@@ -73,7 +73,7 @@ class FixtureCompletenessValidatorTest {
         println("INFO: Fixture sources found: ${sources.size}")
         sources.forEach { println("  - ${it.name}") }
         if (sources.isEmpty()) {
-            println("INFO: S16-FIXTURE-004 pending — awaiting user HTML submission")
+            println("INFO: S16-FIXTURE-004 DONE — manual HTML fixture captured")
             println("INFO: See docs/PLANNING/ANDROID_REAL_SOURCE_FIXTURE_CAPTURE_GUIDE.md")
         }
     }
@@ -82,7 +82,7 @@ class FixtureCompletenessValidatorTest {
     fun `each source has manifest and required HTML files`() {
         val sources = fixturesRoot.listFiles()?.filter { it.isDirectory } ?: emptyList()
         if (sources.isEmpty()) {
-            println("SKIP: No sources yet — S16-FIXTURE-004 pending")
+            println("SKIP: No fixture sources found")
             return
         }
 

@@ -8,6 +8,7 @@ class ContentParser {
         // Extract text from common content containers
         val content = extract(html, Regex("""<div[^>]*id="content"[^>]*>\s*([\s\S]+?)</div>"""))
             ?: extract(html, Regex("""<div[^>]*class="[^"]*content[^"]*"[^>]*>\s*([\s\S]+?)</div>"""))
+            ?: extract(html, Regex("""<article[^>]*class="article"[^>]*>\s*([\s\S]+?)</article>"""))
             ?: extract(html, Regex("""<article[^>]*>\s*([\s\S]+?)</article>"""))
             ?: return null
 

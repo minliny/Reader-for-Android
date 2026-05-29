@@ -5,7 +5,7 @@ import com.reader.android.data.model.TOCItem
 class TOCParser {
 
     fun parseTOCResponse(html: String): List<TOCItem> {
-        // Match chapter links: <a href="url">title</a>
+        // Match chapter links: <a href="url">title</a> or <a href="url" title="title">display</a>
         val chapterRegex = Regex(
             """<a[^>]*href="([^"]*)"[^>]*>\s*([^<]{1,60})\s*</a>""",
             setOf(RegexOption.DOT_MATCHES_ALL)

@@ -1,0 +1,28 @@
+{
+  "sourceId": "xingxingxsw-manual",
+  "sourceName": "新笔趣阁（biquges123.com）手工受控捕获",
+  "captureMode": "controlled-browser-single-pass",
+  "capturedAt": "2026-05-29T01:22:00.000Z",
+  "query": "凡人修仙传",
+  "searchUrl": "https://www.biquges123.com/search?keyword=%E5%87%A1%E4%BA%BA%E4%BF%AE%E4%BB%99%E4%BC%A0",
+  "detailUrl": "https://www.biquges123.com/34811",
+  "tocUrl": "https://www.biquges123.com/34811",
+  "contentUrl": "https://www.biquges123.com/34811/1",
+  "charset": "UTF-8",
+  "files": {
+    "search": "search/search.html",
+    "detail": "detail/detail.html",
+    "toc": "toc/toc.html",
+    "content": "content/chapter-001.html"
+  },
+  "harFiles": {},
+  "antiBotObserved": false,
+  "blockedStage": null,
+  "requestPolicy": {
+    "maxVisitPerPage": 1,
+    "parallelism": 1,
+    "retry": 0,
+    "bypassAntiBot": false
+  },
+  "notes": "用于 Reader for Android S16 真实书源离线 replay 测试。原始指定站点 xingxingxsw.com 触发 403 反爬，换用同源书源集合中的新笔趣阁（biquges123.com）。页面内容为静态 HTML，无需 HAR。抓取过程不绕过反爬，不进行高频请求。"
+}
