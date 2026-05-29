@@ -1,68 +1,53 @@
-# Phase A Closure Report
+# Loop Report: ANDROID-LT-A-003
 
 **Date**: 2026-05-29
-**Phase**: A — Stitch P1 Visual Polish
-**Status**: COMPLETE
+**Loop ID**: A-003
+**HEAD**: `076860a`
 
 ---
 
-## Summary
+## Task
 
-Phase A addressed two P1 visual polish items (P1-4 hardcoded sizes, P1-6 component duplication) from the `STITCH_VISUAL_REVIEW_AFTER_CAPABILITY_SMOKE.md` audit.
-
-Both items were **deferred with rationale** rather than fixed — the deferral decisions are documented in code and match the execution plan recommendations.
+Phase A closure report — `ANDROID-LT-A-003`
 
 ---
 
-## Task Outcomes
+## Phase A Completion
 
-### ANDROID-LT-A-001 — StitchAppShell hardcoded sizes (P1-4)
+All Phase A tasks are DONE. This report closes the phase.
 
-**Status**: DONE (DEFERRED_WITH_RATIONALE)
+## Phase A Summary
 
-**Action**: Added deferral comment to `StitchAppShell.kt`:
+| Task | Title | Status | Action |
+|------|-------|--------|--------|
+| ANDROID-LT-A-001 | StitchAppShell hardcoded sizes (P1-4) | DONE | Deferred with rationale — comment added to StitchAppShell.kt |
+| ANDROID-LT-A-002 | Component duplication (P1-6) | DONE | Deferred with rationale — KDoc cross-references added to both component files |
+
+## P1-4: StitchAppShell hardcoded font sizes
+
+**Deferral rationale**: Font sizes (24sp/18sp/14sp/12sp/10sp) are Stitch design spec values, not bugs. Mapping to ReaderTheme.typography tokens would cause visual changes requiring design re-approval.
+
+**Code evidence**: Comment added to `StitchAppShell.kt`:
 ```
 // Note: font sizes (24sp/18sp/14sp/12sp/10sp) are Stitch design spec values,
 // intentionally not mapped to ReaderTheme.typography tokens.
 ```
 
-**Rationale**: Hardcoded sizes are part of Stitch design spec, not a bug. Mapping to ReaderTheme tokens would cause visual changes requiring design re-approval.
+**Visual review doc** (`STITCH_VISUAL_REVIEW_AFTER_CAPABILITY_SMOKE.md`): P1-4 already marked DEFERRED — now matches code.
 
-**Commit**: `f85b0ea` — `docs: add StitchAppShell hardcoded font deferral note`
+## P1-6: Component duplication (ReaderIconButton, ReaderChip)
 
----
+**Deferral rationale**: Two variants serve distinct purposes — general UI (CommonComponents) vs reader control layer (ReaderNativeComponents). Different rendering (Material circle vs soft touch, solid vs alpha-selected background) is deliberate design boundary.
 
-### ANDROID-LT-A-002 — Component duplication (P1-6)
+**Code evidence**: KDoc cross-references added to:
+- `CommonComponents.ReaderIconButton` → "For reader control layer icon buttons, see ReaderNativeComponents.ReaderIconButton"
+- `CommonComponents.ReaderChip` → "For reader control layer chips, see ReaderNativeComponents.ReaderChip"
+- `ReaderNativeComponents.ReaderIconButton` → "For general UI icon buttons, see CommonComponents.ReaderIconButton"
+- `ReaderNativeComponents.ReaderChip` → "For general UI chips, see CommonComponents.ReaderChip"
 
-**Status**: DONE (DEFERRED_WITH_RATIONALE)
+**Visual review doc**: P1-6 already marked DEFERRED — now matches code.
 
-**Action**: Added KDoc cross-references to both component variants:
-
-- `CommonComponents.ReaderIconButton`: "General-purpose icon button with Material3 IconButton styling. For reader control layer icon buttons, see ReaderNativeComponents.ReaderIconButton."
-- `CommonComponents.ReaderChip`: "General-purpose chip with solid background selection state. For reader control layer chips, see ReaderNativeComponents.ReaderChip."
-- `ReaderNativeComponents.ReaderIconButton`: "Reader control layer icon button with soft touch target (no Material circle/shape). For general UI icon buttons, see CommonComponents.ReaderIconButton."
-- `ReaderNativeComponents.ReaderChip`: "Reader control layer chip with alpha-selected background and minimal shape. For general UI chips, see CommonComponents.ReaderChip."
-
-**Rationale**: The two variants serve distinct purposes — general UI vs reader control layer — and have meaningfully different rendering (Material circle vs soft touch, solid vs alpha-selected background). This is a deliberate design boundary, not true duplication.
-
-**Commits**:
-- `34e6667` — `docs: add KDoc cross-references for ReaderIconButton/ReaderChip variants`
-- `7c0ba59` — `docs: add LOOP-A-002 report`
-
----
-
-## Verification
-
-| Task | compileDebugKotlin | testDebugUnitTest | assembleDebug |
-|------|---------------------|-------------------|---------------|
-| A-001 | PASS | BLOCKED (env) | BLOCKED (env) |
-| A-002 | PASS | BLOCKED (env) | BLOCKED (env) |
-
-Both tasks compile successfully. Unit tests and assemble are blocked by a `jlink` environment issue (DevEco-Studio path conflict with Android SDK), not by code correctness.
-
----
-
-## Phase A Commits
+## Phase Commits
 
 | Hash | Message |
 |------|---------|
@@ -72,15 +57,22 @@ Both tasks compile successfully. Unit tests and assemble are blocked by a `jlink
 | `34e6667` | docs: add KDoc cross-references for ReaderIconButton/ReaderChip variants |
 | `7c0ba59` | docs: add LOOP-A-002 report |
 | `1f7dfb8` | docs: mark ANDROID-LT-A-002 DONE in task queue |
+| `64a7119` | docs: Phase A closure + mark ANDROID-LT-A-003 DONE |
 
 ---
 
-## Updated Visual Review Doc
+## Verification
 
-Both P1-4 and P1-6 in `STITCH_VISUAL_REVIEW_AFTER_CAPABILITY_SMOKE.md` were already marked DEFERRED. The code-level comments in `StitchAppShell.kt`, `CommonComponents.kt`, and `ReaderNativeComponents.kt` now match the documented deferral rationale.
+- `./gradlew :app:compileDebugKotlin` — PASS (both A-001 and A-002 changes compile cleanly)
+- `./gradlew :app:testDebugUnitTest` — BLOCKED (jlink env issue — not code)
+- `./gradlew :app:assembleDebug` — BLOCKED (jlink env issue — not code)
+
+**Phase A status**: COMPLETE
 
 ---
 
 ## Next Phase
 
-**Phase B: AppProvider DI Cleanup** — `ANDROID-LT-B-001` (ViewModel DI audit) is the next READY task. It is read-only and unblocks the entire B chain.
+**Phase B: AppProvider DI Cleanup** — `ANDROID-LT-B-003` (Wire SearchViewModel through AppProvider) is the next READY task.
+
+B-002 (CoreBridge provider) is DONE — `AppProvider.coreBridge` now provides FakeCoreBridge or RealCoreBridge based on network state. B-003..B-006 can now wire ViewModels to use it.
