@@ -13,115 +13,99 @@ This is the command file for `/loop 10m /reader-android-loop`.
 1. Work only inside this repository: `/Users/minliny/Documents/Reader for Android`
 2. Do NOT push to remote. Local commits only.
 3. Do NOT copy Legado source code.
-4. Do NOT rewrite Reader-Core internals in Kotlin.
+4. Do NOT modify Reader-Core internals.
 5. Only access Reader-Core via public API/Facade/DTO/Error Taxonomy.
-6. If Core public API is insufficient, record gap — NEVER bypass boundary.
-7. One task per iteration maximum.
-8. Tasks needing user decisions are skipped (marked BLOCKED).
-9. No READY tasks → auto-cancel the loop timer via CronDelete, then output BLOCKED_NEEDS_USER.
-10. Validate before commit. No validation pass = no commit.
-11. NEVER push.
-12. Default: no network access.
-13. Default: no new dependencies without design doc approval.
-14. Never read .env or commit secrets.
+6. One task per cycle. No batching.
+7. Default: no real network access (`AppProvider.isNetworkAllowed = false`).
+8. Default: no new dependencies.
+9. NEVER push.
+10. Never read .env or commit secrets.
 
 ---
 
 ## Iteration Steps
 
-### 1. Read Current State
+### 1. Pre-Check
 
-```
+```bash
+git rev-parse --short HEAD
 git status --short
 ```
 
-Read these files:
-- `docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md`
-- `docs/PLANNING/ANDROID_AUTODEV_QUEUE.md`
+If `git status --short` not empty → BLOCKED_DIRTY_WORKTREE. Output status and stop.
 
-### 2. Blocker Preflight
+### 2. Read Queue
 
-Check each:
-1. Git worktree: dirty from prior failed loop? If unsafe, record BLOCKED_DIRTY_WORKTREE.
-2. P0 OPEN blockers: scan ANDROID_BLOCKERS_AND_DECISIONS.md for P0 OPEN items.
-3. Reader-Core path: `/Users/minliny/Documents/Reader-Core` exists? Missing → Core tasks blocked.
-4. Android SDK: `$ANDROID_HOME` set? Missing → Gradle tasks blocked (doc tasks OK).
-5. User decision pending for selected task? If yes → skip task.
-6. New dependency would be introduced? If task doesn't allow → skip task.
-7. Network access needed? If not allowed → skip task.
-8. Sensitive data: don't read .env, secrets, tokens.
+Read: `docs/PLANNING/ANDROID_LONG_TERM_TASK_QUEUE.md`
 
 ### 3. Select Task
 
-From ANDROID_AUTODEV_QUEUE.md:
-- Sort by Priority (P0 > P1 > P2 > P3), then Stage, then ID
-- Pick first task with Status == READY
-- Skip if Blockers field contains unresolved P0 blocker
-- Mark it IN_PROGRESS
-- If no READY task: run CronDelete on this loop's job ID (find via CronList), output BLOCKED_NEEDS_USER, update blockers, stop
+From the queue:
+- Pick first task with `Status == READY`
+- Priority: Phase A > Phase B > Phase C > Phase D > Phase E > Phase F
+- Within same phase: P0 > P1 > P2
+- Skip if scope violation (e.g., task needs device but BLOCKED_BY_DEVICE, needs network but not D-002)
+- If no READY task: output `LOOP_COMPLETE` with remaining BLOCKED summary. Auto-cancel via CronDelete.
 
 ### 4. Execute
 
-- Read relevant existing files before editing
-- Make the smallest useful change
-- Code tasks: implement, compile, validate
-- Doc tasks: write, format, verify
+Follow the specific task instructions in `docs/PLANNING/ANDROID_LONG_TERM_LOOP_EXECUTION_PLAN.md`.
+If task not found there, follow `docs/PLANNING/ANDROID_LONG_TERM_LOOP_RULES.md`.
 
-### 5. Validate
+Scope enforcement matrix also in `ANDROID_LONG_TERM_LOOP_RULES.md` §4.
 
-Run the task's Validation command from the queue.
-- PASS → Update task to DONE, create local commit with `[TaskID] description`
-- FAIL → Mark task BLOCKED, record failure, revert unsafe changes, NO commit
+### 5. Verify
+
+```bash
+./gradlew :app:testDebugUnitTest
+./gradlew :app:assembleDebug
+```
+
+If task touches UI smoke path, also:
+```bash
+./gradlew :app:testDebugUnitTest --tests "*UiCapabilitySmokeTest"
+```
+
+PASS → mark DONE, create commit.
+FAIL → mark BLOCKED, revert unsafe changes, record failure reason, NO commit.
 
 ### 6. Report
 
-Output:
-
 ```
-## Loop Iteration
+## Loop: <LOOP-ID>
 - HEAD: <hash>
 - Task: <ID> — <description>
-- Changes: <summary>
-- Validation: PASS/FAIL
-- Commit: <hash or N/A>
-- New Blockers: <list or None>
-- Next READY: <ID or NONE>
-- Status: ANDROID_LOOP_OK / BLOCKED_NEEDS_USER / BLOCKED_ENVIRONMENT
+- Changes: <summary or "read-only">
+- Verification: PASS/FAIL
+- Commit: <hash or "N/A">
+- Status: LOOP_OK / BLOCKED_xxx
+- Next READY: <ID or "NONE — LOOP_COMPLETE">
 ```
+
+### 7. Update Queue
+
+- Mark completed task DONE in `ANDROID_LONG_TERM_TASK_QUEUE.md`
+- Unblock downstream tasks that depended on it
+- If milestone reached, update `ANDROID_LONG_TERM_ROADMAP.md`
 
 ---
 
 ## Task Queue Reference
 
-Tasks are in `docs/PLANNING/ANDROID_AUTODEV_QUEUE.md`.
-
-Current READY tasks (doc-only, no Android SDK needed):
-- P0-S0-003: Generate initial BLOCKERS_AND_DECISIONS.md (already done in plan setup)
-- P0-S0-004: Verify git state, initial commit of planning docs
-- P1-S2-002: Write DATA_LAYER_DESIGN.md
-- P1-S3-002: Write CORE_BRIDGE_DESIGN.md
-- P2-S3-003-DOC: Write HTTP adapter design doc
-- P3-S7-001-DOC: Write WebView/JS adapter design doc
-- P3-S11-001-DOC: Write WebDAV design doc
-
-All Gradle/code tasks are BLOCKED until:
-1. Android SDK confirmed (BD-017)
-2. Package name / minSdk / Compose vs XML decided (BD-001 through BD-004)
+Tasks: `docs/PLANNING/ANDROID_LONG_TERM_TASK_QUEUE.md`
+Rules: `docs/PLANNING/ANDROID_LONG_TERM_LOOP_RULES.md`
+Execution plan: `docs/PLANNING/ANDROID_LONG_TERM_LOOP_EXECUTION_PLAN.md`
 
 ---
 
 ## When Blocked (auto-cancel)
 
-If all tasks are DONE/BLOCKED/SKIPPED (zero READY):
-1. Loop calls CronDelete to cancel the scheduled timer (prevents empty wake-ups)
-2. Loop outputs BLOCKED_NEEDS_USER with summary of remaining BLOCKED tasks
-3. User reviews `docs/PLANNING/ANDROID_BLOCKERS_AND_DECISIONS.md`
-4. User resolves decisions, updates task statuses from BLOCKED to READY
-5. User restarts: `/loop 10m /reader-android-loop`
+If all tasks DONE/BLOCKED/SKIPPED (zero READY):
+1. Call CronDelete to cancel the timer
+2. Output `LOOP_COMPLETE` with remaining BLOCKED summary
+3. User resolves blockers and restarts: `/loop 10m /reader-android-loop`
 
-The auto-cancel ensures the loop does not keep firing every 10 minutes when there is nothing to do.
-
-## To Stop manually
+## To Stop
 
 ```
 /loop off
@@ -129,4 +113,4 @@ The auto-cancel ensures the loop does not keep firing every 10 minutes when ther
 
 ---
 
-*This file is the canonical loop command. Do not edit while loop is running.*
+*This file is the canonical loop command. Updated 2026-05-29 for long-term task queue.*
