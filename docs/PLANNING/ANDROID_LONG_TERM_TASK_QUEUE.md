@@ -26,7 +26,7 @@
 | ANDROID-LT-B-004 | Wire BookDetailViewModel through AppProvider | P1 | DONE | BookDetailScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
 | ANDROID-LT-B-005 | Wire TOCViewModel through AppProvider | P1 | DONE | TOCScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
 | ANDROID-LT-B-006 | Wire ReaderViewModel through AppProvider | P1 | DONE | ReaderScreen.kt, AppProvider.kt | Reader-Core, network, UI visuals | UiCapabilitySmokeTest | No |
-| ANDROID-LT-B-007 | Phase B closure report | P1 | READY | docs/ | Code | doc exists | No |
+| ANDROID-LT-B-007 | Phase B closure report | P1 | DONE | docs/ | Code | doc exists | No |
 
 ### Phase C: Device Review
 
