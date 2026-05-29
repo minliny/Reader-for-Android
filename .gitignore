@@ -17,6 +17,9 @@ local.properties
 **/test-results/
 **/test-output/
 
+# Claude cron runtime
+.claude/scheduled_tasks.*
+
 # Misc
 *.log
 *.tmp
