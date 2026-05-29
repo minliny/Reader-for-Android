@@ -62,7 +62,7 @@
 
 | ID | Title | Priority | Status | Modifies | Forbidden | Verification | Human Confirm? |
 |----|-------|----------|--------|----------|-----------|-------------|----------------|
-| ANDROID-LT-F-001 | Release checklist audit | P1 | BLOCKED (Phase C, Phase E) | None (read-only) | Code | checklist doc | No |
+| ANDROID-LT-F-001 | Release checklist audit | P1 | BLOCKED (Phase C) | None (read-only) | Code | checklist doc | No |
 | ANDROID-LT-F-002 | Clean-room compliance re-verify | P0 | BLOCKED (F-001) | None (grep audit) | Code | grep report | No |
 | ANDROID-LT-F-003 | Doc consistency sweep | P1 | BLOCKED (F-001) | docs/ | Code | all docs updated | No |
 | ANDROID-LT-F-004 | Final test baseline | P0 | BLOCKED (F-001) | None (test run) | Code | testDebugUnitTest + assembleDebug | No |
