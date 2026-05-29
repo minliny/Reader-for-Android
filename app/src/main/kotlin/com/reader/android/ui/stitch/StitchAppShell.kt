@@ -25,8 +25,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -56,7 +58,7 @@ data class StitchTab(val label: String, val icon: ImageVector)
 fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth().background(ReaderTheme.colors.bottomBarBg).padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly) {
-        listOf("书架" to Icons.AutoMirrored.Filled.MenuBook, "发现" to Icons.Filled.Search, "书源" to Icons.Filled.MoreVert, "我的" to Icons.Filled.Search)
+        listOf("书架" to Icons.AutoMirrored.Filled.MenuBook, "发现" to Icons.Filled.Explore, "书源" to Icons.Filled.MoreVert, "我的" to Icons.Filled.Person)
             .forEachIndexed { i, t ->
                 val sel = i == selectedIndex
                 Column(Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTabSelected(i) }

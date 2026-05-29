@@ -1,34 +1,21 @@
 package com.reader.android.ui.toc
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +24,11 @@ import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.TOCItem
 import com.reader.android.data.network.HttpClient
 import com.reader.android.data.network.TOCParser
+import com.reader.android.ui.components.ReaderAppTopBar
+import com.reader.android.ui.components.ReaderEmptyState
+import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.theme.ReaderTheme
 
 class TOCViewModel(private val useRealHttp: Boolean = false) {
     private val bridge = FakeCoreBridge()
@@ -68,7 +60,6 @@ class TOCViewModel(private val useRealHttp: Boolean = false) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TOCScreen(tocUrl: String, onBack: () -> Unit, onChapterClick: (String, String) -> Unit) {
     val viewModel = remember { TOCViewModel() }
@@ -77,43 +68,44 @@ fun TOCScreen(tocUrl: String, onBack: () -> Unit, onChapterClick: (String, Strin
         viewModel.load(tocUrl)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("目录") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
+    ReaderTheme {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ReaderAppTopBar(
+                title = "目录",
+                onNavigateBack = onBack
             )
-        }
-    ) { padding ->
-        when {
-            viewModel.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+
+            when {
+                viewModel.error != null -> {
+                    ReaderErrorState(
+                        title = "加载失败",
+                        message = viewModel.error,
+                        modifier = Modifier.weight(1f),
+                        onRetryClick = { /* retry deferred */ }
+                    )
                 }
-            }
-            viewModel.chapters.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("暂无章节", style = MaterialTheme.typography.bodyLarge)
+                viewModel.isLoading -> {
+                    ReaderLoadingState(
+                        modifier = Modifier.weight(1f),
+                        message = "加载中"
+                    )
                 }
-            }
-            else -> {
-                LazyColumn(modifier = Modifier.padding(padding)) {
-                    items(viewModel.chapters) { item ->
-                        ChapterItem(
-                            item = item,
-                            depth = 0,
-                            onChapterClick = onChapterClick
-                        )
+                viewModel.chapters.isEmpty() -> {
+                    ReaderEmptyState(
+                        title = "暂无章节",
+                        message = "目录内容为空",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(viewModel.chapters) { item ->
+                            ChapterItem(
+                                item = item,
+                                depth = 0,
+                                onChapterClick = onChapterClick
+                            )
+                        }
                     }
                 }
             }
@@ -132,12 +124,18 @@ private fun ChapterItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onChapterClick(item.url, item.title) }
-                .padding(start = (16 + depth * 20).dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
+                .padding(
+                    start = ReaderTheme.spacing.screenPadding + (depth * 20).dp,
+                    end = ReaderTheme.spacing.screenPadding,
+                    top = ReaderTheme.spacing.sm,
+                    bottom = ReaderTheme.spacing.sm
+                )
         ) {
             Text(
                 text = item.title,
-                style = if (depth == 0) MaterialTheme.typography.bodyLarge
-                        else MaterialTheme.typography.bodyMedium,
+                style = if (depth == 0) ReaderTheme.typography.bookTitle
+                        else ReaderTheme.typography.bookMeta,
+                color = ReaderTheme.colors.controlInk,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -146,9 +144,13 @@ private fun ChapterItem(
         // Volume header (no url)
         Text(
             text = item.title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = (16 + depth * 20).dp, top = 16.dp, bottom = 4.dp)
+            style = ReaderTheme.typography.sectionTitle,
+            color = ReaderTheme.colors.primary,
+            modifier = Modifier.padding(
+                start = ReaderTheme.spacing.screenPadding + (depth * 20).dp,
+                top = ReaderTheme.spacing.md,
+                bottom = ReaderTheme.spacing.xs
+            )
         )
     }
 
@@ -161,6 +163,9 @@ private fun ChapterItem(
     }
 
     if (depth == 0) {
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = ReaderTheme.spacing.screenPadding),
+            color = ReaderTheme.colors.controlBorder
+        )
     }
 }

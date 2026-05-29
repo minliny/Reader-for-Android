@@ -20,9 +20,9 @@ class AppRouteGroupingTest {
         val primaryRoutes = appScreens.map { it.route }.toSet()
 
         assertTrue(ReaderRoutes.SEARCH in AppRouteGroups.bookshelf)
-        assertTrue(ReaderRoutes.READER in AppRouteGroups.bookshelf)
+        assertTrue(ReaderRoutes.READER_CONTENT in AppRouteGroups.bookshelf)
         assertFalse(ReaderRoutes.SEARCH in primaryRoutes)
-        assertFalse(ReaderRoutes.READER in primaryRoutes)
+        assertFalse(ReaderRoutes.READER_CONTENT in primaryRoutes)
     }
 
     @Test

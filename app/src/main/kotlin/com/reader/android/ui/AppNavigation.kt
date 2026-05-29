@@ -34,8 +34,7 @@ object AppRouteGroups {
         Routes.SEARCH,
         Routes.DETAIL,
         Routes.TOC,
-        Routes.READER_CONTENT,
-        ReaderRoutes.READER
+        Routes.READER_CONTENT
     )
 
     val discover = setOf(
