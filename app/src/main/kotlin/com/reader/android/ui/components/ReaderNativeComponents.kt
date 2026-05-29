@@ -66,8 +66,10 @@ fun ReaderPanel(
     }
 }
 
-// ── ReaderIconButton (soft touch target, no circle, no Material shape) ──
-
+/**
+ * Reader control layer icon button with soft touch target (no Material circle/shape).
+ * For general UI icon buttons, see [com.reader.android.ui.components.CommonComponents.ReaderIconButton].
+ */
 @Composable
 fun ReaderIconButton(
     icon: ImageVector,
@@ -247,6 +249,10 @@ fun ReaderProgressRail(
     }
 }
 
+/**
+ * Reader control layer chip with alpha-selected background and minimal shape.
+ * For general UI chips, see [com.reader.android.ui.components.CommonComponents.ReaderChip].
+ */
 // ── ReaderChip ──
 
 @Composable

@@ -229,6 +229,10 @@ fun ReaderSecondaryButton(
     }
 }
 
+/**
+ * General-purpose icon button with Material3 IconButton styling.
+ * For reader control layer icon buttons, see [com.reader.android.ui.components.ReaderNativeComponents.ReaderIconButton].
+ */
 @Composable
 fun ReaderIconButton(
     icon: ImageVector,
@@ -253,6 +257,10 @@ fun ReaderIconButton(
     }
 }
 
+/**
+ * General-purpose chip with solid background selection state.
+ * For reader control layer chips, see [com.reader.android.ui.components.ReaderNativeComponents.ReaderChip].
+ */
 @Composable
 fun ReaderChip(
     text: String,
