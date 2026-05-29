@@ -51,9 +51,9 @@
 | ID | Title | Priority | Status | Modifies | Forbidden | Verification | Human Confirm? |
 |----|-------|----------|--------|----------|-----------|-------------|----------------|
 | ANDROID-LT-E-001 | Audit current reader UX gaps | P2 | DONE | None (read-only) | Code | gap list doc | No |
-| ANDROID-LT-E-002 | Reading progress save/restore verification | P2 | READY | ReaderScreen, progress adapters | Reader-Core, network | ReaderProgressLocalStateAdapter tests | No |
-| ANDROID-LT-E-003 | Chapter cache verification | P2 | READY | Cache adapters | Reader-Core, network | ReaderCacheLocalStateAdapter tests | No |
-| ANDROID-LT-E-004 | Bookmark flow verification | P2 | READY | Bookmark adapters | Reader-Core, network | ReaderBookmarkActionAdapter tests | No |
+| ANDROID-LT-E-002 | Reading progress save/restore verification | P2 | DONE | ReaderScreen, progress adapters | Reader-Core, network | ReaderProgressLocalStateAdapter tests | No |
+| ANDROID-LT-E-003 | Chapter cache verification | P2 | DONE | Cache adapters | Reader-Core, network | ReaderCacheLocalStateAdapter tests | No |
+| ANDROID-LT-E-004 | Bookmark flow verification | P2 | DONE | Bookmark adapters | Reader-Core, network | ReaderBookmarkActionAdapter tests | No |
 | ANDROID-LT-E-005 | TOC navigation polish | P2 | READY | TOCScreen, ReaderTocLocalStateJoiner | Reader-Core, network, UI visual redesign | UiCapabilitySmokeTest | No |
 | ANDROID-LT-E-006 | Error recovery UX | P2 | READY | Error mappers, error states | Reader-Core, network | ReaderErrorModelTest | No |
 | ANDROID-LT-E-007 | Phase E closure report | P2 | BLOCKED (E-002..006) | docs/ | Code | doc exists | No |
@@ -91,16 +91,21 @@
 
 Phase A ✅ COMPLETE（3/3 DONE）
 Phase B ✅ COMPLETE（7/7 DONE）
+Phase E: E-001 DONE，E-002..E-006 READY
 
 当前可执行任务：
 
 | ID | Phase | Title | Needs Device? | Needs Network? |
 |----|-------|-------|---------------|----------------|
-| ANDROID-LT-E-001 | E | Audit reader UX gaps | No | No |
+| ANDROID-LT-E-002 | E | Reading progress save/restore verification | No | No |
+| ANDROID-LT-E-003 | E | Chapter cache verification | No | No |
+| ANDROID-LT-E-004 | E | Bookmark flow verification | No | No |
+| ANDROID-LT-E-005 | E | TOC navigation polish | No | No |
+| ANDROID-LT-E-006 | E | Error recovery UX | No | No |
 | ANDROID-LT-C-001 | C | Verify installDebug succeeds | **Yes** | No |
 | ANDROID-LT-D-002 | D | Single-pass search smoke on live source | No | **Yes** |
 
-**Recommended next**: E-001（Reader UX gaps audit）— 只读，无风险，unblocks E-002..E-006
+**Recommended next**: E-002（Reading progress save/restore verification）— 只读测试验证，无风险
 
 **阻塞项**：
 - C-001：jlink env issue（DevEco-Studio路径问题）
