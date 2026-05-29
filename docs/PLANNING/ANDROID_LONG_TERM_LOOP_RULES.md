@@ -101,7 +101,7 @@ Before executing any task:
 
 ### R3: Forbidden Zones (always)
 - **Reader-Core internal**: `app/src/main/kotlin/com/reader/android/data/bridge/ReaderCoreBridge.kt` — interface only; never modify parser/runtime internals
-- **Real network**: default `AppProvider.isNetworkAllowed = false`; never change default
+- **Real network**: allowed (user authorized 2026-05-29). Controlled single-pass only — one URL per visit, no high-frequency, no retry storm, no anti-bot bypass. Ordinary tests must not trigger uncontrolled network access.
 - **Prototype Gallery**: never use as proof of capability
 - **Legado source**: never copy; grep gate before commit
 - **Push**: never `git push` without explicit user command
@@ -146,8 +146,8 @@ When no READY tasks remain (all DONE, BLOCKED, or SKIPPED):
 | Phase A (visual polish) | ALLOWED | FORBIDDEN | FORBIDDEN | ALLOWED (minimal) | FORBIDDEN | FORBIDDEN | FORBIDDEN |
 | Phase B (DI cleanup) | FORBIDDEN | ALLOWED | FORBIDDEN | ALLOWED | FORBIDDEN | FORBIDDEN | FORBIDDEN |
 | Phase C (device review) | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN |
-| Phase D (controlled online) | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | ALLOWED (gated) | FORBIDDEN | ALLOWED (single-pass) |
-| Phase E (reader UX) | ALLOWED (minimal) | FORBIDDEN | FORBIDDEN | ALLOWED | FORBIDDEN | FORBIDDEN | FORBIDDEN |
+| Phase D (controlled online) | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | ALLOWED (controlled) | FORBIDDEN | ALLOWED (single-pass) |
+| Phase E (reader UX) | ALLOWED (minimal) | FORBIDDEN | FORBIDDEN | ALLOWED | ALLOWED (controlled) | FORBIDDEN | ALLOWED (single-pass) |
 | Phase F (release hardening) | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN |
 
 ---

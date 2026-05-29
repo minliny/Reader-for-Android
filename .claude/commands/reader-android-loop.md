@@ -16,7 +16,7 @@ This is the command file for `/loop 10m /reader-android-loop`.
 4. Do NOT modify Reader-Core internals.
 5. Only access Reader-Core via public API/Facade/DTO/Error Taxonomy.
 6. One task per cycle. No batching.
-7. Default: no real network access (`AppProvider.isNetworkAllowed = false`).
+7. Default: network access allowed (user authorized 2026-05-29). Controlled single-pass only — no high-frequency, no retry storm, no anti-bot bypass.
 8. Default: no new dependencies.
 9. NEVER push.
 10. Never read .env or commit secrets.
