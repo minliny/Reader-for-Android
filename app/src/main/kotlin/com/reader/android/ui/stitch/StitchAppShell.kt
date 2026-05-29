@@ -114,11 +114,11 @@ fun StitchBookshelfPage(onSearchClick: () -> Unit = {}, onBookClick: (String, St
             // List mode from Stitch "Bookshelf List Mode" HTML: flex-col gap-6
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp, 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                BookListItem("凡人修仙传", "忘语", 0.65f, "已读 65%", "上次阅读: 第一章 山边小村", onClick = { onBookClick("/34811", "凡人修仙传") })
                 BookListItem("人类简史", "尤瓦尔·赫拉利", 0.45f, "已读 45%", "上次阅读: 第十章 农业革命", onClick = { onBookClick("人类简史", "尤瓦尔·赫拉利") })
                 BookListItem("沉思录", "马可·奥勒留", 0.12f, "已读 12%", "上次阅读: 卷三", onClick = { onBookClick("沉思录", "马可·奥勒留") })
                 BookListItem("哥德尔、艾舍尔、巴赫", "侯世达", 0.89f, "已读 89%", "上次阅读: 第六章", onClick = { onBookClick("哥德尔、艾舍尔、巴赫", "侯世达") })
                 BookListItem("三体：地球往事", "刘慈欣", 0.65f, "已读 65%", "上次阅读: 第28章", onClick = { onBookClick("三体：地球往事", "刘慈欣") })
-                BookListItem("设计心理学", "唐纳德·诺曼", 1f, "已读完", "上次阅读: 完", onClick = { onBookClick("设计心理学", "唐纳德·诺曼") })
             }
         } else {
             // Cover mode from Stitch "Bookshelf Cover Mode" HTML: grid-cols-2 gap-x-4 gap-y-8

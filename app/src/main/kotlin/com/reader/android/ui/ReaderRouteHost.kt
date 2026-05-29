@@ -205,9 +205,8 @@ fun ReaderRouteHost(
             composable(ReaderRoutes.BOOKSHELF) {
                 StitchAppShell(
                     onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) },
-                    onBookClick = { _, _ ->
-                        navController.navigate(ReaderRoutes.READER)
-                        backStack.push(ReaderRoutes.READER)
+                    onBookClick = { detailUrl, _ ->
+                        navController.navigateAndTrack(ReaderRoutes.detail(detailUrl), backStack)
                     }
                 )
             }
@@ -248,7 +247,13 @@ fun ReaderRouteHost(
                 )
             }
 
-            composable(ReaderRoutes.SEARCH) { SearchScreen() }
+            composable(ReaderRoutes.SEARCH) {
+                SearchScreen(
+                    onResultClick = { detailUrl ->
+                        navController.navigateAndTrack(ReaderRoutes.detail(detailUrl), backStack)
+                    }
+                )
+            }
             composable(
                 route = ReaderRoutes.DETAIL,
                 arguments = listOf(navArgument("detailUrl") { type = NavType.StringType })

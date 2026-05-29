@@ -76,7 +76,8 @@ class SearchViewModel(private val useRealHttp: Boolean = false) {
 
 @Composable
 fun SearchScreen(
-    uiState: ReaderUiState? = null
+    uiState: ReaderUiState? = null,
+    onResultClick: ((String) -> Unit)? = null
 ) {
     val viewModel = remember { SearchViewModel() }
     val scope = rememberCoroutineScope()
@@ -104,7 +105,7 @@ fun SearchScreen(
                     viewModel.results.isNotEmpty() -> {
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             items(viewModel.results, key = { it.detailUrl ?: it.name }) { item ->
-                                SearchResultItemCard(title = item.name, sourceName = item.author, author = item.kind, latestChapter = item.latestChapter, intro = item.intro, onClick = null)
+                                SearchResultItemCard(title = item.name, sourceName = item.author, author = item.kind, latestChapter = item.latestChapter, intro = item.intro, onClick = item.detailUrl?.let { url -> { onResultClick?.invoke(url) } })
                             }
                         }
                     }
