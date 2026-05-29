@@ -50,12 +50,12 @@
 
 | ID | Title | Priority | Status | Modifies | Forbidden | Verification | Human Confirm? |
 |----|-------|----------|--------|----------|-----------|-------------|----------------|
-| ANDROID-LT-E-001 | Audit current reader UX gaps | P2 | READY | None (read-only) | Code | gap list doc | No |
-| ANDROID-LT-E-002 | Reading progress save/restore verification | P2 | BLOCKED (E-001) | ReaderScreen, progress adapters | Reader-Core, network | ReaderProgressLocalStateAdapter tests | No |
-| ANDROID-LT-E-003 | Chapter cache verification | P2 | BLOCKED (E-001) | Cache adapters | Reader-Core, network | ReaderCacheLocalStateAdapter tests | No |
-| ANDROID-LT-E-004 | Bookmark flow verification | P2 | BLOCKED (E-001) | Bookmark adapters | Reader-Core, network | ReaderBookmarkActionAdapter tests | No |
-| ANDROID-LT-E-005 | TOC navigation polish | P2 | BLOCKED (E-001) | TOCScreen, ReaderTocLocalStateJoiner | Reader-Core, network, UI visual redesign | UiCapabilitySmokeTest | No |
-| ANDROID-LT-E-006 | Error recovery UX | P2 | BLOCKED (E-001) | Error mappers, error states | Reader-Core, network | ReaderErrorModelTest | No |
+| ANDROID-LT-E-001 | Audit current reader UX gaps | P2 | DONE | None (read-only) | Code | gap list doc | No |
+| ANDROID-LT-E-002 | Reading progress save/restore verification | P2 | READY | ReaderScreen, progress adapters | Reader-Core, network | ReaderProgressLocalStateAdapter tests | No |
+| ANDROID-LT-E-003 | Chapter cache verification | P2 | READY | Cache adapters | Reader-Core, network | ReaderCacheLocalStateAdapter tests | No |
+| ANDROID-LT-E-004 | Bookmark flow verification | P2 | READY | Bookmark adapters | Reader-Core, network | ReaderBookmarkActionAdapter tests | No |
+| ANDROID-LT-E-005 | TOC navigation polish | P2 | READY | TOCScreen, ReaderTocLocalStateJoiner | Reader-Core, network, UI visual redesign | UiCapabilitySmokeTest | No |
+| ANDROID-LT-E-006 | Error recovery UX | P2 | READY | Error mappers, error states | Reader-Core, network | ReaderErrorModelTest | No |
 | ANDROID-LT-E-007 | Phase E closure report | P2 | BLOCKED (E-002..006) | docs/ | Code | doc exists | No |
 
 ### Phase F: Pre-Release Hardening
