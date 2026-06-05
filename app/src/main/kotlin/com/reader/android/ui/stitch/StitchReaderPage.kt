@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -211,7 +211,7 @@ fun StitchReaderPage(
                 horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 listOf(
                     Icons.AutoMirrored.Filled.MenuBook to "目录",
-                    Icons.Filled.VolumeUp to "朗读",
+                    Icons.AutoMirrored.Filled.VolumeUp to "朗读",
                     Icons.Filled.TextFormat to "界面",
                     Icons.Filled.Settings to "设置"
                 ).forEach { (icon, label) ->

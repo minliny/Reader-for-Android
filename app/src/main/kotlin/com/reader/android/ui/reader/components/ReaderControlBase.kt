@@ -21,7 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -414,7 +414,7 @@ private fun ReaderControlBottomBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ReaderBottomItem(Icons.Filled.MenuBook, "目录", onDirectoryClick)
+        ReaderBottomItem(Icons.AutoMirrored.Filled.MenuBook, "目录", onDirectoryClick)
         ReaderBottomItem(Icons.Filled.RecordVoiceOver, "朗读", onTtsClick)
         ReaderBottomItem(Icons.Filled.Tune, "界面设置", onAppearanceClick)
         ReaderBottomItem(Icons.Filled.Settings, "阅读行为设置", onSettingsClick)

@@ -80,6 +80,7 @@ object AppProvider {
 
     fun init(context: Context): AppProvider {
         if (initialized) return this
+        @Suppress("DEPRECATION")
         db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "reader.db")
             .fallbackToDestructiveMigration()
             .build()
