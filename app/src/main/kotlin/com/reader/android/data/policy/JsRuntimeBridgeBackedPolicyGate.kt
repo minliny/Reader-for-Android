@@ -124,7 +124,72 @@ class BridgeBackedPolicyGate(
         telemetry.recordAllow(sourceId, requiredBridgeAPI)
         return BridgeBackedPolicyDecision.ALLOW_TEST_ONLY_BRIDGE
     }
+
+    /**
+     * Generate a [BridgeBackedJavaExecutionPermit] from an ALLOW decision.
+     * Returns null for any DENY_* decision.
+     *
+     * Only ALLOW_TEST_ONLY_BRIDGE produces a permit.
+     * The permit carries all context needed by the Java Bridge Adapter for enforcement.
+     */
+    fun generatePermit(
+        decision: BridgeBackedPolicyDecision,
+        sourceId: String,
+        requiredBridgeAPI: String
+    ): BridgeBackedJavaExecutionPermit? {
+        if (decision !is BridgeBackedPolicyDecision.ALLOW_TEST_ONLY_BRIDGE) {
+            telemetry.recordPermitDenied(sourceId, requiredBridgeAPI, "DENY_POLICY_PERMIT_REQUIRED")
+            return null
+        }
+
+        val permit = BridgeBackedJavaExecutionPermit(
+            sourceId = sourceId,
+            requiredBridgeAPI = requiredBridgeAPI,
+            allowlistKind = "BRIDGE_BACKED_TEST_ONLY",
+            bridgeRuntimeFlag = "testOnlyEnabled",
+            fixtureAvailable = true,
+            networkRequired = false,
+            productionContext = false,
+            telemetryEnabled = true,
+            recoveredClassificationRequested = false,
+            privacySafe = true
+        )
+        telemetry.recordPermitGenerated(sourceId, requiredBridgeAPI)
+        return permit
+    }
 }
+
+/**
+ * Execution permit/allow evidence for java bridge API calls.
+ *
+ * Only the policy gate can generate a valid permit (via [BridgeBackedPolicyGate.generatePermit]).
+ * The permit is immutable once created and carries all context the adapter needs
+ * to enforce policy without re-consulting the gate.
+ *
+ * @property sourceId Privacy-safe sanitized source identifier.
+ * @property requiredBridgeAPI The specific bridge API this permit authorizes.
+ * @property allowlistKind Identifies which allowlist authorized this permit.
+ * @property bridgeRuntimeFlag The runtime flag state when the permit was generated.
+ * @property fixtureAvailable Whether test fixtures are available for this source.
+ * @property networkRequired Whether network access is required (always false for test-only).
+ * @property productionContext Whether this permit was generated in production context (always false).
+ * @property telemetryEnabled Whether telemetry recording is active.
+ * @property recoveredClassificationRequested Whether recovery was requested (always false).
+ * @property privacySafe Whether the permit is privacy-safe.
+ */
+data class BridgeBackedJavaExecutionPermit
+internal constructor(
+    val sourceId: String,
+    val requiredBridgeAPI: String,
+    val allowlistKind: String,
+    val bridgeRuntimeFlag: String,
+    val fixtureAvailable: Boolean,
+    val networkRequired: Boolean,
+    val productionContext: Boolean,
+    val telemetryEnabled: Boolean,
+    val recoveredClassificationRequested: Boolean,
+    val privacySafe: Boolean
+)
 
 /**
  * Configuration for policy evaluation.
