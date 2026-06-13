@@ -1,5 +1,10 @@
 # 目录
 
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
 相关示意图：
 
 - `../drafts/16-toc-overlay.png`
@@ -32,7 +37,7 @@
 当前规划校正：
 
 - 阅读控制层底栏 `目录` 首先进入 `目录快捷模块`，该模块属于阅读控制层左侧主内容区。
-- `目录快捷模块` 必须遵守 `reader-control-layer-modules.md`：底部四主按钮和右侧亮度条保持原控制层位置。
+- `目录快捷模块` 必须遵守 `READER_CONTROL_LAYER_SPEC.md`：底部模块导航和右侧亮度栏保持 `04-2` 的基本位置关系。
 - 现有 `16-toc-overlay.png` 和派生图可作为目录扩展覆盖层参考，但不再代表四主按钮点击后的唯一 UI 形态。
 - 完整目录页仍从书籍详情目录预览或目录快捷模块的 `完整目录 >` 进入。
 

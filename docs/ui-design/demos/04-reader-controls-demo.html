@@ -3,25 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>04 阅读控制层 Demo</title>
+  <title>04-2 阅读控制层 Demo</title>
   <style>
     :root {
-      --paper: #f7efe3;
-      --paper-deep: #eee1cf;
-      --card: rgba(255, 252, 246, 0.92);
-      --card-solid: #fffaf1;
-      --ink: #15120f;
-      --muted: #6f655b;
-      --line: #e2d6c7;
-      --blue: #16729a;
-      --blue-dark: #0b5f85;
-      --track: #e2d8ca;
-      --soft: rgba(245, 240, 232, 0.86);
-      --shadow: 0 10px 28px rgba(90, 68, 43, 0.16);
-      --radius-lg: 16px;
-      --radius-md: 12px;
-      --radius-sm: 9px;
-      font-family: "Songti SC", "Noto Serif CJK SC", "STSong", serif;
+      --reader-paper: #f8f1e7;
+      --reader-paper-shadow: #ede2d3;
+      --surface-primary: #fffcf7;
+      --surface-secondary: #fffcf8;
+      --surface-icon: #f4f2ed;
+      --surface-pill: #faf6ef;
+      --text-primary: #11100e;
+      --text-secondary: #585149;
+      --text-muted: #756c62;
+      --icon-primary: #0d0d0c;
+      --border-outer: #d5c8b8;
+      --border-inner: #e5dacb;
+      --track-inactive: #ded8ce;
+      --accent-blue: #087ead;
+      --drag-handle: #b9b0a4;
+      --font-reader: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+      --font-control: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      --font-latin: "Helvetica Neue", Arial, sans-serif;
     }
 
     * {
@@ -34,20 +36,21 @@
       display: grid;
       place-items: center;
       background: #2b2a28;
-      color: var(--ink);
+      color: var(--text-primary);
     }
 
     .phone {
       position: relative;
-      width: 390px;
-      height: 884px;
+      width: min(390px, 100vw, calc(100vh * 390 / 884));
+      aspect-ratio: 390 / 884;
       overflow: hidden;
       background:
         radial-gradient(circle at 25% 20%, rgba(255,255,255,0.6), transparent 32%),
         radial-gradient(circle at 70% 78%, rgba(232,216,190,0.34), transparent 38%),
         linear-gradient(90deg, rgba(90,65,32,0.035), transparent 18%, rgba(94,68,42,0.035) 49%, transparent 80%),
-        var(--paper);
+        var(--reader-paper);
       box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      container-type: inline-size;
     }
 
     .phone::before {
@@ -64,412 +67,434 @@
 
     .status {
       position: absolute;
-      top: 18px;
-      left: 22px;
-      right: 22px;
+      top: 2.04%;
+      left: 5.64%;
+      right: 5.64%;
+      height: 2.26%;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      font: 14px/1.2 "PingFang SC", "Noto Sans CJK SC", sans-serif;
-      color: #6b6259;
+      font-family: var(--font-control);
+      font-size: clamp(12px, 3.59cqw, 14px);
+      font-weight: 400;
+      line-height: 1.43;
+      color: var(--text-secondary);
       letter-spacing: 0;
       z-index: 2;
     }
 
     .top-card {
       position: absolute;
-      top: 43px;
-      left: 13px;
-      right: 13px;
-      height: 59px;
+      top: 4.86%;
+      left: 3.33%;
+      right: 3.33%;
+      height: 6.67%;
       display: grid;
-      grid-template-columns: 42px 1fr 54px 28px;
+      grid-template-columns: 12.73fr 65.76fr 13.64fr 7.87fr;
       align-items: center;
-      padding: 0 17px;
-      border: 1px solid rgba(184, 169, 150, 0.55);
-      border-radius: 15px;
-      background: var(--card);
-      box-shadow: var(--shadow);
+      padding: 0 4.67%;
+      border: 1px solid var(--border-outer);
+      border-radius: min(3.59cqw, 14px);
+      background: var(--surface-primary);
+      box-shadow: 0 7px 19px rgba(78, 59, 39, 0.16);
       z-index: 4;
-      font-family: "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      font-family: var(--font-control);
     }
 
     .icon-svg {
       display: block;
-      width: 24px;
-      height: 24px;
-      color: #111;
+      color: var(--icon-primary);
       fill: none;
       stroke: currentColor;
-      stroke-width: 2.35;
       stroke-linecap: round;
       stroke-linejoin: round;
       flex: 0 0 auto;
     }
 
-    .icon-svg.back-icon {
-      width: 28px;
-      height: 28px;
-      stroke-width: 2.55;
-    }
+    .icon-back { width: min(7.18cqw, 28px); height: min(7.18cqw, 28px); stroke-width: 2.4; }
+    .icon-source { width: min(6.41cqw, 25px); height: min(6.41cqw, 25px); stroke-width: 2.2; }
+    .icon-search { stroke-width: 2.3; }
+    .icon-auto { stroke-width: 2.2; }
+    .icon-replace { stroke-width: 2.2; }
+    .icon-directory { stroke-width: 2.2; }
+    .icon-voice { stroke-width: 2.4; }
+    .icon-settings { stroke-width: 2.3; }
+    .icon-sun { stroke-width: 2; }
 
     .book-title {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 5.08%;
       min-width: 0;
     }
 
     .book-title strong {
-      font-size: 18px;
-      line-height: 1.05;
-      font-weight: 700;
+      font-size: clamp(18px, 5.13cqw, 20px);
+      line-height: 1.2;
+      font-weight: 600;
       letter-spacing: 0;
     }
 
     .book-title span {
-      font-size: 12px;
-      color: #2f2a25;
+      font-size: clamp(12px, 3.33cqw, 13px);
+      line-height: 1.38;
+      color: var(--text-primary);
       white-space: nowrap;
     }
 
     .source {
       display: grid;
       justify-items: center;
-      gap: 1px;
-      font-size: 12px;
-      color: #1e1c19;
-    }
-
-    .source .icon-svg {
-      width: 24px;
-      height: 21px;
-      stroke-width: 2.25;
+      gap: 1.7%;
+      font-size: clamp(12px, 3.33cqw, 13px);
+      line-height: 1.38;
+      color: var(--text-primary);
     }
 
     .kebab-icon {
       justify-self: end;
-      width: 24px;
-      height: 24px;
-      fill: #111;
+      width: min(6.41cqw, 25px);
+      height: min(6.41cqw, 25px);
+      fill: var(--icon-primary);
       stroke: none;
     }
 
     .reader-text {
       position: absolute;
-      top: 126px;
-      left: 34px;
-      right: 34px;
-      font-size: 19px;
-      line-height: 2.12;
-      letter-spacing: 0.04em;
-      color: #15110f;
+      top: 14.25%;
+      left: 8.72%;
+      right: 8.72%;
+      font-family: var(--font-reader);
+      font-size: clamp(17px, 4.62cqw, 19px);
+      font-weight: 400;
+      line-height: 2;
+      letter-spacing: 0;
+      color: var(--text-primary);
       z-index: 1;
     }
 
     .reader-text p {
-      margin: 0 0 18px;
+      margin: 0 0 0.95em;
       text-indent: 2em;
     }
 
     .reader-text p:first-child {
-      text-indent: 4em;
+      text-indent: 2em;
     }
 
     .control-sheet {
       position: absolute;
-      left: 11px;
-      right: 11px;
-      bottom: 23px;
-      height: 289px;
-      border: 1px solid rgba(193, 178, 158, 0.7);
-      border-radius: 17px 17px 0 0;
-      background: rgba(255, 251, 242, 0.9);
-      box-shadow: 0 -10px 28px rgba(91, 72, 48, 0.13);
+      left: 1.28%;
+      right: 1.28%;
+      bottom: 1.13%;
+      height: 39.14%;
+      border: 1px solid var(--border-outer);
+      border-radius: min(4.62cqw, 18px);
+      background: var(--surface-primary);
+      box-shadow: 0 -5px 27px rgba(78, 59, 39, 0.13);
       z-index: 5;
-      padding: 19px 11px 12px;
-      font-family: "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      padding: 9.55% 2.63% 4.21%;
+      font-family: var(--font-control);
     }
 
     .grabber {
       position: absolute;
-      top: 8px;
+      top: 3.09%;
       left: 50%;
-      width: 32px;
-      height: 3px;
+      width: 10%;
+      height: 1.12%;
       transform: translateX(-50%);
-      border-radius: 8px;
-      background: #b7ab9c;
+      border-radius: 999px;
+      background: var(--drag-handle);
     }
 
     .left-controls {
-      width: calc(100% - 62px);
+      width: 79.94%;
+      height: 100%;
       display: grid;
-      grid-template-rows: 82px 76px 69px;
-      gap: 10px;
+      grid-template-rows: 31.45fr 32.7fr 25.79fr;
+      row-gap: 3.14%;
     }
 
     .quick-row,
     .chapter-card,
     .tabs {
-      border: 1px solid var(--line);
-      background: rgba(255, 252, 246, 0.74);
-      border-radius: 12px;
-      box-shadow: 0 3px 12px rgba(120, 93, 55, 0.045);
+      border: 1px solid var(--border-inner);
+      background: var(--surface-secondary);
+      border-radius: min(3.08cqw, 12px);
+      box-shadow: 0 2px 8px rgba(90, 68, 43, 0.045);
     }
 
     .quick-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       align-items: center;
-      padding: 9px 12px 8px;
+      padding: 4% 3.3% 3%;
     }
 
     .action {
       display: grid;
       justify-items: center;
-      gap: 5px;
-      font-size: 12px;
+      gap: 8%;
+      font-size: clamp(13px, 3.59cqw, 14px);
+      font-weight: 400;
+      line-height: 1.43;
+      color: var(--text-primary);
     }
 
     .icon-box {
-      width: 34px;
-      height: 34px;
+      width: min(42%, 42px);
+      aspect-ratio: 1;
       display: grid;
       place-items: center;
-      border-radius: 13px;
-      background: rgba(235, 238, 236, 0.78);
+      border: 1px solid var(--border-inner);
+      border-radius: 23.81%;
+      background: var(--surface-icon);
     }
 
     .icon-box .icon-svg {
-      width: 25px;
-      height: 25px;
-      stroke-width: 2.25;
+      width: 64.29%;
+      height: 64.29%;
     }
 
     .icon-svg .solid {
-      fill: currentColor;
+      fill: var(--icon-primary);
       stroke: none;
     }
 
     .chapter-card {
-      padding: 13px 13px 9px;
+      padding: min(3.59cqw, 14px) 4.2% min(2.82cqw, 11px);
       display: grid;
       align-content: start;
-      gap: 11px;
+      gap: min(2.56cqw, 10px);
     }
 
     .chapter-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 2%;
     }
 
     .chapter-top strong {
-      font-size: 17px;
-      letter-spacing: 0.04em;
+      font-size: clamp(17px, 4.62cqw, 18px);
+      font-weight: 600;
+      line-height: 1.33;
+      letter-spacing: 0;
+      color: var(--text-primary);
     }
 
     .chapter-actions {
       display: flex;
-      gap: 8px;
+      width: 41%;
+      justify-content: flex-end;
+      gap: 8%;
     }
 
     .pill {
-      border: 1px solid #e3d7c8;
-      background: rgba(247, 242, 235, 0.9);
+      border: 1px solid var(--border-inner);
+      background: var(--surface-pill);
       border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 12px;
-      color: #3c342e;
+      width: 46%;
+      min-width: 0;
+      padding: 5% 2%;
+      text-align: center;
+      font-size: clamp(12px, 3.33cqw, 13px);
+      font-weight: 400;
+      line-height: 1.38;
+      color: var(--text-primary);
+      white-space: nowrap;
     }
 
     .progress {
-      height: 18px;
+      height: 19.23%;
+      min-height: 18px;
       position: relative;
     }
 
     .progress .track {
       position: absolute;
-      top: 8px;
+      top: 40%;
       left: 0;
       right: 0;
-      height: 3px;
+      height: 20%;
+      min-height: 3px;
       border-radius: 999px;
-      background: var(--track);
+      background: var(--track-inactive);
     }
 
     .progress .fill {
       position: absolute;
-      top: 8px;
+      top: 40%;
       left: 0;
       width: 38%;
-      height: 3px;
+      height: 20%;
+      min-height: 3px;
       border-radius: 999px;
-      background: var(--blue);
+      background: var(--accent-blue);
     }
 
     .progress .thumb {
       position: absolute;
-      top: 2px;
-      left: calc(38% - 8px);
-      width: 18px;
-      height: 18px;
+      top: 0;
+      left: calc(38% - 3.2%);
+      width: 6.4%;
+      aspect-ratio: 1;
       border-radius: 50%;
-      background: var(--blue);
-      border: 4px solid #f6f3ed;
+      background: var(--accent-blue);
+      border: 4px solid var(--surface-secondary);
       box-shadow: 0 0 0 1px rgba(15, 101, 139, 0.3);
     }
 
     .chapter-percent {
-      font-size: 12px;
-      color: var(--muted);
+      justify-self: start;
+      margin-left: 34%;
+      font-size: clamp(12px, 3.33cqw, 13px);
+      font-weight: 400;
+      line-height: 1.38;
+      color: var(--text-secondary);
     }
 
     .tabs {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       align-items: center;
-      padding: 10px 8px 8px;
+      padding: 4% 2.3% 3%;
     }
 
     .small-action {
       display: grid;
       justify-items: center;
-      gap: 4px;
-      font-size: 12px;
+      gap: 8.54%;
+      font-size: clamp(13px, 3.59cqw, 14px);
+      font-weight: 400;
+      line-height: 1.43;
+      color: var(--text-primary);
     }
 
     .small-icon {
-      width: 31px;
-      height: 31px;
-      border-radius: 13px;
-      background: rgba(235, 238, 236, 0.78);
+      width: min(51.22%, 42px);
+      aspect-ratio: 1;
+      border: 1px solid var(--border-inner);
+      border-radius: 23.81%;
+      background: var(--surface-icon);
       display: grid;
       place-items: center;
-      font-size: 20px;
-      color: #111;
-      font-family: "PingFang SC", sans-serif;
+      font-size: clamp(20px, 5.9cqw, 23px);
+      font-weight: 400;
+      line-height: 1;
+      color: var(--icon-primary);
+      font-family: var(--font-latin);
     }
 
     .small-icon .icon-svg {
-      width: 23px;
-      height: 23px;
-      stroke-width: 2.25;
+      width: 64.29%;
+      height: 64.29%;
     }
 
     .brightness {
       position: absolute;
-      top: 19px;
-      right: 8px;
-      width: 52px;
-      bottom: 12px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(255, 252, 246, 0.74);
+      top: 9.55%;
+      right: 2.63%;
+      width: 17.28%;
+      bottom: 4.21%;
+      border: 1px solid var(--border-inner);
+      border-radius: min(3.08cqw, 12px);
+      background: var(--surface-secondary);
       display: grid;
-      grid-template-rows: 24px 32px 1fr 34px 28px;
+      grid-template-rows: 8.52fr 13.88fr 43.53fr 13.88fr 9.15fr;
       justify-items: center;
       align-items: center;
-      padding: 8px 0 10px;
-      font-size: 12px;
+      padding: min(2.56cqw, 10px) 0 min(2.82cqw, 11px);
+      font-size: clamp(13px, 3.59cqw, 14px);
+      font-weight: 400;
+      line-height: 1.43;
+      color: var(--text-primary);
     }
 
     .brightness .icon-svg {
-      width: 22px;
-      height: 22px;
-      stroke-width: 2.1;
+      width: min(40.3%, 27px);
+      aspect-ratio: 1;
     }
 
     .vertical-slider {
       position: relative;
-      width: 18px;
-      height: 80px;
+      width: 29.85%;
+      height: 83%;
     }
 
     .vertical-slider::before {
       content: "";
       position: absolute;
-      left: 8px;
+      left: 50%;
       top: 0;
       bottom: 0;
-      width: 3px;
+      width: 5.97%;
+      min-width: 3px;
+      transform: translateX(-50%);
       border-radius: 999px;
-      background: #dfd6ca;
+      background: var(--track-inactive);
     }
 
     .vertical-slider::after {
       content: "";
       position: absolute;
-      left: 8px;
+      left: 50%;
       bottom: 0;
-      width: 3px;
-      height: 45px;
+      width: 5.97%;
+      min-width: 3px;
+      height: 52.6%;
+      transform: translateX(-50%);
       border-radius: 999px;
-      background: var(--blue);
+      background: var(--accent-blue);
     }
 
     .v-thumb {
       position: absolute;
-      left: 1px;
-      bottom: 39px;
-      width: 17px;
-      height: 17px;
+      left: 50%;
+      bottom: calc(52.6% - 14.925%);
+      width: 100%;
+      aspect-ratio: 1;
+      transform: translateX(-50%);
       border-radius: 50%;
-      background: var(--blue);
-      border: 5px solid #f8f5ef;
+      background: var(--accent-blue);
+      border: 5px solid var(--surface-secondary);
       box-shadow: 0 2px 7px rgba(0,0,0,0.16);
       z-index: 2;
     }
 
     .system-a {
-      width: 30px;
-      height: 30px;
+      width: 58.21%;
+      aspect-ratio: 1;
       border-radius: 50%;
-      background: #f6f1e8;
-      border: 1px solid #e2d7c8;
+      background: var(--surface-pill);
+      border: 1px solid var(--border-inner);
       display: grid;
       place-items: center;
-      font-size: 18px;
-      font-family: "PingFang SC", sans-serif;
+      font-size: clamp(20px, 5.64cqw, 22px);
+      font-weight: 400;
+      line-height: 1.27;
+      color: var(--text-primary);
+      font-family: var(--font-latin);
     }
 
-    .bottom-info {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 22px;
-      font: 13px/1 "PingFang SC", sans-serif;
-      color: #5e554d;
-      background: rgba(248, 241, 230, 0.74);
-      z-index: 4;
+    .brightness strong {
+      font-size: inherit;
+      font-weight: 500;
+      line-height: inherit;
     }
 
-    .book-progress {
-      position: absolute;
-      left: 0;
-      bottom: 23px;
-      width: 38%;
-      height: 2px;
-      background: var(--blue);
-      z-index: 8;
-    }
   </style>
 </head>
 <body>
-  <main class="phone" aria-label="04 阅读控制层前端复刻 demo">
+  <main class="phone" aria-label="04-2 阅读控制层前端复刻 demo">
     <div class="status">
       <span>长夜余火 · 第 32 章</span>
       <span>10:30</span>
     </div>
 
     <section class="top-card" aria-label="顶部阅读栏">
-      <svg class="icon-svg back-icon" aria-hidden="true" viewBox="0 0 24 24">
+      <svg class="icon-svg icon-back" aria-hidden="true" viewBox="0 0 24 24">
         <path d="M19 12H5"></path>
         <path d="m12 19-7-7 7-7"></path>
       </svg>
@@ -478,12 +503,12 @@
         <span>起点中文网 · 第 32 章</span>
       </div>
       <div class="source">
-        <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+        <svg class="icon-svg icon-source" aria-hidden="true" viewBox="0 0 24 24">
           <path d="M16 3h5v5"></path>
-          <path d="M4 20 21 3"></path>
+          <path d="M4 7h4c4 0 5 10 9 10h4"></path>
           <path d="M21 16v5h-5"></path>
-          <path d="m15 15 6 6"></path>
-          <path d="M4 4h4l4 4"></path>
+          <path d="M4 17h4c1.6 0 2.8-1.6 4-3.6"></path>
+          <path d="M15 7.8C15.7 7.3 16.3 7 17 7h4"></path>
         </svg>
         <span>换源</span>
       </div>
@@ -509,7 +534,7 @@
         <div class="quick-row" aria-label="快捷功能">
           <div class="action">
             <div class="icon-box">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+              <svg class="icon-svg icon-search" aria-hidden="true" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="7"></circle>
                 <path d="m20 20-4.5-4.5"></path>
               </svg>
@@ -518,19 +543,17 @@
           </div>
           <div class="action">
             <div class="icon-box">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M5.4 8A8 8 0 0 1 20 12"></path>
-                <path d="M18.6 16A8 8 0 0 1 4 12"></path>
-                <path d="m7 4-2.6 4H9"></path>
-                <path d="m17 20 2.6-4H15"></path>
-                <path class="solid" d="M10 8.7v6.6c0 .55.61.88 1.07.58l5.1-3.3a.7.7 0 0 0 0-1.16l-5.1-3.3A.7.7 0 0 0 10 8.7Z"></path>
+              <svg class="icon-svg icon-auto" aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M18.5 8.5A7.5 7.5 0 1 0 18 16"></path>
+                <path d="M18.5 4.5v4h-4"></path>
+                <path class="solid" d="M10 8.5v7l5.5-3.5L10 8.5Z"></path>
               </svg>
             </div>
             <span>自动翻页</span>
           </div>
           <div class="action">
             <div class="icon-box">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+              <svg class="icon-svg icon-replace" aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m17 2 4 4-4 4"></path>
                 <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
                 <path d="m7 22-4-4 4-4"></path>
@@ -560,7 +583,7 @@
         <div class="tabs" aria-label="阅读控制主按钮">
           <div class="small-action">
             <div class="small-icon">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+              <svg class="icon-svg icon-directory" aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M8 6h13"></path>
                 <path d="M8 12h13"></path>
                 <path d="M8 18h13"></path>
@@ -573,7 +596,7 @@
           </div>
           <div class="small-action">
             <div class="small-icon">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+              <svg class="icon-svg icon-voice" aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M5 10v4"></path>
                 <path d="M9 7v10"></path>
                 <path d="M13 4v16"></path>
@@ -589,7 +612,7 @@
           </div>
           <div class="small-action">
             <div class="small-icon">
-              <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+              <svg class="icon-svg icon-settings" aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M12 2 20 7v10l-8 5-8-5V7Z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
@@ -601,7 +624,7 @@
 
       <aside class="brightness" aria-label="亮度">
         <strong>亮度</strong>
-        <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+        <svg class="icon-svg icon-sun" aria-hidden="true" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="4"></circle>
           <path d="M12 2v2"></path>
           <path d="M12 20v2"></path>
@@ -618,11 +641,6 @@
       </aside>
     </section>
 
-    <div class="book-progress" aria-hidden="true"></div>
-    <footer class="bottom-info">
-      <span>38%</span>
-      <span>第 32 / 128 章</span>
-    </footer>
   </main>
 </body>
 </html>

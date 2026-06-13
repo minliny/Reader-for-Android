@@ -1,6 +1,15 @@
 # 阅读控制层模块规划
 
-本文档覆盖此前关于阅读控制层四个主按钮的旧规划。后续阅读控制层相关 UI 以本文为准。
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
+本文档保留历史规划和模块内容说明，不再作为最新结构定义源。
+
+阅读控制层的当前视觉与几何基底为
+`../drafts/04-2-reader-controls-opaque-icon-aligned.png`。图片职责和派生限制以
+`READER_CONTROL_IMAGE_USAGE.md` 为准。
 
 ## 核心原则
 
@@ -22,8 +31,8 @@
 
 | 模块 | UI 内容 | 对应示意图 |
 | --- | --- | --- |
-| 阅读基础页 | 沉浸正文、四角弱信息；不显示底部进度条 | `03-reader-immersive.png` |
-| 阅读控制层总览 | 顶部阅读栏、底部控制层、亮度条、四主按钮 | `04-reader-controls.png` |
+| 阅读基础页 | 沉浸正文、四角弱信息；不显示额外贴底细进度条 | `03-reader-immersive.png` |
+| 阅读控制层总览 | 顶部阅读栏、悬浮底部控制层、亮度条、四主按钮 | `04-2-reader-controls-opaque-icon-aligned.png` |
 | 控制层模块规划图 | 控制层区域和入口关系 | `04-1-reader-control-layer-module-plan.svg` |
 
 ### 左侧主内容区默认状态
@@ -31,7 +40,7 @@
 | 模块 | 内容 | 规则 |
 | --- | --- | --- |
 | 快捷功能区 | `搜索 / 自动翻页 / 替换` | 默认显示，四主按钮未进入专属快捷模块时可见 |
-| 章节进度区 | 当前章、上一章、下一章、章节内进度滑条 | 默认显示；进入四主按钮快捷模块时可保留、弱化或被该快捷模块替换，但规则必须在对应规格中写明 |
+| 章节进度区 | 当前章、上一章、下一章、章节内进度滑条 | 只在默认状态显示；进入四主按钮快捷模块时由模块区替换，不得改变控制层外壳、亮度栏和底部工具栏 |
 | 底部四主按钮 | `目录 / 朗读 / 界面 / 设置` | 始终保留 |
 
 ### 四主按钮快捷模块
@@ -45,12 +54,19 @@
 | `界面` | 阅读外观快捷模块 | 保留 | 保留，高亮 `界面` | `21-1-reader-appearance-quick-panel.png` |
 | `设置` | 阅读设置快捷模块 | 保留 | 保留，高亮 `设置` | `22-2-reader-settings-quick-panel-height-aligned.png` |
 
-已补充示意图：
+现有示意图只保留内容参考，必须按 `04-2` 重新生成：
 
 - `../drafts/16-5-reader-toc-quick-panel-height-aligned.png`
 - `../drafts/18-3-read-aloud-quick-panel-height-aligned.png`
 - `../drafts/21-1-reader-appearance-quick-panel.png`
 - `../drafts/22-2-reader-settings-quick-panel-height-aligned.png`
+
+建议标准版命名：
+
+- `16-6-reader-toc-quick-panel-04-2-standard.png`
+- `18-4-read-aloud-quick-panel-04-2-standard.png`
+- `21-2-reader-appearance-quick-panel-04-2-standard.png`
+- `22-3-reader-settings-quick-panel-04-2-standard.png`
 
 历史版本：
 
@@ -166,7 +182,7 @@
 
 以下旧口径不再使用：
 
-- 点击四主按钮后直接打开一张脱离 `04-reader-controls.png` 结构的大底表。
+- 点击四主按钮后直接打开一张脱离 `04-2-reader-controls-opaque-icon-aligned.png` 结构的大底表。
 - 把底部四主按钮重新放到某个功能面板内部。
 - 点击 `设置` 后隐藏或复制右侧亮度条。
 - 把 `设置快捷模块` 和 `完整阅读设置页` 混为同一个页面。

@@ -1,5 +1,10 @@
 # 阅读界面
 
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
 相关示意图：
 
 - `../drafts/21-reader-appearance-flow.png`
@@ -10,7 +15,6 @@
 - `../drafts/31-reader-appearance-theme-edit.png`
 - `../drafts/32-reader-appearance-layout-advanced.png`
 - `../drafts/33-reader-appearance-page-turn-animation.png`
-- `../drafts/34-reader-appearance-main-panel-standard.png`
 - `../drafts/35-reader-appearance-font-selection-standard.png`
 - `../drafts/36-reader-appearance-theme-selection-standard.png`
 - `../drafts/37-reader-appearance-theme-edit-standard.png`
@@ -18,8 +22,12 @@
 - `../drafts/39-reader-appearance-page-turn-animation-standard.png`
 - `../drafts/40-reader-appearance-font-management-states.png`
 
-其中 `21-reader-appearance-flow.png` 是完整流程总图，`28` 至 `33` 是从 21 原图直接拆解得到的单页示意图。21 原图保持不变。
-`34` 至 `39` 是根据 21 的拆解页面重新生成的标准手机比例示例图，用于后续实现参考。
+其中 `21-reader-appearance-flow.png` 是完整流程总图。`28` 至 `33` 只用于理解
+外观设置的信息结构、字段内容和流程拆解，不得用于反推控制层尺寸、底部 sheet 高度、
+字体大小、按钮布局或最终视觉基准。
+`34-reader-appearance-main-panel-standard.png` 是废弃方案，仅保留历史记录，任何新规格
+不得引用它作为界面模块、外观主面板或标准比例依据。
+`35` 至 `39` 是完整外观功能页的标准手机比例示例图，用于后续实现参考。
 `40` 是字体选择/管理的全屏多状态示意图，用于说明字体数量很多时的搜索、分组、滚动、管理模式、删除和固定预览处理。
 
 ## 概念
@@ -31,7 +39,8 @@
 - `界面快捷模块`：属于阅读控制层左侧主内容区，承载高频外观调节。
 - 完整外观管理页：字体、主题、主题编辑、版式高级和翻页动画等低频选择项。
 
-界面快捷模块必须遵守 `reader-control-layer-modules.md`：只替换左侧主内容区，底部四主按钮和右侧亮度条保持原控制层位置。
+界面快捷模块必须遵守 `READER_CONTROL_LAYER_SPEC.md`：只替换左侧主内容区，
+底部模块导航和右侧亮度栏保持 `04-2` 的基本位置关系。
 
 ## 页面流程
 

@@ -1,9 +1,21 @@
 # 阅读设置
 
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
 相关示意图：
 
 - `../drafts/22-reader-settings-flow.png`
 - `../drafts/22-2-reader-settings-quick-panel-height-aligned.png`
+
+阅读内完整设置首页及其屏幕与显示、翻页与手势、阅读辅助、进度与信息、预设页面的
+当前文字定稿以 `MISSING_PAGE_TEXT_SPEC_V1.md` 为准。本文继续负责设置快捷模块的
+字段边界和历史信息。
+
+完整阅读设置页的视觉参数以 `SETTINGS_PAGE_DESIGN_SPEC.md` 为准；设置快捷模块仍使用
+阅读控制层规格。两者不得互相继承顶部栏、圆角、图标或控件尺寸。
 
 ## 概念
 
@@ -19,7 +31,7 @@
 - `../drafts/_rejected/22-1-reader-settings-main-panel.png` 已否决。
 - `../drafts/22-1-reader-settings-quick-panel.png` 是设置快捷模块高度对齐前版本，当前采用 `22-2-reader-settings-quick-panel-height-aligned.png`。
 - 否决原因：它把底栏四个主按钮重新放入设置面板底部，破坏了最开始阅读控制层的模块关系。
-- 后续以 `reader-control-layer-modules.md` 为准。
+- 后续结构以 `READER_CONTROL_LAYER_SPEC.md` 为准。
 - 设置快捷模块不能重新设计底部四个主按钮的位置，也不能覆盖右侧亮度条。
 - 完整阅读设置页应从 `完整设置 >` 进入，不伪装成控制层局部替换。
 
@@ -121,7 +133,9 @@ flowchart LR
 - `章节切换提示`
 - 小型预览
 
-这里控制阅读信息是否显示。沉浸正文页不提供底部进度条、左下阅读百分比、右下章节计数；阅读进度只在控制层章节进度区、目录上下文或用户明确开启的信息位置中出现。信息样式和位置归 `界面`。
+这里控制阅读信息的具体样式和可选显示策略。沉浸阅读基线包含左下阅读百分比和
+右下章节进度，但不包含贴屏幕底部的额外细进度条。控制层章节进度区和目录上下文
+可以提供更详细的进度操作。信息样式和位置归 `界面`。
 
 ## 阅读行为高级
 

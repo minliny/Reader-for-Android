@@ -1,12 +1,17 @@
 # 阅读页
 
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
 相关示意图：
 
 - `../drafts/03-reader-immersive.png`
 - `../drafts/04-reader-controls.png`
 - `../drafts/04-1-reader-control-layer-module-plan.svg`
 
-阅读控制层模块关系以 `reader-control-layer-modules.md` 为准。
+阅读控制层结构与模块关系以 `READER_CONTROL_LAYER_SPEC.md` 为准。
 
 ## 沉浸阅读页
 
@@ -19,6 +24,8 @@
 - 柔和纸张背景
 - 左上弱文本：书名和章节，例如 `长夜余火 · 第 32 章`
 - 右上弱文本：时间，例如 `10:30`
+- 左下弱文本：阅读百分比
+- 右下弱文本：章节进度
 - 正文使用宽松页边距和适合长时间阅读的行高
 
 规则：
@@ -26,11 +33,20 @@
 - 不显示应用主底部导航。
 - 不显示书源。
 - 沉浸模式不显示按钮。
-- 沉浸模式不显示底部进度条。
-- 沉浸模式不显示左下阅读百分比或右下章节计数。
-- 阅读进度只在阅读控制层的章节进度区、目录上下文或用户开启的信息显示中出现。
+- 沉浸模式不显示贴屏幕底部的额外细进度条。
+- 四角信息层中的左下阅读百分比和右下章节进度属于基线弱信息。
 - 阅读正文区域内不放卡片。
 - 覆盖层不得重排或移动阅读正文。
+
+## 透明点击热区
+
+透明点击热区属于交互规格，不是图片中的显性 UI：
+
+- 左侧约 `30%`：翻上一页；
+- 中间约 `40%`：显示或隐藏阅读控制层；
+- 右侧约 `30%`：翻下一页。
+
+文字选择、链接、批注等正文交互优先于翻页热区。
 
 ## 控制层
 

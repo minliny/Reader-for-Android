@@ -1,7 +1,10 @@
 # Stitch 就绪度 — 图片元素设计审计
 
 > 审计维度：UI 组件/元素是否足够 Stitch 复刻风格
-> 日期：2026-06-05
+> 初次审计：2026-06-05
+> 复核日期：2026-06-11
+
+> 以下表格已按现有 46/47/51 图片组更新；“已有图片”不等于“已完成视觉终审”。
 
 ---
 
@@ -22,12 +25,12 @@
 | Slider 滑块 | SUFFICIENT | YES | YES | 04（亮度）/10（翻页速度）/20（语速）中出现，样式一致。 | -- |
 | 分段控件 | SUFFICIENT | YES | YES | 21-1（行距/页边距）/05（搜索范围）中出现。 | -- |
 | Bottom sheet / 弹层 | SUFFICIENT | YES | YES | 13/24-1/24-2/24-3 覆盖（圆角顶、暖色卡片、紧凑列表）。 | -- |
-| 全页设置页 | MISSING | N/A | NO | 阅读内完整设置页（4+ 子页）无图。书源管理全部页面无图。 | P0 |
-| 空状态插画/图标 | MISSING | N/A | NO | 书架/搜索/替换/书源管理/内容搜索全缺空状态图。 | P0 |
-| Loading 状态 | MISSING | N/A | NO | 所有模块缺加载状态图。 | P0 |
-| Error 状态 | MISSING | N/A | NO | 所有模块缺错误态图（除换源 24-2/24-3 有类似态）。 | P0 |
-| 删除/确认弹窗 | MISSING | N/A | NO | 删除书源/移除书架/清空缓存等全缺确认弹窗图。 | P1 |
-| Toast / Snackbar | MISSING | N/A | NO | 25-2（刷新反馈）是唯一轻量反馈。缺通用 toast/snackbar 设计。 | P1 |
+| 全页设置页 | SUFFICIENT | NEEDS_REVIEW | YES | 46～46-5 覆盖阅读完整设置；44、47～47-6 覆盖书源管理；48、48-1 覆盖部分 App 设置二级页。 | P1 |
+| 空状态插画/图标 | SUFFICIENT_AS_TEMPLATE | NEEDS_REVIEW | YES | 51-1 提供全局 empty 模板；具体模块可复用其结构，仍需按暖白 token 复核。 | P1 |
+| Loading 状态 | SUFFICIENT_AS_TEMPLATE | NEEDS_REVIEW | YES | 51 提供全局 loading 模板，已解除无图阻塞。 | P1 |
+| Error 状态 | SUFFICIENT_AS_TEMPLATE | NEEDS_REVIEW | YES | 51-2 覆盖 error / network error，已解除无图阻塞。 | P1 |
+| 删除/确认弹窗 | SUFFICIENT_AS_TEMPLATE | NEEDS_REVIEW | YES | 51-3 覆盖 permission required / delete confirm。 | P1 |
+| Toast / Snackbar | SUFFICIENT_AS_TEMPLATE | NEEDS_REVIEW | YES | 51-4 覆盖 operation success / failed；25-2 保留阅读页轻反馈参考。 | P1 |
 | 颜色 token | PARTIAL | INCONSISTENT | PARTIAL | 从各图可推断（暖色卡、米色背景、柔和纸张色），但无正式提取的 token 清单。Stitch 能提取但可能有细微偏差。 | P2 |
 | 字体 token | PARTIAL | INCONSISTENT | PARTIAL | 字体选择/字号均有图，但无正式字号/行高/字重体系。 | P2 |
 | 间距 token | PARTIAL | INCONSISTENT | PARTIAL | 从图中可看出页边距和间距规律，但无正式 token。 | P2 |
@@ -38,6 +41,6 @@
 ## 关键判断
 
 1. **Stitch 可直接提取的组件**：底栏（需人工确认选中态）、顶栏、四主按钮、书籍卡片、搜索框、列表行、Switch、Slider、分段控件、Bottom sheet。核心交互组件在 40+ 张图中都有呈现且风格统一。
-2. **Stitch 无法生成的组件**：空状态（无参考图）、loading（无参考图）、error 态（无参考图）、确认弹窗（无参考图）。
+2. **原状态组件阻塞已解除**：51～51-4 已提供 empty、loading、error/network error、permission/delete confirm 和 operation feedback 参考。当前问题是暖白 token 一致性，而不是图片缺失。
 3. **视觉 token 未提取但不阻塞**：颜色/字体/间距/圆角 token 未正式提取，但 Stitch 可以从多张图中学习模式。如需精确前端复刻，仍需补充 token 文档。
-4. **主要元素缺口不阻塞阅读模块初稿**，但会阻塞全 App 涉及状态切换的页面。
+4. **主要状态元素可用于全 App 初稿**，但在正式冻结前仍需完成暖白 token 复核和人工验收。

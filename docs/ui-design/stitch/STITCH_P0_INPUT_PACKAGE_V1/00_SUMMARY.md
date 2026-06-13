@@ -4,6 +4,11 @@
 
 `STITCH_P0_INPUT_PACKAGE_READY`
 
+Initial Draft v0 前置条件：`STITCH_INITIAL_DRAFT_PRECONDITIONS_READY`。
+
+统一门禁见 `docs/ui-design/STITCH_INITIAL_DRAFT_V0_PRECONDITIONS.md`。本输入包可用于初稿，
+但不能作为开发交付基准。
+
 ## 背景
 
 当前总体结论为 `STITCH_NEAR_READY_WITH_P0_GAPS`。阅读模块和 App Shell 已接近可交给 Stitch 生成初稿；全 App 初稿前仍有 P0 输入缺口需要先整理给 Stitch。
@@ -20,6 +25,7 @@
 - 组件风格指南 Stitch 提示词。
 - 26/27 辅助态 final 决策。
 - Stitch 执行顺序。
+- Initial Draft v0 的 DARK token、图片排除、49/50 推导和信息架构硬约束。
 
 ## 关键结论
 

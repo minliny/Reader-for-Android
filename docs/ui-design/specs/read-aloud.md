@@ -1,5 +1,10 @@
 # 朗读
 
+> 本文件不再作为阅读控制层结构定义源，最新规格以
+> `READER_CONTROL_LAYER_SPEC.md`、`READER_CONTROL_ACTION_FLOWS.md`、
+> `READER_CONTROL_RESPONSIVE_RULES.md`、`READER_CONTROL_GEOMETRY_SPEC.md`、
+> `READER_CONTROL_IMAGE_USAGE.md` 为准。
+
 相关示意图：
 
 - `../drafts/18-read-aloud-overlay.png`
@@ -21,7 +26,8 @@
 - `朗读运行胶囊`：朗读开始后，控制收起为小型胶囊。
 - `朗读设置页`：完整管理页，用于持久化 TTS 设置。
 
-后续朗读快捷模块必须遵守 `reader-control-layer-modules.md`：只替换左侧主内容区，底部四主按钮和右侧亮度条保持原控制层位置。
+后续朗读快捷模块必须遵守 `READER_CONTROL_LAYER_SPEC.md`：只替换左侧主内容区，
+底部模块导航和右侧亮度栏保持 `04-2` 的基本位置关系。
 
 ## 朗读快捷模块
 
