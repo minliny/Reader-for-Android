@@ -9,7 +9,7 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / "docs/ui-design/IMAGE_TEXT_SPEC_CATALOG.md"
+CATALOG = ROOT / "docs/ui-design/90-审计与索引/01-图片文字稿总册.md"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 EXCLUDED_PARTS = {".git", ".gradle", "build", "dist", "node_modules"}
 
@@ -26,7 +26,7 @@ def image_files() -> list[Path]:
 
 
 def draft_descriptions() -> dict[str, str]:
-    readme = (ROOT / "docs/ui-design/drafts/README.md").read_text(encoding="utf-8")
+    readme = (ROOT / "docs/ui-design/91-历史归档/drafts/旧全局草稿目录/README.md").read_text(encoding="utf-8")
     return {
         name: description
         for name, description in re.findall(r"^\| `([^`]+\.(?:png|svg))` \| (.+?) \|$", readme, re.M)
@@ -110,8 +110,8 @@ def asset_status(path: Path, description: str) -> str:
         return "CONTACT_SHEET：审图拼图，不是独立页面"
     if ".stitch/" in value:
         return "STITCH_DRAFT：生成初稿，必须服从正式规格与正式设计图"
-    if "freezes/_preflight" in value:
-        return "FREEZE_CANDIDATE：冻结候选，采用状态以 preflight 决议为准"
+    if "91-历史归档/freezes" in value:
+        return "FREEZE_CANDIDATE：冻结候选归档，采用状态以冻结决议为准"
     if any(token in description for token in ["上一版", "历史", "中间候选", "内容参考", "流程示意", "结构规划"]):
         return "REFERENCE_ONLY：参考或历史资产，不独立定义最终视觉"
     return "CURRENT_OR_CANDIDATE：正式目录资产；最终采用级别以图片索引和权威规格为准"
@@ -225,7 +225,7 @@ def write_catalog(images: list[Path]) -> None:
         "## 使用规则",
         "",
         "- 手机竖屏统一逻辑基准为 `390×884dp`；导出像素只用于识别比例，不直接等同 dp。",
-        "- 本总册补齐逐图实现语义；产品边界仍以 `specs/README.md` 所列当前权威规格为准。",
+        "- 本总册补齐逐图实现语义；产品边界以 `01-全局规范/` 与对应页面包中的结构、组件、交互、状态稿为准。",
         "- `EXCLUDED`、`HISTORY_ONLY`、`CONTACT_SHEET` 和 `REFERENCE_ONLY` 不得作为最终视觉或路由依据。",
         "- 所有数值均为实现目标；历史图片中的偏差应按文字稿和当前权威 token 修正。",
         "",
