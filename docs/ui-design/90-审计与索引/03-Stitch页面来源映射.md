@@ -1,5 +1,9 @@
 # Stitch Page Source Mapping
 
+状态：`AUDIT_SNAPSHOT`
+当前权威：以 `../01-全局规范/00-唯一约束参考.md` 和 `../01-全局规范/07-文档权威索引.md` 为准。
+说明：本文件保留 2026-06-12 的 Stitch 来源映射历史，不作为当前页面约束、上传清单或旧规格有效性依据。
+
 - Project ID: `6080030181007410630`
 - Human review preparation date: `2026-06-12`
 - Primary source rule: only `SOURCE_UI_IMAGE` may appear in `mappedSourceImages`.

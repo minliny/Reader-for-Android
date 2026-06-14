@@ -1,5 +1,9 @@
 # Stitch Source Upload Manifest
 
+状态：`AUDIT_SNAPSHOT`
+当前权威：以 `../01-全局规范/00-唯一约束参考.md` 和 `../01-全局规范/07-文档权威索引.md` 为准。
+说明：本文件保留 2026-06-12 的上传候选历史，不作为当前上传、生成、页面约束或旧规格有效性依据。
+
 - Project ID: `6080030181007410630`
 - Human review preparation date: `2026-06-12`
 - Upload state: `READY_FOR_HUMAN_VISUAL_REVIEW_NO_UPLOAD`

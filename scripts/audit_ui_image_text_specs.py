@@ -11,7 +11,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "docs/ui-design/90-审计与索引/01-图片文字稿总册.md"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
-EXCLUDED_PARTS = {".git", ".gradle", "build", "dist", "node_modules"}
+EXCLUDED_PARTS = {".git", ".gradle", ".stitch", "build", "dist", "node_modules"}
 
 
 def image_files() -> list[Path]:
