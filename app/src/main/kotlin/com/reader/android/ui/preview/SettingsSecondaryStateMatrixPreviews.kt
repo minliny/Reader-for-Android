@@ -5,6 +5,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.settings.BookshelfSearchSettingsMapper
 import com.reader.android.ui.settings.BookshelfSearchSettingsScreen
+import com.reader.android.ui.settings.CacheManagementMapper
+import com.reader.android.ui.settings.CacheManagementScreen
 import com.reader.android.ui.settings.GeneralSettingsMapper
 import com.reader.android.ui.settings.GeneralSettingsScreen
 import com.reader.android.ui.settings.PrivacyPermissionsMapper
@@ -114,6 +116,36 @@ fun SettingsPrivacyPermissionsErrorPreview() {
 @Composable
 fun SettingsPrivacyPermissionsPermissionPreview() {
     PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.permission())
+}
+
+@Preview(name = "Settings Secondary / Cache Management / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsCacheManagementDefaultPreview() {
+    CacheManagementScreen(state = CacheManagementMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / Cache Management / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsCacheManagementLoadingPreview() {
+    CacheManagementScreen(state = CacheManagementMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / Cache Management / Empty", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsCacheManagementEmptyPreview() {
+    CacheManagementScreen(state = CacheManagementMapper.empty())
+}
+
+@Preview(name = "Settings Secondary / Cache Management / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsCacheManagementConfirmPreview() {
+    CacheManagementScreen(state = CacheManagementMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / Cache Management / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsCacheManagementErrorPreview() {
+    CacheManagementScreen(state = CacheManagementMapper.error())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
