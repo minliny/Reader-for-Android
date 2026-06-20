@@ -94,6 +94,26 @@ class ReaderControlBaseStructureTest {
     }
 
     @Test
+    fun `reader control base bottom bar active state does not move modules`() {
+        listOf(
+            "activeModule",
+            "ReaderOverlayType.DIRECTORY",
+            "ReaderOverlayType.TTS",
+            "ReaderOverlayType.APPEARANCE",
+            "ReaderOverlayType.SETTINGS",
+            "val itemBackground",
+            "val iconBackground",
+            "val iconTint",
+            "val labelColor",
+            ".width(72.dp)",
+            ".height(56.dp)",
+            ".size(28.dp)"
+        ).forEach { token ->
+            assertTrue("Bottom module active state must preserve $token", token in baseSource)
+        }
+    }
+
+    @Test
     fun `reader control base bottom bar settings is reading behavior only`() {
         assertTrue(
             "Bottom bar settings must be reading behavior, not global",
