@@ -101,7 +101,18 @@ private fun ImportIntroCard(
     onOpenSystemFilePicker: () -> Unit
 ) {
     ReaderCard(contentDescription = intro.title) {
-        Text(intro.title, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.pageTitle)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
+        ) {
+            Icon(
+                imageVector = ReaderIconToken.FileOpen.asImageVector(),
+                contentDescription = null,
+                tint = ReaderTheme.colors.primary,
+                modifier = Modifier.size(32.dp)
+            )
+            Text(intro.title, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.pageTitle)
+        }
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
         Text(intro.message, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.stateMessage)
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
@@ -123,7 +134,18 @@ private fun ImportIntroCard(
 @Composable
 private fun ImportPermissionCard(permission: BookshelfLocalImportPermissionUiModel) {
     ReaderCard(contentDescription = permission.title) {
-        Text(permission.title, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
+        ) {
+            Icon(
+                imageVector = ReaderIconToken.Permission.asImageVector(),
+                contentDescription = null,
+                tint = ReaderTheme.colors.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(permission.title, color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+        }
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
         Text(permission.message, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.stateMessage)
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
@@ -240,7 +262,18 @@ private fun ImportSummaryCard(summary: BookshelfLocalImportSummaryUiModel) {
 @Composable
 private fun ImportErrorGuidanceCard() {
     ReaderCard(contentDescription = "失败原因和下一步") {
-        Text("失败原因和下一步", color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
+        ) {
+            Icon(
+                imageVector = ReaderIconToken.Warning.asImageVector(),
+                contentDescription = null,
+                tint = ReaderTheme.colors.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text("失败原因和下一步", color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+        }
         Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
         Text(
             "不支持或解析失败的文件不会被静默丢弃。请查看每一行原因后，重新选择 TXT 或 EPUB 文件。",
@@ -298,6 +331,7 @@ private fun ImportBottomActions(
         modifier = Modifier
             .fillMaxWidth()
             .background(ReaderTheme.colors.bottomBarBg)
+            .semantics { contentDescription = "本地书导入底部操作" }
             .padding(ReaderTheme.spacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
     ) {
