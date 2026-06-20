@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.reader.AutoPageMapper
 import com.reader.android.ui.reader.AutoPageScreen
+import com.reader.android.ui.reader.ContentReplacementMapper
+import com.reader.android.ui.reader.ContentReplacementScreen
 import com.reader.android.ui.reader.ContentSearchMapper
 import com.reader.android.ui.reader.ContentSearchScreen
 import com.reader.android.ui.reader.ImmersiveReadingMapper
@@ -248,4 +250,34 @@ fun ContentSearchErrorPreview() {
 @Composable
 fun ContentSearchOfflinePreview() {
     ContentSearchScreen(state = ContentSearchMapper.offline())
+}
+
+@Preview(name = "Reader Shell / Content Replacement / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentReplacementDefaultPreview() {
+    ContentReplacementScreen(state = ContentReplacementMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Content Replacement / Edit", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentReplacementEditPreview() {
+    ContentReplacementScreen(state = ContentReplacementMapper.edit())
+}
+
+@Preview(name = "Reader Shell / Content Replacement / Empty", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentReplacementEmptyPreview() {
+    ContentReplacementScreen(state = ContentReplacementMapper.empty())
+}
+
+@Preview(name = "Reader Shell / Content Replacement / Loading", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentReplacementLoadingPreview() {
+    ContentReplacementScreen(state = ContentReplacementMapper.loading())
+}
+
+@Preview(name = "Reader Shell / Content Replacement / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentReplacementErrorPreview() {
+    ContentReplacementScreen(state = ContentReplacementMapper.error())
 }

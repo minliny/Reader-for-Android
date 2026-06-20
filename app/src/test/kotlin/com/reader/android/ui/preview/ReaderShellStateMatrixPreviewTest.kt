@@ -59,6 +59,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ContentSearchDesignUiState.kt")))
     }
 
+    private val contentReplacementScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ContentReplacementDesignScreen.kt")))
+    }
+
+    private val contentReplacementStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ContentReplacementDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -99,7 +107,12 @@ class ReaderShellStateMatrixPreviewTest {
             "ContentSearchLoadingPreview",
             "ContentSearchEmptyPreview",
             "ContentSearchErrorPreview",
-            "ContentSearchOfflinePreview"
+            "ContentSearchOfflinePreview",
+            "ContentReplacementDefaultPreview",
+            "ContentReplacementEditPreview",
+            "ContentReplacementEmptyPreview",
+            "ContentReplacementLoadingPreview",
+            "ContentReplacementErrorPreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -145,7 +158,12 @@ class ReaderShellStateMatrixPreviewTest {
             "ContentSearchMapper.loading",
             "ContentSearchMapper.empty",
             "ContentSearchMapper.error",
-            "ContentSearchMapper.offline"
+            "ContentSearchMapper.offline",
+            "ContentReplacementMapper.fromFixture",
+            "ContentReplacementMapper.edit",
+            "ContentReplacementMapper.empty",
+            "ContentReplacementMapper.loading",
+            "ContentReplacementMapper.error"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -413,6 +431,54 @@ class ReaderShellStateMatrixPreviewTest {
             "点击结果跳转并高亮"
         ).forEach { token ->
             assertTrue("Content search state source must include $token", token in contentSearchStateSource)
+        }
+    }
+
+    @Test
+    fun `content replacement screen keeps readershell slots with empty module nav host`() {
+        listOf(
+            "ContentReplacementScreen",
+            "ContentReplacementReadingSurface",
+            "ContentReplacementOverlay",
+            "ContentReplacementBottomSheet",
+            "ContentReplacementRuleRow",
+            "ContentReplacementTextField",
+            "ContentReplacementPreviewCard",
+            "ContentReplacementFeedbackPanel",
+            "ReplacementHighlightedText",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Content replacement screen source must include $token", token in contentReplacementScreenSource)
+        }
+        assertTrue("Content replacement must not render module navigation items", "ReaderBottomItem" !in contentReplacementScreenSource)
+        assertTrue("Content replacement must not import book source package", "com.reader.android.ui.booksource" !in contentReplacementScreenSource)
+    }
+
+    @Test
+    fun `content replacement state model keeps frontend input contract text`() {
+        listOf(
+            "ContentReplacementDisplayState",
+            "ContentReplacementMapper",
+            "fun edit()",
+            "fun empty()",
+            "fun loading()",
+            "fun error()",
+            "内容替换",
+            "新增规则",
+            "替换前",
+            "替换后",
+            "测试",
+            "保存",
+            "启用内容替换",
+            "替换预览",
+            "仅影响当前阅读显示，不修改原文",
+            "规则格式错误，已保留替换前和替换后内容"
+        ).forEach { token ->
+            assertTrue("Content replacement state source must include $token", token in contentReplacementStateSource)
         }
     }
 }
