@@ -35,6 +35,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAloudDesignUiState.kt")))
     }
 
+    private val settingsScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingSettingsDesignScreen.kt")))
+    }
+
+    private val settingsStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingSettingsDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -62,7 +70,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingAloudDefaultPreview",
             "ReadingAloudRunningPreview",
             "ReadingAloudPausedPreview",
-            "ReadingAloudErrorPreview"
+            "ReadingAloudErrorPreview",
+            "ReadingSettingsDefaultPreview",
+            "ReadingSettingsSubpagePreview",
+            "ReadingSettingsLoadingPreview",
+            "ReadingSettingsErrorPreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -95,7 +107,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingAloudMapper.fromFixture",
             "ReadingAloudMapper.running",
             "ReadingAloudMapper.paused",
-            "ReadingAloudMapper.error"
+            "ReadingAloudMapper.error",
+            "ReadingSettingsMapper.fromFixture",
+            "ReadingSettingsMapper.subpage",
+            "ReadingSettingsMapper.loading",
+            "ReadingSettingsMapper.error"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -224,6 +240,52 @@ class ReaderShellStateMatrixPreviewTest {
             "15 分钟"
         ).forEach { token ->
             assertTrue("Aloud state source must include $token", token in aloudStateSource)
+        }
+    }
+
+    @Test
+    fun `settings screen keeps readershell hosts without main tab navigation`() {
+        listOf(
+            "ReadingSettingsScreen",
+            "ReadingSettingsSurface",
+            "ReadingSettingsOverlay",
+            "ReadingSettingsTopBar",
+            "ReadingSettingsHome",
+            "ReadingSettingsSubpage",
+            "ReadingSettingsFeedback",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Settings screen source must include $token", token in settingsScreenSource)
+        }
+        listOf("ReaderMainTabShell", "BottomNavigation", "ReaderBottomItem").forEach { token ->
+            assertTrue("Settings screen source must not include $token", token !in settingsScreenSource)
+        }
+    }
+
+    @Test
+    fun `settings state model keeps frontend input contract text`() {
+        listOf(
+            "ReadingSettingsDisplayState",
+            "ReadingSettingsMapper",
+            "fun subpage()",
+            "fun loading()",
+            "fun error()",
+            "阅读设置",
+            "预设管理",
+            "屏幕与显示",
+            "翻页与手势",
+            "阅读辅助",
+            "进度与信息",
+            "高级设置",
+            "恢复默认阅读设置",
+            "不会删除书籍或阅读进度",
+            "保存失败，已保留当前阅读设置"
+        ).forEach { token ->
+            assertTrue("Settings state source must include $token", token in settingsStateSource)
         }
     }
 }
