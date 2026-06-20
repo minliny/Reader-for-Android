@@ -43,6 +43,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingSettingsDesignUiState.kt")))
     }
 
+    private val autoPageScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/AutoPageDesignScreen.kt")))
+    }
+
+    private val autoPageStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/AutoPageDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -74,7 +82,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingSettingsDefaultPreview",
             "ReadingSettingsSubpagePreview",
             "ReadingSettingsLoadingPreview",
-            "ReadingSettingsErrorPreview"
+            "ReadingSettingsErrorPreview",
+            "AutoPageDefaultPreview",
+            "AutoPageRunningPreview",
+            "AutoPagePausedPreview",
+            "AutoPageErrorPreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -111,7 +123,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingSettingsMapper.fromFixture",
             "ReadingSettingsMapper.subpage",
             "ReadingSettingsMapper.loading",
-            "ReadingSettingsMapper.error"
+            "ReadingSettingsMapper.error",
+            "AutoPageMapper.fromFixture",
+            "AutoPageMapper.running",
+            "AutoPageMapper.paused",
+            "AutoPageMapper.error"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -286,6 +302,52 @@ class ReaderShellStateMatrixPreviewTest {
             "保存失败，已保留当前阅读设置"
         ).forEach { token ->
             assertTrue("Settings state source must include $token", token in settingsStateSource)
+        }
+    }
+
+    @Test
+    fun `auto page screen keeps readershell slots with empty module nav host`() {
+        listOf(
+            "AutoPageScreen",
+            "AutoPageReadingSurface",
+            "AutoPageOverlay",
+            "AutoPageBottomSheet",
+            "AutoPageRunningCapsule",
+            "AutoPageSpeedCard",
+            "AutoPageOptionsCard",
+            "AutoPageFeedbackPanel",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Auto page screen source must include $token", token in autoPageScreenSource)
+        }
+        assertTrue("Auto page must not render module navigation items", "ReaderBottomItem" !in autoPageScreenSource)
+        assertTrue("Auto page module nav host must not reuse module nav buttons", "AutoPageModuleNav" !in autoPageScreenSource)
+    }
+
+    @Test
+    fun `auto page state model keeps frontend input contract text`() {
+        listOf(
+            "AutoPageDisplayState",
+            "AutoPageMapper",
+            "fun running()",
+            "fun paused()",
+            "fun error()",
+            "自动翻页",
+            "开始自动翻页",
+            "暂停",
+            "停止",
+            "翻页速度",
+            "屏幕常亮",
+            "到章末停止",
+            "音量键调速",
+            "当前章节暂时无法继续翻页",
+            "已停止自动翻页并保留阅读位置"
+        ).forEach { token ->
+            assertTrue("Auto page state source must include $token", token in autoPageStateSource)
         }
     }
 }
