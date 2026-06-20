@@ -8,8 +8,10 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
@@ -24,16 +26,20 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class ReaderIconToken {
@@ -75,7 +81,13 @@ enum class ReaderIconToken {
     People,
     Clock,
     List,
-    Trash
+    Trash,
+    Bell,
+    Battery,
+    EyeOff,
+    Info,
+    Shield,
+    Bug
 }
 
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -118,4 +130,10 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Clock -> Icons.Filled.History
     ReaderIconToken.List -> Icons.AutoMirrored.Filled.ViewList
     ReaderIconToken.Trash -> Icons.Filled.Delete
+    ReaderIconToken.Bell -> Icons.Filled.Notifications
+    ReaderIconToken.Battery -> Icons.Filled.BatterySaver
+    ReaderIconToken.EyeOff -> Icons.Filled.VisibilityOff
+    ReaderIconToken.Info -> Icons.Filled.Info
+    ReaderIconToken.Shield -> Icons.Filled.Shield
+    ReaderIconToken.Bug -> Icons.Filled.BugReport
 }
