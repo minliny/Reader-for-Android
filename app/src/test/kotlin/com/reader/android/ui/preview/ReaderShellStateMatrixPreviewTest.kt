@@ -27,6 +27,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAppearanceDesignUiState.kt")))
     }
 
+    private val aloudScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAloudDesignScreen.kt")))
+    }
+
+    private val aloudStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAloudDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -50,7 +58,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingAppearanceThemePreview",
             "ReadingAppearanceEditPreview",
             "ReadingAppearanceLoadingPreview",
-            "ReadingAppearanceErrorPreview"
+            "ReadingAppearanceErrorPreview",
+            "ReadingAloudDefaultPreview",
+            "ReadingAloudRunningPreview",
+            "ReadingAloudPausedPreview",
+            "ReadingAloudErrorPreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -79,7 +91,11 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingAppearanceMapper.theme",
             "ReadingAppearanceMapper.edit",
             "ReadingAppearanceMapper.loading",
-            "ReadingAppearanceMapper.error"
+            "ReadingAppearanceMapper.error",
+            "ReadingAloudMapper.fromFixture",
+            "ReadingAloudMapper.running",
+            "ReadingAloudMapper.paused",
+            "ReadingAloudMapper.error"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -168,6 +184,46 @@ class ReaderShellStateMatrixPreviewTest {
             "已保留当前阅读外观"
         ).forEach { token ->
             assertTrue("Appearance state source must include $token", token in appearanceStateSource)
+        }
+    }
+
+    @Test
+    fun `aloud screen keeps readershell slots and tts controls`() {
+        listOf(
+            "ReadingAloudScreen",
+            "AloudReadingSurface",
+            "AloudOverlay",
+            "AloudBottomSheet",
+            "AloudModuleNav",
+            "AloudBrightnessPanel",
+            "AloudRunningCapsule",
+            "AloudTransport",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Aloud screen source must include $token", token in aloudScreenSource)
+        }
+    }
+
+    @Test
+    fun `aloud state model keeps frontend input contract text`() {
+        listOf(
+            "ReadingAloudDisplayState",
+            "ReadingAloudMapper",
+            "fun running()",
+            "fun paused()",
+            "fun error()",
+            "正在朗读",
+            "朗读已暂停",
+            "系统 TTS 暂不可用",
+            "已保留当前阅读位置",
+            "清晰女声",
+            "15 分钟"
+        ).forEach { token ->
+            assertTrue("Aloud state source must include $token", token in aloudStateSource)
         }
     }
 }
