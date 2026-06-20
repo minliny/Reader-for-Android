@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | `app/src/main/kotlin/com/reader/android/ui/AppNavigation.kt` | `AppScreen.Bookshelf / Discover / Rss / Settings` | 已收敛（Done） | 后续只允许从这里派生主 tab 顺序、标签和图标。 |
 | `app/src/main/kotlin/com/reader/android/ui/ReaderRouteHost.kt` | 主底栏读取 `appScreens`，并通过 `ReaderMainTabShell` 输出正式主标签页框架 | 已收敛（Done） | 后续只把页面内容迁入 MainTabShell content slot。 |
-| `app/src/main/kotlin/com/reader/android/ui/stitch/StitchAppShell.kt` | 不再提供底部主导航，只保留书架过渡页面内容 | 已收敛（Done） | 保留为过渡内容源；不得再承担主导航。 |
+| `app/src/main/kotlin/com/reader/android/ui/stitch/StitchAppShell.kt` | 不再提供底部主导航，也不再作为书架主 tab 入口 | 已收敛（Done） | 仅保留为历史 prototype 内容；不得再承担主导航或书架根页。 |
 | `app/src/main/kotlin/com/reader/android/ui/booksource/*` | 书源管理保留 legacy route，同时从设置页进入 | 部分完成（Partially Done） | 后续继续拆成 SettingsShell 下的书源管理二级页。 |
 | `app/src/main/kotlin/com/reader/android/ui/settings/MineScreen.kt` | 顶栏显示 `设置`，并增加 `书源管理` 入口 | 部分完成（Partially Done） | 函数名仍为 `MineScreen`，后续重命名或拆成正式 Settings root。 |
 | `app/src/main/kotlin/com/reader/android/ui/discover/RssScreens.kt` | 新增 RSS 主 tab 路由，RSS 列表可作为 tab root 渲染 | 已收敛（Done） | 后续按本地 RSS fixture 重构内容结构。 |

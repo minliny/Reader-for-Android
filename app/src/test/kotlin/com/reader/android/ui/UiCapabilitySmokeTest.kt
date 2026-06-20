@@ -182,7 +182,7 @@ class UiCapabilitySmokeTest {
     @Test
     fun `bookshelf has fanren entry for smoke path`() {
         // Verify the bookshelf includes the fixture-consistent entry
-        // StitchAppShell hardcoded books include "凡人修仙传" as first item
+        // BookshelfAdapterShell fake mode keeps "凡人修仙传" available for smoke path.
         println("BOOKSHELF OK: includes '凡人修仙传' entry for smoke path entry point")
     }
 }
