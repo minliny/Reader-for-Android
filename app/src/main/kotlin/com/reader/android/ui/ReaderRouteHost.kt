@@ -233,6 +233,7 @@ fun ReaderRouteHost(
             composable(ReaderRoutes.SETTINGS) {
                 SettingsRootScreen(
                     onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
+                    onRssManagementClick = { navController.navigateAndTrack(ReaderRoutes.RSS_SUBSCRIPTION, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
                     onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },
@@ -250,6 +251,7 @@ fun ReaderRouteHost(
             composable(ReaderRoutes.MINE) {
                 MineScreen(
                     onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
+                    onRssManagementClick = { navController.navigateAndTrack(ReaderRoutes.RSS_SUBSCRIPTION, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
                     onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },

@@ -61,11 +61,18 @@ class SettingsScreenStructureTest {
         listOf(
             "SettingsRootScreen",
             "SettingsHomeState",
+            "SettingsHomeDisplayState",
+            "LoadingOverview",
+            "NoBackup",
+            "PermissionNeeded",
             "本地概览",
+            "本地概览加载中",
             "本地书籍",
             "订阅源",
             "书源可用",
             "最近备份",
+            "还没有备份记录",
+            "需要存储权限",
             "常用管理",
             "书源管理",
             "RSS/订阅管理",
@@ -80,6 +87,28 @@ class SettingsScreenStructureTest {
             "关于与反馈"
         ).forEach { token ->
             assertTrue("SettingsRootScreen must preserve $token", token in rootSource)
+        }
+    }
+
+    @Test
+    fun `settings root remains a frontend input not an account page`() {
+        listOf(
+            "ReaderAppTopBar",
+            "ReaderCard",
+            "ReaderSettingsGroup",
+            "ReaderSettingsRow",
+            "ReaderChip",
+            "ReaderLoadingState",
+            "ReaderPermissionRequiredState",
+            "onSearchClick",
+            "onMoreClick",
+            "onRssManagementClick"
+        ).forEach { token ->
+            assertTrue("SettingsRootScreen must preserve input contract token $token", token in rootSource)
+        }
+
+        listOf("头像", "登录", "昵称", "账号", "退出登录").forEach { forbidden ->
+            assertTrue("SettingsRootScreen must not become an account page with $forbidden", forbidden !in rootSource)
         }
     }
 
