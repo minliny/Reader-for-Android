@@ -35,6 +35,7 @@ import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.detail.BookDetailScreen
 import com.reader.android.ui.discover.DiscoverScreen
 import com.reader.android.ui.discover.RssDetailScreen
+import com.reader.android.ui.discover.RssHomeScreen
 import com.reader.android.ui.discover.RssListScreen
 import com.reader.android.ui.discover.RssSubscriptionManagementScreen
 import com.reader.android.ui.prototype.ReaderPrototypeGallery
@@ -220,8 +221,13 @@ fun ReaderRouteHost(
                 DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS, backStack) })
             }
             composable(ReaderRoutes.RSS) {
-                RssListScreen(
-                    onSourceClick = { navController.navigateAndTrack("rss_detail/$it", backStack) }
+                RssHomeScreen(
+                    onEntryClick = { article ->
+                        navController.navigateAndTrack("rss_detail/${article.id}", backStack)
+                    },
+                    onAddSubscription = {
+                        navController.navigateAndTrack(ReaderRoutes.RSS_SUBSCRIPTION, backStack)
+                    }
                 )
             }
             composable(ReaderRoutes.SETTINGS) {

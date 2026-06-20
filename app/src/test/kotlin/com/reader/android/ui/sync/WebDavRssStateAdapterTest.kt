@@ -57,7 +57,11 @@ class WebDavRssStateAdapterTest {
 
         assertTrue(state.feeds.isNotEmpty())
         assertTrue(state.articles.isNotEmpty())
-        assertEquals("rss-feed-1", state.selectedFeedId)
+        assertEquals("rss-feed-novel", state.selectedFeedId)
+        assertEquals("12", state.summaryFeedCountLabel)
+        assertEquals("38", state.unreadCountLabel)
+        assertEquals("刚刚更新", state.latestUpdateLabel)
+        assertEquals("24", state.visibleCountLabel)
     }
 
     @Test

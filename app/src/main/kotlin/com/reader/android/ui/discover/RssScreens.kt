@@ -1,12 +1,19 @@
 package com.reader.android.ui.discover
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,13 +24,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.reader.android.ui.components.BookCover
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderCard
+import com.reader.android.ui.components.ReaderChip
 import com.reader.android.ui.components.ReaderDivider
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderListItem
 import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.ReaderSecondaryButton
+import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.components.ReaderSettingsSwitchRow
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.sync.DiscoverRssWebDavMapper
@@ -42,6 +54,270 @@ data class RssDetail(
     val title: String,
     val description: String
 )
+
+data class RssHomeFilter(
+    val label: String,
+    val type: String,
+    val active: Boolean = false
+)
+
+private val defaultStatusFilters = listOf(
+    RssHomeFilter("全部", "all", active = true),
+    RssHomeFilter("未读", "unread"),
+    RssHomeFilter("收藏", "favorite"),
+    RssHomeFilter("稍后读", "later"),
+    RssHomeFilter("书单", "booklist")
+)
+
+private val defaultSourceFilters = listOf(
+    RssHomeFilter("全部来源", "all", active = true),
+    RssHomeFilter("小说更新", "novel"),
+    RssHomeFilter("技术文章", "tech"),
+    RssHomeFilter("书单推送", "booklist")
+)
+
+@Composable
+fun RssHomeScreen(
+    rssState: RssListUiState = DiscoverRssWebDavMapper.rssList(),
+    modifier: Modifier = Modifier,
+    uiState: ReaderUiState? = null,
+    statusFilters: List<RssHomeFilter> = defaultStatusFilters,
+    sourceFilters: List<RssHomeFilter> = defaultSourceFilters,
+    onRefresh: () -> Unit = {},
+    onStatusFilterChange: (String) -> Unit = {},
+    onSourceFilterChange: (String) -> Unit = {},
+    onEntryClick: (RssArticleUiModel) -> Unit = {},
+    onEntryMoreClick: (RssArticleUiModel) -> Unit = {},
+    onAddSubscription: () -> Unit = {},
+    onRetry: () -> Unit = {},
+    onMoreClick: () -> Unit = {}
+) {
+    val activeStatusFilterType = statusFilters.firstOrNull { it.active }?.type
+
+    ReaderTheme {
+        Column(modifier = modifier.fillMaxSize()) {
+            ReaderAppTopBar(
+                title = "RSS",
+                actions = {
+                    IconButton(onClick = onMoreClick) {
+                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
+                    }
+                }
+            )
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = ReaderTheme.spacing.lg)
+            ) {
+                item {
+                    RssSummaryCard(
+                        feedCount = rssState.summaryFeedCountLabel,
+                        unreadCount = rssState.unreadCountLabel,
+                        latestLabel = rssState.latestUpdateLabel,
+                        onRefresh = onRefresh
+                    )
+                }
+                item {
+                    RssFilterSection(
+                        title = "阅读状态",
+                        filters = statusFilters,
+                        onFilterClick = onStatusFilterChange
+                    )
+                }
+                item {
+                    RssFilterSection(
+                        title = "来源筛选",
+                        filters = sourceFilters,
+                        onFilterClick = onSourceFilterChange
+                    )
+                }
+                item {
+                    ReaderSectionHeader(title = "最新订阅")
+                }
+                when {
+                    uiState is ReaderUiState.Loading || rssState.isLoading -> item {
+                        ReaderLoadingState(
+                            message = "订阅流刷新中",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    uiState is ReaderUiState.Error -> item {
+                        ReaderErrorState(
+                            title = "订阅流加载失败",
+                            message = uiState.message,
+                            onRetryClick = if (uiState.retryable) onRetry else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    rssState.offline -> item {
+                        ReaderErrorState(
+                            title = "当前离线",
+                            message = rssState.error?.message ?: "保留上次订阅框架，可以稍后重试。",
+                            onRetryClick = onRetry,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    rssState.error != null -> item {
+                        ReaderErrorState(
+                            title = rssState.error.title,
+                            message = rssState.error.message,
+                            onRetryClick = onRetry,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    rssState.articles.isEmpty() && activeStatusFilterType == "unread" -> item {
+                        ReaderEmptyState(
+                            title = "当前没有未读内容",
+                            message = "筛选条件仍保留，可以切回全部查看历史订阅。",
+                            actionText = "查看全部",
+                            onActionClick = { onStatusFilterChange("all") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    rssState.articles.isEmpty() -> item {
+                        ReaderEmptyState(
+                            title = "还没有订阅内容",
+                            message = "添加订阅源后，最新内容会显示在这里。",
+                            actionText = "添加订阅源",
+                            onActionClick = onAddSubscription,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                        )
+                    }
+                    else -> {
+                        items(rssState.articles, key = { it.id }) { article ->
+                            RssEntryRow(
+                                article = article,
+                                feedTitle = rssState.feeds.firstOrNull { it.id == article.feedId }?.title ?: article.feedId,
+                                unread = true,
+                                onClick = { onEntryClick(article) },
+                                onMoreClick = { onEntryMoreClick(article) }
+                            )
+                            ReaderDivider()
+                        }
+                        item {
+                            Text(
+                                text = "已显示最新 ${rssState.visibleCountLabel} 条",
+                                modifier = Modifier.padding(
+                                    horizontal = ReaderTheme.spacing.screenPadding,
+                                    vertical = ReaderTheme.spacing.sm
+                                ),
+                                color = ReaderTheme.colors.bodyText,
+                                style = ReaderTheme.typography.bookMeta
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RssSummaryCard(
+    feedCount: String,
+    unreadCount: String,
+    latestLabel: String,
+    onRefresh: () -> Unit
+) {
+    ReaderCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ReaderTheme.spacing.screenPadding, vertical = ReaderTheme.spacing.sm),
+        contentDescription = "RSS 订阅概览"
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("订阅概览", color = ReaderTheme.colors.controlInk, style = ReaderTheme.typography.sectionTitle)
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)) {
+                    RssSummaryMetric(value = feedCount, label = "个订阅源")
+                    RssSummaryMetric(value = unreadCount, label = "条未读")
+                    RssSummaryMetric(value = latestLabel, label = "最近更新")
+                }
+            }
+            ReaderSecondaryButton(text = "刷新", onClick = onRefresh)
+        }
+    }
+}
+
+@Composable
+private fun RssSummaryMetric(value: String, label: String) {
+    Column(modifier = Modifier.width(88.dp)) {
+        Text(value, color = ReaderTheme.colors.primary, style = ReaderTheme.typography.sectionTitle, maxLines = 1)
+        Text(label, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta, maxLines = 1)
+    }
+}
+
+@Composable
+private fun RssFilterSection(
+    title: String,
+    filters: List<RssHomeFilter>,
+    onFilterClick: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = ReaderTheme.spacing.xs)) {
+        ReaderSectionHeader(title = title)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = ReaderTheme.spacing.screenPadding),
+            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.xs)
+        ) {
+            filters.forEach { filter ->
+                ReaderChip(
+                    text = filter.label,
+                    selected = filter.active,
+                    onClick = { onFilterClick(filter.type) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RssEntryRow(
+    article: RssArticleUiModel,
+    feedTitle: String,
+    unread: Boolean,
+    onClick: () -> Unit,
+    onMoreClick: () -> Unit
+) {
+    ReaderListItem(
+        title = article.title,
+        subtitle = "$feedTitle · ${article.publishedAt}\n${article.description}",
+        contentDescription = "RSS 条目，${article.title}",
+        onClick = onClick,
+        leading = {
+            BookCover(
+                title = article.title,
+                modifier = Modifier.size(width = 48.dp, height = 64.dp),
+                contentDescription = "RSS 条目封面，${article.title}"
+            )
+        },
+        trailing = {
+            Row {
+                if (unread) {
+                    ReaderChip(text = "未读", selected = true)
+                    Spacer(modifier = Modifier.width(ReaderTheme.spacing.xs))
+                }
+                IconButton(onClick = onMoreClick) {
+                    Icon(Icons.Filled.MoreVert, "条目更多", tint = ReaderTheme.colors.controlInk)
+                }
+            }
+        }
+    )
+}
 
 @Composable
 fun RssListScreen(

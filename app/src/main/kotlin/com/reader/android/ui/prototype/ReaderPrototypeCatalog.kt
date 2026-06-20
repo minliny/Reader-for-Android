@@ -45,7 +45,7 @@ object ReaderPrototypeCatalog {
         entry("source-edit-import", "书源编辑/导入状态", ReaderPrototypeGroup.SOURCE_MANAGEMENT),
         entry("source-test-disabled-error", "书源测试/禁用/错误状态", ReaderPrototypeGroup.SOURCE_MANAGEMENT),
         entry("discover-home", "发现首页", ReaderPrototypeGroup.DISCOVER_RSS),
-        entry("rss-list", "RSS 列表", ReaderPrototypeGroup.DISCOVER_RSS),
+        entry("rss-list", "RSS 首页", ReaderPrototypeGroup.DISCOVER_RSS),
         entry("rss-detail", "RSS 详情", ReaderPrototypeGroup.DISCOVER_RSS),
         entry("rss-subscriptions", "RSS 订阅管理", ReaderPrototypeGroup.DISCOVER_RSS),
         entry("webdav-config", "WebDAV 配置", ReaderPrototypeGroup.WEBDAV_SYNC),

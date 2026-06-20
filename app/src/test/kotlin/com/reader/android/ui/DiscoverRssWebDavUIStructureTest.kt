@@ -26,17 +26,52 @@ class DiscoverRssWebDavUIStructureTest {
     }
 
     @Test
-    fun `rss screens expose three composables`() {
+    fun `rss screens expose home list detail and subscription composables`() {
         val s = sourceOf("discover/RssScreens.kt")
-        listOf("fun RssListScreen", "fun RssDetailScreen", "fun RssSubscriptionManagementScreen").forEach {
+        listOf("fun RssHomeScreen", "fun RssListScreen", "fun RssDetailScreen", "fun RssSubscriptionManagementScreen").forEach {
             assertTrue("Must expose $it", it in s)
+        }
+    }
+
+    @Test
+    fun `rss home follows main tab input structure`() {
+        val s = sourceOf("discover/RssScreens.kt")
+        listOf(
+            "订阅概览",
+            "阅读状态",
+            "来源筛选",
+            "最新订阅",
+            "还没有订阅内容",
+            "当前没有未读内容",
+            "筛选条件仍保留",
+            "查看全部",
+            "订阅流刷新中"
+        ).forEach { token ->
+            assertTrue("RssHomeScreen must preserve input token $token", token in s)
+        }
+    }
+
+    @Test
+    fun `rss fixture mirrors frontend input copy`() {
+        val s = sourceOf("sync/WebDavRssUiState.kt")
+        listOf(
+            "rssSummaryFeedCountLabel = \"12\"",
+            "rssUnreadCountLabel = \"38\"",
+            "rssLatestUpdateLabel = \"刚刚更新\"",
+            "rssVisibleCountLabel = \"24\"",
+            "《长夜余火》更新到第 33 章",
+            "本周 Android Compose 动画笔记",
+            "六月完结书单精选",
+            "诡秘之主番外整理"
+        ).forEach { token ->
+            assertTrue("RSS fixture must preserve $token", token in s)
         }
     }
 
     @Test
     fun `rss screens use reader components`() {
         val s = sourceOf("discover/RssScreens.kt")
-        listOf("ReaderTheme", "ReaderAppTopBar", "ReaderListItem", "ReaderCard", "ReaderSettingsSwitchRow").forEach {
+        listOf("ReaderTheme", "ReaderAppTopBar", "ReaderListItem", "ReaderCard", "ReaderChip", "ReaderSettingsSwitchRow").forEach {
             assertTrue("Rss screens must use $it", it in s)
         }
     }
