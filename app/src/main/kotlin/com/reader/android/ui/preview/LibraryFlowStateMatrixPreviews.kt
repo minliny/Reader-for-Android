@@ -2,6 +2,8 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.reader.android.ui.bookshelf.BookshelfSortFilterMapper
+import com.reader.android.ui.bookshelf.BookshelfSortFilterScreen
 import com.reader.android.ui.detail.BookDetailAdapterShell
 import com.reader.android.ui.detail.BookDetailScreen
 import com.reader.android.ui.search.SearchAdapterShell
@@ -163,4 +165,28 @@ fun LibraryBookDirectoryErrorPreview() {
         onChapterClick = { _, _ -> },
         directoryState = BookDirectoryUiStateMapper.error()
     )
+}
+
+@Preview(name = "Library Flow / Sort Filter / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibrarySortFilterDefaultPreview() {
+    BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.fromFixture())
+}
+
+@Preview(name = "Library Flow / Sort Filter / Selected", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibrarySortFilterSelectedPreview() {
+    BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.selected())
+}
+
+@Preview(name = "Library Flow / Sort Filter / Empty", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibrarySortFilterEmptyPreview() {
+    BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.empty())
+}
+
+@Preview(name = "Library Flow / Sort Filter / Error", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibrarySortFilterErrorPreview() {
+    BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.error())
 }

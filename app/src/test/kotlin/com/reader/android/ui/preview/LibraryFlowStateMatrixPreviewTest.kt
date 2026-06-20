@@ -23,6 +23,10 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/toc/TOCScreen.kt")))
     }
 
+    private val sortFilterScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfSortFilterScreen.kt")))
+    }
+
     @Test
     fun `library flow compose previews expose search detail and directory state matrices`() {
         listOf(
@@ -42,7 +46,11 @@ class LibraryFlowStateMatrixPreviewTest {
             "LibraryBookDirectoryDefaultPreview",
             "LibraryBookDirectoryLoadingPreview",
             "LibraryBookDirectoryEmptyPreview",
-            "LibraryBookDirectoryErrorPreview"
+            "LibraryBookDirectoryErrorPreview",
+            "LibrarySortFilterDefaultPreview",
+            "LibrarySortFilterSelectedPreview",
+            "LibrarySortFilterEmptyPreview",
+            "LibrarySortFilterErrorPreview"
         ).forEach { token ->
             assertTrue("Library flow preview source must contain $token", token in previewSource)
         }
@@ -64,6 +72,10 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookDirectoryUiStateMapper.loading",
             "BookDirectoryUiStateMapper.empty",
             "BookDirectoryUiStateMapper.error",
+            "BookshelfSortFilterMapper.fromFixture",
+            "BookshelfSortFilterMapper.selected",
+            "BookshelfSortFilterMapper.empty",
+            "BookshelfSortFilterMapper.error",
             "ReaderUiState.Offline",
             "ReaderUiState.PermissionRequired"
         ).forEach { token ->
@@ -105,6 +117,20 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookDirectoryDisplayState.Error"
         ).forEach { token ->
             assertTrue("TOCScreen must expose frontend input state token $token", token in tocScreenSource)
+        }
+
+        listOf(
+            "BookshelfSortFilterUiState",
+            "SortFilterBackdrop",
+            "SortFilterBottomSheet",
+            "SortFilterSections",
+            "SortFilterFeedbackBlock",
+            "BookshelfSortFilterDisplayState.Error",
+            "ReaderChip",
+            "ReaderPrimaryButton",
+            "ReaderSecondaryButton"
+        ).forEach { token ->
+            assertTrue("BookshelfSortFilterScreen must expose frontend input state token $token", token in sortFilterScreenSource)
         }
     }
 }
