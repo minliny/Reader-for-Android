@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.bookshelf.BookshelfGroupManagementMapper
 import com.reader.android.ui.bookshelf.BookshelfGroupManagementScreen
+import com.reader.android.ui.bookshelf.BookshelfLocalImportMapper
+import com.reader.android.ui.bookshelf.BookshelfLocalImportScreen
 import com.reader.android.ui.bookshelf.BookshelfSortFilterMapper
 import com.reader.android.ui.bookshelf.BookshelfSortFilterScreen
 import com.reader.android.ui.detail.BookDetailAdapterShell
@@ -233,4 +235,40 @@ fun LibraryGroupManagementLoadingPreview() {
 @Composable
 fun LibraryGroupManagementErrorPreview() {
     BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.error())
+}
+
+@Preview(name = "Library Flow / Local Import / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportDefaultPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.fromFixture())
+}
+
+@Preview(name = "Library Flow / Local Import / Importing", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportImportingPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.importing())
+}
+
+@Preview(name = "Library Flow / Local Import / Success", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportSuccessPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.success())
+}
+
+@Preview(name = "Library Flow / Local Import / Partial Failed", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportPartialFailedPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.partialFailed())
+}
+
+@Preview(name = "Library Flow / Local Import / Failed", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportFailedPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.failed())
+}
+
+@Preview(name = "Library Flow / Local Import / Picker Cancelled", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryLocalImportPickerCancelledPreview() {
+    BookshelfLocalImportScreen(state = BookshelfLocalImportMapper.pickerCancelled())
 }
