@@ -4,6 +4,7 @@
 
 文件：
 - `../../../frontend-input/component-library/library.css`：公共组件库样式。
+- `../../shared-main-tab-kit/kit.js` / `kit.css`：主标签页共享 shell、状态栏、顶部栏、内容 slot、主导航和状态矩阵外壳。
 - `../../../frontend-input/contracts.d.ts`：共享 TypeScript 输入契约。
 - `components.css`：设置首页页面布局样式，统一使用 `st-` 前缀。
 - `components.html`：可摘取的组件结构说明。
@@ -15,22 +16,22 @@
 - `COMPONENT_SPEC.md`：props、states、events 和验收标准。
 
 组件拆分：
-- `SettingsStatusBar`
-- `SettingsTopBar`
+- `MainTabPageKit.StatusBar`
+- `MainTabPageKit.AppTopBar`
 - `LocalOverviewCard`
 - `QuickEntryGrid`
 - `QuickEntryCard`
 - `SettingsSection`
 - `SettingsListItem`
-- `MainNav`
+- `MainTabPageKit.MainNav`
 
 公共库复用：
-- `rl-app-frame`
-- `rl-status-bar`
-- `rl-app-top-bar`
+- `mt-app-frame`
+- `mt-status-bar`
+- `mt-app-top-bar`
 - `rl-icon`
 - `rl-badge`
-- `rl-bottom-nav`（公共 `MainNav` 样式）
+- `mt-main-nav`（公共 `MainNav` 结构）
 
 前端接入：
 - 使用 `fixture.json` 生成业务类型。

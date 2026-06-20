@@ -9,6 +9,7 @@
 - `recentUpdates[]`：最近更新列表；为空时展示刷新提示。
 - `books[]`：封面网格数据；为空时展示空书架态。
 - `bottomNav[]`：公共主导航，固定为 `书架 / 发现 / RSS / 设置`，`type` 映射图标。
+- 根框架由 `MainTabPageKit` 输出：`AppFrame / StatusBar / AppTopBar / ContentRegion / MainNav / StateHost`。
 
 ## States
 
@@ -34,3 +35,4 @@
 - `state-matrix.html` 至少展示默认、筛选、加载、空书架四种状态。
 - 图片资源加载失败数为 0。
 - 样式只使用 `bs-` 前缀和共享 token。
+- `MainNav` 必须使用 `mt-main-nav` 结构，active 只改变图标背景、图标颜色和文字颜色，不改变四按钮相对位置。

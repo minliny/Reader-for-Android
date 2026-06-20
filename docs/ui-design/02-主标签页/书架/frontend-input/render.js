@@ -31,31 +31,6 @@
     return icons[name] || "";
   }
 
-  function statusBar(data) {
-    const status = data.status || {};
-    return `
-      <header class="bs-status-bar" aria-label="系统状态栏">
-        <div>${esc(status.time || "10:30")}</div>
-        <div class="bs-system-icons" aria-hidden="true">
-          <span class="bs-wifi"></span>
-          <span class="bs-signal"></span>
-          <span class="bs-battery"></span>
-          <span>${esc(status.battery || "")}</span>
-        </div>
-      </header>`;
-  }
-
-  function topBar(data) {
-    return `
-      <section class="bs-app-top-bar" aria-label="顶部栏">
-        <h1 class="bs-app-title">${esc((data.topBar || {}).title || "书架")}</h1>
-        <div class="bs-top-actions">
-          <button type="button" aria-label="搜索">${icon("search")}</button>
-          <button type="button" aria-label="更多">${icon("more")}</button>
-        </div>
-      </section>`;
-  }
-
   function chipGroup(groups) {
     return `
       <nav class="bs-chip-group" aria-label="书架分组">
@@ -173,36 +148,38 @@
       </section>`;
   }
 
-  function mainNav(items) {
-    const iconMap = {
-      bookshelf: "book",
-      discover: "discover",
-      rss: "rss",
-      settings: "settings"
-    };
-    return `
-      <nav class="bs-bottom-nav" aria-label="公共主导航">
-        ${(items || []).map((item) => `
-          <button type="button" class="bs-nav-item${item.active ? " is-active" : ""}"${item.active ? ' aria-current="page"' : ""}>
-            ${icon(iconMap[item.type] || "book", "bs-icon bs-nav-icon")}
-            <span>${esc(item.label)}</span>
-          </button>`).join("")}
-      </nav>`;
+  function mainTabFrame(data, contentHtml) {
+    return window.MainTabPageKit.renderPage({
+      data,
+      contentHtml,
+      ariaLabel: "书架封面模式组件预览",
+      defaultTitle: "书架",
+      frameWidth: 853,
+      frameHeight: 1844,
+      pageClass: "bs-phone-frame",
+      statusBarClass: "bs-status-bar",
+      systemIconsClass: "bs-system-icons",
+      wifiClass: "bs-wifi",
+      signalClass: "bs-signal",
+      batteryClass: "bs-battery",
+      topBarClass: "bs-app-top-bar",
+      titleClass: "bs-app-title",
+      topActionsClass: "bs-top-actions",
+      iconClass: "bs-icon",
+      navClass: "bs-bottom-nav",
+      navItemClass: "bs-nav-item",
+      navIconClass: "bs-nav-icon"
+    });
   }
 
   function bookshelfHtml(data, options) {
     const state = options && options.state ? options.state : "default";
     const modeLabel = state === "filtering" ? "追更" : "封面";
-    return `
-      <main class="bs-phone-frame" aria-label="书架封面模式组件预览">
-        ${statusBar(data)}
-        ${topBar(data)}
+    return mainTabFrame(data, `
         ${chipGroup(data.groups)}
         ${summary(data)}
         ${sectionHead(modeLabel)}
-        ${bookGrid(data.books, state)}
-        ${mainNav(data.bottomNav)}
-      </main>`;
+        ${bookGrid(data.books, state)}`);
   }
 
   function renderBookshelf(target, data, options) {
@@ -231,27 +208,23 @@
       { key: "empty", title: "空书架态", desc: "无继续阅读、无更新、无书籍时的导入引导。" }
     ];
 
-    target.innerHTML = `
-      <section class="bs-state-workbench">
-        <header class="bs-state-header">
-          <h1>书架封面模式状态矩阵</h1>
-          <p>用于前端实现时核对 props、空态、加载态和筛选态。</p>
-        </header>
-        <div class="bs-state-grid">
-          ${states.map((state) => `
-            <article class="bs-state-card">
-              <div class="bs-state-meta">
-                <h2>${esc(state.title)}</h2>
-                <p>${esc(state.desc)}</p>
-              </div>
-              <div class="bs-state-viewport">
-                <div class="bs-state-scale">
-                  ${bookshelfHtml(stateData(data, state.key), { state: state.key })}
-                </div>
-              </div>
-            </article>`).join("")}
-        </div>
-      </section>`;
+    target.innerHTML = window.MainTabPageKit.renderStateMatrix({
+      data,
+      title: "书架封面模式状态矩阵",
+      desc: "用于前端实现时核对 props、空态、加载态和筛选态。",
+      states,
+      frameWidth: 853,
+      frameHeight: 1844,
+      stateClass: "bs-state-workbench",
+      stateHeaderClass: "bs-state-header",
+      stateGridClass: "bs-state-grid",
+      stateCardClass: "bs-state-card",
+      stateMetaClass: "bs-state-meta",
+      stateViewportClass: "bs-state-viewport",
+      stateScaleClass: "bs-state-scale",
+      getStateData: stateData,
+      renderFrame: bookshelfHtml
+    });
   }
 
   window.BookshelfInput = {

@@ -1,4 +1,5 @@
 @import "../../../frontend-input/component-library/library.css";
+@import "../../shared-main-tab-kit/kit.css";
 
 :root {
   --st-paper: var(--reader-ds-color-paper);

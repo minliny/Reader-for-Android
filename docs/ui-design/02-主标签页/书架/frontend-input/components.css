@@ -1,4 +1,5 @@
 @import "../../../frontend-input/tokens.css";
+@import "../../shared-main-tab-kit/kit.css";
 
 :root {
   --bs-paper: var(--reader-ds-color-paper);

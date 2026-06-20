@@ -39,6 +39,8 @@
 
 - `preview.html` 在 841 x 1870 画布内渲染完整默认态。
 - `state-matrix.html` 至少展示默认、目录、朗读、外观、设置五种状态。
+- 页面根节点必须由 `ReaderShellKit.renderReaderShell(...)` 输出，并带有 `data-shell="ReaderShell"`。
+- DOM 必须包含 `readerFrame`、`readingSurface`、`readerOverlayHost`、`bottomSheetHost`、`readerModuleNav`、`readerStateHost` 六个 slot。
 - 状态矩阵中的目录、朗读、外观、设置 active 按钮必须符合固定位置的颜色反馈规则。
 - 控制层内文本不与亮度面板、底部读数重叠。
-- 样式只使用 `rc-` 前缀和共享 token。
+- 页面业务样式只使用 `rc-` 前缀和共享 token；shell 基础样式来自 `shared-shell-kit/kit.css`。

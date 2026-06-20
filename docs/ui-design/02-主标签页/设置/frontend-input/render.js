@@ -38,31 +38,6 @@
     return `st-tone-${tone || "blue"}`;
   }
 
-  function statusBar(data) {
-    const status = data.status || {};
-    return `
-      <header class="rl-status-bar" aria-label="系统状态栏">
-        <span>${esc(status.time || "10:30")}</span>
-        <span class="rl-system-icons" aria-hidden="true">
-          <span class="rl-wifi"></span>
-          <span class="rl-signal"></span>
-          <span class="rl-battery"></span>
-          <span>${esc(status.battery || "")}</span>
-        </span>
-      </header>`;
-  }
-
-  function topBar(data) {
-    return `
-      <section class="rl-app-top-bar" aria-label="顶部栏">
-        <h1 class="rl-app-title">${esc((data.topBar || {}).title || "设置")}</h1>
-        <div class="rl-top-actions st-top-actions">
-          <button type="button" aria-label="搜索">${icon("search")}</button>
-          <button type="button" aria-label="更多">${icon("more")}</button>
-        </div>
-      </section>`;
-  }
-
   function overviewCard(overview, state) {
     const loading = state === "loading-overview";
     return `
@@ -129,28 +104,35 @@
         </section>`).join("")}`;
   }
 
-  function mainNav(items) {
-    return `
-      <nav class="rl-bottom-nav st-bottom-nav" aria-label="公共主导航">
-        ${(items || []).map((item) => `
-          <button class="rl-bottom-nav-item${item.active ? " is-active" : ""}" type="button"${item.active ? ' aria-current="page"' : ""}>
-            ${icon(item.type)}
-            <span>${esc(item.label)}</span>
-          </button>`).join("")}
-      </nav>`;
+  function mainTabFrame(data, contentHtml) {
+    return window.MainTabPageKit.renderPage({
+      data,
+      contentHtml,
+      ariaLabel: "设置首页组件预览",
+      defaultTitle: "设置",
+      frameWidth: 852,
+      frameHeight: 1846,
+      pageClass: "rl-app-frame st-page-frame",
+      statusBarClass: "rl-status-bar",
+      systemIconsClass: "rl-system-icons",
+      wifiClass: "rl-wifi",
+      signalClass: "rl-signal",
+      batteryClass: "rl-battery",
+      topBarClass: "rl-app-top-bar",
+      titleClass: "rl-app-title",
+      topActionsClass: "rl-top-actions st-top-actions",
+      iconClass: "rl-icon",
+      navClass: "rl-bottom-nav st-bottom-nav",
+      navItemClass: "rl-bottom-nav-item"
+    });
   }
 
   function settingsHomeHtml(data, options) {
     const state = options && options.state ? options.state : "default";
-    return `
-      <main class="rl-app-frame st-page-frame" aria-label="设置首页组件预览">
-        ${statusBar(data)}
-        ${topBar(data)}
+    return mainTabFrame(data, `
         ${overviewCard(data.overview, state)}
         ${quickEntryGrid(data.quickEntries)}
-        ${settingsSections(data.sections)}
-        ${mainNav(data.bottomNav)}
-      </main>`;
+        ${settingsSections(data.sections)}`);
   }
 
   function renderSettingsHome(target, data, options) {
@@ -183,27 +165,23 @@
       { key: "permission-needed", title: "权限缺失态", desc: "隐私与权限行显示待授权，不弹全屏错误。" }
     ];
 
-    target.innerHTML = `
-      <section class="st-state-workbench">
-        <header class="st-state-header">
-          <h1>设置首页状态矩阵</h1>
-          <p>用于前端实现时核对概览加载、无备份和权限缺失状态。</p>
-        </header>
-        <div class="st-state-grid">
-          ${states.map((state) => `
-            <article class="st-state-card">
-              <div class="st-state-meta">
-                <h2>${esc(state.title)}</h2>
-                <p>${esc(state.desc)}</p>
-              </div>
-              <div class="st-state-viewport">
-                <div class="st-state-scale">
-                  ${settingsHomeHtml(stateData(data, state.key), { state: state.key })}
-                </div>
-              </div>
-            </article>`).join("")}
-        </div>
-      </section>`;
+    target.innerHTML = window.MainTabPageKit.renderStateMatrix({
+      data,
+      title: "设置首页状态矩阵",
+      desc: "用于前端实现时核对概览加载、无备份和权限缺失状态。",
+      states,
+      frameWidth: 852,
+      frameHeight: 1846,
+      stateClass: "st-state-workbench",
+      stateHeaderClass: "st-state-header",
+      stateGridClass: "st-state-grid",
+      stateCardClass: "st-state-card",
+      stateMetaClass: "st-state-meta",
+      stateViewportClass: "st-state-viewport",
+      stateScaleClass: "st-state-scale",
+      getStateData: stateData,
+      renderFrame: settingsHomeHtml
+    });
   }
 
   window.SettingsHomeInput = {

@@ -31,4 +31,4 @@
 - `state-matrix.html` 至少展示默认、概览加载、无备份、权限缺失四种状态。
 - 页面不展示账户头像、昵称、登录入口。
 - 设置首页不直接执行删除、清空、恢复默认等破坏性操作。
-- 页面必须复用公共库 `rl-` App Shell、Badge 和 MainNav 语义。
+- 页面必须复用 `MainTabPageKit` 的 App Shell / MainNav 结构，并继续复用公共库 `rl-` Badge 与基础图标语义。

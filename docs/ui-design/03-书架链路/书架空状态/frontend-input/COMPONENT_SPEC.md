@@ -9,6 +9,14 @@
 - `variants`：全书架空、加载、错误、离线、权限说明状态。
 - `bottomNav[]`：公共主导航，统一为 `书架 / 发现 / RSS / 设置`。
 
+## Shell
+
+- 使用 `LibraryShell`。
+- 页面骨架由 `LibraryPageKit.renderPage` 输出。
+- 分组 chip 进入 `ContentRegion`。
+- 空态内容和提示进入 `StateHost`。
+- 公共主导航进入 `BottomActionHost`。
+
 ## States
 
 - `default`：当前分组没有书籍。
@@ -35,3 +43,4 @@
 - 空态必须说明原因，并提供明确下一步。
 - 不得出现账号、会员、推荐流、广告或云端商业化入口。
 - 本地导入不得作为 P0 强制流程。
+- 真实 DOM 必须包含完整 `LibraryShell` slots。

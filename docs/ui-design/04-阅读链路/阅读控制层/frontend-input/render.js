@@ -17,19 +17,21 @@
   }
 
   function icon(name) {
-    const icons = {
-      back: '<svg viewBox="0 0 48 48"><path d="M29 10 15 24l14 14"></path><path d="M16 24h27"></path></svg>',
-      swap: '<svg viewBox="0 0 48 48"><path d="M11 16h22l-6-6"></path><path d="M37 32H15l6 6"></path><path d="M33 10l6 6-6 6"></path><path d="M15 38l-6-6 6-6"></path></svg>',
-      search: '<svg viewBox="0 0 48 48"><circle cx="21" cy="21" r="12"></circle><path d="M31 31 42 42"></path></svg>',
-      "auto-page": '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17"></circle><path d="M22 16v16l12-8-12-8Z" fill="currentColor" stroke="none"></path><path d="M9 24h4M35 24h4M24 9v4M24 35v4"></path></svg>',
-      replace: '<svg viewBox="0 0 48 48"><path d="M33 8h7v7"></path><path d="M8 22v-4a10 10 0 0 1 10-10h20"></path><path d="M15 40H8v-7"></path><path d="M40 26v4a10 10 0 0 1-10 10H10"></path></svg>',
-      directory: '<svg viewBox="0 0 48 48"><path d="M13 12h22"></path><path d="M13 24h22"></path><path d="M13 36h22"></path><path d="M7 12h.01M7 24h.01M7 36h.01"></path></svg>',
-      tts: '<svg viewBox="0 0 48 48"><path d="M12 26v-4"></path><path d="M18 34V14"></path><path d="M24 39V9"></path><path d="M30 34V14"></path><path d="M36 26v-4"></path></svg>',
-      appearance: '<svg viewBox="0 0 48 48"><path d="M8 35 18 12h2l10 23"></path><path d="M12 27h14"></path><path d="M31 35V20"></path><path d="M31 20c7 0 9 3 9 7v8"></path></svg>',
-      settings: '<svg viewBox="0 0 48 48"><path d="M24 7 39 15v18l-15 8-15-8V15l15-8Z"></path><circle cx="24" cy="24" r="6"></circle></svg>',
-      sun: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="8"></circle><path d="M24 4v7M24 37v7M4 24h7M37 24h7M9.8 9.8l5 5M33.2 33.2l5 5M38.2 9.8l-5 5M14.8 33.2l-5 5"></path></svg>'
-    };
-    return icons[name] || "";
+    const semantic = name === "swap" ? "source" : name;
+    if (window.ReaderShellKit && window.ReaderShellKit.icon) {
+      return window.ReaderShellKit.icon(semantic, "rc-inline-icon");
+    }
+    if (window.ReaderAssetIcons && window.ReaderAssetIcons.renderIcon) {
+      return window.ReaderAssetIcons.renderIcon(semantic, "rc-inline-icon");
+    }
+    return "";
+  }
+
+  function shellKit() {
+    if (!window.ReaderShellKit) {
+      throw new Error("ReaderShellKit is required before 阅读控制层/frontend-input/render.js");
+    }
+    return window.ReaderShellKit;
   }
 
   function statusRow(data) {
@@ -98,18 +100,15 @@
       </section>`;
   }
 
-  function moduleNav(items, activeModule) {
-    return `
-      <nav class="rc-panel rc-module-nav" aria-label="底部模块导航">
-        ${(items || []).map((item) => {
-          const isActive = item.type === activeModule;
-          return `
+  function moduleNavItems(items, activeModule) {
+    return (items || []).map((item) => {
+      const isActive = item.type === activeModule;
+      return `
           <button class="rc-module-item${isActive ? " is-active" : ""}" type="button" data-module="${esc(item.type)}"${isActive ? ' aria-current="page"' : ""}>
             <span class="rc-module-icon">${icon(item.type)}</span>
             <span>${esc(item.label)}</span>
           </button>`;
-        }).join("")}
-      </nav>`;
+    }).join("");
   }
 
   function detailPanel(activeModule) {
@@ -167,16 +166,13 @@
   function controlSheet(data, options) {
     const activeModule = options && options.activeModule;
     return `
-      <section class="rc-control-sheet" aria-label="阅读控制面板">
-        <div class="rc-grabber" aria-hidden="true"></div>
-        <div class="rc-control-main${activeModule ? " has-detail" : ""}">
-          ${quickActions(data.quickActions)}
-          ${chapterPanel(data.chapterProgress)}
-          ${moduleNav(data.moduleNav, activeModule)}
-          ${detailPanel(activeModule)}
-        </div>
-        ${brightnessPanel(data.brightness)}
-      </section>`;
+      <div class="rc-grabber" aria-hidden="true"></div>
+      <div class="rc-control-main${activeModule ? " has-detail" : ""}">
+        ${quickActions(data.quickActions)}
+        ${chapterPanel(data.chapterProgress)}
+        ${detailPanel(activeModule)}
+      </div>
+      ${brightnessPanel(data.brightness)}`;
   }
 
   function bottomReadout(data) {
@@ -190,16 +186,25 @@
   }
 
   function readerControlHtml(data, options) {
-    return `
-      <main class="rc-page-frame" aria-label="阅读控制层组件预览">
+    const activeModule = options && options.activeModule;
+    return shellKit().renderReaderShell({
+      frameClass: "rc-page-frame",
+      readingSurfaceClass: "rc-reading-surface-host",
+      overlayClass: "rc-reader-overlay-host",
+      bottomSheetHostClass: "rc-control-sheet",
+      moduleNavClass: "rc-panel rc-module-nav",
+      stateHostClass: "rc-reader-state-host",
+      ariaLabel: "阅读控制层组件预览",
+      readingSurfaceHtml: `
         <div class="rc-reading-haze" aria-hidden="true"></div>
         <div class="rc-ambient-top" aria-hidden="true"></div>
         ${statusRow(data)}
-        ${topControl(data)}
         ${readingText(data.readingText)}
-        ${controlSheet(data, options || {})}
-        ${bottomReadout(data)}
-      </main>`;
+        ${bottomReadout(data)}`,
+      overlayHtml: topControl(data),
+      bottomSheetHtml: controlSheet(data, options || {}),
+      moduleNavHtml: moduleNavItems(data.moduleNav, activeModule)
+    });
   }
 
   function renderReaderControl(target, data, options) {

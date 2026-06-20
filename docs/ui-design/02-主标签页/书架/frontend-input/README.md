@@ -4,6 +4,7 @@
 
 文件：
 - `../../../frontend-input/tokens.css`：跨页面共享设计 token。
+- `../../shared-main-tab-kit/kit.js` / `kit.css`：主标签页共享 shell、状态栏、顶部栏、内容 slot、主导航和状态矩阵外壳。
 - `../../../frontend-input/contracts.d.ts`：共享 TypeScript 输入契约。
 - `components.css`：组件样式，统一使用 `bs-` 前缀。
 - `components.html`：可摘取的组件片段。
@@ -15,15 +16,15 @@
 - `COMPONENT_SPEC.md`：props、states、events 和验收标准。
 
 组件拆分：
-- `BookshelfStatusBar`
-- `BookshelfTopBar`
+- `MainTabPageKit.StatusBar`
+- `MainTabPageKit.AppTopBar`
 - `ShelfChipGroup`
 - `ContinueReadingCard`
 - `RecentUpdateCard`
 - `ShelfSectionHeader`
 - `BookCoverGrid`
 - `BookCoverCard`
-- `MainNav`
+- `MainTabPageKit.MainNav`
 
 前端接入：
 - 使用 `fixture.json` 生成业务类型。

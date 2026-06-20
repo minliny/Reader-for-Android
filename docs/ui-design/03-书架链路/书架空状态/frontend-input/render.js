@@ -12,6 +12,10 @@
   }
 
   function icon(name) {
+    if (window.ReaderAssetIcons && window.ReaderAssetIcons.renderIcon) {
+      return window.ReaderAssetIcons.renderIcon(name, "rl-icon");
+    }
+
     const icons = {
       search: '<svg class="rl-icon" viewBox="0 0 48 48"><circle cx="21" cy="21" r="13"></circle><path d="M31 31 42 42"></path></svg>',
       more: '<svg class="rl-icon" viewBox="0 0 48 48"><circle cx="24" cy="10" r="3.1" fill="currentColor" stroke="none"></circle><circle cx="24" cy="24" r="3.1" fill="currentColor" stroke="none"></circle><circle cx="24" cy="38" r="3.1" fill="currentColor" stroke="none"></circle></svg>',
@@ -112,15 +116,16 @@
 
   function bookshelfEmptyHtml(data, options) {
     const state = statePayload(data, options && options.state);
-    return `
-      <main class="se-page-frame" aria-label="书架空状态组件预览">
-        ${statusBar(data)}
-        ${topBar(data)}
-        ${chipRow(data.groups)}
-        ${emptyContent(state)}
-        ${hint(state)}
-        ${mainNav(data.bottomNav)}
-      </main>`;
+    return window.LibraryPageKit.renderPage({
+      data,
+      pageClass: "se-page-frame",
+      ariaLabel: "书架空状态组件预览",
+      statusHtml: statusBar(data),
+      topBarHtml: topBar(data),
+      contentHtml: chipRow(data.groups),
+      bottomActionHtml: mainNav(data.bottomNav),
+      stateHostHtml: `${emptyContent(state)}${hint(state)}`
+    });
   }
 
   function renderBookshelfEmpty(target, data, options) {
@@ -145,27 +150,21 @@
       { key: "permission", title: "权限说明态", desc: "本地导入前说明用途，不提前请求全盘权限。" }
     ];
 
-    target.innerHTML = `
-      <section class="se-state-workbench">
-        <header class="se-state-header">
-          <h1>书架空状态矩阵</h1>
-          <p>用于前端实现时核对当前分组空、全书架空、加载、错误、离线和权限说明状态。</p>
-        </header>
-        <div class="se-state-grid">
-          ${states.map((state) => `
-            <article class="se-state-card">
-              <div class="se-state-meta">
-                <h2>${esc(state.title)}</h2>
-                <p>${esc(state.desc)}</p>
-              </div>
-              <div class="se-state-viewport">
-                <div class="se-state-scale">
-                  ${bookshelfEmptyHtml(stateData(data, state.key), { state: state.key })}
-                </div>
-              </div>
-            </article>`).join("")}
-        </div>
-      </section>`;
+    target.innerHTML = window.LibraryPageKit.renderStateMatrix({
+      data,
+      states,
+      title: "书架空状态矩阵",
+      desc: "用于前端实现时核对当前分组空、全书架空、加载、错误、离线和权限说明状态。",
+      stateClass: "se-state-workbench",
+      stateHeaderClass: "se-state-header",
+      stateGridClass: "se-state-grid",
+      stateCardClass: "se-state-card",
+      stateMetaClass: "se-state-meta",
+      stateViewportClass: "se-state-viewport",
+      stateScaleClass: "se-state-scale",
+      getStateData: stateData,
+      renderFrame: bookshelfEmptyHtml
+    });
   }
 
   window.BookshelfEmptyInput = {
