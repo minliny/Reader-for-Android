@@ -2,7 +2,7 @@
 
 本文整理当前 `figma` 分支的前端设计稿输入件内容，方便审计、交接和后续真实前端开发。可见 UI 文案仍以各页面 `fixture` 和设计图为准；本文只描述文件归属、框架结构和验证入口。
 
-当前 HEAD（Current HEAD）：`7acf2c2 Checkpoint local frontend design inputs`
+当前分支状态（Current Branch State）：以当前 `git log -1 --oneline` 为准；本文只记录交付结构，不固定易过期的 commit 号。
 
 ## 分支范围（Branch Scope）
 
@@ -93,8 +93,8 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 ## 当前待办（Open Work）
 
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
-2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`；下一步把临时 `StitchBottomNav` 替换为正式 MainTabShell Composable。
-3. 图标素材同步执行（Icon Asset Sync Implementation）：按 `ICON_COMPOSE_MAPPING.md` 和 `ICON_LIBRARY_AUDIT.md` 把本地补齐 token 同步到 Compose token wrapper 与 Figma `Icon/*` 主组件或缺源清单。
+2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`；下一步迁移书架、RSS 和设置内容到 fixture/state 驱动。
+3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航已接入 `ReaderIconToken`；下一步按 `ICON_COMPOSE_MAPPING.md` 继续迁移阅读、设置和书源链路的散落 Material Icons，并同步 Figma `Icon/*` 主组件或缺源清单。
 4. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）

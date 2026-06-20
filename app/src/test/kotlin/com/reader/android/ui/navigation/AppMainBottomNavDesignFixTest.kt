@@ -15,8 +15,8 @@ class AppMainBottomNavDesignFixTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/ReaderRouteHost.kt")))
     }
 
-    private val stitchShellSource: String by lazy {
-        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/stitch/StitchAppShell.kt")))
+    private val componentSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/components/CommonComponents.kt")))
     }
 
     @Test
@@ -41,15 +41,17 @@ class AppMainBottomNavDesignFixTest {
     @Test
     fun `app main bottom bar only renders on primary tab routes`() {
         assertTrue("Route host must derive main tab routes from appScreens", "appScreens.map { it.route }.toSet()" in routeHostSource)
-        assertTrue("Route host must hide main bottom bar outside primary tabs", "if (showMainBottomBar)" in routeHostSource)
+        assertTrue("Route host must use formal ReaderMainTabShell", "ReaderMainTabShell(" in routeHostSource)
+        assertTrue("Route host must hide main bottom bar outside primary tabs", "showMainNav = showMainBottomBar" in routeHostSource)
+        assertFalse("Route host must not use temporary StitchBottomNav", "StitchBottomNav" in routeHostSource)
     }
 
     @Test
     fun `app main bottom nav selected state changes color without moving buttons`() {
-        assertTrue("Bottom nav must receive shared tabs instead of hardcoding labels", "tabs: List<StitchTab>" in stitchShellSource)
-        assertTrue("Selected button must keep fixed width", ".width(64.dp)" in stitchShellSource)
-        assertTrue("Selected button must keep fixed height", ".height(44.dp)" in stitchShellSource)
-        assertTrue("Selected button must deepen background", "background(ReaderTheme.colors.primary)" in stitchShellSource)
-        assertTrue("Selected icon must invert color", "ReaderTheme.colors.paperBg" in stitchShellSource)
+        assertTrue("MainTabShell must own the shared tab bar", "fun ReaderMainTabShell(" in componentSource)
+        assertTrue("Selected button must keep fixed width", ".width(64.dp)" in componentSource)
+        assertTrue("Selected button must keep fixed height", ".height(44.dp)" in componentSource)
+        assertTrue("Selected button must deepen background", "background(ReaderTheme.colors.primary)" in componentSource)
+        assertTrue("Selected icon must invert color", "ReaderTheme.colors.paperBg" in componentSource)
     }
 }

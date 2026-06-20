@@ -40,7 +40,7 @@
 
 | 差异（Gap） | 当前代码（Current Code） | 设计输入件（Design Input） | 处理要求（Required Action） |
 | --- | --- | --- | --- |
-| 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，`StitchBottomNav` 已改为读取外部 tabs | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成第一轮代码收敛；后续继续把临时 Stitch 底栏替换为正式 MainTabShell Composable。 |
+| 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell` | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成主导航代码收敛；后续继续迁移 MainTabShell 内部页面内容。 |
 | 书架实现来源（Bookshelf Implementation Source） | `ReaderRouteHost` 当前 `bookshelf` 路由进入 `StitchAppShell` | 书架输入件由 `MainTabPageKit` + `BookshelfInput` 输出 | 不能继续只沿用 Stitch 硬编码列表；应迁到 fixture/state 驱动。 |
 | 图标体系（Icon System） | 部分 Compose 代码直接使用 Material Icons | 本地素材库登记 71 个统一语义图标 token | 需要建立 token 到 Compose icon 的映射表；缺图标先补素材库，不现场画。 |
 | 换源落点（Source Switching Target） | 当前没有单独 FlowShell Composable | `换源` 是横屏 `FlowShell` | 应新增或抽出横向 FlowShell，而不是复用主标签页或普通设置页骨架。 |

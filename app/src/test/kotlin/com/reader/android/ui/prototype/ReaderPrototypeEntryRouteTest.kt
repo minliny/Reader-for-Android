@@ -23,7 +23,7 @@ class ReaderPrototypeEntryRouteTest {
             "prototype_gallery",
             "ReaderPrototypeGallery",
             "startDestination",
-            "StitchBottomNav"
+            "ReaderMainTabShell"
         ).forEach { token ->
             assertTrue("Route host must contain $token", token in routeHostSource)
         }

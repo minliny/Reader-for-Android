@@ -2,7 +2,6 @@ package com.reader.android.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -28,6 +27,8 @@ import com.reader.android.ui.booksource.SourceEditScreen
 import com.reader.android.ui.booksource.SourceImportScreen
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderMainTab
+import com.reader.android.ui.components.ReaderMainTabShell
 import com.reader.android.ui.components.ReaderOfflineState
 import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.detail.BookDetailScreen
@@ -40,8 +41,6 @@ import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.stitch.StitchAppShell
-import com.reader.android.ui.stitch.StitchBottomNav
-import com.reader.android.ui.stitch.StitchTab
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
@@ -173,28 +172,32 @@ fun ReaderRouteHost(
     val mainTabRoutes = appScreens.map { it.route }.toSet()
     val currentRoute = currentDestination?.route
     val showMainBottomBar = currentRoute in mainTabRoutes
+    val selectedMainTabIndex = appScreens.indexOfFirst { it.route == currentRoute }
+        .coerceAtLeast(0)
+    val mainTabs = appScreens.map { screen ->
+        ReaderMainTab(
+            label = screen.label,
+            contentDescription = screen.label,
+            icon = screen.icon
+        )
+    }
     val startDestination = ReaderRoutes.BOOKSHELF
 
-    Scaffold(
-        bottomBar = {
-            if (showMainBottomBar) {
-                val selectedIndex = appScreens.indexOfFirst { it.route == currentRoute }
-                    .coerceAtLeast(0)
-                StitchBottomNav(
-                    tabs = appScreens.map { screen -> StitchTab(screen.label, screen.icon) },
-                    selectedIndex = selectedIndex,
-                    onTabSelected = { index ->
-                        val route = appScreens.getOrNull(index)?.route ?: return@StitchBottomNav
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        backStack.push(route)
+    ReaderMainTabShell(
+        tabs = mainTabs,
+        selectedIndex = selectedMainTabIndex,
+        showMainNav = showMainBottomBar,
+        onTabSelected = { index ->
+            val route = appScreens.getOrNull(index)?.route
+            if (route != null) {
+                navController.navigate(route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
                     }
-                )
+                    launchSingleTop = true
+                    restoreState = true
+                }
+                backStack.push(route)
             }
         }
     ) { innerPadding ->
