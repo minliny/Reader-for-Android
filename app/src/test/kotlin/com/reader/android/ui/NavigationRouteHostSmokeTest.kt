@@ -14,8 +14,15 @@ class NavigationRouteHostSmokeTest {
 
     @Test
     fun `reader route host defines all core tab routes`() {
-        listOf("BOOKSHELF", "DISCOVER", "SOURCES", "MINE").forEach { tab ->
+        listOf("BOOKSHELF", "DISCOVER", "RSS", "SETTINGS").forEach { tab ->
             assertTrue("Must define $tab", "const val $tab" in routeHostSource)
+        }
+    }
+
+    @Test
+    fun `reader route host keeps legacy source and mine routes as secondary destinations`() {
+        listOf("SOURCES", "MINE").forEach { route ->
+            assertTrue("Must define $route", "const val $route" in routeHostSource)
         }
     }
 
@@ -41,7 +48,7 @@ class NavigationRouteHostSmokeTest {
     }
 
     @Test
-    fun `reader route host defines mine subscreen routes`() {
+    fun `reader route host defines settings subscreen routes`() {
         listOf(
             "GLOBAL_SETTINGS",
             "WEBDAV_CONFIG",
@@ -90,6 +97,6 @@ class NavigationRouteHostSmokeTest {
     @Test
     fun `total route count matches expected`() {
         val count = routeHostSource.lines().count { it.trimStart().startsWith("const val ") }
-        assertEquals("ReaderRoutes must define 24 production routes plus 1 debug prototype route", 25, count)
+        assertEquals("ReaderRoutes must define 26 production routes plus 1 debug prototype route", 27, count)
     }
 }

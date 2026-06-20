@@ -19,6 +19,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.reader.android.BuildConfig
+import com.reader.android.ui.bookshelf.BookshelfAdapterShell
 import com.reader.android.ui.bookshelf.BookshelfScreen
 import com.reader.android.ui.booksource.BookSourceScreen
 import com.reader.android.ui.booksource.SourceDetailData
@@ -40,7 +41,6 @@ import com.reader.android.ui.prototype.ReaderPrototypeGallery
 import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
-import com.reader.android.ui.stitch.StitchAppShell
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
@@ -207,10 +207,11 @@ fun ReaderRouteHost(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(ReaderRoutes.BOOKSHELF) {
-                StitchAppShell(
+                BookshelfScreen(
                     onSearchClick = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) },
-                    onBookClick = { detailUrl, _ ->
-                        navController.navigateAndTrack(ReaderRoutes.detail(detailUrl), backStack)
+                    bookshelfState = BookshelfAdapterShell.bookshelfState(),
+                    onBookClick = { book ->
+                        navController.navigateAndTrack(ReaderRoutes.detail(book.detailTarget), backStack)
                     }
                 )
             }
