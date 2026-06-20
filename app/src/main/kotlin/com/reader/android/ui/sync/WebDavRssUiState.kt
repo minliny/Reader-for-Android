@@ -126,6 +126,10 @@ data class RssListUiState(
     val feeds: List<RssFeedUiModel>,
     val selectedFeedId: String? = null,
     val articles: List<RssArticleUiModel> = emptyList(),
+    val summaryFeedCountLabel: String = feeds.size.toString(),
+    val unreadCountLabel: String = articles.size.toString(),
+    val latestUpdateLabel: String = articles.firstOrNull()?.publishedAt ?: "暂无更新",
+    val visibleCountLabel: String = articles.size.toString(),
     val isLoading: Boolean = false,
     val emptyMessage: String = "暂无 RSS 订阅",
     val error: SyncErrorUiState? = null,
@@ -143,9 +147,21 @@ object DiscoverRssWebDavMapper {
     fun rssList(
         feeds: List<RssFeedUiModel> = DiscoverRssWebDavFixture.rssFeeds,
         articles: List<RssArticleUiModel> = DiscoverRssWebDavFixture.rssArticles,
-        selectedFeedId: String? = DiscoverRssWebDavFixture.rssFeeds.firstOrNull()?.id
+        selectedFeedId: String? = DiscoverRssWebDavFixture.rssFeeds.firstOrNull()?.id,
+        summaryFeedCountLabel: String = DiscoverRssWebDavFixture.rssSummaryFeedCountLabel,
+        unreadCountLabel: String = DiscoverRssWebDavFixture.rssUnreadCountLabel,
+        latestUpdateLabel: String = DiscoverRssWebDavFixture.rssLatestUpdateLabel,
+        visibleCountLabel: String = DiscoverRssWebDavFixture.rssVisibleCountLabel
     ): RssListUiState =
-        RssListUiState(feeds = feeds, selectedFeedId = selectedFeedId, articles = articles)
+        RssListUiState(
+            feeds = feeds,
+            selectedFeedId = selectedFeedId,
+            articles = articles,
+            summaryFeedCountLabel = summaryFeedCountLabel,
+            unreadCountLabel = unreadCountLabel,
+            latestUpdateLabel = latestUpdateLabel,
+            visibleCountLabel = visibleCountLabel
+        )
 
     fun rssLoading(): RssListUiState =
         RssListUiState(feeds = emptyList(), isLoading = true, emptyMessage = "正在刷新 RSS")
@@ -231,18 +247,46 @@ object DiscoverRssWebDavFixture {
         DiscoverItemUiModel("discover-local-3", "雨线手记", "随笔 · UI fixture", null)
     )
 
+    const val rssSummaryFeedCountLabel = "12"
+    const val rssUnreadCountLabel = "38"
+    const val rssLatestUpdateLabel = "刚刚更新"
+    const val rssVisibleCountLabel = "24"
+
     val rssFeeds = listOf(
-        RssFeedUiModel("rss-feed-1", "订阅源 1", 2, enabled = true),
-        RssFeedUiModel("rss-feed-2", "订阅源 2", 0, enabled = false)
+        RssFeedUiModel("rss-feed-novel", "小说更新", 18, enabled = true),
+        RssFeedUiModel("rss-feed-tech", "技术文章", 8, enabled = true),
+        RssFeedUiModel("rss-feed-booklist", "书单推送", 7, enabled = true),
+        RssFeedUiModel("rss-feed-index", "章节索引", 5, enabled = false)
     )
 
     val rssArticles = listOf(
         RssArticleUiModel(
             id = "rss-article-1",
-            feedId = "rss-feed-1",
-            title = "深空信号更新",
-            description = "来自订阅源的章节更新与说明。",
-            publishedAt = "UI fixture"
+            feedId = "rss-feed-novel",
+            title = "《长夜余火》更新到第 33 章",
+            description = "雨夜之后，旧城线索继续展开。",
+            publishedAt = "12 分钟前"
+        ),
+        RssArticleUiModel(
+            id = "rss-article-2",
+            feedId = "rss-feed-tech",
+            title = "本周 Android Compose 动画笔记",
+            description = "整理了过渡、手势和性能优化。",
+            publishedAt = "35 分钟前"
+        ),
+        RssArticleUiModel(
+            id = "rss-article-3",
+            feedId = "rss-feed-booklist",
+            title = "六月完结书单精选",
+            description = "悬疑、科幻、修真共 18 本。",
+            publishedAt = "1 小时前"
+        ),
+        RssArticleUiModel(
+            id = "rss-article-4",
+            feedId = "rss-feed-index",
+            title = "诡秘之主番外整理",
+            description = "新增章节索引和来源链接。",
+            publishedAt = "2 小时前"
         )
     )
 

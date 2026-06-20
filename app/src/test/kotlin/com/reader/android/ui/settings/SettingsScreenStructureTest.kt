@@ -15,6 +15,14 @@ class SettingsScreenStructureTest {
         )
     }
 
+    private val rootSource: String by lazy {
+        String(
+            Files.readAllBytes(
+                Paths.get("src/main/kotlin/com/reader/android/ui/settings/MineScreen.kt")
+            )
+        )
+    }
+
     @Test
     fun `settings screen uses reader theme and components`() {
         listOf(
@@ -45,6 +53,33 @@ class SettingsScreenStructureTest {
     fun `settings screen exposes reader settings section`() {
         listOf("阅读设置", "夜间模式", "字号", "行间距", "页边距").forEach { text ->
             assertTrue("SettingsScreen must display '$text'", text in screenSource)
+        }
+    }
+
+    @Test
+    fun `settings root mirrors main tab input structure`() {
+        listOf(
+            "SettingsRootScreen",
+            "SettingsHomeState",
+            "本地概览",
+            "本地书籍",
+            "订阅源",
+            "书源可用",
+            "最近备份",
+            "常用管理",
+            "书源管理",
+            "RSS/订阅管理",
+            "阅读偏好",
+            "缓存管理",
+            "全部设置",
+            "通用",
+            "书架与搜索",
+            "书源与订阅",
+            "同步与备份",
+            "隐私与权限",
+            "关于与反馈"
+        ).forEach { token ->
+            assertTrue("SettingsRootScreen must preserve $token", token in rootSource)
         }
     }
 

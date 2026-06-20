@@ -38,7 +38,7 @@ import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.discover.DiscoverScreen
 import com.reader.android.ui.discover.RssDetailScreen
-import com.reader.android.ui.discover.RssListScreen
+import com.reader.android.ui.discover.RssHomeScreen
 import com.reader.android.ui.discover.RssSubscriptionManagementScreen
 import com.reader.android.ui.reader.ReaderScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
@@ -165,7 +165,7 @@ fun ReaderPrototypeSurface(entry: ReaderPrototypeEntry) {
         "reader-appearance" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[7]) }
         "reader-settings" -> ReaderPreview { ReaderScreen(runtimeState = ReaderPrototypeFixtures.readerStates[8]) }
         "discover-home" -> DiscoverScreen(discoverState = ReaderPrototypeFixtures.discover)
-        "rss-list" -> RssListScreen(rssState = ReaderPrototypeFixtures.rssList)
+        "rss-list" -> RssHomeScreen(rssState = ReaderPrototypeFixtures.rssList)
         "rss-detail" -> RssDetailScreen(article = ReaderPrototypeFixtures.rssList.articles.first())
         "rss-subscriptions" -> RssSubscriptionManagementScreen(subscriptionState = ReaderPrototypeFixtures.rssSubscriptions)
         "webdav-config" -> WebDavConfigScreen(webDavState = ReaderPrototypeFixtures.webDavConfigured)

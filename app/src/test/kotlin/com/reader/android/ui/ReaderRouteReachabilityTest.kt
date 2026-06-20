@@ -27,6 +27,7 @@ class ReaderRouteReachabilityTest {
             "SourceEditScreen",
             "SourceImportScreen",
             "DiscoverScreen",
+            "RssHomeScreen",
             "RssListScreen",
             "WebDavConfigScreen"
         ).forEach { screen ->
