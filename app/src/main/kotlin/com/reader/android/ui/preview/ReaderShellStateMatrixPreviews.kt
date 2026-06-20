@@ -2,6 +2,8 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.reader.android.ui.reader.AutoPageMapper
+import com.reader.android.ui.reader.AutoPageScreen
 import com.reader.android.ui.reader.ImmersiveReadingMapper
 import com.reader.android.ui.reader.ImmersiveReadingScreen
 import com.reader.android.ui.reader.ReadingAppearanceMapper
@@ -190,4 +192,28 @@ fun ReadingSettingsLoadingPreview() {
 @Composable
 fun ReadingSettingsErrorPreview() {
     ReadingSettingsScreen(state = ReadingSettingsMapper.error())
+}
+
+@Preview(name = "Reader Shell / Auto Page / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun AutoPageDefaultPreview() {
+    AutoPageScreen(state = AutoPageMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Auto Page / Running", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun AutoPageRunningPreview() {
+    AutoPageScreen(state = AutoPageMapper.running())
+}
+
+@Preview(name = "Reader Shell / Auto Page / Paused", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun AutoPagePausedPreview() {
+    AutoPageScreen(state = AutoPageMapper.paused())
+}
+
+@Preview(name = "Reader Shell / Auto Page / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun AutoPageErrorPreview() {
+    AutoPageScreen(state = AutoPageMapper.error())
 }
