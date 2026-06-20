@@ -31,6 +31,14 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfSortFilterUiState.kt")))
     }
 
+    private val groupManagementScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfGroupManagementScreen.kt")))
+    }
+
+    private val groupManagementStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfGroupManagementUiState.kt")))
+    }
+
     @Test
     fun `library flow compose previews expose search detail directory and sort filter state matrices`() {
         listOf(
@@ -54,7 +62,14 @@ class LibraryFlowStateMatrixPreviewTest {
             "LibrarySortFilterDefaultPreview",
             "LibrarySortFilterSelectedPreview",
             "LibrarySortFilterEmptyPreview",
-            "LibrarySortFilterErrorPreview"
+            "LibrarySortFilterErrorPreview",
+            "LibraryGroupManagementDefaultPreview",
+            "LibraryGroupManagementNewPreview",
+            "LibraryGroupManagementRenamePreview",
+            "LibraryGroupManagementDeletePreview",
+            "LibraryGroupManagementEmptyPreview",
+            "LibraryGroupManagementLoadingPreview",
+            "LibraryGroupManagementErrorPreview"
         ).forEach { token ->
             assertTrue("Library flow preview source must contain $token", token in previewSource)
         }
@@ -80,6 +95,13 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookshelfSortFilterMapper.selected",
             "BookshelfSortFilterMapper.empty",
             "BookshelfSortFilterMapper.error",
+            "BookshelfGroupManagementMapper.fromFixture",
+            "BookshelfGroupManagementMapper.newGroup",
+            "BookshelfGroupManagementMapper.rename",
+            "BookshelfGroupManagementMapper.delete",
+            "BookshelfGroupManagementMapper.empty",
+            "BookshelfGroupManagementMapper.loading",
+            "BookshelfGroupManagementMapper.error",
             "ReaderUiState.Offline",
             "ReaderUiState.PermissionRequired"
         ).forEach { token ->
@@ -150,6 +172,38 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookshelfGroupFilterSort.apply"
         ).forEach { token ->
             assertTrue("BookshelfSortFilterUiState must expose frontend input state token $token", token in sortFilterStateSource)
+        }
+
+        listOf(
+            "BookshelfGroupManagementUiState",
+            "GroupManagementContent",
+            "GroupRow",
+            "GroupEmptyBlock",
+            "GroupNameDialog",
+            "GroupDeleteConfirmDialog",
+            "BookshelfGroupManagementDisplayState.Delete",
+            "ReaderIconToken.Delete",
+            "ReaderPrimaryButton",
+            "ReaderSecondaryButton"
+        ).forEach { token ->
+            assertTrue("BookshelfGroupManagementScreen must expose frontend input state token $token", token in groupManagementScreenSource)
+        }
+
+        listOf(
+            "BookshelfGroupRowUiModel",
+            "BookshelfGroupDialogUiModel",
+            "BookshelfGroupDeleteConfirmUiModel",
+            "BookshelfGroupManagementMapper",
+            "fun newGroup()",
+            "fun rename()",
+            "fun delete()",
+            "fun empty()",
+            "fun loading()",
+            "fun error(",
+            "不会删除书籍",
+            "canDelete = false"
+        ).forEach { token ->
+            assertTrue("BookshelfGroupManagementUiState must expose frontend input state token $token", token in groupManagementStateSource)
         }
     }
 }
