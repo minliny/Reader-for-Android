@@ -7,7 +7,7 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 语义 token 映射（Compose Semantic Token Mapping） | 45 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 48 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
@@ -47,6 +47,7 @@
 | `CloudOff` | `offline` | 可映射 | 离线状态。 |
 | `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `Delete` | `trash` | 已映射 | 删除、移除或危险清空通过 `ReaderIconToken.Trash` 表达。 |
+| `Download` | `download` | 已映射 | 自动缓存或下载缓存通过 `ReaderIconToken.Download` 表达。 |
 | `Edit` | `edit` | 可映射 | Figma 当前标为缺源；Compose 可先走语义 token。 |
 | `ErrorOutline` | `warning` | 可映射 | 错误或警告状态。 |
 | `Explore` | `discover` | 可映射 | 发现。 |
@@ -56,6 +57,7 @@
 | `GridView` | `grid` | 可映射 | 宫格视图。 |
 | `Groups` | `people` | 已映射 | 合并同名同作者等多人/作者语义通过 `ReaderIconToken.People` 表达。 |
 | `History` | `clock` | 已映射 | 搜索历史或历史记录通过 `ReaderIconToken.Clock` 表达。 |
+| `Image` | `image` | 已映射 | 封面缓存和图片缓存通过 `ReaderIconToken.Image` 表达。 |
 | `Info` | `info` | 已映射 | 说明入口通过 `ReaderIconToken.Info` 表达。 |
 | `Hub` | `source-stack` | 需降级为设置二级入口 | 书源不再作为主 tab。 |
 | `Lock` | `shield` | 可映射 | 权限、隐私保护。 |
@@ -71,6 +73,7 @@
 | `Settings` | `settings` / `gear` | 可映射 | 设置主入口用 `settings`，齿轮操作可用 `gear`。 |
 | `Shield` | `shield` | 已映射 | 隐私说明和安全说明通过 `ReaderIconToken.Shield` 表达。 |
 | `Sort` | `sort` | 已映射 | 搜索结果排序通过 `ReaderIconToken.Sort` 表达。 |
+| `Storage` | `storage` | 已映射 | 缓存占用、存储策略和清理结果通过 `ReaderIconToken.Storage` 表达。 |
 | `Stop` | 待补 `stop` | 缺口 | 停止自动翻页或朗读。 |
 | `SwapHoriz` | `replace` / `source` | 需按上下文 | 内容替换用 `replace`，换源用 `source`。 |
 | `TextFormat` | `typo` | 可映射 | 字体、排版。 |
@@ -152,6 +155,9 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Info -> Icons.Filled.Info
     ReaderIconToken.Shield -> Icons.Filled.Shield
     ReaderIconToken.Bug -> Icons.Filled.BugReport
+    ReaderIconToken.Storage -> Icons.Filled.Storage
+    ReaderIconToken.Download -> Icons.Filled.Download
+    ReaderIconToken.Image -> Icons.Filled.Image
 }
 ```
 

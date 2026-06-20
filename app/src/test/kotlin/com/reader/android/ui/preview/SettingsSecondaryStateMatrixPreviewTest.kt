@@ -35,6 +35,14 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/PrivacyPermissionsDesignUiState.kt")))
     }
 
+    private val cacheManagementScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/CacheManagementDesignScreen.kt")))
+    }
+
+    private val cacheManagementStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/CacheManagementDesignUiState.kt")))
+    }
+
     @Test
     fun `settings secondary compose previews expose general webdav backup sync and remote book states`() {
         listOf(
@@ -54,6 +62,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsPrivacyPermissionsLoadingPreview",
             "SettingsPrivacyPermissionsErrorPreview",
             "SettingsPrivacyPermissionsPermissionPreview",
+            "SettingsCacheManagementDefaultPreview",
+            "SettingsCacheManagementLoadingPreview",
+            "SettingsCacheManagementEmptyPreview",
+            "SettingsCacheManagementConfirmPreview",
+            "SettingsCacheManagementErrorPreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -90,6 +103,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "PrivacyPermissionsMapper.loading",
             "PrivacyPermissionsMapper.error",
             "PrivacyPermissionsMapper.permission",
+            "CacheManagementMapper.fromFixture",
+            "CacheManagementMapper.loading",
+            "CacheManagementMapper.empty",
+            "CacheManagementMapper.confirm",
+            "CacheManagementMapper.error",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -282,6 +300,67 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "需要系统权限"
         ).forEach { token ->
             assertTrue("Privacy permissions state source must include $token", token in privacyPermissionsStateSource)
+        }
+    }
+
+    @Test
+    fun `cache management screen keeps settingsshell slots storage card and cleanup feedback`() {
+        listOf(
+            "CacheManagementScreen",
+            "ReaderAppTopBar",
+            "ReaderSwitch",
+            "CacheSizeCard",
+            "StorageBar",
+            "CacheManagementSection",
+            "CacheCategoryRow",
+            "CacheDangerActionRow",
+            "CacheCleanupResult",
+            "CacheEmptyState",
+            "CacheConfirmDialog",
+            "CacheDangerButton",
+            "CacheFeedback",
+            "ReaderIconToken.Storage",
+            "ReaderIconToken.Download",
+            "ReaderIconToken.Image",
+            "contentDescription = \"SettingsShell 缓存管理\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("Cache management screen source must include $token", token in cacheManagementScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("Cache management screen must not include $forbidden", forbidden !in cacheManagementScreenSource)
+        }
+    }
+
+    @Test
+    fun `cache management state model keeps frontend input contract text`() {
+        listOf(
+            "CacheManagementDisplayState",
+            "CacheManagementMapper",
+            "fun loading()",
+            "fun empty()",
+            "fun confirm()",
+            "fun error()",
+            "缓存管理",
+            "缓存占用",
+            "正在计算",
+            "清理缓存",
+            "缓存分类",
+            "确认清理",
+            "暂无缓存",
+            "重新计算",
+            "不会删除书架记录",
+            "已清理"
+        ).forEach { token ->
+            assertTrue("Cache management state source must include $token", token in cacheManagementStateSource)
         }
     }
 }
