@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
@@ -103,7 +104,8 @@ enum class ReaderIconToken {
     Link,
     Message,
     Code,
-    Help
+    Help,
+    Upload
 }
 
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -160,4 +162,5 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Message -> Icons.Filled.ChatBubbleOutline
     ReaderIconToken.Code -> Icons.Filled.Code
     ReaderIconToken.Help -> Icons.AutoMirrored.Filled.HelpOutline
+    ReaderIconToken.Upload -> Icons.Filled.CloudUpload
 }

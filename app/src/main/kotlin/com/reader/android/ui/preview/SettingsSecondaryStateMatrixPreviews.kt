@@ -15,6 +15,8 @@ import com.reader.android.ui.settings.PrivacyPermissionsMapper
 import com.reader.android.ui.settings.PrivacyPermissionsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
+import com.reader.android.ui.settings.SyncBackupMapper
+import com.reader.android.ui.settings.SyncBackupScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
 import com.reader.android.ui.sync.DiscoverRssWebDavMapper
 import com.reader.android.ui.sync.ProgressSyncState
@@ -178,6 +180,48 @@ fun SettingsAboutFeedbackConfirmPreview() {
 @Composable
 fun SettingsAboutFeedbackOfflinePreview() {
     AboutFeedbackScreen(state = AboutFeedbackMapper.offline())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupDefaultPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupConfirmPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupLoadingPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Empty", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupEmptyPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.empty())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupErrorPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.error())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Offline", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupOfflinePreview() {
+    SyncBackupScreen(state = SyncBackupMapper.offline())
+}
+
+@Preview(name = "Settings Secondary / Sync Backup / Permission", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSyncBackupPermissionPreview() {
+    SyncBackupScreen(state = SyncBackupMapper.permission())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
