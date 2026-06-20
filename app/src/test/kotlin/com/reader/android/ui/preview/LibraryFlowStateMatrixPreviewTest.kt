@@ -19,8 +19,12 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/detail/BookDetailScreen.kt")))
     }
 
+    private val tocScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/toc/TOCScreen.kt")))
+    }
+
     @Test
-    fun `library flow compose previews expose search and detail state matrices`() {
+    fun `library flow compose previews expose search detail and directory state matrices`() {
         listOf(
             "LibrarySearchHomePreview",
             "LibrarySearchResultsPreview",
@@ -34,7 +38,11 @@ class LibraryFlowStateMatrixPreviewTest {
             "LibraryBookDetailEmptyPreview",
             "LibraryBookDetailErrorPreview",
             "LibraryBookDetailOfflinePreview",
-            "LibraryBookDetailPermissionPreview"
+            "LibraryBookDetailPermissionPreview",
+            "LibraryBookDirectoryDefaultPreview",
+            "LibraryBookDirectoryLoadingPreview",
+            "LibraryBookDirectoryEmptyPreview",
+            "LibraryBookDirectoryErrorPreview"
         ).forEach { token ->
             assertTrue("Library flow preview source must contain $token", token in previewSource)
         }
@@ -52,6 +60,10 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookDetailAdapterShell.detailLoading",
             "BookDetailAdapterShell.detailEmpty",
             "BookDetailAdapterShell.detailError",
+            "BookDirectoryUiStateMapper.fromFixture",
+            "BookDirectoryUiStateMapper.loading",
+            "BookDirectoryUiStateMapper.empty",
+            "BookDirectoryUiStateMapper.error",
             "ReaderUiState.Offline",
             "ReaderUiState.PermissionRequired"
         ).forEach { token ->
@@ -80,6 +92,19 @@ class LibraryFlowStateMatrixPreviewTest {
             "ReaderPermissionRequiredState"
         ).forEach { token ->
             assertTrue("BookDetailScreen must expose frontend input state token $token", token in detailScreenSource)
+        }
+
+        listOf(
+            "directoryState: BookDirectoryUiState? = null",
+            "BookDirectoryStateContent",
+            "BookDirectorySummaryBar",
+            "BookDirectoryCurrentChapterRow",
+            "BookDirectoryChapterRow",
+            "BookDirectoryDisplayState.Loading",
+            "BookDirectoryDisplayState.Empty",
+            "BookDirectoryDisplayState.Error"
+        ).forEach { token ->
+            assertTrue("TOCScreen must expose frontend input state token $token", token in tocScreenSource)
         }
     }
 }
