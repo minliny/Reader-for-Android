@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reader.android.ui.reader.ReaderControlLayerState
+import com.reader.android.ui.reader.ReaderOverlayType
 import com.reader.android.ui.theme.ReaderTheme
 
 enum class BrightnessDock { Left, Right }
@@ -83,6 +85,7 @@ fun ReaderControlBase(
     val showBrightness = !isQuickOverlay && !isBottomOverlay
     val showQuickActions = !isBottomOverlay
     val showPageControl = !isBottomOverlay
+    val activeBottomModule = (overlayState as? ReaderControlLayerState.BottomFunctionOverlay)?.type
 
     // Compute quick-action and page-control bottom insets so overlays don't cover them
     val quickActionsBottomInset = bottomBarHeight + bottomSafeGap + floatingPageControlHeight +
@@ -150,6 +153,7 @@ fun ReaderControlBase(
 
         // Bottom bar — always visible
         ReaderControlBottomBar(
+            activeModule = activeBottomModule,
             onDirectoryClick = onDirectoryClick,
             onTtsClick = onTtsClick,
             onAppearanceClick = onAppearanceClick,
@@ -385,6 +389,7 @@ private fun ReaderFloatingPageControl(
 
 @Composable
 private fun ReaderControlBottomBar(
+    activeModule: ReaderOverlayType?,
     onDirectoryClick: () -> Unit,
     onTtsClick: () -> Unit,
     onAppearanceClick: () -> Unit,
@@ -400,29 +405,50 @@ private fun ReaderControlBottomBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ReaderBottomItem(ReaderIconToken.Directory, "目录", onDirectoryClick)
-        ReaderBottomItem(ReaderIconToken.Tts, "朗读", onTtsClick)
-        ReaderBottomItem(ReaderIconToken.Appearance, "界面设置", onAppearanceClick)
-        ReaderBottomItem(ReaderIconToken.ReadingSettings, "阅读行为设置", onSettingsClick)
+        ReaderBottomItem(ReaderIconToken.Directory, "目录", activeModule == ReaderOverlayType.DIRECTORY, onDirectoryClick)
+        ReaderBottomItem(ReaderIconToken.Tts, "朗读", activeModule == ReaderOverlayType.TTS, onTtsClick)
+        ReaderBottomItem(ReaderIconToken.Appearance, "界面设置", activeModule == ReaderOverlayType.APPEARANCE, onAppearanceClick)
+        ReaderBottomItem(ReaderIconToken.ReadingSettings, "阅读行为设置", activeModule == ReaderOverlayType.SETTINGS, onSettingsClick)
     }
 }
 
 @Composable
-private fun ReaderBottomItem(icon: ReaderIconToken, label: String, onClick: () -> Unit) {
+private fun ReaderBottomItem(icon: ReaderIconToken, label: String, active: Boolean, onClick: () -> Unit) {
+    val itemBackground = if (active) ReaderTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent
+    val iconBackground = if (active) ReaderTheme.colors.primary else Color.Transparent
+    val iconTint = if (active) ReaderTheme.colors.paperBg else ReaderTheme.colors.controlInk
+    val labelColor = if (active) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk
+
     Column(
         modifier = Modifier
             .width(72.dp)
+            .height(56.dp)
+            .clip(ReaderTheme.shapes.small)
+            .background(itemBackground)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label }
             .padding(vertical = ReaderTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon.asImageVector(), contentDescription = null, tint = ReaderTheme.colors.controlInk)
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(iconBackground),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon.asImageVector(),
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
-            color = ReaderTheme.colors.controlInk,
+            color = labelColor,
             style = ReaderTheme.typography.readerControlLabel
         )
     }
