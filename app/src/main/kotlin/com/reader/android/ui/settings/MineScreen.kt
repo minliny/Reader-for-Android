@@ -14,7 +14,7 @@ import com.reader.android.ui.components.ReaderSettingsRow
 import com.reader.android.ui.theme.ReaderTheme
 
 @Composable
-fun MineScreen(
+fun SettingsRootScreen(
     onSourceManagementClick: () -> Unit = {},
     onGlobalSettingsClick: () -> Unit = {},
     onWebDavClick: () -> Unit = {},
@@ -101,4 +101,27 @@ fun MineScreen(
             }
         }
     }
+}
+
+@Composable
+fun MineScreen(
+    onSourceManagementClick: () -> Unit = {},
+    onGlobalSettingsClick: () -> Unit = {},
+    onWebDavClick: () -> Unit = {},
+    onBackupClick: () -> Unit = {},
+    onProgressSyncClick: () -> Unit = {},
+    onRemoteBooksClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
+    onPrototypeGalleryClick: (() -> Unit)? = null
+) {
+    SettingsRootScreen(
+        onSourceManagementClick = onSourceManagementClick,
+        onGlobalSettingsClick = onGlobalSettingsClick,
+        onWebDavClick = onWebDavClick,
+        onBackupClick = onBackupClick,
+        onProgressSyncClick = onProgressSyncClick,
+        onRemoteBooksClick = onRemoteBooksClick,
+        onAboutClick = onAboutClick,
+        onPrototypeGalleryClick = onPrototypeGalleryClick
+    )
 }

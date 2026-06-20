@@ -29,7 +29,7 @@
 | 路由与主框架（Routes and App Shell） | `app/src/main/kotlin/com/reader/android/ui/AppNavigation.kt`、`ReaderRouteHost.kt` | 对齐 MainTabShell、二级页栈、阅读页全屏和设置页入口。 |
 | 主题 token（Theme Tokens） | `ui/theme/ReaderColors.kt`、`ReaderSpacing.kt`、`ReaderShapes.kt`、`ReaderTypography.kt`、`ReaderElevation.kt` | 对照 `tokens.css` 建立颜色、间距、圆角、阴影和字体映射。 |
 | 通用组件（Common Components） | `ui/components/CommonComponents.kt`、`BookComponents.kt`、`SearchComponents.kt`、`SettingsComponents.kt`、`StateComponents.kt`、`ReaderNativeComponents.kt` | 承接公共组件库中的 primitive、book、settings、state、reader components。 |
-| 主标签页（Main Tabs） | `ui/bookshelf/BookshelfScreen.kt`、`ui/discover/DiscoverScreen.kt`、`ui/discover/RssScreens.kt`、`ui/settings/MineScreen.kt`、`ui/settings/SettingsScreen.kt` | 需要先解决主导航标签差异，再映射四个主标签页。 |
+| 主标签页（Main Tabs） | `ui/bookshelf/BookshelfScreen.kt`、`ui/discover/DiscoverScreen.kt`、`ui/discover/RssScreens.kt`、`ui/settings/MineScreen.kt::SettingsRootScreen`、`ui/settings/SettingsScreen.kt` | 需要先解决主导航标签差异，再映射四个主标签页。 |
 | 书架链路（Library Flow） | `ui/search/SearchScreen.kt`、`ui/detail/BookDetailScreen.kt`、`ui/toc/TOCScreen.kt`、`ui/bookshelf/*` | 映射 LibraryShell 的返回顶栏、内容区、底部操作、底表、弹窗和状态宿主。 |
 | 阅读链路（Reader Flow） | `ui/reader/ReaderScreen.kt`、`ui/reader/components/*` | 映射 ReaderShell 的正文底层、覆盖层、模块导航、底表宿主和阅读状态。 |
 | 横向流程（Flow Shell） | `ui/reader/*` 或后续新增 `ui/reader/source/*` | 当前没有明确的一一对应 Compose 页面；换源应作为独立 FlowShell 结构实现，不塞进普通竖屏 ReaderShell。 |

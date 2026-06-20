@@ -18,6 +18,7 @@ class ReaderRouteReachabilityTest {
             "BookSourceScreen",
             "ReaderScreen",
             "SettingsScreen",
+            "SettingsRootScreen",
             "MineScreen",
             "SearchScreen",
             "BookDetailScreen",

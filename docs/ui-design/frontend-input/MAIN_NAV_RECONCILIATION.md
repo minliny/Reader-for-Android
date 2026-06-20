@@ -27,7 +27,7 @@
 | `app/src/main/kotlin/com/reader/android/ui/ReaderRouteHost.kt` | 主底栏读取 `appScreens`，并通过 `ReaderMainTabShell` 输出正式主标签页框架 | 已收敛（Done） | 后续只把页面内容迁入 MainTabShell content slot。 |
 | `app/src/main/kotlin/com/reader/android/ui/stitch/StitchAppShell.kt` | 不再提供底部主导航，也不再作为书架主 tab 入口 | 已收敛（Done） | 仅保留为历史 prototype 内容；不得再承担主导航或书架根页。 |
 | `app/src/main/kotlin/com/reader/android/ui/booksource/*` | 书源管理保留 legacy route，同时从设置页进入 | 部分完成（Partially Done） | 后续继续拆成 SettingsShell 下的书源管理二级页。 |
-| `app/src/main/kotlin/com/reader/android/ui/settings/MineScreen.kt` | 顶栏显示 `设置`，并增加 `书源管理` 入口 | 部分完成（Partially Done） | 函数名仍为 `MineScreen`，后续重命名或拆成正式 Settings root。 |
+| `app/src/main/kotlin/com/reader/android/ui/settings/MineScreen.kt` | 新增正式 `SettingsRootScreen`，`MineScreen` 仅保留为 legacy wrapper | 已收敛（Done） | 后续按本地 `02-主标签页/设置` fixture 重构内容结构。 |
 | `app/src/main/kotlin/com/reader/android/ui/discover/RssScreens.kt` | 新增 RSS 主 tab 路由，RSS 列表可作为 tab root 渲染 | 已收敛（Done） | 后续按本地 RSS fixture 重构内容结构。 |
 
 ## 建议路由归并（Route Reconciliation）
@@ -48,7 +48,7 @@
 1. 改 `AppScreen`（AppScreen Update）：已完成，主 tab 为 `Bookshelf / Discover / Rss / Settings`。
 2. 改路由分组（Route Group Update）：已完成，RSS 子路由归入 `rss`，书源、备份、关于等归入 `settings`。
 3. 改底栏数据源（Bottom Nav Source）：已完成，`ReaderRouteHost` 底栏读取 `appScreens` 并使用 `ReaderMainTabShell`，旧 `StitchBottomNav` 已移除。
-4. 建设置首页（Settings Root）：部分完成，当前复用 `MineScreen` 并显示 `设置`；后续需按本地 `02-主标签页/设置` fixture 重构。
+4. 建设置首页（Settings Root）：已完成第一轮命名收敛，主 tab 使用 `SettingsRootScreen`，`MineScreen` 仅兼容 legacy route；后续需按本地 `02-主标签页/设置` fixture 重构内容。
 5. 建 RSS 根页（RSS Root）：部分完成，当前 `ReaderRoutes.RSS` 渲染 `RssListScreen`；后续需按本地 RSS fixture 重构。
 6. 回归验证（Regression）：已完成主导航相关 JVM 测试；后续重构 Settings/RSS 内容时继续补 UI 状态覆盖。
 

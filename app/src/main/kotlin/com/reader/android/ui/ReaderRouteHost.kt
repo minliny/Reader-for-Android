@@ -44,6 +44,7 @@ import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
+import com.reader.android.ui.settings.SettingsRootScreen
 import com.reader.android.ui.settings.SettingsScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
 import com.reader.android.ui.toc.TOCScreen
@@ -224,7 +225,7 @@ fun ReaderRouteHost(
                 )
             }
             composable(ReaderRoutes.SETTINGS) {
-                MineScreen(
+                SettingsRootScreen(
                     onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
