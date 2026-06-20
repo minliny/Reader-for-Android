@@ -7,7 +7,8 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 当前 Material icon 符号（Current Compose Material Icon Symbols） | 37 | 由 `app/src/main/kotlin/com/reader/android/ui` 下 `Icons.Filled.*` 和 `Icons.AutoMirrored.Filled.*` 扫描得出。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 18 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路和共享状态组件。 |
+| Legacy 直连 Material 图标（Legacy Direct Material Icons） | 分批保留 | 阅读控制层和 `ui/stitch/*` prototype 暂保留直接 Material Icons，后续按模块迁移。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
 ## 使用规则（Usage Rules）
@@ -86,10 +87,11 @@
 | --- | --- | --- |
 | `AppNavigation.kt` | `AppScreen` 已持有 `ReaderIconToken`，并通过 `asImageVector()` 暴露兼容图标。 | 后续禁止主 tab 直接新增 `ImageVector` 字段。 |
 | `ReaderRouteHost.kt` | 底栏读取 `appScreens`，图标从 `ReaderIconToken` 解析，并由 `ReaderMainTabShell` 输出统一主导航。 | 后续主 tab 只能扩展 `ReaderMainTabShell`，不再恢复临时 `StitchBottomNav`。 |
-| `ui/components/*` | 通用组件直接使用 Material Icons。 | 建立 `ReaderIcon` wrapper 后逐步迁移。 |
+| `ui/components/*` | 顶栏返回、搜索、设置下拉、状态组件和 reader setting chevron 已接入 `ReaderIconToken`。 | 后续新增共享组件不得直接 import Material Icons。 |
+| `ui/bookshelf/*` | 书架布局切换、搜索 FAB 和更多操作已接入 `ReaderIconToken`。 | 后续书架操作继续从 token 扩展。 |
 | `ui/reader/components/*` | 阅读控制层直接使用搜索、自动翻页、换源、夜间模式等 Material Icons。 | 优先迁移阅读模块导航和快捷操作图标。 |
 | `ui/stitch/*` | 原型代码大量直接引用 Material Icons。 | 保留为历史参考，不作为最终图标规则来源。 |
-| `ui/booksource/*`、`ui/settings/*`、`ui/discover/*` | 顶栏、更多、导入、RSS 入口直接使用 Material Icons。 | 按页面归属映射到设置、RSS、发现语义 token。 |
+| `ui/booksource/*`、`ui/settings/*`、`ui/discover/*` | 顶栏更多、导入、删除、文件导入、RSS 入口已接入 `ReaderIconToken`。 | 后续按页面新增 token，不再页面内直连 Material Icons。 |
 
 ## 建议实现形态（Suggested Implementation Shape）
 
@@ -104,6 +106,17 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Search -> Icons.Filled.Search
     ReaderIconToken.More -> Icons.Filled.MoreVert
     ReaderIconToken.Back -> Icons.AutoMirrored.Filled.ArrowBack
+    ReaderIconToken.Chevron -> Icons.Filled.ChevronRight
+    ReaderIconToken.ChevronDown -> Icons.Filled.ArrowDropDown
+    ReaderIconToken.ViewList -> Icons.AutoMirrored.Filled.ViewList
+    ReaderIconToken.Grid -> Icons.Filled.GridView
+    ReaderIconToken.Add -> Icons.Filled.Add
+    ReaderIconToken.Delete -> Icons.Filled.Delete
+    ReaderIconToken.FileOpen -> Icons.Filled.FileOpen
+    ReaderIconToken.FolderOff -> Icons.Filled.FolderOff
+    ReaderIconToken.Warning -> Icons.Filled.ErrorOutline
+    ReaderIconToken.Offline -> Icons.Filled.CloudOff
+    ReaderIconToken.Permission -> Icons.Filled.Lock
 }
 ```
 

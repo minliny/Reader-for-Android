@@ -7,11 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,8 +19,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderPrimaryButton
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.theme.ReaderTheme
 
@@ -46,9 +45,11 @@ fun SourceImportScreen(
                 title = "导入书源",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
 
@@ -60,7 +61,7 @@ fun SourceImportScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    Icons.Filled.FileOpen,
+                    imageVector = ReaderIconToken.FileOpen.asImageVector(),
                     contentDescription = null,
                     tint = ReaderTheme.colors.primary,
                     modifier = Modifier.size(48.dp)

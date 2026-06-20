@@ -19,6 +19,9 @@ class ReaderSharedComponentsStructureTest {
     private fun commonSource(): String =
         String(Files.readAllBytes(componentDir.resolve("CommonComponents.kt")))
 
+    private fun componentFileSource(fileName: String): String =
+        String(Files.readAllBytes(componentDir.resolve(fileName)))
+
     @Test
     fun `slice 2 shared component package exposes required components`() {
         val source = componentSource()
@@ -92,6 +95,58 @@ class ReaderSharedComponentsStructureTest {
 
         assertTrue("ReaderAppTopBar must use Back icon token", "ReaderIconToken.Back.asImageVector()" in source)
         assertTrue("ReaderAppTopBar must not hardcode ArrowBack", "Icons.AutoMirrored.Filled.ArrowBack" !in source)
+    }
+
+    @Test
+    fun `shared icon tokens cover main navigation and common actions`() {
+        val source = componentSource()
+
+        listOf(
+            "ReaderIconToken.Bookshelf",
+            "ReaderIconToken.Discover",
+            "ReaderIconToken.Rss",
+            "ReaderIconToken.Settings",
+            "ReaderIconToken.Search",
+            "ReaderIconToken.More",
+            "ReaderIconToken.Back",
+            "ReaderIconToken.Chevron",
+            "ReaderIconToken.ChevronDown",
+            "ReaderIconToken.ViewList",
+            "ReaderIconToken.Grid",
+            "ReaderIconToken.Add",
+            "ReaderIconToken.Delete",
+            "ReaderIconToken.FileOpen",
+            "ReaderIconToken.FolderOff",
+            "ReaderIconToken.Warning",
+            "ReaderIconToken.Offline",
+            "ReaderIconToken.Permission"
+        ).forEach { token ->
+            assertTrue("Shared icon token mapping must include $token", token in source)
+        }
+    }
+
+    @Test
+    fun `shared component files use icon tokens instead of page local material icons`() {
+        val files = mapOf(
+            "CommonComponents.kt" to listOf("ReaderIconToken.Back.asImageVector()"),
+            "SearchComponents.kt" to listOf("ReaderIconToken.Search.asImageVector()"),
+            "SettingsComponents.kt" to listOf("ReaderIconToken.ChevronDown.asImageVector()"),
+            "StateComponents.kt" to listOf(
+                "ReaderIconToken.FolderOff.asImageVector()",
+                "ReaderIconToken.Warning.asImageVector()",
+                "ReaderIconToken.Offline.asImageVector()",
+                "ReaderIconToken.Permission.asImageVector()"
+            ),
+            "ReaderNativeComponents.kt" to listOf("ReaderIconToken.Chevron.asImageVector()")
+        )
+
+        files.forEach { (fileName, requiredTokens) ->
+            val source = componentFileSource(fileName)
+            requiredTokens.forEach { token ->
+                assertTrue("$fileName must use $token", token in source)
+            }
+            assertTrue("$fileName must not import Material Icons directly", "import androidx.compose.material.icons" !in source)
+        }
     }
 
     @Test

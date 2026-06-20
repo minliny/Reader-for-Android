@@ -89,6 +89,26 @@ class SourceManagementUIStructureTest {
         }
     }
 
+    @Test
+    fun `source management screens use icon tokens`() {
+        val combined = listOf(
+            "BookSourceScreen.kt",
+            "SourceDetailScreen.kt",
+            "SourceEditScreen.kt",
+            "SourceImportScreen.kt"
+        ).joinToString("\n") { sourceOf(it) }
+
+        listOf(
+            "ReaderIconToken.Add",
+            "ReaderIconToken.Delete",
+            "ReaderIconToken.More",
+            "ReaderIconToken.FileOpen"
+        ).forEach { token ->
+            assertTrue("Source management screens must use $token", token in combined)
+        }
+        assertTrue("Source management screens must not import Material Icons directly", "import androidx.compose.material.icons" !in combined)
+    }
+
     // ── Shared regression ──
 
     @Test

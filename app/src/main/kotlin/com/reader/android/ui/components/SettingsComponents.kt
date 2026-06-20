@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -88,7 +86,7 @@ fun ReaderSettingsDropdownRow(
         contentDescription = "$contentDescription，当前为$selectedText",
         trailing = {
             Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
+                imageVector = ReaderIconToken.ChevronDown.asImageVector(),
                 contentDescription = "展开$title",
                 tint = ReaderTheme.colors.controlInk
             )

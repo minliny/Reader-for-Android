@@ -13,9 +13,19 @@ class DiscoverRssWebDavUIStructureTest {
     @Test
     fun `discover screen uses reader components`() {
         val s = sourceOf("discover/DiscoverScreen.kt")
-        listOf("ReaderTheme", "ReaderAppTopBar", "ReaderSectionHeader", "BookCard", "ReaderSettingsRow").forEach {
+        listOf(
+            "ReaderTheme",
+            "ReaderAppTopBar",
+            "ReaderSectionHeader",
+            "BookCard",
+            "ReaderSettingsRow",
+            "ReaderIconToken.More",
+            "ReaderIconToken.Chevron"
+        ).forEach {
             assertTrue("DiscoverScreen must use $it", it in s)
         }
+        assertTrue("DiscoverScreen must not hardcode MoreVert", "Icons.Filled.MoreVert" !in s)
+        assertTrue("DiscoverScreen must not hardcode ChevronRight", "Icons.Filled.ChevronRight" !in s)
     }
 
     @Test

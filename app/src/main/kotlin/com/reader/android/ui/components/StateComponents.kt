@@ -6,11 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.FolderOff
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -52,7 +47,7 @@ fun ReaderEmptyState(
     onActionClick: (() -> Unit)? = null
 ) {
     ReaderStateMessage(
-        icon = Icons.Filled.FolderOff,
+        icon = ReaderIconToken.FolderOff.asImageVector(),
         title = title,
         message = message,
         actionText = actionText,
@@ -71,7 +66,7 @@ fun ReaderErrorState(
     onRetryClick: (() -> Unit)? = null
 ) {
     ReaderStateMessage(
-        icon = Icons.Filled.ErrorOutline,
+        icon = ReaderIconToken.Warning.asImageVector(),
         title = title,
         message = message,
         actionText = if (onRetryClick != null) retryText else null,
@@ -90,7 +85,7 @@ fun ReaderOfflineState(
     onRetryClick: (() -> Unit)? = null
 ) {
     ReaderStateMessage(
-        icon = Icons.Filled.CloudOff,
+        icon = ReaderIconToken.Offline.asImageVector(),
         title = title,
         message = message,
         actionText = if (onRetryClick != null) retryText else null,
@@ -109,7 +104,7 @@ fun ReaderPermissionRequiredState(
     onActionClick: (() -> Unit)? = null
 ) {
     ReaderStateMessage(
-        icon = Icons.Filled.Lock,
+        icon = ReaderIconToken.Permission.asImageVector(),
         title = title,
         message = message,
         actionText = if (onActionClick != null) actionText else null,
