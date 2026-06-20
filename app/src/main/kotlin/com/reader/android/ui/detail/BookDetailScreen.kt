@@ -27,6 +27,8 @@ import com.reader.android.data.network.BookInfoParser
 import com.reader.android.data.network.HttpClient
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderCard
+import com.reader.android.ui.components.ReaderEmptyState
+import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderPrimaryButton
 import com.reader.android.ui.state.ReaderUiState
@@ -67,22 +69,31 @@ fun BookDetailScreen(
     detailUrl: String,
     onBack: () -> Unit,
     onTOC: (String) -> Unit,
-    uiState: ReaderUiState? = null
+    uiState: ReaderUiState? = null,
+    detailState: BookDetailUiState? = null
 ) {
     val viewModel = remember { BookDetailViewModel() }
 
-    LaunchedEffect(detailUrl) {
-        viewModel.load(detailUrl)
+    if (detailState == null && uiState == null) {
+        LaunchedEffect(detailUrl) {
+            viewModel.load(detailUrl)
+        }
     }
 
     ReaderTheme {
         Column(modifier = Modifier.fillMaxSize()) {
             ReaderAppTopBar(
-                title = viewModel.bookInfo?.name ?: "书籍详情",
+                title = detailState?.detail?.title ?: viewModel.bookInfo?.name ?: "书籍详情",
                 onNavigateBack = onBack
             )
 
-            when (uiState) {
+            if (detailState != null) {
+                BookDetailStateContent(
+                    state = detailState,
+                    onTOC = onTOC,
+                    modifier = Modifier.weight(1f)
+                )
+            } else when (uiState) {
                 null -> when {
                     viewModel.isLoading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "加载中")
                     viewModel.bookInfo != null -> {
@@ -112,8 +123,81 @@ fun BookDetailScreen(
                     }
                 }
                 is ReaderUiState.Loading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "加载中")
-                is ReaderUiState.Error -> com.reader.android.ui.components.ReaderErrorState(title = "加载失败", message = uiState.message, modifier = Modifier.weight(1f))
+                is ReaderUiState.Error -> ReaderErrorState(title = "加载失败", message = uiState.message, modifier = Modifier.weight(1f))
+                is ReaderUiState.Empty -> ReaderEmptyState(title = "暂无书籍详情", message = "请选择其他书籍", modifier = Modifier.weight(1f))
+                is ReaderUiState.Offline -> com.reader.android.ui.components.ReaderOfflineState(modifier = Modifier.weight(1f))
+                is ReaderUiState.PermissionRequired -> com.reader.android.ui.components.ReaderPermissionRequiredState(
+                    title = "需要${uiState.permission}权限",
+                    message = "授权后才能加载网络书源详情",
+                    modifier = Modifier.weight(1f)
+                )
                 else -> {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookDetailStateContent(
+    state: BookDetailUiState,
+    onTOC: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when {
+        state.isLoading -> ReaderLoadingState(modifier = modifier, message = "加载中")
+        state.errorMessage != null -> ReaderErrorState(
+            title = "加载失败",
+            message = state.errorMessage,
+            modifier = modifier
+        )
+        state.detail == null -> ReaderEmptyState(
+            title = "暂无书籍详情",
+            message = state.emptyMessage,
+            modifier = modifier
+        )
+        else -> {
+            val detail = state.detail
+            Column(
+                modifier = modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(ReaderTheme.spacing.screenPadding)
+            ) {
+                Text(detail.title, style = ReaderTheme.typography.pageTitle, color = ReaderTheme.colors.controlInk)
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.sm))
+                Row {
+                    Text("作者：${detail.author}", style = ReaderTheme.typography.bookTitle, color = ReaderTheme.colors.controlInk)
+                    Spacer(modifier = Modifier.width(ReaderTheme.spacing.md))
+                    Text("分类：${detail.category}", style = ReaderTheme.typography.bookTitle, color = ReaderTheme.colors.controlInk)
+                }
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                Text("来源：${detail.sourceName}", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                Text("字数：${detail.wordCount}", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                Text("最新：${detail.latestChapter}", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                Text("更新：${detail.updateTime}", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                if (detail.currentChapter.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(ReaderTheme.spacing.xs))
+                    Text("继续阅读：${detail.currentChapter}", style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                }
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
+                ReaderCard {
+                    Text(text = detail.intro, style = ReaderTheme.typography.bookMeta, color = ReaderTheme.colors.bodyText)
+                }
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
+                Text(
+                    "目录预览：${detail.tocPreview.chapterCount} 章，最新 ${detail.tocPreview.latestChapterTitle}",
+                    style = ReaderTheme.typography.bookMeta,
+                    color = ReaderTheme.colors.bodyText
+                )
+                Spacer(modifier = Modifier.height(ReaderTheme.spacing.md))
+                ReaderPrimaryButton(
+                    text = "查看目录",
+                    onClick = { onTOC(detail.tocPreview.tocTarget) },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentDescription = "查看目录"
+                )
             }
         }
     }

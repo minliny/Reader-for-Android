@@ -24,6 +24,8 @@ import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
 import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.ReaderOfflineState
+import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.components.ReaderSearchBox
 import com.reader.android.ui.components.SearchResultItem as SearchResultItemCard
 import com.reader.android.ui.state.ReaderUiState
@@ -79,21 +81,29 @@ class SearchViewModel(private val useRealHttp: Boolean = false) {
 @Composable
 fun SearchScreen(
     uiState: ReaderUiState? = null,
+    searchState: SearchUiState? = null,
     onResultClick: ((String) -> Unit)? = null
 ) {
     val viewModel = remember { SearchViewModel() }
     val scope = rememberCoroutineScope()
+    val displayedQuery = searchState?.query ?: viewModel.query
 
     ReaderTheme {
         Column(modifier = Modifier.fillMaxSize()) {
             ReaderAppTopBar(title = "搜索")
             ReaderSearchBox(
-                query = viewModel.query,
-                onQueryChange = { viewModel.onQueryChange(it) },
+                query = displayedQuery,
+                onQueryChange = { if (searchState == null) viewModel.onQueryChange(it) },
                 modifier = Modifier.padding(horizontal = ReaderTheme.spacing.screenPadding, vertical = ReaderTheme.spacing.xs)
             )
 
-            when (uiState) {
+            if (searchState != null) {
+                SearchStateContent(
+                    state = searchState,
+                    onResultClick = onResultClick,
+                    modifier = Modifier.weight(1f)
+                )
+            } else when (uiState) {
                 null -> when {
                     viewModel.error != null -> {
                         ReaderErrorState(title = "搜索失败", message = viewModel.error, modifier = Modifier.weight(1f), onRetryClick = { scope.launch { viewModel.search() } })
@@ -118,8 +128,48 @@ fun SearchScreen(
                 is ReaderUiState.Loading -> ReaderLoadingState(modifier = Modifier.weight(1f), message = "搜索中")
                 is ReaderUiState.Error -> ReaderErrorState(title = "搜索失败", message = uiState.message, modifier = Modifier.weight(1f), onRetryClick = if (uiState.retryable) {{ scope.launch { viewModel.search() } }} else null)
                 is ReaderUiState.Empty -> ReaderEmptyState(title = "未找到结果", message = "请尝试其他关键词", modifier = Modifier.weight(1f))
-                is ReaderUiState.Offline -> com.reader.android.ui.components.ReaderOfflineState(modifier = Modifier.weight(1f))
+                is ReaderUiState.Offline -> ReaderOfflineState(modifier = Modifier.weight(1f))
+                is ReaderUiState.PermissionRequired -> ReaderPermissionRequiredState(
+                    title = "需要${uiState.permission}权限",
+                    message = "授权后才能搜索网络书源",
+                    modifier = Modifier.weight(1f)
+                )
                 else -> {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchStateContent(
+    state: SearchUiState,
+    onResultClick: ((String) -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    when {
+        state.isLoading -> ReaderLoadingState(modifier = modifier, message = "搜索中")
+        state.errorMessage != null -> ReaderErrorState(
+            title = "搜索失败",
+            message = state.errorMessage,
+            modifier = modifier
+        )
+        state.results.isEmpty() -> ReaderEmptyState(
+            title = if (state.query.isBlank()) "搜索书籍" else "未找到结果",
+            message = state.emptyMessage,
+            modifier = modifier
+        )
+        else -> {
+            LazyColumn(modifier = modifier) {
+                items(state.results, key = { it.id }) { item ->
+                    SearchResultItemCard(
+                        title = item.title,
+                        sourceName = item.sourceName,
+                        author = item.author,
+                        latestChapter = item.latestChapter,
+                        intro = item.intro,
+                        onClick = { onResultClick?.invoke(item.detailTarget) }
+                    )
+                }
             }
         }
     }
