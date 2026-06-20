@@ -3,6 +3,8 @@ package com.reader.android.ui.preview
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.settings.GeneralSettingsMapper
+import com.reader.android.ui.settings.GeneralSettingsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
@@ -13,6 +15,36 @@ import com.reader.android.ui.sync.SyncErrorUiState
 
 private const val SettingsPreviewWidth = 390
 private const val SettingsPreviewHeight = 844
+
+@Preview(name = "Settings Secondary / General / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsGeneralDefaultPreview() {
+    GeneralSettingsScreen(state = GeneralSettingsMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / General / Option Sheet", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsGeneralOptionSheetPreview() {
+    GeneralSettingsScreen(state = GeneralSettingsMapper.optionSheet())
+}
+
+@Preview(name = "Settings Secondary / General / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsGeneralLoadingPreview() {
+    GeneralSettingsScreen(state = GeneralSettingsMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / General / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsGeneralErrorPreview() {
+    GeneralSettingsScreen(state = GeneralSettingsMapper.error())
+}
+
+@Preview(name = "Settings Secondary / General / Permission", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsGeneralPermissionPreview() {
+    GeneralSettingsScreen(state = GeneralSettingsMapper.permission())
+}
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
 @Composable
