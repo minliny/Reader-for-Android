@@ -17,10 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -32,11 +28,14 @@ import com.reader.android.ui.components.ReaderChip
 import com.reader.android.ui.components.ReaderDivider
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderListItem
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderSecondaryButton
 import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.components.ReaderSettingsSwitchRow
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.sync.DiscoverRssWebDavMapper
 import com.reader.android.ui.sync.RssArticleUiModel
@@ -99,9 +98,11 @@ fun RssHomeScreen(
             ReaderAppTopBar(
                 title = "RSS",
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             LazyColumn(
@@ -311,9 +312,11 @@ private fun RssEntryRow(
                     ReaderChip(text = "未读", selected = true)
                     Spacer(modifier = Modifier.width(ReaderTheme.spacing.xs))
                 }
-                IconButton(onClick = onMoreClick) {
-                    Icon(Icons.Filled.MoreVert, "条目更多", tint = ReaderTheme.colors.controlInk)
-                }
+                ReaderIconButton(
+                    icon = ReaderIconToken.More.asImageVector(),
+                    contentDescription = "条目更多",
+                    onClick = onMoreClick
+                )
             }
         }
     )
@@ -348,9 +351,11 @@ fun RssListScreen(
                 title = "RSS 列表",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             when {
@@ -395,9 +400,11 @@ fun RssDetailScreen(
                 title = "RSS 详情",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             Column(
@@ -466,9 +473,11 @@ fun RssSubscriptionManagementScreen(
                 title = "订阅管理",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             LazyColumn(modifier = Modifier.weight(1f)) {
