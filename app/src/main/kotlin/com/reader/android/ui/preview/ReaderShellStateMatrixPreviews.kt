@@ -6,6 +6,8 @@ import com.reader.android.ui.reader.ImmersiveReadingMapper
 import com.reader.android.ui.reader.ImmersiveReadingScreen
 import com.reader.android.ui.reader.ReadingAppearanceMapper
 import com.reader.android.ui.reader.ReadingAppearanceScreen
+import com.reader.android.ui.reader.ReadingAloudMapper
+import com.reader.android.ui.reader.ReadingAloudScreen
 import com.reader.android.ui.reader.ReadingTocBookmarkMapper
 import com.reader.android.ui.reader.ReadingTocBookmarkScreen
 import com.reader.android.ui.reader.ReadingEntryMapper
@@ -138,4 +140,28 @@ fun ReadingAppearanceLoadingPreview() {
 @Composable
 fun ReadingAppearanceErrorPreview() {
     ReadingAppearanceScreen(state = ReadingAppearanceMapper.error())
+}
+
+@Preview(name = "Reader Shell / Aloud / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAloudDefaultPreview() {
+    ReadingAloudScreen(state = ReadingAloudMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Aloud / Running", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAloudRunningPreview() {
+    ReadingAloudScreen(state = ReadingAloudMapper.running())
+}
+
+@Preview(name = "Reader Shell / Aloud / Paused", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAloudPausedPreview() {
+    ReadingAloudScreen(state = ReadingAloudMapper.paused())
+}
+
+@Preview(name = "Reader Shell / Aloud / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAloudErrorPreview() {
+    ReadingAloudScreen(state = ReadingAloudMapper.error())
 }
