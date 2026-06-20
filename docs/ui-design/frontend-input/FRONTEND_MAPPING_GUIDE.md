@@ -42,7 +42,7 @@
 | --- | --- | --- | --- |
 | 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell` | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成主导航代码收敛；后续继续迁移 MainTabShell 内部页面内容。 |
 | 书架实现来源（Bookshelf Implementation Source） | `ReaderRouteHost` 当前 `bookshelf` 路由进入 `BookshelfScreen`，状态来自 `BookshelfAdapterShell` | 书架输入件由 `MainTabPageKit` + `BookshelfInput` 输出 | 已脱离 `StitchAppShell`；后续继续把 `BookshelfAdapterShell` 数据收敛到正式 fixture/state 驱动。 |
-| 图标体系（Icon System） | 部分 Compose 代码直接使用 Material Icons | 本地素材库登记 71 个统一语义图标 token | 需要建立 token 到 Compose icon 的映射表；缺图标先补素材库，不现场画。 |
+| 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路和共享状态组件已通过 `ReaderIconToken` 映射；阅读控制层和 `ui/stitch/*` prototype 仍有直接 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | 当前没有单独 FlowShell Composable | `换源` 是横屏 `FlowShell` | 应新增或抽出横向 FlowShell，而不是复用主标签页或普通设置页骨架。 |
 | 状态矩阵（State Matrix） | Compose 现有状态覆盖分散在 screen/state 文件 | 每页都有 `state-matrix.html` 和 manifest 状态 | 应转成 Compose previews、UI tests 或 fixture-driven preview states。 |
 
@@ -84,7 +84,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
+7. 验证覆盖（Validation Coverage）：主标签页已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
 
 ## 开发禁用项（Do Not）
 
