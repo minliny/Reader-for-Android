@@ -43,8 +43,16 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/CacheManagementDesignUiState.kt")))
     }
 
+    private val aboutFeedbackScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/AboutFeedbackDesignScreen.kt")))
+    }
+
+    private val aboutFeedbackStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/AboutFeedbackDesignUiState.kt")))
+    }
+
     @Test
-    fun `settings secondary compose previews expose general webdav backup sync and remote book states`() {
+    fun `settings secondary compose previews expose general about webdav backup sync and remote book states`() {
         listOf(
             "SettingsGeneralDefaultPreview",
             "SettingsGeneralOptionSheetPreview",
@@ -67,6 +75,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsCacheManagementEmptyPreview",
             "SettingsCacheManagementConfirmPreview",
             "SettingsCacheManagementErrorPreview",
+            "SettingsAboutFeedbackDefaultPreview",
+            "SettingsAboutFeedbackLoadingPreview",
+            "SettingsAboutFeedbackErrorPreview",
+            "SettingsAboutFeedbackConfirmPreview",
+            "SettingsAboutFeedbackOfflinePreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -108,6 +121,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "CacheManagementMapper.empty",
             "CacheManagementMapper.confirm",
             "CacheManagementMapper.error",
+            "AboutFeedbackMapper.fromFixture",
+            "AboutFeedbackMapper.loading",
+            "AboutFeedbackMapper.error",
+            "AboutFeedbackMapper.confirm",
+            "AboutFeedbackMapper.offline",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -361,6 +379,64 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "已清理"
         ).forEach { token ->
             assertTrue("Cache management state source must include $token", token in cacheManagementStateSource)
+        }
+    }
+
+    @Test
+    fun `about feedback screen keeps settingsshell slots version links feedback and update controls`() {
+        listOf(
+            "AboutFeedbackScreen",
+            "ReaderAppTopBar",
+            "VersionCard",
+            "AboutFeedbackSection",
+            "AboutLinkRow",
+            "FeedbackEntry",
+            "UpdateButton",
+            "AboutFeedbackConfirmDialog",
+            "AboutFeedbackFeedback",
+            "AboutToastHost",
+            "ReaderIconToken.Check",
+            "ReaderIconToken.Link",
+            "ReaderIconToken.Message",
+            "ReaderIconToken.Help",
+            "contentDescription = \"SettingsShell 关于与反馈\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("About feedback screen source must include $token", token in aboutFeedbackScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("About feedback screen must not include $forbidden", forbidden !in aboutFeedbackScreenSource)
+        }
+    }
+
+    @Test
+    fun `about feedback state model keeps frontend input contract text`() {
+        listOf(
+            "AboutFeedbackDisplayState",
+            "AboutFeedbackMapper",
+            "fun loading()",
+            "fun error()",
+            "fun confirm()",
+            "fun offline()",
+            "关于与反馈",
+            "当前版本",
+            "检查更新",
+            "问题反馈",
+            "开源许可",
+            "隐私协议",
+            "确认导出",
+            "网络不可用，请稍后重试",
+            "本应用不提供账户与登录功能"
+        ).forEach { token ->
+            assertTrue("About feedback state source must include $token", token in aboutFeedbackStateSource)
         }
     }
 }

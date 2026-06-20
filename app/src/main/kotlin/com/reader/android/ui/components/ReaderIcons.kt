@@ -2,6 +2,7 @@ package com.reader.android.ui.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -12,12 +13,15 @@ import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Explore
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
@@ -93,7 +98,12 @@ enum class ReaderIconToken {
     Bug,
     Storage,
     Download,
-    Image
+    Image,
+    Check,
+    Link,
+    Message,
+    Code,
+    Help
 }
 
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -145,4 +155,9 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Storage -> Icons.Filled.Storage
     ReaderIconToken.Download -> Icons.Filled.Download
     ReaderIconToken.Image -> Icons.Filled.Image
+    ReaderIconToken.Check -> Icons.Filled.CheckCircle
+    ReaderIconToken.Link -> Icons.Filled.Link
+    ReaderIconToken.Message -> Icons.Filled.ChatBubbleOutline
+    ReaderIconToken.Code -> Icons.Filled.Code
+    ReaderIconToken.Help -> Icons.AutoMirrored.Filled.HelpOutline
 }

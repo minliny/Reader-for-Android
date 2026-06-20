@@ -2,6 +2,8 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.reader.android.ui.settings.AboutFeedbackMapper
+import com.reader.android.ui.settings.AboutFeedbackScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.settings.BookshelfSearchSettingsMapper
 import com.reader.android.ui.settings.BookshelfSearchSettingsScreen
@@ -146,6 +148,36 @@ fun SettingsCacheManagementConfirmPreview() {
 @Composable
 fun SettingsCacheManagementErrorPreview() {
     CacheManagementScreen(state = CacheManagementMapper.error())
+}
+
+@Preview(name = "Settings Secondary / About Feedback / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsAboutFeedbackDefaultPreview() {
+    AboutFeedbackScreen(state = AboutFeedbackMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / About Feedback / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsAboutFeedbackLoadingPreview() {
+    AboutFeedbackScreen(state = AboutFeedbackMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / About Feedback / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsAboutFeedbackErrorPreview() {
+    AboutFeedbackScreen(state = AboutFeedbackMapper.error())
+}
+
+@Preview(name = "Settings Secondary / About Feedback / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsAboutFeedbackConfirmPreview() {
+    AboutFeedbackScreen(state = AboutFeedbackMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / About Feedback / Offline", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsAboutFeedbackOfflinePreview() {
+    AboutFeedbackScreen(state = AboutFeedbackMapper.offline())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
