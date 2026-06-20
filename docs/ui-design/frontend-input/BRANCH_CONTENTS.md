@@ -96,7 +96,7 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
 2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，RSS 根路由已接入 `RssHomeScreen`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix 第一批状态。
 3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中。
-4. 预览矩阵扩展（Preview Matrix Expansion）：FlowShell 换源已新增 Compose 输入框架和 6 态 preview；继续把书架链路、设置二级页、书源链路和阅读控制层的 fixture/state 转成 Compose preview 或 UI test fixtures。
+4. 预览矩阵扩展（Preview Matrix Expansion）：FlowShell 换源已新增 Compose 输入框架、6 态 preview，并从阅读控制层换源入口接入 `ReaderRoutes.SOURCE_SWITCH`；继续把书架链路、设置二级页、书源链路和阅读控制层的 fixture/state 转成 Compose preview 或 UI test fixtures。
 5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）

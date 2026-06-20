@@ -33,7 +33,14 @@ class AppMainBottomNavDesignFixTest {
         listOf("搜索", "阅读", "书源", "我的").forEach { forbidden ->
             assertFalse("$forbidden must not be a primary tab", forbidden in labels)
         }
-        listOf(ReaderRoutes.SEARCH, ReaderRoutes.READER_CONTENT, ReaderRoutes.SOURCES, ReaderRoutes.MINE, ReaderRoutes.GLOBAL_SETTINGS).forEach { route ->
+        listOf(
+            ReaderRoutes.SEARCH,
+            ReaderRoutes.READER_CONTENT,
+            ReaderRoutes.SOURCE_SWITCH,
+            ReaderRoutes.SOURCES,
+            ReaderRoutes.MINE,
+            ReaderRoutes.GLOBAL_SETTINGS
+        ).forEach { route ->
             assertFalse("$route must not be a primary tab", route in routes)
         }
     }

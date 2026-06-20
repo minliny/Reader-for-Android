@@ -28,7 +28,7 @@ class NavigationRouteHostSmokeTest {
 
     @Test
     fun `reader route host defines s5 flow routes`() {
-        listOf("SEARCH", "DETAIL", "TOC", "READER_CONTENT").forEach { route ->
+        listOf("SEARCH", "DETAIL", "TOC", "READER_CONTENT", "SOURCE_SWITCH").forEach { route ->
             assertTrue("Must define $route", "const val $route" in routeHostSource)
         }
     }
@@ -97,6 +97,6 @@ class NavigationRouteHostSmokeTest {
     @Test
     fun `total route count matches expected`() {
         val count = routeHostSource.lines().count { it.trimStart().startsWith("const val ") }
-        assertEquals("ReaderRoutes must define 26 production routes plus 1 debug prototype route", 27, count)
+        assertEquals("ReaderRoutes must define 27 production routes plus 1 debug prototype route", 28, count)
     }
 }

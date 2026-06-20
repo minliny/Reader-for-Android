@@ -33,7 +33,8 @@ object AppRouteGroups {
         Routes.SEARCH,
         Routes.DETAIL,
         Routes.TOC,
-        Routes.READER_CONTENT
+        Routes.READER_CONTENT,
+        ReaderRoutes.SOURCE_SWITCH
     )
 
     val discover = setOf(
@@ -73,6 +74,7 @@ object Routes {
     const val DETAIL = "detail/{detailUrl}"
     const val TOC = "toc/{tocUrl}"
     const val READER_CONTENT = "reader_content/{contentUrl}/{chapterTitle}"
+    const val SOURCE_SWITCH = "source_switch"
 
     fun detail(detailUrl: String) = "detail/${URLEncoder.encode(detailUrl, "UTF-8")}"
     fun toc(tocUrl: String) = "toc/${URLEncoder.encode(tocUrl, "UTF-8")}"

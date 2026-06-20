@@ -88,6 +88,7 @@ fun ReaderScreen(
     contentUrl: String? = null,
     chapterTitle: String = "",
     onBack: (() -> Unit)? = null,
+    onSourceChange: (() -> Unit)? = null,
     onNextChapter: ((String, String) -> Unit)? = null,
     runtimeState: ReaderRuntimeUiState? = null
 ) {
@@ -105,6 +106,7 @@ fun ReaderScreen(
         StateDrivenReaderScreen(
             state = runtimeState,
             onBack = onBack,
+            onSourceChange = onSourceChange,
             onNightModeToggle = { isNight = !isNight },
             onOverlayDismiss = { /* handled by state changes */ }
         )
@@ -127,6 +129,7 @@ fun ReaderScreen(
                     chapterProgress = 0.25f,
                     brightnessDock = BrightnessDock.Left,
                     onBackClick = { onBack?.invoke() },
+                    onSourceChangeClick = { onSourceChange?.invoke() },
                     onNightModeClick = { isNight = !isNight }
                 ) {
                     // Content area with chapter title + body text
@@ -154,6 +157,7 @@ fun ReaderScreen(
 private fun StateDrivenReaderScreen(
     state: ReaderRuntimeUiState,
     onBack: (() -> Unit)?,
+    onSourceChange: (() -> Unit)?,
     onNightModeToggle: () -> Unit,
     onOverlayDismiss: () -> Unit
 ) {
@@ -174,6 +178,7 @@ private fun StateDrivenReaderScreen(
             overlayState = state.controlLayerState,
             brightnessValue = state.brightnessDockState.brightnessValue,
             onBackClick = { onBack?.invoke() },
+            onSourceChangeClick = { onSourceChange?.invoke() },
             onNightModeClick = onNightModeToggle,
             onSearchClick = { },
             onAutoScrollClick = { },
