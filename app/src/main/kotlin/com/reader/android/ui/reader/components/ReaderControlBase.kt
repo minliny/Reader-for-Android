@@ -16,31 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.material.icons.filled.RecordVoiceOver
-import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderProgressRail
 import com.reader.android.ui.components.ReaderQuickCircle
+import com.reader.android.ui.components.asImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -226,7 +212,7 @@ private fun ReaderTopArea(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ReaderIconButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                icon = ReaderIconToken.Back.asImageVector(),
                 contentDescription = "返回",
                 onClick = onBackClick
             )
@@ -242,9 +228,9 @@ private fun ReaderTopArea(
                 overflow = TextOverflow.Ellipsis
             )
             Row(horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)) {
-                ReaderTopIcon(Icons.Filled.Refresh, "刷新当前章节", onRefreshClick)
-                ReaderTopIcon(Icons.Filled.SwapHoriz, "换源", onSourceChangeClick)
-                ReaderTopIcon(Icons.Filled.MoreVert, "更多操作", onMoreClick)
+                ReaderTopIcon(ReaderIconToken.Refresh, "刷新当前章节", onRefreshClick)
+                ReaderTopIcon(ReaderIconToken.SourceSwitch, "换源", onSourceChangeClick)
+                ReaderTopIcon(ReaderIconToken.More, "更多操作", onMoreClick)
             }
         }
         // Meta row
@@ -282,8 +268,8 @@ private fun ReaderTopArea(
 }
 
 @Composable
-private fun ReaderTopIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    ReaderIconButton(icon = icon, contentDescription = contentDescription, onClick = onClick, size = 32.dp, iconSize = 18.dp)
+private fun ReaderTopIcon(icon: ReaderIconToken, contentDescription: String, onClick: () -> Unit) {
+    ReaderIconButton(icon = icon.asImageVector(), contentDescription = contentDescription, onClick = onClick, size = 32.dp, iconSize = 18.dp)
 }
 
 @Composable
@@ -305,7 +291,7 @@ private fun ReaderFloatingBrightness(
         verticalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
     ) {
         Icon(
-            Icons.Filled.BrightnessAuto,
+            ReaderIconToken.AutoBrightness.asImageVector(),
             contentDescription = "自动亮度",
             tint = ReaderTheme.colors.controlInk,
             modifier = Modifier.size(20.dp)
@@ -327,7 +313,7 @@ private fun ReaderFloatingBrightness(
             )
         }
         Icon(
-            if (dock == BrightnessDock.Left) Icons.Filled.ChevronRight else Icons.Filled.ChevronLeft,
+            if (dock == BrightnessDock.Left) ReaderIconToken.Chevron.asImageVector() else ReaderIconToken.ChevronLeft.asImageVector(),
             contentDescription = "移动亮度条到${if (dock == BrightnessDock.Left) "右" else "左"}侧",
             tint = ReaderTheme.colors.controlInk,
             modifier = Modifier.size(20.dp)
@@ -347,10 +333,10 @@ private fun ReaderFloatingQuickActions(
         modifier = modifier.semantics { contentDescription = "快捷功能" },
         horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.quickCircleGap)
     ) {
-        ReaderQuickCircle(Icons.Filled.Search, "搜索本章", onSearchClick)
-        ReaderQuickCircle(Icons.Filled.AutoMode, "自动翻页", onAutoScrollClick)
-        ReaderQuickCircle(Icons.Filled.SwapHoriz, "内容替换", onReplaceClick)
-        ReaderQuickCircle(Icons.Filled.DarkMode, "切换夜间模式", onNightModeClick)
+        ReaderQuickCircle(ReaderIconToken.Search.asImageVector(), "搜索本章", onSearchClick)
+        ReaderQuickCircle(ReaderIconToken.AutoScroll.asImageVector(), "自动翻页", onAutoScrollClick)
+        ReaderQuickCircle(ReaderIconToken.ContentReplace.asImageVector(), "内容替换", onReplaceClick)
+        ReaderQuickCircle(ReaderIconToken.NightMode.asImageVector(), "切换夜间模式", onNightModeClick)
     }
 }
 
@@ -375,7 +361,7 @@ private fun ReaderFloatingPageControl(
         horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.md)
     ) {
         ReaderIconButton(
-            icon = Icons.Filled.ChevronLeft,
+            icon = ReaderIconToken.ChevronLeft.asImageVector(),
             contentDescription = "本章内上一页",
             onClick = onPrevPageClick,
             size = 32.dp, iconSize = 18.dp,
@@ -388,7 +374,7 @@ private fun ReaderFloatingPageControl(
                 .semantics { contentDescription = "本章阅读进度，${(progress * 100).toInt()}%" }
         )
         ReaderIconButton(
-            icon = Icons.Filled.ChevronRight,
+            icon = ReaderIconToken.Chevron.asImageVector(),
             contentDescription = "本章内下一页",
             onClick = onNextPageClick,
             size = 32.dp, iconSize = 18.dp,
@@ -414,15 +400,15 @@ private fun ReaderControlBottomBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ReaderBottomItem(Icons.AutoMirrored.Filled.MenuBook, "目录", onDirectoryClick)
-        ReaderBottomItem(Icons.Filled.RecordVoiceOver, "朗读", onTtsClick)
-        ReaderBottomItem(Icons.Filled.Tune, "界面设置", onAppearanceClick)
-        ReaderBottomItem(Icons.Filled.Settings, "阅读行为设置", onSettingsClick)
+        ReaderBottomItem(ReaderIconToken.Directory, "目录", onDirectoryClick)
+        ReaderBottomItem(ReaderIconToken.Tts, "朗读", onTtsClick)
+        ReaderBottomItem(ReaderIconToken.Appearance, "界面设置", onAppearanceClick)
+        ReaderBottomItem(ReaderIconToken.ReadingSettings, "阅读行为设置", onSettingsClick)
     }
 }
 
 @Composable
-private fun ReaderBottomItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun ReaderBottomItem(icon: ReaderIconToken, label: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(72.dp)
@@ -432,7 +418,7 @@ private fun ReaderBottomItem(icon: ImageVector, label: String, onClick: () -> Un
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = null, tint = ReaderTheme.colors.controlInk)
+        Icon(icon.asImageVector(), contentDescription = null, tint = ReaderTheme.colors.controlInk)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,

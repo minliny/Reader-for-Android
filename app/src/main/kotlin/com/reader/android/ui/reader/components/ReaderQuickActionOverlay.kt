@@ -19,10 +19,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -42,8 +38,11 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderPrimaryButton
 import com.reader.android.ui.components.ReaderSecondaryButton
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.theme.ReaderTheme
 
 data class SearchMatch(
@@ -102,12 +101,14 @@ fun ReaderSearchOverlay(
                     style = ReaderTheme.typography.bookTitle
                 )
             }
-            IconButton(
+            ReaderIconButton(
+                icon = ReaderIconToken.Close.asImageVector(),
+                contentDescription = "清除",
                 onClick = onClear,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(Icons.Filled.Close, "清除", tint = ReaderTheme.colors.controlInk)
-            }
+                modifier = Modifier.size(32.dp),
+                size = 32.dp,
+                iconSize = 18.dp
+            )
         }
 
         // Results list

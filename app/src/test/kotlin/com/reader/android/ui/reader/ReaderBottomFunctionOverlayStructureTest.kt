@@ -76,7 +76,7 @@ class ReaderBottomFunctionOverlayStructureTest {
 
     @Test
     fun `directory overlay has current reading indicator`() {
-        listOf("isCurrent", "MyLocation", "当前阅读位置", "当前阅读章节").forEach { token ->
+        listOf("isCurrent", "ReaderIconToken.CurrentLocation", "当前阅读位置", "当前阅读章节").forEach { token ->
             assertTrue("Directory overlay must have $token", token in overlaySource)
         }
     }

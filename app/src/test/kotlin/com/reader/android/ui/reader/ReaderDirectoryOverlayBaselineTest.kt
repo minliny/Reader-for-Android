@@ -70,15 +70,15 @@ class ReaderDirectoryOverlayBaselineTest {
         assertTrue("TocEntry must have hasBookmark field",
             "hasBookmark" in overlaySource)
         assertTrue("Bookmark must be rendered with icon",
-            "Icons.Filled.Bookmark" in overlaySource && "书签" in overlaySource)
+            "ReaderIconToken.Bookmark" in overlaySource && "书签" in overlaySource)
     }
 
     @Test
     fun `toc entry has current reading indicator`() {
         assertTrue("TocEntry must have isCurrent field",
             "isCurrent" in overlaySource)
-        assertTrue("Current must be indicated with MyLocation",
-            "Icons.Filled.MyLocation" in overlaySource)
+        assertTrue("Current must be indicated with CurrentLocation token",
+            "ReaderIconToken.CurrentLocation" in overlaySource)
     }
 
     // ── TOC model ──

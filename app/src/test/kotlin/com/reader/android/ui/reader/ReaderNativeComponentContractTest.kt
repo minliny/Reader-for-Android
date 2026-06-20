@@ -50,8 +50,9 @@ class ReaderNativeComponentContractTest {
         val source = String(Files.readAllBytes(Paths.get(
             "src/main/kotlin/com/reader/android/ui/reader/components/ReaderControlBase.kt"
         )))
-        assertTrue("Must have Search icon", "Icons.Filled.Search" in source)
-        assertTrue("Must have DarkMode icon", "Icons.Filled.DarkMode" in source)
+        assertTrue("Must have Search icon token", "ReaderIconToken.Search" in source)
+        assertTrue("Must have NightMode icon token", "ReaderIconToken.NightMode" in source)
+        assertFalse("Must not import Material Icons directly", "import androidx.compose.material.icons" in source)
     }
 
     @Test

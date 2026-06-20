@@ -32,7 +32,7 @@
 | 主标签页（Main Tabs） | `ui/bookshelf/BookshelfScreen.kt`、`ui/discover/DiscoverScreen.kt`、`ui/discover/RssScreens.kt`、`ui/settings/MineScreen.kt::SettingsRootScreen`、`ui/settings/SettingsScreen.kt` | 需要先解决主导航标签差异，再映射四个主标签页。 |
 | 书架链路（Library Flow） | `ui/search/SearchScreen.kt`、`ui/detail/BookDetailScreen.kt`、`ui/toc/TOCScreen.kt`、`ui/bookshelf/*` | 映射 LibraryShell 的返回顶栏、内容区、底部操作、底表、弹窗和状态宿主。 |
 | 阅读链路（Reader Flow） | `ui/reader/ReaderScreen.kt`、`ui/reader/components/*` | 映射 ReaderShell 的正文底层、覆盖层、模块导航、底表宿主和阅读状态。 |
-| 横向流程（Flow Shell） | `ui/reader/*` 或后续新增 `ui/reader/source/*` | 当前没有明确的一一对应 Compose 页面；换源应作为独立 FlowShell 结构实现，不塞进普通竖屏 ReaderShell。 |
+| 横向流程（Flow Shell） | `ui/reader/source/SourceSwitchFlowScreen.kt` | 换源已建立独立 FlowShell Compose 输入框架；后续再接阅读入口和真实来源检测数据。 |
 | 设置链路（Settings Flow） | `ui/settings/*`、`ui/booksource/*` | 映射 SettingsShell；书源管理属于设置链路输入件，但当前 Android 代码里也作为 `sources` 主入口存在。 |
 | 过渡原型（Prototype / Stitch） | `ui/stitch/*`、`ui/prototype/*` | 可作为历史参考，不应作为最终组件命名边界。 |
 
@@ -42,8 +42,8 @@
 | --- | --- | --- | --- |
 | 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell` | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成主导航代码收敛；后续继续迁移 MainTabShell 内部页面内容。 |
 | 书架实现来源（Bookshelf Implementation Source） | `ReaderRouteHost` 当前 `bookshelf` 路由进入 `BookshelfScreen`，状态来自 `BookshelfAdapterShell` | 书架输入件由 `MainTabPageKit` + `BookshelfInput` 输出 | 已脱离 `StitchAppShell`；后续继续把 `BookshelfAdapterShell` 数据收敛到正式 fixture/state 驱动。 |
-| 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路和共享状态组件已通过 `ReaderIconToken` 映射；阅读控制层和 `ui/stitch/*` prototype 仍有直接 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
-| 换源落点（Source Switching Target） | 当前没有单独 FlowShell Composable | `换源` 是横屏 `FlowShell` | 应新增或抽出横向 FlowShell，而不是复用主标签页或普通设置页骨架。 |
+| 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
+| 换源落点（Source Switching Target） | 已新增 `SourceSwitchFlowScreen` 作为横屏 FlowShell Compose 输入框架 | `换源` 是横屏 `FlowShell` | 后续把阅读控制层的换源事件接入该 FlowShell，并接入真实候选来源与检测结果。 |
 | 状态矩阵（State Matrix） | Compose 现有状态覆盖分散在 screen/state 文件 | 每页都有 `state-matrix.html` 和 manifest 状态 | 应转成 Compose previews、UI tests 或 fixture-driven preview states。 |
 
 ## Shell 到 Compose 映射（Shell to Compose Mapping）
@@ -66,7 +66,7 @@
 | `LoadingState`、`EmptyState`、`ErrorState`、`PermissionState` | `ui/components/StateComponents.kt` | 状态只能替换对应内容 slot，不替换根 shell。 |
 | `ReaderModuleNav`、`ReadingSurface`、`ReaderPanel`、`BrightnessSlider` | `ui/reader/components/*`、`ui/components/ReaderNativeComponents.kt` | 四按钮选中态只改变背景、图标颜色、文字颜色，不改变位置。 |
 | `SettingRow`、`SettingGroupCard`、`StatusBadge`、`DangerActionRow` | `ui/components/SettingsComponents.kt` | 设置链路和阅读设置都应复用同一语义。 |
-| `SourceCandidateRow`、`DetectStatusBadge`、`SwitchSourceButton` | 后续 `ui/reader/source/*` 或 `ui/reader/components/*` | 属于 FlowShell，不应混成普通列表行。 |
+| `SourceCandidateRow`、`DetectStatusBadge`、`SwitchSourceButton` | `ui/reader/source/SourceSwitchFlowScreen.kt` | 属于 FlowShell，不应混成普通列表行；当前先作为换源输入框架私有组件落地。 |
 
 ## 状态与事件映射（State and Event Mapping）
 

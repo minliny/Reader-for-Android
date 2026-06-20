@@ -27,8 +27,8 @@ class ReaderDirectoryRowAlignmentTest {
         assertTrue("Chapter title must use weight(1f)", "Modifier.weight(1f)" in tocRowSection)
         // Title must appear before any icon in the composable tree
         val titleIndex = tocRowSection.indexOf("entry.title")
-        val bookmarkIconIndex = tocRowSection.indexOf("Icons.Filled.Bookmark")
-        val locationIconIndex = tocRowSection.indexOf("Icons.Filled.MyLocation")
+        val bookmarkIconIndex = tocRowSection.indexOf("ReaderIconToken.Bookmark")
+        val locationIconIndex = tocRowSection.indexOf("ReaderIconToken.CurrentLocation")
         assertTrue("Chapter title must be rendered before bookmark icon",
             titleIndex < bookmarkIconIndex || bookmarkIconIndex == -1)
         assertTrue("Chapter title must be rendered before current chapter icon",
@@ -39,7 +39,7 @@ class ReaderDirectoryRowAlignmentTest {
     fun `toc row does not place bookmark icon before chapter title`() {
         // Bookmark icon must appear AFTER the title, not before it
         val titleIndex = tocRowSection.indexOf("entry.title")
-        val bookmarkIndex = tocRowSection.indexOf("Icons.Filled.Bookmark")
+        val bookmarkIndex = tocRowSection.indexOf("ReaderIconToken.Bookmark")
         if (bookmarkIndex > 0) {
             assertTrue("Bookmark icon must be after chapter title",
                 bookmarkIndex > titleIndex)
@@ -49,7 +49,7 @@ class ReaderDirectoryRowAlignmentTest {
     @Test
     fun `toc row does not place current chapter icon before chapter title`() {
         val titleIndex = tocRowSection.indexOf("entry.title")
-        val locationIndex = tocRowSection.indexOf("Icons.Filled.MyLocation")
+        val locationIndex = tocRowSection.indexOf("ReaderIconToken.CurrentLocation")
         if (locationIndex > 0) {
             assertTrue("Current chapter icon must be after chapter title",
                 locationIndex > titleIndex)
@@ -64,8 +64,8 @@ class ReaderDirectoryRowAlignmentTest {
         val bookmarkSection = overlaySource.substringAfter("Bookmark slot")
         assertTrue("Bookmark slot must use fixed-width Box", "Box(" in bookmarkSection.take(200))
         // Icons are conditionally shown inside fixed slots
-        assertTrue("Must have Bookmark icon", "Icons.Filled.Bookmark" in overlaySource)
-        assertTrue("Must have MyLocation icon", "Icons.Filled.MyLocation" in overlaySource)
+        assertTrue("Must have Bookmark icon token", "ReaderIconToken.Bookmark" in overlaySource)
+        assertTrue("Must have CurrentLocation icon token", "ReaderIconToken.CurrentLocation" in overlaySource)
     }
 
     @Test

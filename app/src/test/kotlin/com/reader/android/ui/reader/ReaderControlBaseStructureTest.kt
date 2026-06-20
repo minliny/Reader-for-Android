@@ -79,8 +79,7 @@ class ReaderControlBaseStructureTest {
 
     @Test
     fun `reader control base night mode is quick button not dialog`() {
-        // Night mode is a quick action toggle, not an overlay/dialog
-        listOf("DarkMode", "onNightModeClick").forEach { token ->
+        listOf("ReaderIconToken.NightMode", "onNightModeClick").forEach { token ->
             assertTrue("Night mode must be quick button: $token", token in baseSource)
         }
         assertTrue("Night mode must not be dialog", "Dialog" !in baseSource)
@@ -140,9 +139,31 @@ class ReaderControlBaseStructureTest {
 
     @Test
     fun `reader control base has brightness arrow direction logic`() {
-        listOf("BrightnessDock.Left", "ChevronRight", "ChevronLeft", "移动亮度条").forEach { token ->
+        listOf("BrightnessDock.Left", "ReaderIconToken.Chevron", "ReaderIconToken.ChevronLeft", "移动亮度条").forEach { token ->
             assertTrue("Brightness must handle $token", token in baseSource)
         }
+    }
+
+    @Test
+    fun `reader control base uses semantic icon tokens`() {
+        listOf(
+            "ReaderIconToken.Back",
+            "ReaderIconToken.Refresh",
+            "ReaderIconToken.SourceSwitch",
+            "ReaderIconToken.More",
+            "ReaderIconToken.AutoBrightness",
+            "ReaderIconToken.Search",
+            "ReaderIconToken.AutoScroll",
+            "ReaderIconToken.ContentReplace",
+            "ReaderIconToken.NightMode",
+            "ReaderIconToken.Directory",
+            "ReaderIconToken.Tts",
+            "ReaderIconToken.Appearance",
+            "ReaderIconToken.ReadingSettings"
+        ).forEach { token ->
+            assertTrue("ReaderControlBase must use $token", token in baseSource)
+        }
+        assertTrue("ReaderControlBase must not import Material Icons directly", "import androidx.compose.material.icons" !in baseSource)
     }
 
     @Test
