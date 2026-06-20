@@ -20,15 +20,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderSwitch
+import com.reader.android.ui.components.asImageVector
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -147,7 +145,7 @@ fun ReaderDirectoryOverlay(
                     ) {
                         if (entry.hasBookmark) {
                             Icon(
-                                Icons.Filled.Bookmark,
+                                ReaderIconToken.Bookmark.asImageVector(),
                                 contentDescription = "书签",
                                 tint = ReaderTheme.colors.primary,
                                 modifier = Modifier.size(14.dp)
@@ -161,7 +159,7 @@ fun ReaderDirectoryOverlay(
                     ) {
                         if (entry.isCurrent) {
                             Icon(
-                                Icons.Filled.MyLocation,
+                                ReaderIconToken.CurrentLocation.asImageVector(),
                                 contentDescription = "当前阅读位置",
                                 tint = ReaderTheme.colors.primary,
                                 modifier = Modifier.size(14.dp)
@@ -351,7 +349,12 @@ private fun TtsSettingRow(label: String, currentValue: String) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(currentValue, color = ReaderTheme.colors.bodyText, style = ReaderTheme.typography.bookMeta)
             Spacer(modifier = Modifier.width(4.dp))
-            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(SettingRowIconSize))
+            Icon(
+                ReaderIconToken.Chevron.asImageVector(),
+                contentDescription = null,
+                tint = ReaderTheme.colors.controlInk,
+                modifier = Modifier.size(SettingRowIconSize)
+            )
         }
     }
 }

@@ -7,8 +7,8 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 语义 token 映射（Compose Semantic Token Mapping） | 18 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路和共享状态组件。 |
-| Legacy 直连 Material 图标（Legacy Direct Material Icons） | 分批保留 | 阅读控制层和 `ui/stitch/*` prototype 暂保留直接 Material Icons，后续按模块迁移。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 32 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
+| Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
 ## 使用规则（Usage Rules）
@@ -43,20 +43,20 @@
 | `ChevronRight` | `chevron` | 可映射 | 进入详情或右向翻页。 |
 | `Close` | `close` | 可映射 | 关闭、清除面板。 |
 | `CloudOff` | `offline` | 可映射 | 离线状态。 |
-| `DarkMode` | 待补 `night-mode` | 缺口 | 当前素材库没有夜间模式独立 token。 |
+| `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `Delete` | `trash` | 可映射 | 删除、移除。 |
 | `Edit` | `edit` | 可映射 | Figma 当前标为缺源；Compose 可先走语义 token。 |
 | `ErrorOutline` | `warning` | 可映射 | 错误或警告状态。 |
 | `Explore` | `discover` | 可映射 | 发现。 |
 | `FileOpen` | `file` | 可映射 | 文件选择或导入。 |
 | `Folder` | `folder` | 可映射 | 文件夹导入。 |
-| `FolderOff` | 待补 `folder-off` | 缺口 | 空文件夹或无文件状态。 |
+| `FolderOff` | `folder-off` | 已映射 | 空文件夹或无文件状态通过 `ReaderIconToken.FolderOff` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `GridView` | `grid` | 可映射 | 宫格视图。 |
 | `Hub` | `source-stack` | 需降级为设置二级入口 | 书源不再作为主 tab。 |
 | `Lock` | `shield` | 可映射 | 权限、隐私保护。 |
 | `MenuBook` | `directory` / `book-open` | 需按上下文 | 目录用 `directory`，打开书籍用 `book-open`。 |
 | `MoreVert` | `more` | 可映射 | 更多操作。 |
-| `MyLocation` | 待补 `current-location` | 缺口 | 当前章节、定位或当前项。 |
+| `MyLocation` | `current-location` | 已映射 | 当前章节、定位或当前项通过 `ReaderIconToken.CurrentLocation` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `Person` | `people` / 待移除 | 需产品确认 | 主 tab 不再使用 `我的`；作者/用户语义需另定。 |
 | `PlayArrow` | `play` | 可映射 | 播放、朗读开始。 |
 | `RecordVoiceOver` | `tts` | 可映射 | 朗读。 |
@@ -70,16 +70,15 @@
 | `ViewList` | `list` | 可映射 | 列表视图。 |
 | `VolumeUp` | `volume` | 可映射 | 声音、音量。 |
 
-## 需要补 token 的缺口（Token Gaps）
+## 需要回流素材库的缺口（Asset Backflow Gaps）
 
 | 建议 token（Suggested Token） | 用途（Usage） | 来源（Current Trigger） |
 | --- | --- | --- |
-| `night-mode` | 夜间模式切换 | `DarkMode`。 |
-| `folder-off` | 文件夹空态或不可用 | `FolderOff`。 |
-| `current-location` | 当前章节定位、当前位置 | `MyLocation`。 |
 | `stop` | 停止自动翻页或停止朗读 | `Stop`。 |
-| `chevron-down` | 下拉、展开 | `ArrowDropDown`；也可由 `chevron` 旋转派生。 |
-| `chevron-left` | 左向翻页或返回以外的左向动作 | `ChevronLeft`；也可由 `chevron` 旋转派生。 |
+| `night-mode` | 夜间模式切换 | Compose 已有 `ReaderIconToken.NightMode`，Figma 源图标状态仍需回流审计。 |
+| `folder-off` | 文件夹空态或不可用 | Compose 已有 `ReaderIconToken.FolderOff`，Figma 源图标状态仍需回流审计。 |
+| `current-location` | 当前章节定位、当前位置 | Compose 已有 `ReaderIconToken.CurrentLocation`，Figma 源图标状态仍需回流审计。 |
+| `chevron-left` | 左向翻页或返回以外的左向动作 | Compose 已有 `ReaderIconToken.ChevronLeft`，Figma 可复用旋转规则或补方向 variant。 |
 
 ## 代码落点（Code Targets）
 
@@ -89,7 +88,7 @@
 | `ReaderRouteHost.kt` | 底栏读取 `appScreens`，图标从 `ReaderIconToken` 解析，并由 `ReaderMainTabShell` 输出统一主导航。 | 后续主 tab 只能扩展 `ReaderMainTabShell`，不再恢复临时 `StitchBottomNav`。 |
 | `ui/components/*` | 顶栏返回、搜索、设置下拉、状态组件和 reader setting chevron 已接入 `ReaderIconToken`。 | 后续新增共享组件不得直接 import Material Icons。 |
 | `ui/bookshelf/*` | 书架布局切换、搜索 FAB 和更多操作已接入 `ReaderIconToken`。 | 后续书架操作继续从 token 扩展。 |
-| `ui/reader/components/*` | 阅读控制层直接使用搜索、自动翻页、换源、夜间模式等 Material Icons。 | 优先迁移阅读模块导航和快捷操作图标。 |
+| `ui/reader/components/*` | 阅读顶部栏、亮度条、快捷操作、页内翻页、底栏、目录指示和清除按钮已接入 `ReaderIconToken`。 | 后续新增阅读控制图标必须先扩展 token。 |
 | `ui/stitch/*` | 原型代码大量直接引用 Material Icons。 | 保留为历史参考，不作为最终图标规则来源。 |
 | `ui/booksource/*`、`ui/settings/*`、`ui/discover/*` | 顶栏更多、导入、删除、文件导入、RSS 入口已接入 `ReaderIconToken`。 | 后续按页面新增 token，不再页面内直连 Material Icons。 |
 
@@ -117,10 +116,24 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Warning -> Icons.Filled.ErrorOutline
     ReaderIconToken.Offline -> Icons.Filled.CloudOff
     ReaderIconToken.Permission -> Icons.Filled.Lock
+    ReaderIconToken.Directory -> Icons.AutoMirrored.Filled.MenuBook
+    ReaderIconToken.Refresh -> Icons.Filled.Refresh
+    ReaderIconToken.SourceSwitch -> Icons.Filled.SwapHoriz
+    ReaderIconToken.AutoBrightness -> Icons.Filled.BrightnessAuto
+    ReaderIconToken.ChevronLeft -> Icons.Filled.ChevronLeft
+    ReaderIconToken.AutoScroll -> Icons.Filled.AutoMode
+    ReaderIconToken.ContentReplace -> Icons.Filled.SwapHoriz
+    ReaderIconToken.NightMode -> Icons.Filled.DarkMode
+    ReaderIconToken.Tts -> Icons.Filled.RecordVoiceOver
+    ReaderIconToken.Appearance -> Icons.Filled.Tune
+    ReaderIconToken.ReadingSettings -> Icons.Filled.Settings
+    ReaderIconToken.Bookmark -> Icons.Filled.Bookmark
+    ReaderIconToken.CurrentLocation -> Icons.Filled.MyLocation
+    ReaderIconToken.Close -> Icons.Filled.Close
 }
 ```
 
-上面代码只表达当前已落地的第一批 token，后续新增 token 必须先进入本清单和素材库审计，再补充映射。
+上面代码表达当前已落地的 Compose token。后续新增 token 必须先进入本清单和素材库审计，再补充映射。
 
 ## 验收标准（Acceptance Criteria）
 

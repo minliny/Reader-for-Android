@@ -72,11 +72,32 @@ class ReaderControlBaselineRegressionTest {
 
     @Test
     fun `night mode is quick button not dialog`() {
-        listOf("DarkMode", "onNightModeClick").forEach { token ->
+        listOf("ReaderIconToken.NightMode", "onNightModeClick").forEach { token ->
             assertTrue("Night mode must be quick button: $token", token in allReaderSources)
         }
         assertFalse("Night mode must not be Dialog", "Dialog" in allReaderSources)
         assertFalse("Night mode must not be AlertDialog", "AlertDialog" in allReaderSources)
+    }
+
+    @Test
+    fun `reader control layer uses icon tokens instead of direct material icons`() {
+        listOf(
+            "ReaderIconToken.Refresh",
+            "ReaderIconToken.SourceSwitch",
+            "ReaderIconToken.AutoBrightness",
+            "ReaderIconToken.AutoScroll",
+            "ReaderIconToken.ContentReplace",
+            "ReaderIconToken.NightMode",
+            "ReaderIconToken.Directory",
+            "ReaderIconToken.Tts",
+            "ReaderIconToken.Appearance",
+            "ReaderIconToken.ReadingSettings",
+            "ReaderIconToken.Bookmark",
+            "ReaderIconToken.CurrentLocation",
+            "ReaderIconToken.Close"
+        ).forEach { token ->
+            assertTrue("Reader controls must use $token", token in allReaderSources)
+        }
     }
 
     // ── Settings overlay is reading behavior only ──
