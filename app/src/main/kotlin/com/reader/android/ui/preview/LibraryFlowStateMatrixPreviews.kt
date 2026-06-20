@@ -2,6 +2,8 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.reader.android.ui.bookshelf.BookshelfGroupManagementMapper
+import com.reader.android.ui.bookshelf.BookshelfGroupManagementScreen
 import com.reader.android.ui.bookshelf.BookshelfSortFilterMapper
 import com.reader.android.ui.bookshelf.BookshelfSortFilterScreen
 import com.reader.android.ui.detail.BookDetailAdapterShell
@@ -189,4 +191,46 @@ fun LibrarySortFilterEmptyPreview() {
 @Composable
 fun LibrarySortFilterErrorPreview() {
     BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.error())
+}
+
+@Preview(name = "Library Flow / Group Management / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementDefaultPreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.fromFixture())
+}
+
+@Preview(name = "Library Flow / Group Management / New", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementNewPreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.newGroup())
+}
+
+@Preview(name = "Library Flow / Group Management / Rename", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementRenamePreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.rename())
+}
+
+@Preview(name = "Library Flow / Group Management / Delete", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementDeletePreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.delete())
+}
+
+@Preview(name = "Library Flow / Group Management / Empty", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementEmptyPreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.empty())
+}
+
+@Preview(name = "Library Flow / Group Management / Loading", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementLoadingPreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.loading())
+}
+
+@Preview(name = "Library Flow / Group Management / Error", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryGroupManagementErrorPreview() {
+    BookshelfGroupManagementScreen(state = BookshelfGroupManagementMapper.error())
 }
