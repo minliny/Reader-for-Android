@@ -21,6 +21,7 @@
 | 公共素材库（Asset Library） | `docs/ui-design/frontend-input/asset-library/` | UI 设计图、封面素材和 71 个统一语义图标 token。 |
 | 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/` | 组件、状态、底表、卡片、行和交互规则的可视化入口。 |
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
+| Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/` | 主标签页默认、加载、空态、筛选空态和权限缺失等 Android Compose preview 状态。 |
 
 ## 页面输入包（Page Input Packages）
 
@@ -93,9 +94,10 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 ## 当前待办（Open Work）
 
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
-2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，RSS 根路由已接入 `RssHomeScreen`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeDisplayState`，并覆盖概览加载、无备份和权限缺失状态；下一步补齐图标 token 迁移。
-3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航已接入 `ReaderIconToken`；下一步按 `ICON_COMPOSE_MAPPING.md` 继续迁移阅读、设置和书源链路的散落 Material Icons，并同步 Figma `Icon/*` 主组件或缺源清单。
-4. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
+2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，RSS 根路由已接入 `RssHomeScreen`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix 第一批状态。
+3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路和共享状态组件已接入 `ReaderIconToken`；剩余直接 Material Icons 集中在阅读控制层和 `ui/stitch/*` prototype，按 `ICON_COMPOSE_MAPPING.md` 后续迁移。
+4. 预览矩阵扩展（Preview Matrix Expansion）：继续把书架链路、设置二级页、书源链路和阅读控制层的 fixture/state 转成 Compose preview 或 UI test fixtures。
+5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）
 
