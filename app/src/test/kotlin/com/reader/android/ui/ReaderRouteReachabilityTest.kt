@@ -17,6 +17,7 @@ class ReaderRouteReachabilityTest {
             "BookshelfScreen",
             "BookSourceScreen",
             "ReaderScreen",
+            "SourceSwitchFlowScreen",
             "SettingsScreen",
             "SettingsRootScreen",
             "onRssManagementClick",
@@ -31,6 +32,7 @@ class ReaderRouteReachabilityTest {
             "RssHomeScreen",
             "RssListScreen",
             "RSS_SUBSCRIPTION",
+            "SOURCE_SWITCH",
             "WebDavConfigScreen"
         ).forEach { screen ->
             assertTrue("$screen must be referenced by route host", screen in routeHostSource)

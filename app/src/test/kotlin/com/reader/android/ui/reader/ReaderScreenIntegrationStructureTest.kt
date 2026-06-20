@@ -75,7 +75,7 @@ class ReaderScreenIntegrationStructureTest {
 
     @Test
     fun `reader screen preserves callback interface`() {
-        listOf("onBack", "onNextChapter", "contentUrl", "chapterTitle").forEach { token ->
+        listOf("onBack", "onSourceChange", "onNextChapter", "contentUrl", "chapterTitle").forEach { token ->
             assertTrue("Must expose $token", token in screenSource)
         }
     }

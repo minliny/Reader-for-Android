@@ -21,8 +21,10 @@ class AppRouteGroupingTest {
 
         assertTrue(ReaderRoutes.SEARCH in AppRouteGroups.bookshelf)
         assertTrue(ReaderRoutes.READER_CONTENT in AppRouteGroups.bookshelf)
+        assertTrue(ReaderRoutes.SOURCE_SWITCH in AppRouteGroups.bookshelf)
         assertFalse(ReaderRoutes.SEARCH in primaryRoutes)
         assertFalse(ReaderRoutes.READER_CONTENT in primaryRoutes)
+        assertFalse(ReaderRoutes.SOURCE_SWITCH in primaryRoutes)
     }
 
     @Test

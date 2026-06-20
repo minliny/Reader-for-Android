@@ -40,6 +40,7 @@ import com.reader.android.ui.discover.RssListScreen
 import com.reader.android.ui.discover.RssSubscriptionManagementScreen
 import com.reader.android.ui.prototype.ReaderPrototypeGallery
 import com.reader.android.ui.reader.ReaderScreen
+import com.reader.android.ui.reader.source.SourceSwitchFlowScreen
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.settings.MineScreen
@@ -70,6 +71,7 @@ object ReaderRoutes {
     const val DETAIL = "detail/{detailUrl}"
     const val TOC = "toc/{tocUrl}"
     const val READER_CONTENT = "reader_content/{contentUrl}/{chapterTitle}"
+    const val SOURCE_SWITCH = "source_switch"
 
     // Source management
     const val SOURCE_DETAIL = "source_detail/{sourceId}"
@@ -316,9 +318,18 @@ fun ReaderRouteHost(
                     contentUrl = entry.encodedArg("contentUrl"),
                     chapterTitle = entry.encodedArg("chapterTitle"),
                     onBack = { navController.popBackStack() },
+                    onSourceChange = {
+                        navController.navigateAndTrack(ReaderRoutes.SOURCE_SWITCH, backStack)
+                    },
                     onNextChapter = { nextUrl, nextTitle ->
                         navController.navigateAndTrack(ReaderRoutes.readerContent(nextUrl, nextTitle), backStack)
                     }
+                )
+            }
+            composable(ReaderRoutes.SOURCE_SWITCH) {
+                SourceSwitchFlowScreen(
+                    onBackToReading = { navController.popBackStack() },
+                    onSwitchSource = { navController.popBackStack() }
                 )
             }
 
