@@ -19,6 +19,14 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/GeneralSettingsDesignUiState.kt")))
     }
 
+    private val bookshelfSearchSettingsScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/BookshelfSearchSettingsDesignScreen.kt")))
+    }
+
+    private val bookshelfSearchSettingsStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/BookshelfSearchSettingsDesignUiState.kt")))
+    }
+
     @Test
     fun `settings secondary compose previews expose general webdav backup sync and remote book states`() {
         listOf(
@@ -27,6 +35,12 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsGeneralLoadingPreview",
             "SettingsGeneralErrorPreview",
             "SettingsGeneralPermissionPreview",
+            "SettingsBookshelfSearchDefaultPreview",
+            "SettingsBookshelfSearchOptionSheetPreview",
+            "SettingsBookshelfSearchConfirmPreview",
+            "SettingsBookshelfSearchLoadingPreview",
+            "SettingsBookshelfSearchErrorPreview",
+            "SettingsBookshelfSearchPermissionPreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -52,6 +66,12 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "GeneralSettingsMapper.loading",
             "GeneralSettingsMapper.error",
             "GeneralSettingsMapper.permission",
+            "BookshelfSearchSettingsMapper.fromFixture",
+            "BookshelfSearchSettingsMapper.optionSheet",
+            "BookshelfSearchSettingsMapper.confirm",
+            "BookshelfSearchSettingsMapper.loading",
+            "BookshelfSearchSettingsMapper.error",
+            "BookshelfSearchSettingsMapper.permission",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -121,6 +141,67 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "需要系统权限"
         ).forEach { token ->
             assertTrue("General settings state source must include $token", token in generalSettingsStateSource)
+        }
+    }
+
+    @Test
+    fun `bookshelf search settings screen keeps settingsshell slots preview and danger action`() {
+        listOf(
+            "BookshelfSearchSettingsScreen",
+            "ReaderAppTopBar",
+            "ReaderChip",
+            "ReaderSwitch",
+            "BookCover",
+            "BookshelfSearchSettingsSection",
+            "BookshelfSearchSettingsRow",
+            "BookshelfModePreviewCard",
+            "BookshelfSearchDangerActionRow",
+            "BookshelfSearchOptionSheet",
+            "BookshelfSearchConfirmDialog",
+            "BookshelfSearchDangerButton",
+            "BookshelfSearchFeedback",
+            "ReaderIconToken.Trash",
+            "contentDescription = \"SettingsShell 书架与搜索\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"sheetHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("Bookshelf search settings screen source must include $token", token in bookshelfSearchSettingsScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("Bookshelf search settings screen must not include $forbidden", forbidden !in bookshelfSearchSettingsScreenSource)
+        }
+    }
+
+    @Test
+    fun `bookshelf search settings state model keeps frontend input contract text`() {
+        listOf(
+            "BookshelfSearchSettingsDisplayState",
+            "BookshelfSearchSettingsMapper",
+            "fun optionSheet()",
+            "fun confirm()",
+            "fun loading()",
+            "fun error()",
+            "fun permission()",
+            "书架与搜索",
+            "默认展示",
+            "封面模式预览",
+            "列表模式预览",
+            "搜索范围",
+            "结果排序",
+            "搜索历史",
+            "清空搜索历史",
+            "确认清空",
+            "需要存储权限"
+        ).forEach { token ->
+            assertTrue("Bookshelf search settings state source must include $token", token in bookshelfSearchSettingsStateSource)
         }
     }
 }

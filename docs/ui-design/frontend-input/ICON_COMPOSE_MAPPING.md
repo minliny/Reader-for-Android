@@ -7,7 +7,7 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 语义 token 映射（Compose Semantic Token Mapping） | 32 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 39 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
@@ -37,21 +37,23 @@
 | `ArrowDropDown` | `chevron` | 需方向规则 | 下拉箭头可用 `chevron` 旋转或补 `chevron-down`。 |
 | `AutoMode` | `auto-page` | 可映射 | 自动翻页。 |
 | `Book` | `book` / `bookshelf` | 需按上下文 | 书籍对象用 `book`，主导航书架用 `bookshelf`。 |
-| `Bookmark` | `bookmark` | 可映射 | 书签。 |
+| `Bookmark` | `bookmark` / `badge` | 已映射 | 书签用 `ReaderIconToken.Bookmark`，更新标记用 `ReaderIconToken.Badge`。 |
 | `BrightnessAuto` | `sun` | 需确认 | 自动亮度没有独立 token；可先映射到亮度/日间语义，后续可补 `brightness-auto`。 |
 | `ChevronLeft` | `back` / `chevron` | 需按上下文 | 返回用 `back`；翻页方向用 `chevron` 旋转或补方向 token。 |
 | `ChevronRight` | `chevron` | 可映射 | 进入详情或右向翻页。 |
 | `Close` | `close` | 可映射 | 关闭、清除面板。 |
 | `CloudOff` | `offline` | 可映射 | 离线状态。 |
 | `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
-| `Delete` | `trash` | 可映射 | 删除、移除。 |
+| `Delete` | `trash` | 已映射 | 删除、移除或危险清空通过 `ReaderIconToken.Trash` 表达。 |
 | `Edit` | `edit` | 可映射 | Figma 当前标为缺源；Compose 可先走语义 token。 |
 | `ErrorOutline` | `warning` | 可映射 | 错误或警告状态。 |
 | `Explore` | `discover` | 可映射 | 发现。 |
 | `FileOpen` | `file` | 可映射 | 文件选择或导入。 |
-| `Folder` | `folder` | 可映射 | 文件夹导入。 |
+| `Folder` | `folder` | 已映射 | 默认分组或文件夹入口通过 `ReaderIconToken.Folder` 表达。 |
 | `FolderOff` | `folder-off` | 已映射 | 空文件夹或无文件状态通过 `ReaderIconToken.FolderOff` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `GridView` | `grid` | 可映射 | 宫格视图。 |
+| `Groups` | `people` | 已映射 | 合并同名同作者等多人/作者语义通过 `ReaderIconToken.People` 表达。 |
+| `History` | `clock` | 已映射 | 搜索历史或历史记录通过 `ReaderIconToken.Clock` 表达。 |
 | `Hub` | `source-stack` | 需降级为设置二级入口 | 书源不再作为主 tab。 |
 | `Lock` | `shield` | 可映射 | 权限、隐私保护。 |
 | `MenuBook` | `directory` / `book-open` | 需按上下文 | 目录用 `directory`，打开书籍用 `book-open`。 |
@@ -63,11 +65,12 @@
 | `Refresh` | `refresh` | 可映射 | 刷新。 |
 | `Search` | `search` | 可映射 | 搜索。 |
 | `Settings` | `settings` / `gear` | 可映射 | 设置主入口用 `settings`，齿轮操作可用 `gear`。 |
+| `Sort` | `sort` | 已映射 | 搜索结果排序通过 `ReaderIconToken.Sort` 表达。 |
 | `Stop` | 待补 `stop` | 缺口 | 停止自动翻页或朗读。 |
 | `SwapHoriz` | `replace` / `source` | 需按上下文 | 内容替换用 `replace`，换源用 `source`。 |
 | `TextFormat` | `typo` | 可映射 | 字体、排版。 |
 | `Tune` | `appearance` | 可映射 | 界面/显示调整。 |
-| `ViewList` | `list` | 可映射 | 列表视图。 |
+| `ViewList` | `list` | 已映射 | 列表视图和列表数量通过 `ReaderIconToken.List` 表达。 |
 | `VolumeUp` | `volume` | 可映射 | 声音、音量。 |
 
 ## 需要回流素材库的缺口（Asset Backflow Gaps）
@@ -112,7 +115,9 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Add -> Icons.Filled.Add
     ReaderIconToken.Delete -> Icons.Filled.Delete
     ReaderIconToken.FileOpen -> Icons.Filled.FileOpen
+    ReaderIconToken.Folder -> Icons.Filled.Folder
     ReaderIconToken.FolderOff -> Icons.Filled.FolderOff
+    ReaderIconToken.Badge -> Icons.Filled.Bookmark
     ReaderIconToken.Warning -> Icons.Filled.ErrorOutline
     ReaderIconToken.Offline -> Icons.Filled.CloudOff
     ReaderIconToken.Permission -> Icons.Filled.Lock
@@ -130,6 +135,11 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Bookmark -> Icons.Filled.Bookmark
     ReaderIconToken.CurrentLocation -> Icons.Filled.MyLocation
     ReaderIconToken.Close -> Icons.Filled.Close
+    ReaderIconToken.Sort -> Icons.AutoMirrored.Filled.Sort
+    ReaderIconToken.People -> Icons.Filled.Groups
+    ReaderIconToken.Clock -> Icons.Filled.History
+    ReaderIconToken.List -> Icons.AutoMirrored.Filled.ViewList
+    ReaderIconToken.Trash -> Icons.Filled.Delete
 }
 ```
 

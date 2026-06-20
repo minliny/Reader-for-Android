@@ -116,7 +116,9 @@ class ReaderSharedComponentsStructureTest {
             "ReaderIconToken.Add",
             "ReaderIconToken.Delete",
             "ReaderIconToken.FileOpen",
+            "ReaderIconToken.Folder",
             "ReaderIconToken.FolderOff",
+            "ReaderIconToken.Badge",
             "ReaderIconToken.Warning",
             "ReaderIconToken.Offline",
             "ReaderIconToken.Permission",
@@ -133,7 +135,12 @@ class ReaderSharedComponentsStructureTest {
             "ReaderIconToken.ReadingSettings",
             "ReaderIconToken.Bookmark",
             "ReaderIconToken.CurrentLocation",
-            "ReaderIconToken.Close"
+            "ReaderIconToken.Close",
+            "ReaderIconToken.Sort",
+            "ReaderIconToken.People",
+            "ReaderIconToken.Clock",
+            "ReaderIconToken.List",
+            "ReaderIconToken.Trash"
         ).forEach { token ->
             assertTrue("Shared icon token mapping must include $token", token in source)
         }
