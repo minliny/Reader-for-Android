@@ -7,6 +7,8 @@ import com.reader.android.ui.settings.BookshelfSearchSettingsMapper
 import com.reader.android.ui.settings.BookshelfSearchSettingsScreen
 import com.reader.android.ui.settings.GeneralSettingsMapper
 import com.reader.android.ui.settings.GeneralSettingsScreen
+import com.reader.android.ui.settings.PrivacyPermissionsMapper
+import com.reader.android.ui.settings.PrivacyPermissionsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
@@ -82,6 +84,36 @@ fun SettingsBookshelfSearchErrorPreview() {
 @Composable
 fun SettingsBookshelfSearchPermissionPreview() {
     BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.permission())
+}
+
+@Preview(name = "Settings Secondary / Privacy Permissions / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsPrivacyPermissionsDefaultPreview() {
+    PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / Privacy Permissions / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsPrivacyPermissionsConfirmPreview() {
+    PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / Privacy Permissions / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsPrivacyPermissionsLoadingPreview() {
+    PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / Privacy Permissions / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsPrivacyPermissionsErrorPreview() {
+    PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.error())
+}
+
+@Preview(name = "Settings Secondary / Privacy Permissions / Permission", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsPrivacyPermissionsPermissionPreview() {
+    PrivacyPermissionsScreen(state = PrivacyPermissionsMapper.permission())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)

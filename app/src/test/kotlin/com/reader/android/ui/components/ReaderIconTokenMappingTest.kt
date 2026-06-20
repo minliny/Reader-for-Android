@@ -36,7 +36,13 @@ class ReaderIconTokenMappingTest {
             ReaderIconToken.People,
             ReaderIconToken.Clock,
             ReaderIconToken.List,
-            ReaderIconToken.Trash
+            ReaderIconToken.Trash,
+            ReaderIconToken.Bell,
+            ReaderIconToken.Battery,
+            ReaderIconToken.EyeOff,
+            ReaderIconToken.Info,
+            ReaderIconToken.Shield,
+            ReaderIconToken.Bug
         ).forEach { token ->
             assertNotNull("${token.name} must support settings secondary pages", token.asImageVector())
         }

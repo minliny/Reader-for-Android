@@ -140,7 +140,13 @@ class ReaderSharedComponentsStructureTest {
             "ReaderIconToken.People",
             "ReaderIconToken.Clock",
             "ReaderIconToken.List",
-            "ReaderIconToken.Trash"
+            "ReaderIconToken.Trash",
+            "ReaderIconToken.Bell",
+            "ReaderIconToken.Battery",
+            "ReaderIconToken.EyeOff",
+            "ReaderIconToken.Info",
+            "ReaderIconToken.Shield",
+            "ReaderIconToken.Bug"
         ).forEach { token ->
             assertTrue("Shared icon token mapping must include $token", token in source)
         }

@@ -27,6 +27,14 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/BookshelfSearchSettingsDesignUiState.kt")))
     }
 
+    private val privacyPermissionsScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/PrivacyPermissionsDesignScreen.kt")))
+    }
+
+    private val privacyPermissionsStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/PrivacyPermissionsDesignUiState.kt")))
+    }
+
     @Test
     fun `settings secondary compose previews expose general webdav backup sync and remote book states`() {
         listOf(
@@ -41,6 +49,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsBookshelfSearchLoadingPreview",
             "SettingsBookshelfSearchErrorPreview",
             "SettingsBookshelfSearchPermissionPreview",
+            "SettingsPrivacyPermissionsDefaultPreview",
+            "SettingsPrivacyPermissionsConfirmPreview",
+            "SettingsPrivacyPermissionsLoadingPreview",
+            "SettingsPrivacyPermissionsErrorPreview",
+            "SettingsPrivacyPermissionsPermissionPreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -72,6 +85,11 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "BookshelfSearchSettingsMapper.loading",
             "BookshelfSearchSettingsMapper.error",
             "BookshelfSearchSettingsMapper.permission",
+            "PrivacyPermissionsMapper.fromFixture",
+            "PrivacyPermissionsMapper.confirm",
+            "PrivacyPermissionsMapper.loading",
+            "PrivacyPermissionsMapper.error",
+            "PrivacyPermissionsMapper.permission",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -202,6 +220,68 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "需要存储权限"
         ).forEach { token ->
             assertTrue("Bookshelf search settings state source must include $token", token in bookshelfSearchSettingsStateSource)
+        }
+    }
+
+    @Test
+    fun `privacy permissions screen keeps settingsshell slots badges and system settings action`() {
+        listOf(
+            "PrivacyPermissionsScreen",
+            "ReaderAppTopBar",
+            "ReaderSwitch",
+            "PrivacyPermissionsSection",
+            "PrivacyPermissionsRow",
+            "PrivacyStatusBadge",
+            "PrivacyOpenSystemSettingsButton",
+            "PrivacyDangerActionRow",
+            "PrivacyConfirmDialog",
+            "PrivacyDangerButton",
+            "PrivacyFeedback",
+            "ReaderIconToken.Bell",
+            "ReaderIconToken.Battery",
+            "ReaderIconToken.EyeOff",
+            "ReaderIconToken.Shield",
+            "contentDescription = \"SettingsShell 隐私与权限\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("Privacy permissions screen source must include $token", token in privacyPermissionsScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("Privacy permissions screen must not include $forbidden", forbidden !in privacyPermissionsScreenSource)
+        }
+    }
+
+    @Test
+    fun `privacy permissions state model keeps frontend input contract text`() {
+        listOf(
+            "PrivacyPermissionsDisplayState",
+            "PrivacyPermissionsMapper",
+            "fun confirm()",
+            "fun loading()",
+            "fun error()",
+            "fun permission()",
+            "隐私与权限",
+            "文件访问",
+            "通知权限",
+            "网络访问说明",
+            "去设置",
+            "隐私开关",
+            "已授权",
+            "未授权",
+            "受系统管理",
+            "清除隐私数据",
+            "确认清除",
+            "需要系统权限"
+        ).forEach { token ->
+            assertTrue("Privacy permissions state source must include $token", token in privacyPermissionsStateSource)
         }
     }
 }
