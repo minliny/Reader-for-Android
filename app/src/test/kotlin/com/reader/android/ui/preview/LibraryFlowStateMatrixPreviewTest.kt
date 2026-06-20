@@ -39,6 +39,14 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfGroupManagementUiState.kt")))
     }
 
+    private val localImportScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfLocalImportScreen.kt")))
+    }
+
+    private val localImportStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfLocalImportUiState.kt")))
+    }
+
     @Test
     fun `library flow compose previews expose search detail directory and sort filter state matrices`() {
         listOf(
@@ -69,7 +77,13 @@ class LibraryFlowStateMatrixPreviewTest {
             "LibraryGroupManagementDeletePreview",
             "LibraryGroupManagementEmptyPreview",
             "LibraryGroupManagementLoadingPreview",
-            "LibraryGroupManagementErrorPreview"
+            "LibraryGroupManagementErrorPreview",
+            "LibraryLocalImportDefaultPreview",
+            "LibraryLocalImportImportingPreview",
+            "LibraryLocalImportSuccessPreview",
+            "LibraryLocalImportPartialFailedPreview",
+            "LibraryLocalImportFailedPreview",
+            "LibraryLocalImportPickerCancelledPreview"
         ).forEach { token ->
             assertTrue("Library flow preview source must contain $token", token in previewSource)
         }
@@ -102,6 +116,12 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookshelfGroupManagementMapper.empty",
             "BookshelfGroupManagementMapper.loading",
             "BookshelfGroupManagementMapper.error",
+            "BookshelfLocalImportMapper.fromFixture",
+            "BookshelfLocalImportMapper.importing",
+            "BookshelfLocalImportMapper.success",
+            "BookshelfLocalImportMapper.partialFailed",
+            "BookshelfLocalImportMapper.failed",
+            "BookshelfLocalImportMapper.pickerCancelled",
             "ReaderUiState.Offline",
             "ReaderUiState.PermissionRequired"
         ).forEach { token ->
@@ -204,6 +224,43 @@ class LibraryFlowStateMatrixPreviewTest {
             "canDelete = false"
         ).forEach { token ->
             assertTrue("BookshelfGroupManagementUiState must expose frontend input state token $token", token in groupManagementStateSource)
+        }
+
+        listOf(
+            "BookshelfLocalImportUiState",
+            "ImportIntroCard",
+            "ImportPermissionCard",
+            "SupportedFormatsCard",
+            "ImportFlowCard",
+            "ImportingCard",
+            "ImportSummaryCard",
+            "ImportResultRow",
+            "PickerCancelledCard",
+            "ImportBottomActions",
+            "BookshelfLocalImportDisplayState.Failed",
+            "ReaderPrimaryButton",
+            "ReaderSecondaryButton"
+        ).forEach { token ->
+            assertTrue("BookshelfLocalImportScreen must expose frontend input state token $token", token in localImportScreenSource)
+        }
+
+        listOf(
+            "BookshelfLocalImportIntroUiModel",
+            "BookshelfLocalImportPermissionUiModel",
+            "BookshelfLocalImportProgressUiModel",
+            "BookshelfLocalImportResultRowUiModel",
+            "BookshelfLocalImportMapper",
+            "fun importing()",
+            "fun success()",
+            "fun partialFailed()",
+            "fun failed()",
+            "fun pickerCancelled()",
+            "系统文件选择器",
+            "不会扫描全盘",
+            "不需要“管理所有文件”权限",
+            "不展示错误页"
+        ).forEach { token ->
+            assertTrue("BookshelfLocalImportUiState must expose frontend input state token $token", token in localImportStateSource)
         }
     }
 }
