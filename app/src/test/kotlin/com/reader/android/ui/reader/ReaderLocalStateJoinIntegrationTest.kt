@@ -80,7 +80,9 @@ class ReaderLocalStateJoinIntegrationTest {
         ).readText()
         assertTrue("Must have 书架", "书架" in nav)
         assertTrue("Must have 发现", "发现" in nav)
-        assertTrue("Must have 书源", "书源" in nav)
-        assertTrue("Must have 我的", "我的" in nav)
+        assertTrue("Must have RSS", "RSS" in nav)
+        assertTrue("Must have 设置", "设置" in nav)
+        assertTrue("Must not keep legacy 书源 tab", "\"书源\"" !in nav)
+        assertTrue("Must not keep legacy 我的 tab", "\"我的\"" !in nav)
     }
 }

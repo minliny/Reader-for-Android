@@ -3,8 +3,8 @@ package com.reader.android.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RssFeed
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.net.URLEncoder
@@ -17,15 +17,15 @@ sealed class AppScreen(
 ) {
     data object Bookshelf : AppScreen("bookshelf", "书架", Icons.Filled.Book)
     data object Discover : AppScreen("discover", "发现", Icons.Filled.Explore)
-    data object Sources : AppScreen("sources", "书源", Icons.Filled.Hub)
-    data object Mine : AppScreen("mine", "我的", Icons.Filled.Person)
+    data object Rss : AppScreen("rss", "RSS", Icons.Filled.RssFeed)
+    data object Settings : AppScreen("settings", "设置", Icons.Filled.Settings)
 }
 
 val appScreens = listOf(
     AppScreen.Bookshelf,
     AppScreen.Discover,
-    AppScreen.Sources,
-    AppScreen.Mine
+    AppScreen.Rss,
+    AppScreen.Settings
 )
 
 object AppRouteGroups {
@@ -38,20 +38,25 @@ object AppRouteGroups {
     )
 
     val discover = setOf(
-        ReaderRoutes.DISCOVER,
+        ReaderRoutes.DISCOVER
+    )
+
+    val rss = setOf(
+        ReaderRoutes.RSS,
         ReaderRoutes.RSS_LIST,
         ReaderRoutes.RSS_DETAIL,
         ReaderRoutes.RSS_SUBSCRIPTION
     )
 
-    val sources = setOf(
+    val sourceManagement = setOf(
         ReaderRoutes.SOURCES,
         ReaderRoutes.SOURCE_DETAIL,
         ReaderRoutes.SOURCE_EDIT,
         ReaderRoutes.SOURCE_IMPORT
     )
 
-    val mine = setOf(
+    val settings = setOf(
+        ReaderRoutes.SETTINGS,
         ReaderRoutes.MINE,
         ReaderRoutes.GLOBAL_SETTINGS,
         ReaderRoutes.WEBDAV_CONFIG,
@@ -61,7 +66,7 @@ object AppRouteGroups {
         ReaderRoutes.ABOUT,
         ReaderRoutes.STATE_ERROR,
         ReaderRoutes.STATE_OFFLINE
-    )
+    ) + sourceManagement
 }
 
 object Routes {

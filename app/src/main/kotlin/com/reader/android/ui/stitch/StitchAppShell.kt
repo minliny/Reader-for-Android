@@ -25,10 +25,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -55,18 +53,48 @@ import com.reader.android.ui.theme.ReaderTheme
 data class StitchTab(val label: String, val icon: ImageVector)
 
 @Composable
-fun StitchBottomNav(selectedIndex: Int, onTabSelected: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun StitchBottomNav(
+    tabs: List<StitchTab>,
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Row(modifier = modifier.fillMaxWidth().background(ReaderTheme.colors.bottomBarBg).padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly) {
-        listOf("书架" to Icons.AutoMirrored.Filled.MenuBook, "发现" to Icons.Filled.Explore, "书源" to Icons.Filled.MoreVert, "我的" to Icons.Filled.Person)
-            .forEachIndexed { i, t ->
-                val sel = i == selectedIndex
-                Column(Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTabSelected(i) }
-                    .semantics { contentDescription = t.first }.padding(vertical = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(t.second, null, tint = if (sel) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk, modifier = Modifier.size(20.dp))
-                    Text(t.first, color = if (sel) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk, fontSize = 10.sp)
+        tabs.forEachIndexed { i, tab ->
+            val sel = i == selectedIndex
+            val iconContainerModifier = Modifier
+                .size(28.dp)
+                .clip(ReaderTheme.shapes.medium)
+                .let { base ->
+                    if (sel) base.background(ReaderTheme.colors.primary) else base
                 }
+            Column(
+                Modifier
+                    .width(64.dp)
+                    .height(44.dp)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTabSelected(i) }
+                    .semantics { contentDescription = tab.label }
+                    .padding(vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(iconContainerModifier, contentAlignment = Alignment.Center) {
+                    Icon(
+                        tab.icon,
+                        null,
+                        tint = if (sel) ReaderTheme.colors.paperBg else ReaderTheme.colors.controlInk,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Text(
+                    tab.label,
+                    color = if (sel) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
+        }
     }
 }
 

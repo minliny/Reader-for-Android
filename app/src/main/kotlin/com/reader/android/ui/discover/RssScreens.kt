@@ -58,7 +58,7 @@ fun RssListScreen(
     ),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
-    onBack: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     onMoreClick: () -> Unit = {},
     onSourceClick: (Int) -> Unit = {}
 ) {

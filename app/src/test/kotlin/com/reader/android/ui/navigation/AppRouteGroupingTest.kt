@@ -26,19 +26,24 @@ class AppRouteGroupingTest {
     }
 
     @Test
-    fun `discover rss and sources are grouped under correct modules`() {
-        listOf(ReaderRoutes.DISCOVER, ReaderRoutes.RSS_LIST, ReaderRoutes.RSS_DETAIL, ReaderRoutes.RSS_SUBSCRIPTION).forEach {
+    fun `discover rss and source management are grouped under correct modules`() {
+        listOf(ReaderRoutes.DISCOVER).forEach {
             assertTrue("$it must belong to Discover", it in AppRouteGroups.discover)
         }
+        listOf(ReaderRoutes.RSS, ReaderRoutes.RSS_LIST, ReaderRoutes.RSS_DETAIL, ReaderRoutes.RSS_SUBSCRIPTION).forEach {
+            assertTrue("$it must belong to RSS", it in AppRouteGroups.rss)
+        }
         listOf(ReaderRoutes.SOURCES, ReaderRoutes.SOURCE_DETAIL, ReaderRoutes.SOURCE_EDIT, ReaderRoutes.SOURCE_IMPORT).forEach {
-            assertTrue("$it must belong to Sources", it in AppRouteGroups.sources)
+            assertTrue("$it must belong to Settings", it in AppRouteGroups.settings)
         }
     }
 
     @Test
-    fun `mine owns settings sync webdav backup remote books and about`() {
+    fun `settings owns sync webdav backup source management remote books and about`() {
         listOf(
+            ReaderRoutes.SETTINGS,
             ReaderRoutes.MINE,
+            ReaderRoutes.SOURCES,
             ReaderRoutes.GLOBAL_SETTINGS,
             ReaderRoutes.WEBDAV_CONFIG,
             ReaderRoutes.BACKUP_SETTINGS,
@@ -46,7 +51,7 @@ class AppRouteGroupingTest {
             ReaderRoutes.REMOTE_WEBDAV_BOOKS,
             ReaderRoutes.ABOUT
         ).forEach {
-            assertTrue("$it must belong to Mine", it in AppRouteGroups.mine)
+            assertTrue("$it must belong to Settings", it in AppRouteGroups.settings)
         }
     }
 

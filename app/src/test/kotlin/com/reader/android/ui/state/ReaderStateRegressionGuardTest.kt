@@ -32,19 +32,19 @@ class ReaderStateRegressionGuardTest {
     @Test
     fun `app main bottom nav remains four redesigned modules`() {
         assertEquals(
-            listOf("书架", "发现", "书源", "我的"),
+            listOf("书架", "发现", "RSS", "设置"),
             appScreens.map { it.label }
         )
         assertEquals(
             listOf(
                 AppScreen.Bookshelf.route,
                 AppScreen.Discover.route,
-                AppScreen.Sources.route,
-                AppScreen.Mine.route
+                AppScreen.Rss.route,
+                AppScreen.Settings.route
             ),
             appScreens.map { it.route }
         )
-        assertFalse(appScreens.any { it.label in setOf("搜索", "阅读", "设置") })
+        assertFalse(appScreens.any { it.label in setOf("搜索", "阅读", "书源", "我的") })
     }
 
     @Test

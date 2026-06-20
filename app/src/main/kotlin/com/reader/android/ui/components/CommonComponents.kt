@@ -27,8 +27,6 @@ import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,30 +94,49 @@ fun ReaderMainTabBar(
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    NavigationBar(
-        modifier = modifier.semantics { contentDescription = "主导航" },
-        containerColor = ReaderTheme.colors.bottomBarBg,
-        tonalElevation = ReaderTheme.elevation.none
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(ReaderTheme.colors.bottomBarBg)
+            .padding(vertical = ReaderTheme.spacing.xs)
+            .semantics { contentDescription = "主导航" },
+        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         tabs.forEachIndexed { index, tab ->
-            NavigationBarItem(
-                selected = index == selectedIndex,
-                onClick = { onTabSelected(index) },
-                icon = {
+            val selected = index == selectedIndex
+            val iconContainerModifier = Modifier
+                .size(28.dp)
+                .clip(ReaderTheme.shapes.medium)
+                .let { base ->
+                    if (selected) base.background(ReaderTheme.colors.primary) else base
+                }
+
+            Column(
+                modifier = Modifier
+                    .width(64.dp)
+                    .height(44.dp)
+                    .clickable(
+                        role = Role.Tab,
+                        onClick = { onTabSelected(index) }
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(iconContainerModifier, contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = tab.icon,
                         contentDescription = tab.contentDescription,
-                        tint = ReaderTheme.colors.controlInk
-                    )
-                },
-                label = {
-                    Text(
-                        text = tab.label,
-                        style = ReaderTheme.typography.readerControlLabel,
-                        color = ReaderTheme.colors.controlInk
+                        tint = if (selected) ReaderTheme.colors.paperBg else ReaderTheme.colors.controlInk,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-            )
+                Text(
+                    text = tab.label,
+                    style = ReaderTheme.typography.readerControlLabel,
+                    color = if (selected) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

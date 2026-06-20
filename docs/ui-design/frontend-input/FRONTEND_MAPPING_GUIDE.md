@@ -40,7 +40,7 @@
 
 | 差异（Gap） | 当前代码（Current Code） | 设计输入件（Design Input） | 处理要求（Required Action） |
 | --- | --- | --- | --- |
-| 主导航标签（Main Navigation Labels） | `AppScreen` 和 `StitchBottomNav` 使用 `书架 / 发现 / 书源 / 我的` | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 真实前端实现前必须统一。若按设计输入件开发，应把第三、第四主入口调整为 RSS 和设置。 |
+| 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，`StitchBottomNav` 已改为读取外部 tabs | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成第一轮代码收敛；后续继续把临时 Stitch 底栏替换为正式 MainTabShell Composable。 |
 | 书架实现来源（Bookshelf Implementation Source） | `ReaderRouteHost` 当前 `bookshelf` 路由进入 `StitchAppShell` | 书架输入件由 `MainTabPageKit` + `BookshelfInput` 输出 | 不能继续只沿用 Stitch 硬编码列表；应迁到 fixture/state 驱动。 |
 | 图标体系（Icon System） | 部分 Compose 代码直接使用 Material Icons | 本地素材库登记 71 个统一语义图标 token | 需要建立 token 到 Compose icon 的映射表；缺图标先补素材库，不现场画。 |
 | 换源落点（Source Switching Target） | 当前没有单独 FlowShell Composable | `换源` 是横屏 `FlowShell` | 应新增或抽出横向 FlowShell，而不是复用主标签页或普通设置页骨架。 |
@@ -79,7 +79,7 @@
 ## 实现顺序（Implementation Order）
 
 1. Token 桥接（Token Bridge）：对齐 `tokens.css` 与 `ReaderTheme`，先固定颜色、间距、圆角、阴影和文字层级。
-2. 主导航决策（Main Navigation Decision）：按 `MAIN_NAV_RECONCILIATION.md` 统一 `书架 / 发现 / RSS / 设置` 与当前 `书架 / 发现 / 书源 / 我的` 的产品取舍。
+2. 主导航决策（Main Navigation Decision）：已按 `MAIN_NAV_RECONCILIATION.md` 完成第一轮 `书架 / 发现 / RSS / 设置` 代码收敛。
 3. Shell Composable（Shell Composables）：先实现 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell` 的骨架。
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
