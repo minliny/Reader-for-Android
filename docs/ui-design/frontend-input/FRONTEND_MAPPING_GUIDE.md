@@ -84,7 +84,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：主标签页、书源管理链路、设置二级页、阅读控制层、阅读入口、沉浸阅读、书架搜索/详情/目录/排序筛选/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
+7. 验证覆盖（Validation Coverage）：主标签页、书源管理链路、设置二级页、阅读控制层、阅读入口、沉浸阅读、目录与书签、书架搜索/详情/目录/排序筛选/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
 
 ## 开发禁用项（Do Not）
 
