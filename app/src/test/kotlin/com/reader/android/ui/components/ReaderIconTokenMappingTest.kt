@@ -45,7 +45,12 @@ class ReaderIconTokenMappingTest {
             ReaderIconToken.Bug,
             ReaderIconToken.Storage,
             ReaderIconToken.Download,
-            ReaderIconToken.Image
+            ReaderIconToken.Image,
+            ReaderIconToken.Check,
+            ReaderIconToken.Link,
+            ReaderIconToken.Message,
+            ReaderIconToken.Code,
+            ReaderIconToken.Help
         ).forEach { token ->
             assertNotNull("${token.name} must support settings secondary pages", token.asImageVector())
         }
