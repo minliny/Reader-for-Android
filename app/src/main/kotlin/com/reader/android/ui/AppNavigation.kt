@@ -1,24 +1,23 @@
 package com.reader.android.ui
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Book
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.RssFeed
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.reader.android.ui.components.ReaderIconToken
+import com.reader.android.ui.components.asImageVector
 import java.net.URLEncoder
 
 @Suppress("DEPRECATION")
 sealed class AppScreen(
     val route: String,
     val label: String,
-    val icon: ImageVector
+    val iconToken: ReaderIconToken
 ) {
-    data object Bookshelf : AppScreen("bookshelf", "书架", Icons.Filled.Book)
-    data object Discover : AppScreen("discover", "发现", Icons.Filled.Explore)
-    data object Rss : AppScreen("rss", "RSS", Icons.Filled.RssFeed)
-    data object Settings : AppScreen("settings", "设置", Icons.Filled.Settings)
+    val icon: ImageVector get() = iconToken.asImageVector()
+
+    data object Bookshelf : AppScreen("bookshelf", "书架", ReaderIconToken.Bookshelf)
+    data object Discover : AppScreen("discover", "发现", ReaderIconToken.Discover)
+    data object Rss : AppScreen("rss", "RSS", ReaderIconToken.Rss)
+    data object Settings : AppScreen("settings", "设置", ReaderIconToken.Settings)
 }
 
 val appScreens = listOf(

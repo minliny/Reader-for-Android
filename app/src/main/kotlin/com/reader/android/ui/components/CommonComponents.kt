@@ -27,6 +27,7 @@ import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +50,30 @@ data class ReaderMainTab(
     val contentDescription: String,
     val icon: ImageVector
 )
+
+@Composable
+fun ReaderMainTabShell(
+    tabs: List<ReaderMainTab>,
+    selectedIndex: Int,
+    showMainNav: Boolean,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    Scaffold(
+        modifier = modifier,
+        bottomBar = {
+            if (showMainNav) {
+                ReaderMainTabBar(
+                    tabs = tabs,
+                    selectedIndex = selectedIndex,
+                    onTabSelected = onTabSelected
+                )
+            }
+        },
+        content = content
+    )
+}
 
 @Composable
 fun ReaderAppTopBar(

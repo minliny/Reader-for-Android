@@ -22,6 +22,7 @@ class ReaderSharedComponentsStructureTest {
 
         listOf(
             "ReaderAppTopBar",
+            "ReaderMainTabShell",
             "ReaderMainTabBar",
             "ReaderSectionHeader",
             "ReaderCard",

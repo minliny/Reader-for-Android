@@ -22,10 +22,10 @@
 
 | 主导航（Main Nav） | 目标 token（Target Token） | 当前 Compose 图标（Current Compose Icon） | 处理（Action） |
 | --- | --- | --- | --- |
-| 书架 | `bookshelf` | `Book` / `MenuBook` | 统一到 `bookshelf`。 |
-| 发现 | `discover` | `Explore` | 统一到 `discover`。 |
-| RSS | `rss` | 当前没有主 tab；RSS 子页未作为底栏项 | 新增主 tab token `rss`。 |
-| 设置 | `settings` | 当前主 tab 用 `Person` 表示 `我的`，设置页内用 `Settings` | 主 tab 改为 `settings`，不再用 `Person`。 |
+| 书架 | `bookshelf` | `MenuBook` | 已通过 `ReaderIconToken.Bookshelf` 统一。 |
+| 发现 | `discover` | `Explore` | 已通过 `ReaderIconToken.Discover` 统一。 |
+| RSS | `rss` | `RssFeed` | 已通过 `ReaderIconToken.Rss` 统一。 |
+| 设置 | `settings` | `Settings` | 已通过 `ReaderIconToken.Settings` 统一，不再用 `Person`。 |
 
 ## Material 到本地 token 映射（Material to Local Token Mapping）
 
@@ -84,8 +84,8 @@
 
 | 文件组（File Group） | 当前情况（Current State） | 后续动作（Next Action） |
 | --- | --- | --- |
-| `AppNavigation.kt` | `AppScreen` 直接持有 `ImageVector`。 | 改为持有语义 token 或统一 `ReaderIconToken`。 |
-| `ReaderRouteHost.kt` | 底栏走 `StitchBottomNav`，间接使用旧硬编码图标。 | 底栏改为统一 MainTabShell 数据源。 |
+| `AppNavigation.kt` | `AppScreen` 已持有 `ReaderIconToken`，并通过 `asImageVector()` 暴露兼容图标。 | 后续禁止主 tab 直接新增 `ImageVector` 字段。 |
+| `ReaderRouteHost.kt` | 底栏读取 `appScreens`，图标从 `ReaderIconToken` 解析，并由 `ReaderMainTabShell` 输出统一主导航。 | 后续主 tab 只能扩展 `ReaderMainTabShell`，不再恢复临时 `StitchBottomNav`。 |
 | `ui/components/*` | 通用组件直接使用 Material Icons。 | 建立 `ReaderIcon` wrapper 后逐步迁移。 |
 | `ui/reader/components/*` | 阅读控制层直接使用搜索、自动翻页、换源、夜间模式等 Material Icons。 | 优先迁移阅读模块导航和快捷操作图标。 |
 | `ui/stitch/*` | 原型代码大量直接引用 Material Icons。 | 保留为历史参考，不作为最终图标规则来源。 |
@@ -93,27 +93,7 @@
 
 ## 建议实现形态（Suggested Implementation Shape）
 
-```kotlin
-enum class ReaderIconToken {
-    Bookshelf,
-    Discover,
-    Rss,
-    Settings,
-    Search,
-    More,
-    Back,
-    Chevron,
-    Directory,
-    Tts,
-    Appearance,
-    AutoPage,
-    Replace,
-    Source,
-    Warning
-}
-```
-
-真实实现可以保留 Material `ImageVector`，但应通过一个统一函数完成映射：
+当前已经建立 `ReaderIconToken` 和 `asImageVector()`，主导航已接入。真实实现可以继续保留 Material `ImageVector` 作为渲染载体，但必须通过统一函数完成映射：
 
 ```kotlin
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -121,11 +101,13 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Discover -> Icons.Filled.Explore
     ReaderIconToken.Rss -> Icons.Filled.RssFeed
     ReaderIconToken.Settings -> Icons.Filled.Settings
-    else -> Icons.Filled.MoreVert
+    ReaderIconToken.Search -> Icons.Filled.Search
+    ReaderIconToken.More -> Icons.Filled.MoreVert
+    ReaderIconToken.Back -> Icons.AutoMirrored.Filled.ArrowBack
 }
 ```
 
-上面代码只表达结构，具体 icon 选择必须按本清单和素材库最终 token 落地。
+上面代码只表达当前已落地的第一批 token，后续新增 token 必须先进入本清单和素材库审计，再补充映射。
 
 ## 验收标准（Acceptance Criteria）
 

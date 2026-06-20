@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -49,54 +48,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.ui.theme.ReaderTheme
-
-data class StitchTab(val label: String, val icon: ImageVector)
-
-@Composable
-fun StitchBottomNav(
-    tabs: List<StitchTab>,
-    selectedIndex: Int,
-    onTabSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(modifier = modifier.fillMaxWidth().background(ReaderTheme.colors.bottomBarBg).padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly) {
-        tabs.forEachIndexed { i, tab ->
-            val sel = i == selectedIndex
-            val iconContainerModifier = Modifier
-                .size(28.dp)
-                .clip(ReaderTheme.shapes.medium)
-                .let { base ->
-                    if (sel) base.background(ReaderTheme.colors.primary) else base
-                }
-            Column(
-                Modifier
-                    .width(64.dp)
-                    .height(44.dp)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTabSelected(i) }
-                    .semantics { contentDescription = tab.label }
-                    .padding(vertical = 2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(iconContainerModifier, contentAlignment = Alignment.Center) {
-                    Icon(
-                        tab.icon,
-                        null,
-                        tint = if (sel) ReaderTheme.colors.paperBg else ReaderTheme.colors.controlInk,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Text(
-                    tab.label,
-                    color = if (sel) ReaderTheme.colors.primary else ReaderTheme.colors.controlInk,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun StitchAppShell(onSearchClick: () -> Unit = {}, onBookClick: (String, String) -> Unit = { _, _ -> }) {
