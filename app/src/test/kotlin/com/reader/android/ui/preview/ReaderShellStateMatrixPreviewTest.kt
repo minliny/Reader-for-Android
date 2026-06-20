@@ -19,6 +19,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingTocBookmarkDesignUiState.kt")))
     }
 
+    private val appearanceScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAppearanceDesignScreen.kt")))
+    }
+
+    private val appearanceStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ReadingAppearanceDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -36,7 +44,13 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingTocBookmarkEmptyPreview",
             "ReadingTocBookmarkLoadingPreview",
             "ReadingTocBookmarkErrorPreview",
-            "ReadingTocBookmarkMoreMenuPreview"
+            "ReadingTocBookmarkMoreMenuPreview",
+            "ReadingAppearanceDefaultPreview",
+            "ReadingAppearanceFontPreview",
+            "ReadingAppearanceThemePreview",
+            "ReadingAppearanceEditPreview",
+            "ReadingAppearanceLoadingPreview",
+            "ReadingAppearanceErrorPreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -59,7 +73,13 @@ class ReaderShellStateMatrixPreviewTest {
             "ReadingTocBookmarkMapper.empty",
             "ReadingTocBookmarkMapper.loading",
             "ReadingTocBookmarkMapper.error",
-            "ReadingTocBookmarkMapper.moreMenu"
+            "ReadingTocBookmarkMapper.moreMenu",
+            "ReadingAppearanceMapper.fromFixture",
+            "ReadingAppearanceMapper.font",
+            "ReadingAppearanceMapper.theme",
+            "ReadingAppearanceMapper.edit",
+            "ReadingAppearanceMapper.loading",
+            "ReadingAppearanceMapper.error"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -103,6 +123,51 @@ class ReaderShellStateMatrixPreviewTest {
             "只看未读"
         ).forEach { token ->
             assertTrue("Toc bookmark state source must include $token", token in tocBookmarkStateSource)
+        }
+    }
+
+    @Test
+    fun `appearance screen keeps readershell slots and visible appearance controls`() {
+        listOf(
+            "ReadingAppearanceScreen",
+            "AppearanceReadingSurface",
+            "AppearanceOverlay",
+            "AppearanceBottomSheet",
+            "AppearanceModuleNav",
+            "AppearanceBrightnessPanel",
+            "AppearanceFontStepper",
+            "AppearanceThemeSwatches",
+            "AppearanceEditThemePanel",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Appearance screen source must include $token", token in appearanceScreenSource)
+        }
+    }
+
+    @Test
+    fun `appearance state model keeps frontend input contract text`() {
+        listOf(
+            "ReadingAppearanceDisplayState",
+            "ReadingAppearanceMapper",
+            "fun font()",
+            "fun theme()",
+            "fun edit()",
+            "fun loading()",
+            "fun error()",
+            "字号",
+            "行距",
+            "主题",
+            "字体",
+            "翻页动画",
+            "编辑主题",
+            "加载失败，请重试",
+            "已保留当前阅读外观"
+        ).forEach { token ->
+            assertTrue("Appearance state source must include $token", token in appearanceStateSource)
         }
     }
 }
