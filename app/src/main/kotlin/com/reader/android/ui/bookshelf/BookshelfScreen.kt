@@ -10,14 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,8 +21,11 @@ import com.reader.android.ui.components.BookListItem
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderOfflineState
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.theme.ReaderTheme
 
@@ -47,7 +44,13 @@ fun BookshelfScreen(
                 ReaderAppTopBar(
                     title = "书架",
                     actions = {
-                        IconButton(
+                        ReaderIconButton(
+                            icon = if (bookshelfState.layoutMode == BookshelfLayoutMode.Cover) {
+                                ReaderIconToken.ViewList.asImageVector()
+                            } else {
+                                ReaderIconToken.Grid.asImageVector()
+                            },
+                            contentDescription = "切换书架布局",
                             onClick = {
                                 onLayoutModeChange(
                                     if (bookshelfState.layoutMode == BookshelfLayoutMode.Cover) {
@@ -57,17 +60,7 @@ fun BookshelfScreen(
                                     }
                                 )
                             }
-                        ) {
-                            Icon(
-                                imageVector = if (bookshelfState.layoutMode == BookshelfLayoutMode.Cover) {
-                                    Icons.AutoMirrored.Filled.ViewList
-                                } else {
-                                    Icons.Filled.GridView
-                                },
-                                contentDescription = "切换书架布局",
-                                tint = ReaderTheme.colors.controlInk
-                            )
-                        }
+                        )
                     }
                 )
                 when (uiState) {
@@ -93,7 +86,10 @@ fun BookshelfScreen(
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
             ) {
-                Icon(Icons.Filled.Search, contentDescription = "搜索")
+                Icon(
+                    imageVector = ReaderIconToken.Search.asImageVector(),
+                    contentDescription = "搜索"
+                )
             }
         }
     }
@@ -151,13 +147,11 @@ private fun BookshelfCoverMode(
                             progress = book.progress,
                             onClick = { onBookClick(book) }
                         )
-                        IconButton(onClick = { onBookMoreClick(book) }) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = "更多，${book.title}",
-                                tint = ReaderTheme.colors.controlInk
-                            )
-                        }
+                        ReaderIconButton(
+                            icon = ReaderIconToken.More.asImageVector(),
+                            contentDescription = "更多，${book.title}",
+                            onClick = { onBookMoreClick(book) }
+                        )
                     }
                     Spacer(modifier = Modifier.width(ReaderTheme.spacing.sm))
                 }
@@ -190,13 +184,11 @@ private fun BookshelfListMode(
                     onClick = { onBookClick(book) },
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { onBookMoreClick(book) }) {
-                    Icon(
-                        Icons.Filled.MoreVert,
-                        contentDescription = "更多，${book.title}",
-                        tint = ReaderTheme.colors.controlInk
-                    )
-                }
+                ReaderIconButton(
+                    icon = ReaderIconToken.More.asImageVector(),
+                    contentDescription = "更多，${book.title}",
+                    onClick = { onBookMoreClick(book) }
+                )
             }
         }
     }

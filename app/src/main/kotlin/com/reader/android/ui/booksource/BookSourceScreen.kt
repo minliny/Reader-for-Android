@@ -10,12 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -33,7 +29,10 @@ import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.theme.ReaderTheme
 
@@ -104,7 +103,10 @@ fun BookSourceScreen(uiState: ReaderUiState? = null) {
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "导入")
+                Icon(
+                    imageVector = ReaderIconToken.Add.asImageVector(),
+                    contentDescription = "导入"
+                )
             }
         }
             }
@@ -156,12 +158,10 @@ private fun SourceItem(
                 uncheckedTrackColor = ReaderTheme.colors.mutedTrack
             )
         )
-        IconButton(onClick = onDelete) {
-            Icon(
-                Icons.Filled.Delete,
-                contentDescription = "删除${source.name}",
-                tint = ReaderTheme.colors.controlInk
-            )
-        }
+        ReaderIconButton(
+            icon = ReaderIconToken.Delete.asImageVector(),
+            contentDescription = "删除${source.name}",
+            onClick = onDelete
+        )
     }
 }

@@ -23,6 +23,14 @@ class SettingsScreenStructureTest {
         )
     }
 
+    private val secondarySettingsSource: String by lazy {
+        String(
+            Files.readAllBytes(
+                Paths.get("src/main/kotlin/com/reader/android/ui/settings/WebDavAndBackupScreens.kt")
+            )
+        )
+    }
+
     @Test
     fun `settings screen uses reader theme and components`() {
         listOf(
@@ -110,6 +118,15 @@ class SettingsScreenStructureTest {
         listOf("头像", "登录", "昵称", "账号", "退出登录").forEach { forbidden ->
             assertTrue("SettingsRootScreen must not become an account page with $forbidden", forbidden !in rootSource)
         }
+    }
+
+    @Test
+    fun `settings secondary screens use icon tokens`() {
+        assertTrue("Settings secondary screens must use more icon token", "ReaderIconToken.More" in secondarySettingsSource)
+        assertTrue(
+            "Settings secondary screens must not import Material Icons directly",
+            "import androidx.compose.material.icons" !in secondarySettingsSource
+        )
     }
 
     @Test

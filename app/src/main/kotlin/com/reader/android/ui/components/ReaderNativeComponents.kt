@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -300,7 +298,12 @@ fun ReaderSettingRow(
             Text(value, color = ReaderTheme.colors.bodyText, style = TextStyle(fontSize = 13.sp, lineHeight = 18.sp))
             if (onClick != null) {
                 Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.Filled.ChevronRight, null, tint = ReaderTheme.colors.controlInk, modifier = Modifier.size(16.dp))
+                Icon(
+                    imageVector = ReaderIconToken.Chevron.asImageVector(),
+                    contentDescription = null,
+                    tint = ReaderTheme.colors.controlInk,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }

@@ -8,10 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -23,9 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderPrimaryButton
 import com.reader.android.ui.components.ReaderSectionHeader
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.theme.ReaderTheme
 
@@ -52,9 +51,11 @@ fun SourceEditScreen(
                 title = "编辑书源",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
 

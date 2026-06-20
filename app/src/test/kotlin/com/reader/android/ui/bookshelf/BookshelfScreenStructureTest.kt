@@ -71,4 +71,17 @@ class BookshelfScreenStructureTest {
             assertTrue("BookshelfScreen empty state must include '$text'", text in screenSource)
         }
     }
+
+    @Test
+    fun `bookshelf screen uses icon tokens`() {
+        listOf(
+            "ReaderIconToken.ViewList",
+            "ReaderIconToken.Grid",
+            "ReaderIconToken.Search",
+            "ReaderIconToken.More"
+        ).forEach { token ->
+            assertTrue("BookshelfScreen must use $token", token in screenSource)
+        }
+        assertTrue("BookshelfScreen must not import Material Icons directly", "import androidx.compose.material.icons" !in screenSource)
+    }
 }

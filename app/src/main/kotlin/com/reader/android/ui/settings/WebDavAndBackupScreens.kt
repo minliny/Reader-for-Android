@@ -10,10 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -28,12 +24,15 @@ import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderChip
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderListItem
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderPrimaryButton
 import com.reader.android.ui.components.ReaderSecondaryButton
 import com.reader.android.ui.components.ReaderSettingsRow
 import com.reader.android.ui.components.ReaderSettingsSwitchRow
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.sync.BackupSettingsUiState
 import com.reader.android.ui.sync.DiscoverRssWebDavMapper
@@ -74,9 +73,11 @@ fun WebDavConfigScreen(
                 title = "WebDAV 配置",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             Column(
@@ -183,9 +184,11 @@ fun BackupSettingsScreen(
                 title = "备份设置",
                 onNavigateBack = onBack,
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
             Column(
@@ -251,9 +254,11 @@ fun ProgressSyncStatusScreen(
                         title = "进度同步",
                         onNavigateBack = onBack,
                         actions = {
-                            IconButton(onClick = onMoreClick) {
-                                Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                            }
+                            ReaderIconButton(
+                                icon = ReaderIconToken.More.asImageVector(),
+                                contentDescription = "更多",
+                                onClick = onMoreClick
+                            )
                         }
                     )
                     Column(
@@ -318,9 +323,11 @@ fun RemoteWebDavBooksScreen(
                         title = "远程书籍",
                         onNavigateBack = onBack,
                         actions = {
-                            IconButton(onClick = onMoreClick) {
-                                Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                            }
+                            ReaderIconButton(
+                                icon = ReaderIconToken.More.asImageVector(),
+                                contentDescription = "更多",
+                                onClick = onMoreClick
+                            )
                         }
                     )
                     when {

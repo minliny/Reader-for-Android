@@ -8,11 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,9 +16,12 @@ import com.reader.android.ui.components.BookCard
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderEmptyState
 import com.reader.android.ui.components.ReaderErrorState
+import com.reader.android.ui.components.ReaderIconButton
+import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderLoadingState
 import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.components.ReaderSettingsRow
+import com.reader.android.ui.components.asImageVector
 import com.reader.android.ui.state.ReaderUiState
 import com.reader.android.ui.sync.DiscoverRssWebDavMapper
 import com.reader.android.ui.sync.DiscoverUiState
@@ -66,9 +65,11 @@ fun DiscoverScreen(
             ReaderAppTopBar(
                 title = "发现",
                 actions = {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(Icons.Filled.MoreVert, "更多", tint = ReaderTheme.colors.controlInk)
-                    }
+                    ReaderIconButton(
+                        icon = ReaderIconToken.More.asImageVector(),
+                        contentDescription = "更多",
+                        onClick = onMoreClick
+                    )
                 }
             )
 
@@ -116,7 +117,11 @@ fun DiscoverScreen(
                         .fillMaxWidth()
                         .padding(top = 8.dp),
                     trailing = {
-                        Icon(Icons.Filled.ChevronRight, "RSS 订阅", tint = ReaderTheme.colors.controlInk)
+                        Icon(
+                            imageVector = ReaderIconToken.Chevron.asImageVector(),
+                            contentDescription = "RSS 订阅",
+                            tint = ReaderTheme.colors.controlInk
+                        )
                     },
                     onClick = onRssClick
                 )
