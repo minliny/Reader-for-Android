@@ -27,8 +27,12 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfSortFilterScreen.kt")))
     }
 
+    private val sortFilterStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfSortFilterUiState.kt")))
+    }
+
     @Test
-    fun `library flow compose previews expose search detail and directory state matrices`() {
+    fun `library flow compose previews expose search detail directory and sort filter state matrices`() {
         listOf(
             "LibrarySearchHomePreview",
             "LibrarySearchResultsPreview",
@@ -57,7 +61,7 @@ class LibraryFlowStateMatrixPreviewTest {
     }
 
     @Test
-    fun `library flow previews use adapter shell fixture states`() {
+    fun `library flow previews use adapter shell and mapper fixture states`() {
         listOf(
             "SearchAdapterShell.searchHome",
             "SearchAdapterShell.searchResults",
@@ -131,6 +135,21 @@ class LibraryFlowStateMatrixPreviewTest {
             "ReaderSecondaryButton"
         ).forEach { token ->
             assertTrue("BookshelfSortFilterScreen must expose frontend input state token $token", token in sortFilterScreenSource)
+        }
+
+        listOf(
+            "BookshelfSortFilterFeedbackUiModel",
+            "val message: String",
+            "BookshelfSortFilterDisplayState.Selected",
+            "BookshelfSortFilterDisplayState.Empty",
+            "BookshelfSortFilterMapper",
+            "fun selected()",
+            "fun empty()",
+            "fun error(",
+            "fun fromBookshelfState",
+            "BookshelfGroupFilterSort.apply"
+        ).forEach { token ->
+            assertTrue("BookshelfSortFilterUiState must expose frontend input state token $token", token in sortFilterStateSource)
         }
     }
 }
