@@ -26,4 +26,19 @@ class ReaderIconTokenMappingTest {
             assertNotNull("${token.name} must resolve to an ImageVector", token.asImageVector())
         }
     }
+
+    @Test
+    fun `settings secondary semantic icons are available`() {
+        listOf(
+            ReaderIconToken.Folder,
+            ReaderIconToken.Badge,
+            ReaderIconToken.Sort,
+            ReaderIconToken.People,
+            ReaderIconToken.Clock,
+            ReaderIconToken.List,
+            ReaderIconToken.Trash
+        ).forEach { token ->
+            assertNotNull("${token.name} must support settings secondary pages", token.asImageVector())
+        }
+    }
 }

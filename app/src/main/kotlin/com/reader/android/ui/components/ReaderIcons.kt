@@ -3,6 +3,7 @@ package com.reader.android.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -19,7 +20,10 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
@@ -47,7 +51,9 @@ enum class ReaderIconToken {
     Add,
     Delete,
     FileOpen,
+    Folder,
     FolderOff,
+    Badge,
     Warning,
     Offline,
     Permission,
@@ -64,7 +70,12 @@ enum class ReaderIconToken {
     ReadingSettings,
     Bookmark,
     CurrentLocation,
-    Close
+    Close,
+    Sort,
+    People,
+    Clock,
+    List,
+    Trash
 }
 
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -82,7 +93,9 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Add -> Icons.Filled.Add
     ReaderIconToken.Delete -> Icons.Filled.Delete
     ReaderIconToken.FileOpen -> Icons.Filled.FileOpen
+    ReaderIconToken.Folder -> Icons.Filled.Folder
     ReaderIconToken.FolderOff -> Icons.Filled.FolderOff
+    ReaderIconToken.Badge -> Icons.Filled.Bookmark
     ReaderIconToken.Warning -> Icons.Filled.ErrorOutline
     ReaderIconToken.Offline -> Icons.Filled.CloudOff
     ReaderIconToken.Permission -> Icons.Filled.Lock
@@ -100,4 +113,9 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Bookmark -> Icons.Filled.Bookmark
     ReaderIconToken.CurrentLocation -> Icons.Filled.MyLocation
     ReaderIconToken.Close -> Icons.Filled.Close
+    ReaderIconToken.Sort -> Icons.AutoMirrored.Filled.Sort
+    ReaderIconToken.People -> Icons.Filled.Groups
+    ReaderIconToken.Clock -> Icons.Filled.History
+    ReaderIconToken.List -> Icons.AutoMirrored.Filled.ViewList
+    ReaderIconToken.Trash -> Icons.Filled.Delete
 }

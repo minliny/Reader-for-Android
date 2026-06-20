@@ -3,6 +3,8 @@ package com.reader.android.ui.preview
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.settings.BookshelfSearchSettingsMapper
+import com.reader.android.ui.settings.BookshelfSearchSettingsScreen
 import com.reader.android.ui.settings.GeneralSettingsMapper
 import com.reader.android.ui.settings.GeneralSettingsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
@@ -44,6 +46,42 @@ fun SettingsGeneralErrorPreview() {
 @Composable
 fun SettingsGeneralPermissionPreview() {
     GeneralSettingsScreen(state = GeneralSettingsMapper.permission())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchDefaultPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Option Sheet", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchOptionSheetPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.optionSheet())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchConfirmPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchLoadingPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchErrorPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.error())
+}
+
+@Preview(name = "Settings Secondary / Bookshelf Search / Permission", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsBookshelfSearchPermissionPreview() {
+    BookshelfSearchSettingsScreen(state = BookshelfSearchSettingsMapper.permission())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
