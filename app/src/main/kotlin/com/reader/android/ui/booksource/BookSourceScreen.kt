@@ -67,48 +67,69 @@ class SourceManagementViewModel(
 }
 
 @Composable
-fun BookSourceScreen(uiState: ReaderUiState? = null) {
+fun BookSourceScreen(
+    uiState: ReaderUiState? = null,
+    sourceStateOverride: SourceManagementUiState? = null
+) {
     val viewModel = remember { SourceManagementViewModel() }
-    val sourceState = SourceManagementMapper.fromSources(viewModel.sources)
+    val sourceState = sourceStateOverride ?: SourceManagementMapper.fromSources(viewModel.sources)
 
     ReaderTheme {
         when (uiState) {
-            is ReaderUiState.Loading -> { ReaderLoadingState(modifier = Modifier.fillMaxSize()) }
-            is ReaderUiState.Error -> { ReaderErrorState(title = "加载失败", message = uiState.message, modifier = Modifier.fillMaxSize()) }
+            is ReaderUiState.Loading -> {
+                ReaderLoadingState(modifier = Modifier.fillMaxSize())
+            }
+            is ReaderUiState.Error -> {
+                ReaderErrorState(title = "加载失败", message = uiState.message, modifier = Modifier.fillMaxSize())
+            }
             else -> {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                ReaderAppTopBar(title = "书源管理")
-                if (sourceState.isEmpty) {
-                    ReaderEmptyState(
-                        title = "暂无书源",
-                        message = sourceState.emptyMessage,
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(sourceState.sources, key = { it.id }) { source ->
-                            SourceItem(
-                                source = source,
-                                onToggle = { viewModel.toggleEnabled(source.url) },
-                                onDelete = { viewModel.delete(source.url) }
-                            )
+                when {
+                    sourceState.isLoading -> {
+                        ReaderLoadingState(modifier = Modifier.fillMaxSize(), message = "正在加载书源")
+                    }
+                    sourceState.errorMessage != null -> {
+                        ReaderErrorState(
+                            title = "书源加载失败",
+                            message = sourceState.errorMessage,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    else -> {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                ReaderAppTopBar(title = "书源管理")
+                                if (sourceState.isEmpty) {
+                                    ReaderEmptyState(
+                                        title = "暂无书源",
+                                        message = sourceState.emptyMessage,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    LazyColumn(modifier = Modifier.weight(1f)) {
+                                        items(sourceState.sources, key = { it.id }) { source ->
+                                            SourceItem(
+                                                source = source,
+                                                onToggle = { viewModel.toggleEnabled(source.url) },
+                                                onDelete = { viewModel.delete(source.url) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            FloatingActionButton(
+                                onClick = { /* TODO: import dialog */ },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = ReaderIconToken.Add.asImageVector(),
+                                    contentDescription = "导入"
+                                )
+                            }
                         }
                     }
                 }
-            }
-            FloatingActionButton(
-                onClick = { /* TODO: import dialog */ },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-            ) {
-                Icon(
-                    imageVector = ReaderIconToken.Add.asImageVector(),
-                    contentDescription = "导入"
-                )
-            }
-        }
             }
         }
     }
