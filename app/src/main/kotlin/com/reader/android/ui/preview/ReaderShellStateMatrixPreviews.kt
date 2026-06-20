@@ -8,6 +8,8 @@ import com.reader.android.ui.reader.ReadingAppearanceMapper
 import com.reader.android.ui.reader.ReadingAppearanceScreen
 import com.reader.android.ui.reader.ReadingAloudMapper
 import com.reader.android.ui.reader.ReadingAloudScreen
+import com.reader.android.ui.reader.ReadingSettingsMapper
+import com.reader.android.ui.reader.ReadingSettingsScreen
 import com.reader.android.ui.reader.ReadingTocBookmarkMapper
 import com.reader.android.ui.reader.ReadingTocBookmarkScreen
 import com.reader.android.ui.reader.ReadingEntryMapper
@@ -164,4 +166,28 @@ fun ReadingAloudPausedPreview() {
 @Composable
 fun ReadingAloudErrorPreview() {
     ReadingAloudScreen(state = ReadingAloudMapper.error())
+}
+
+@Preview(name = "Reader Shell / Settings / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingSettingsDefaultPreview() {
+    ReadingSettingsScreen(state = ReadingSettingsMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Settings / Subpage", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingSettingsSubpagePreview() {
+    ReadingSettingsScreen(state = ReadingSettingsMapper.subpage())
+}
+
+@Preview(name = "Reader Shell / Settings / Loading", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingSettingsLoadingPreview() {
+    ReadingSettingsScreen(state = ReadingSettingsMapper.loading())
+}
+
+@Preview(name = "Reader Shell / Settings / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingSettingsErrorPreview() {
+    ReadingSettingsScreen(state = ReadingSettingsMapper.error())
 }
