@@ -7,6 +7,8 @@ import com.reader.android.ui.detail.BookDetailScreen
 import com.reader.android.ui.search.SearchAdapterShell
 import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.state.ReaderUiState
+import com.reader.android.ui.toc.BookDirectoryUiStateMapper
+import com.reader.android.ui.toc.TOCScreen
 
 private const val LibraryPreviewWidth = 390
 private const val LibraryPreviewHeight = 844
@@ -116,5 +118,49 @@ fun LibraryBookDetailPermissionPreview() {
         onBack = {},
         onTOC = {},
         uiState = ReaderUiState.PermissionRequired("网络")
+    )
+}
+
+@Preview(name = "Library Flow / Directory / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookDirectoryDefaultPreview() {
+    TOCScreen(
+        tocUrl = "fixture-toc-paper-mountain",
+        onBack = {},
+        onChapterClick = { _, _ -> },
+        directoryState = BookDirectoryUiStateMapper.fromFixture()
+    )
+}
+
+@Preview(name = "Library Flow / Directory / Loading", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookDirectoryLoadingPreview() {
+    TOCScreen(
+        tocUrl = "fixture-toc-paper-mountain",
+        onBack = {},
+        onChapterClick = { _, _ -> },
+        directoryState = BookDirectoryUiStateMapper.loading()
+    )
+}
+
+@Preview(name = "Library Flow / Directory / Empty", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookDirectoryEmptyPreview() {
+    TOCScreen(
+        tocUrl = "fixture-toc-paper-mountain",
+        onBack = {},
+        onChapterClick = { _, _ -> },
+        directoryState = BookDirectoryUiStateMapper.empty()
+    )
+}
+
+@Preview(name = "Library Flow / Directory / Error", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookDirectoryErrorPreview() {
+    TOCScreen(
+        tocUrl = "fixture-toc-paper-mountain",
+        onBack = {},
+        onChapterClick = { _, _ -> },
+        directoryState = BookDirectoryUiStateMapper.error()
     )
 }
