@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.reader.ImmersiveReadingMapper
 import com.reader.android.ui.reader.ImmersiveReadingScreen
+import com.reader.android.ui.reader.ReadingAppearanceMapper
+import com.reader.android.ui.reader.ReadingAppearanceScreen
 import com.reader.android.ui.reader.ReadingTocBookmarkMapper
 import com.reader.android.ui.reader.ReadingTocBookmarkScreen
 import com.reader.android.ui.reader.ReadingEntryMapper
@@ -100,4 +102,40 @@ fun ReadingTocBookmarkErrorPreview() {
 @Composable
 fun ReadingTocBookmarkMoreMenuPreview() {
     ReadingTocBookmarkScreen(state = ReadingTocBookmarkMapper.moreMenu())
+}
+
+@Preview(name = "Reader Shell / Appearance / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceDefaultPreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Appearance / Font", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceFontPreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.font())
+}
+
+@Preview(name = "Reader Shell / Appearance / Theme", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceThemePreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.theme())
+}
+
+@Preview(name = "Reader Shell / Appearance / Edit", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceEditPreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.edit())
+}
+
+@Preview(name = "Reader Shell / Appearance / Loading", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceLoadingPreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.loading())
+}
+
+@Preview(name = "Reader Shell / Appearance / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ReadingAppearanceErrorPreview() {
+    ReadingAppearanceScreen(state = ReadingAppearanceMapper.error())
 }
