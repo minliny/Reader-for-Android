@@ -1,0 +1,232 @@
+{
+  "generatedAt": "2026-06-20T05:37:59.795Z",
+  "manifest": "docs/ui-design/frontend-input/manifest.json",
+  "passed": true,
+  "results": [
+    {
+      "name": "component-library",
+      "html": "docs/ui-design/frontend-input/component-library/preview.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/frontend-input/component-library/verify/component-library-preview.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "Reader 公共组件库",
+        "bodyWidth": 1180,
+        "bodyHeight": 3999,
+        "frame": {
+          "width": 1180,
+          "height": 3999
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 0,
+        "imageCount": 2,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": 21
+      }
+    },
+    {
+      "name": "bookshelf-preview",
+      "html": "docs/ui-design/02-主标签页/书架/frontend-input/preview.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/02-主标签页/书架/frontend-input/verify/design-draft-preview.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "书架封面模式组件预览",
+        "bodyWidth": 853,
+        "bodyHeight": 1844,
+        "frame": {
+          "width": 853,
+          "height": 1844
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 0,
+        "imageCount": 9,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "bookshelf-state-matrix",
+      "html": "docs/ui-design/02-主标签页/书架/frontend-input/state-matrix.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/02-主标签页/书架/frontend-input/verify/design-draft-state-matrix.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "书架封面模式状态矩阵",
+        "bodyWidth": 940,
+        "bodyHeight": 2239,
+        "frame": {
+          "width": 940,
+          "height": 2239
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 4,
+        "imageCount": 18,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "bookshelf-empty-preview",
+      "html": "docs/ui-design/03-书架链路/书架空状态/frontend-input/preview.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/03-书架链路/书架空状态/frontend-input/verify/design-draft-preview.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "书架空状态组件预览",
+        "bodyWidth": 833,
+        "bodyHeight": 1888,
+        "frame": {
+          "width": 833,
+          "height": 1888
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 0,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "bookshelf-empty-state-matrix",
+      "html": "docs/ui-design/03-书架链路/书架空状态/frontend-input/state-matrix.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/03-书架链路/书架空状态/frontend-input/verify/design-draft-state-matrix.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "书架空状态矩阵",
+        "bodyWidth": 1180,
+        "bodyHeight": 3349,
+        "frame": {
+          "width": 1180,
+          "height": 3349
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 6,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "settings-home-preview",
+      "html": "docs/ui-design/02-主标签页/设置/frontend-input/preview.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/02-主标签页/设置/frontend-input/verify/design-draft-preview.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "设置首页组件预览",
+        "bodyWidth": 852,
+        "bodyHeight": 1846,
+        "frame": {
+          "width": 852,
+          "height": 1846
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 0,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "settings-home-state-matrix",
+      "html": "docs/ui-design/02-主标签页/设置/frontend-input/state-matrix.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/02-主标签页/设置/frontend-input/verify/design-draft-state-matrix.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "设置首页状态矩阵",
+        "bodyWidth": 1180,
+        "bodyHeight": 2241,
+        "frame": {
+          "width": 1180,
+          "height": 2241
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 4,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "reader-control-preview",
+      "html": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/preview.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/04-阅读链路/阅读控制层/frontend-input/verify/design-draft-preview.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "阅读控制层组件预览",
+        "bodyWidth": 841,
+        "bodyHeight": 1870,
+        "frame": {
+          "width": 841,
+          "height": 1870
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 0,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    },
+    {
+      "name": "reader-control-state-matrix",
+      "html": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/state-matrix.html",
+      "screenshot": "/Users/minliny/Documents/Reader for Android/docs/ui-design/04-阅读链路/阅读控制层/frontend-input/verify/design-draft-state-matrix.png",
+      "passed": true,
+      "failures": [],
+      "failedRequests": [],
+      "consoleErrors": [],
+      "actual": {
+        "title": "阅读控制层状态矩阵",
+        "bodyWidth": 928,
+        "bodyHeight": 3322,
+        "frame": {
+          "width": 928,
+          "height": 3322
+        },
+        "requiredTextPresent": true,
+        "rendererLoaded": true,
+        "stateCardCount": 5,
+        "imageCount": 0,
+        "missingImages": 0,
+        "cssLinks": 1,
+        "expectedDomCount": null
+      }
+    }
+  ]
+}

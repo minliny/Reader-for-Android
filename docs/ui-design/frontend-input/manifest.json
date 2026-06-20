@@ -1,0 +1,110 @@
+{
+  "name": "reader-android-frontend-inputs",
+  "version": "2026-06-20-design-draft",
+  "shared": {
+    "tokens": "docs/ui-design/frontend-input/tokens.css",
+    "contracts": "docs/ui-design/frontend-input/contracts.d.ts",
+    "spec": "docs/ui-design/frontend-input/COMPONENT_SPEC.md"
+  },
+  "targets": [
+    {
+      "name": "component-library",
+      "html": "docs/ui-design/frontend-input/component-library/preview.html",
+      "screenshot": "docs/ui-design/frontend-input/component-library/verify/component-library-preview.png",
+      "viewport": { "width": 1180, "height": 2600 },
+      "selector": ".rl-library",
+      "rendererGlobal": "ReaderComponentLibrary",
+      "requiredText": ["Reader 公共组件库", "Foundations", "App Shell", "Basic Controls", "Cards & Rows", "Sheets & Panels", "States"],
+      "expectedDomCount": { "selector": ".rl-component-card", "min": 16 },
+      "expectedImages": { "min": 1, "missing": 0 }
+    },
+    {
+      "name": "bookshelf-preview",
+      "html": "docs/ui-design/02-主标签页/书架/frontend-input/preview.html",
+      "screenshot": "docs/ui-design/02-主标签页/书架/frontend-input/verify/design-draft-preview.png",
+      "viewport": { "width": 853, "height": 1844 },
+      "selector": ".bs-phone-frame",
+      "rendererGlobal": "BookshelfInput",
+      "requiredText": ["书架", "继续阅读", "长夜余火", "我的书架"],
+      "expectedFrame": { "width": 853, "height": 1844 },
+      "expectedImages": { "min": 9, "missing": 0 }
+    },
+    {
+      "name": "bookshelf-state-matrix",
+      "html": "docs/ui-design/02-主标签页/书架/frontend-input/state-matrix.html",
+      "screenshot": "docs/ui-design/02-主标签页/书架/frontend-input/verify/design-draft-state-matrix.png",
+      "viewport": { "width": 940, "height": 2200 },
+      "selector": ".bs-state-workbench",
+      "rendererGlobal": "BookshelfInput",
+      "requiredText": ["默认封面态", "追更筛选态", "加载态", "空书架态"],
+      "expectedStateCards": 4,
+      "expectedImages": { "min": 18, "missing": 0 }
+    },
+    {
+      "name": "bookshelf-empty-preview",
+      "html": "docs/ui-design/03-书架链路/书架空状态/frontend-input/preview.html",
+      "screenshot": "docs/ui-design/03-书架链路/书架空状态/frontend-input/verify/design-draft-preview.png",
+      "viewport": { "width": 833, "height": 1888 },
+      "selector": ".se-page-frame",
+      "rendererGlobal": "BookshelfEmptyInput",
+      "requiredText": ["书架", "长篇追读", "当前分组没有书籍", "搜索书籍", "管理分组"],
+      "expectedFrame": { "width": 833, "height": 1888 },
+      "expectedImages": { "min": 0, "missing": 0 }
+    },
+    {
+      "name": "bookshelf-empty-state-matrix",
+      "html": "docs/ui-design/03-书架链路/书架空状态/frontend-input/state-matrix.html",
+      "screenshot": "docs/ui-design/03-书架链路/书架空状态/frontend-input/verify/design-draft-state-matrix.png",
+      "viewport": { "width": 1180, "height": 3200 },
+      "selector": ".se-state-workbench",
+      "rendererGlobal": "BookshelfEmptyInput",
+      "requiredText": ["当前分组空态", "全书架空态", "首次检查加载态", "读取失败态", "网络不可用态", "权限说明态"],
+      "expectedStateCards": 6,
+      "expectedImages": { "min": 0, "missing": 0 }
+    },
+    {
+      "name": "settings-home-preview",
+      "html": "docs/ui-design/02-主标签页/设置/frontend-input/preview.html",
+      "screenshot": "docs/ui-design/02-主标签页/设置/frontend-input/verify/design-draft-preview.png",
+      "viewport": { "width": 852, "height": 1846 },
+      "selector": ".st-page-frame",
+      "rendererGlobal": "SettingsHomeInput",
+      "requiredText": ["设置", "本地概览", "常用管理", "全部设置", "书源管理", "隐私与权限"],
+      "expectedFrame": { "width": 852, "height": 1846 },
+      "expectedImages": { "min": 0, "missing": 0 }
+    },
+    {
+      "name": "settings-home-state-matrix",
+      "html": "docs/ui-design/02-主标签页/设置/frontend-input/state-matrix.html",
+      "screenshot": "docs/ui-design/02-主标签页/设置/frontend-input/verify/design-draft-state-matrix.png",
+      "viewport": { "width": 1180, "height": 2500 },
+      "selector": ".st-state-workbench",
+      "rendererGlobal": "SettingsHomeInput",
+      "requiredText": ["默认态", "概览加载态", "无备份态", "权限缺失态"],
+      "expectedStateCards": 4,
+      "expectedImages": { "min": 0, "missing": 0 }
+    },
+    {
+      "name": "reader-control-preview",
+      "html": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/preview.html",
+      "screenshot": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/verify/design-draft-preview.png",
+      "viewport": { "width": 841, "height": 1870 },
+      "selector": ".rc-page-frame",
+      "rendererGlobal": "ReaderControlInput",
+      "requiredText": ["长夜余火", "第 32 章", "自动翻页", "亮度"],
+      "expectedFrame": { "width": 841, "height": 1870 },
+      "expectedImages": { "min": 0, "missing": 0 }
+    },
+    {
+      "name": "reader-control-state-matrix",
+      "html": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/state-matrix.html",
+      "screenshot": "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/verify/design-draft-state-matrix.png",
+      "viewport": { "width": 928, "height": 3000 },
+      "selector": ".rc-state-workbench",
+      "rendererGlobal": "ReaderControlInput",
+      "requiredText": ["默认控制层", "目录展开态", "朗读展开态", "外观展开态", "设置展开态"],
+      "expectedStateCards": 5,
+      "expectedImages": { "min": 0, "missing": 0 }
+    }
+  ]
+}

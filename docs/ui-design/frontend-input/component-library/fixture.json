@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "title": "Reader 公共组件库",
+    "summary": "从书架封面模式和阅读控制层两个已验证前端输入件抽象出的公共组件集合。后续页面转换必须优先复用这些组件，再补缺口。",
+    "version": "2026-06-20"
+  },
+  "colors": [
+    { "name": "paper", "value": "#fbf6ee" },
+    { "name": "paper-bright", "value": "#fff8f1" },
+    { "name": "surface", "value": "rgba(255,255,255,.88)" },
+    { "name": "ink", "value": "#17130f" },
+    { "name": "muted", "value": "#756f69" },
+    { "name": "primary", "value": "#2379a4" },
+    { "name": "accent", "value": "#f48b13" },
+    { "name": "border", "value": "rgba(180,166,151,.42)" }
+  ],
+  "chips": ["全部", "默认", "本地书", "追更"],
+  "bottomNav": [
+    { "label": "书架", "type": "bookshelf", "active": true },
+    { "label": "发现", "type": "discover", "active": false },
+    { "label": "RSS", "type": "rss", "active": false },
+    { "label": "设置", "type": "settings", "active": false }
+  ],
+  "book": {
+    "title": "长夜余火",
+    "author": "爱潜水的乌贼",
+    "chapter": "第 32 章 雨夜",
+    "progress": 38,
+    "cover": "../../02-主标签页/书架/bookshelf-cover-assets/long-night.png"
+  },
+  "rows": [
+    { "title": "起点中文网", "meta": "已启用 · 36 个书源规则", "value": "启用", "icon": "source" },
+    { "title": "缓存管理", "meta": "图片缓存与章节缓存", "value": "128 MB", "icon": "storage" },
+    { "title": "同步与备份", "meta": "WebDAV · 最近同步 10:30", "value": "正常", "icon": "sync" }
+  ],
+  "quickActions": [
+    { "label": "搜索", "type": "search" },
+    { "label": "自动翻页", "type": "auto-page" },
+    { "label": "替换", "type": "replace" }
+  ],
+  "moduleNav": [
+    { "label": "目录", "type": "directory", "active": true },
+    { "label": "朗读", "type": "tts", "active": false },
+    { "label": "界面", "type": "appearance", "active": false },
+    { "label": "设置", "type": "settings", "active": false }
+  ],
+  "states": [
+    { "title": "空状态", "copy": "没有内容时保留稳定容器，并提供下一步入口。" },
+    { "title": "错误状态", "copy": "说明失败原因，提供重试或切换来源。" },
+    { "title": "权限状态", "copy": "说明所需权限和影响范围，避免混同错误态。" }
+  ]
+}
