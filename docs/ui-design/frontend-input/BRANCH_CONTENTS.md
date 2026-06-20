@@ -44,8 +44,8 @@
 | `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验。 |
 | `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验。 |
 | `ReaderShell` | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验。 |
-| `FlowShell` | 2 | 换源 | 已声明横向流程 shell 和 manifest 目标；下一步迁入中心化 FlowShell 并补 DOM slot 强校验。 |
-| `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面已使用 `SettingsPageKit`；下一步补 SettingsShell DOM slot 强校验。 |
+| `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验。 |
+| `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验。 |
 
 ## 目录归属（Directory Ownership）
 
@@ -65,6 +65,9 @@
 | `PAGE_FRAMEWORK_AUDIT.md` | 逐页框架使用审计。 |
 | `FRAMEWORK_COMPONENT_CATALOG.md` | 框架、组件、页面归属和抽象边界总目录。 |
 | `FRAMEWORK_COMPONENT_ROADMAP.md` | 已完成内容和后续真实前端映射顺序。 |
+| `FRONTEND_MAPPING_GUIDE.md` | 本地输入件到 Android Compose 前端实现的映射指南。 |
+| `MAIN_NAV_RECONCILIATION.md` | 主导航从 `书源 / 我的` 收敛到 `RSS / 设置` 的实施清单。 |
+| `ICON_COMPOSE_MAPPING.md` | 本地图标 token 到 Compose Material Icons 的映射和缺口清单。 |
 | `FRAMEWORK_COMPONENT_ICON_STYLE_GUIDE.md` | UI 风格、图标、组件化和框架化规则。 |
 | `HTML_FILE_REQUIREMENTS.md` | 本地 HTML 的正式输入件、状态矩阵、组件参考页和历史临时页规则。 |
 | `ICON_LIBRARY_AUDIT.md` | 图标素材库审计。 |
@@ -89,10 +92,10 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 
 ## 当前待办（Open Work）
 
-1. 横向流程框架（FlowShell）：把 `04-阅读链路/换源/frontend-input/` 迁入中心化 FlowShell，并补 DOM slot 强校验。
-2. 设置页框架（SettingsShell）：补齐 SettingsShell 的真实 DOM slot 强校验。
-3. 真实前端映射（Frontend Mapping）：把已归一的 shell 和组件库映射到实际前端组件结构。
-4. 图标素材同步（Icon Asset Sync）：把本地补齐 token 同步到 Figma `Icon/*` 主组件或缺源清单。
+1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
+2. 主导航代码收敛（Main Navigation Code Reconciliation）：把 Android 端 `书源 / 我的` 主入口改为 `RSS / 设置`，并确保底栏只有一套数据源。
+3. 图标素材同步执行（Icon Asset Sync Implementation）：按 `ICON_COMPOSE_MAPPING.md` 和 `ICON_LIBRARY_AUDIT.md` 把本地补齐 token 同步到 Figma `Icon/*` 主组件或缺源清单。
+4. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）
 
@@ -106,7 +109,10 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 1. 先看 `frontend-demo-draft/index.html`，判断整体前端设计稿是否符合开发输入预期。
 2. 再看 `shared-shell-kit/preview.html`，确认五类 shell 的 slot 结构。
 3. 按 `PAGE_FRAMEWORK_AUDIT.md` 逐页抽查 preview 和 state matrix。
-4. 最后看 `asset-library/preview.html` 和 `component-library/preview.html`，确认图标、封面和组件语义是否可复用。
+4. 再看 `FRONTEND_MAPPING_GUIDE.md`，确认输入件到 Android Compose 的文件映射、导航差异和实现优先级。
+5. 再看 `MAIN_NAV_RECONCILIATION.md`，确认主导航产品结构是否按本地输入件收敛。
+6. 再看 `ICON_COMPOSE_MAPPING.md`，确认 Compose 图标是否都能追溯到素材库 token。
+7. 最后看 `asset-library/preview.html` 和 `component-library/preview.html`，确认图标、封面和组件语义是否可复用。
 
 ## 当前注意事项（Current Notes）
 

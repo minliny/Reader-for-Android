@@ -10,7 +10,7 @@
 | 统一设计 token | 30/30 已统一 | 每页直接或间接接入 `tokens.css`。 |
 | 统一公共组件语义 | 已统一主要框架 | 公共库已沉淀组件名；设置链路、主标签页、书架链路和阅读链路 10/10 已收敛到对应 kit。 |
 | 统一页面 shell | 已统一 | 设置链路 7/7 已使用 `SettingsPageKit`，主标签页 4/4 已使用 `MainTabPageKit`，书架链路 8/8 已使用 `LibraryPageKit`；阅读链路 10/10 已使用中心化 `ReaderShellKit`，换源已使用中心化 `FlowShell`。 |
-| 可直接真实前端接入 | 具备本地输入基础 | `shellName`、slots、state model、主要 renderer kit 和 DOM slot 校验已归一；下一步是真实前端映射说明。 |
+| 可直接真实前端接入 | 具备本地输入基础 | `shellName`、slots、state model、主要 renderer kit 和 DOM slot 校验已归一；真实前端映射见 `FRONTEND_MAPPING_GUIDE.md`。 |
 
 ## 逐页矩阵
 
@@ -111,4 +111,4 @@
 
 - 如果只在 CSS 层统一，不收敛 renderer，后续状态矩阵和交互逻辑仍会漂移。
 - 如果 manifest 不记录 shell 归属，页面新增时会继续按单页复刻路径扩散。
-- SettingsShell、MainTabShell、LibraryShell、ReaderShell 和 FlowShell 已完成，下一步应推进真实前端映射说明。
+- SettingsShell、MainTabShell、LibraryShell、ReaderShell 和 FlowShell 已完成；真实前端映射说明已进入 `FRONTEND_MAPPING_GUIDE.md`。

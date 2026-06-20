@@ -7,7 +7,8 @@
 | UI 设计图（UI Design Screens） | 30 | 当前所有 `UI设计图.png` 已按页面组进入 `fixture.json`。 |
 | 书籍封面素材（Book Cover Assets） | 6 | 当前书架封面图已进入素材库。 |
 | fixture 图标 token（Fixture Icon Tokens） | 54 | 从当前所有页面 `fixture.json` 扫描得出。 |
-| 补齐图标（Supplemented Icons） | 14 | 补齐 Shell、阅读模块和缺少公共登记的图标 token。 |
+| 补齐图标（Supplemented Icons） | 17 | 补齐 Shell、阅读模块、状态和缺少公共登记的图标 token。 |
+| 本地总图标 token（Total Local Icon Tokens） | 71 | 以 `icons.js` 中 `ReaderAssetIcons.icons` 为准。 |
 | 验证截图（Validation Screenshots） | 60 | 作为验证素材集合登记，不在预览页逐张加载。 |
 
 ## 补齐图标（Supplemented Icons）
@@ -26,6 +27,9 @@
 - 进度（Progress）：`progress`
 - 音量（Volume）：`volume`
 - 齿轮（Gear）：`gear`
+- 清除（Clear）：`clear`
+- 离线（Offline）：`offline`
+- 闪光 / 智能提示（Sparkle）：`sparkle`
 
 ## 准入规则（Acceptance Rules）
 

@@ -2,7 +2,7 @@
 
 本文按统一格式 `中文名称（English Name）` 梳理当前已完成内容和后续规划。后续文档、组件规格、审计结论和实现说明都应沿用这个命名格式。
 
-完整框架、共享 kit、页面归属和组件化清单见 `FRAMEWORK_COMPONENT_CATALOG.md`。
+完整框架、共享 kit、页面归属和组件化清单见 `FRAMEWORK_COMPONENT_CATALOG.md`。真实 Android Compose 接入顺序见 `FRONTEND_MAPPING_GUIDE.md`，主导航和图标专项清单见 `MAIN_NAV_RECONCILIATION.md`、`ICON_COMPOSE_MAPPING.md`。
 
 ## 总原则（Overall Rule）
 
@@ -168,7 +168,9 @@
 
 ## 后续开发顺序（Development Order）
 
-1. 真实前端映射（Frontend Mapping）：把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际前端组件结构。
+1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构。
+2. 主导航差异收敛（Main Navigation Reconciliation）：按 `MAIN_NAV_RECONCILIATION.md` 把 Android 代码中的 `书源 / 我的` 主入口收敛到 `RSS / 设置`。
+3. 图标映射收敛（Icon Mapping Reconciliation）：按 `ICON_COMPOSE_MAPPING.md` 把 Compose 中散落的 Material Icons 收敛到素材库语义 token。
 
 ## 本地 HTML 要求（Local HTML Requirements）
 

@@ -6,7 +6,7 @@
 
 - 前端输入件（Frontend Inputs）：当前 manifest 有 64 个验证目标，包括 30 个页面的 `preview.html` 和 `state-matrix.html`、1 个公共组件库预览、1 个共享 Shell Kit 预览、1 个公共素材库预览，以及 1 个前端 Demo 设计稿预览。
 - 本地 HTML（Local HTML）：当前共有 99 个本地 HTML；其中 2 个 `preview 2.html` 是历史临时预览，不作为正式输入件。
-- 已有共享 kit（Implemented Shared Kits）：主标签页框架（MainTabShell）、书架链路框架（LibraryShell）、设置页框架（SettingsShell）和中心化共享 Shell Kit（Shared Shell Kit）已经可用。
+- 已有共享 kit（Implemented Shared Kits）：主标签页框架（MainTabShell）、书架链路框架（LibraryShell）、设置页框架（SettingsShell）、阅读器框架（ReaderShell）、横向流程框架（FlowShell）和中心化共享 Shell Kit（Shared Shell Kit）已经可用。
 - 已完成共享 kit（Completed Shared Kits）：阅读器框架（ReaderShell）10 页已接入中心化 `ReaderShellKit`；横向流程框架（FlowShell）1 页已接入中心化 `ReaderShellKit.renderFlowShell(...)`。
 - 组件库状态（Component Library Status）：公共组件库已经覆盖当前 30 个页面需要的基础控件、书籍组件、阅读组件、设置组件、底表面板和状态组件。
 - 素材库状态（Asset Library Status）：公共素材库已经登记 30 张 UI 设计图、6 张书籍封面和 71 个统一图标 token。
@@ -89,11 +89,11 @@
 | 状态栏（StatusBar） | 主标签页框架（MainTabShell） | 已在 `MainTabPageKit` 中实现。 |
 | 顶部栏（AppTopBar） | 主标签页框架（MainTabShell） | 已在 `MainTabPageKit` 中实现。 |
 | 返回顶栏（BackTopBar） | 书架链路框架、设置页框架（LibraryShell, SettingsShell） | 设置页和书架链路已实现。 |
-| 内容区（ContentRegion / SettingsContent） | 各页面框架（All Shells） | MainTab、Library、Settings 和 ReaderShell 10 页已统一；Flow 待继续固化。 |
+| 内容区（ContentRegion / SettingsContent） | 各页面框架（All Shells） | MainTab、Library、Settings、ReaderShell 10 页和 FlowShell 已统一。 |
 | 公共主导航（MainNav / MainNavItem） | 主标签页框架（MainTabShell） | 已实现并固定四项。 |
 | 底部操作宿主（BottomActionHost） | 书架链路框架（LibraryShell） | 已由 `LibraryPageKit` 输出。 |
 | 弹层宿主（SheetHost / DialogHost / BottomSheetHost） | 书架链路、阅读器、设置页（LibraryShell, ReaderShell, SettingsShell） | 书架、设置和 ReaderShell 10 页已实现。 |
-| 状态容器（StateHost / ReaderStateHost / SettingsStateHost） | 各页面框架（All Shells） | MainTab、Library、Settings 和 ReaderShell 10 页已统一；Flow 待继续固化。 |
+| 状态容器（StateHost / ReaderStateHost / SettingsStateHost） | 各页面框架（All Shells） | MainTab、Library、Settings、ReaderShell 10 页和 FlowShell 已统一。 |
 
 ## 业务组件（Product Components）
 
@@ -260,7 +260,9 @@
 
 ## 开发优先级（Development Priority）
 
-1. 真实前端映射（Frontend Mapping）：将已归一的 shell 映射到实际前端组件结构。
+1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 将已归一的 shell 映射到实际 Android Compose 组件结构。
+2. 主导航差异收敛（Main Navigation Reconciliation）：按 `MAIN_NAV_RECONCILIATION.md` 确认 Android 端主导航是否调整为 `书架 / 发现 / RSS / 设置`。
+3. 图标映射收敛（Icon Mapping Reconciliation）：按 `ICON_COMPOSE_MAPPING.md` 统一素材库 token 与 Compose 图标实现。
 
 ## 使用方式（Usage）
 
