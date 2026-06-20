@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-20T13:27:55.688Z",
+  "generatedAt": "2026-06-20T14:18:45.404Z",
   "manifest": "docs/ui-design/frontend-input/manifest.json",
   "passed": true,
   "results": [
@@ -129,7 +129,7 @@
         "readerShellDom": null,
         "flowShellDom": null,
         "settingsShellDom": null,
-        "expectedDomCount": 68
+        "expectedDomCount": 71
       }
     },
     {

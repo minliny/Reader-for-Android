@@ -73,9 +73,9 @@ window.ReaderAssetLibraryFixture = {
     { title: "阅读图标（Reader Icons）", items: ["directory", "tts", "appearance", "auto-page", "replace", "bookmark", "book-open", "play", "pause", "volume", "sun", "progress"] },
     { title: "书籍与来源图标（Book and Source Icons）", items: ["book", "source", "source-stack", "database", "storage", "folder", "file", "image", "download", "upload", "cloud"] },
     { title: "设置图标（Settings Icons）", items: ["home", "palette", "globe", "bell", "battery", "eyeOff", "bug", "shield", "trash", "gear", "columns", "grid", "badge"] },
-    { title: "状态与动作图标（Status and Action Icons）", items: ["clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo"] }
+    { title: "状态与动作图标（Status and Action Icons）", items: ["clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo", "clear", "offline", "sparkle"] }
   ],
-  supplementedIcons: ["back", "more", "chevron", "close", "directory", "tts", "auto-page", "replace", "pause", "book-open", "source-stack", "progress", "volume", "gear"],
+  supplementedIcons: ["back", "more", "chevron", "close", "directory", "tts", "auto-page", "replace", "pause", "book-open", "source-stack", "progress", "volume", "gear", "clear", "offline", "sparkle"],
   usageRules: [
     "新增页面前必须先查询素材库。",
     "已有图标 token 不得新增同义名称。",

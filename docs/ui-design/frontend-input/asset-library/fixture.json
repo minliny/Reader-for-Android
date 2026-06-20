@@ -87,10 +87,10 @@
     },
     {
       "title": "状态与动作图标（Status and Action Icons）",
-      "items": ["clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo"]
+      "items": ["clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo", "clear", "offline", "sparkle"]
     }
   ],
-  "supplementedIcons": ["back", "more", "chevron", "close", "directory", "tts", "auto-page", "replace", "pause", "book-open", "source-stack", "progress", "volume", "gear"],
+  "supplementedIcons": ["back", "more", "chevron", "close", "directory", "tts", "auto-page", "replace", "pause", "book-open", "source-stack", "progress", "volume", "gear", "clear", "offline", "sparkle"],
   "usageRules": [
     "新增页面前必须先查询素材库。",
     "已有图标 token 不得新增同义名称。",
