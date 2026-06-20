@@ -1,0 +1,85 @@
+package com.reader.android.ui.preview
+
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Paths
+
+class LibraryFlowStateMatrixPreviewTest {
+
+    private val previewSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/preview/LibraryFlowStateMatrixPreviews.kt")))
+    }
+
+    private val searchScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/search/SearchScreen.kt")))
+    }
+
+    private val detailScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/detail/BookDetailScreen.kt")))
+    }
+
+    @Test
+    fun `library flow compose previews expose search and detail state matrices`() {
+        listOf(
+            "LibrarySearchHomePreview",
+            "LibrarySearchResultsPreview",
+            "LibrarySearchLoadingPreview",
+            "LibrarySearchEmptyPreview",
+            "LibrarySearchErrorPreview",
+            "LibrarySearchOfflinePreview",
+            "LibrarySearchPermissionPreview",
+            "LibraryBookDetailDefaultPreview",
+            "LibraryBookDetailLoadingPreview",
+            "LibraryBookDetailEmptyPreview",
+            "LibraryBookDetailErrorPreview",
+            "LibraryBookDetailOfflinePreview",
+            "LibraryBookDetailPermissionPreview"
+        ).forEach { token ->
+            assertTrue("Library flow preview source must contain $token", token in previewSource)
+        }
+    }
+
+    @Test
+    fun `library flow previews use adapter shell fixture states`() {
+        listOf(
+            "SearchAdapterShell.searchHome",
+            "SearchAdapterShell.searchResults",
+            "SearchAdapterShell.searchLoading",
+            "SearchAdapterShell.searchEmpty",
+            "SearchAdapterShell.searchError",
+            "BookDetailAdapterShell.detailReady",
+            "BookDetailAdapterShell.detailLoading",
+            "BookDetailAdapterShell.detailEmpty",
+            "BookDetailAdapterShell.detailError",
+            "ReaderUiState.Offline",
+            "ReaderUiState.PermissionRequired"
+        ).forEach { token ->
+            assertTrue("Library flow preview source must use $token", token in previewSource)
+        }
+    }
+
+    @Test
+    fun `search and detail screens accept frontend input state injection`() {
+        listOf(
+            "searchState: SearchUiState? = null",
+            "SearchStateContent",
+            "state.results",
+            "state.errorMessage",
+            "ReaderPermissionRequiredState"
+        ).forEach { token ->
+            assertTrue("SearchScreen must expose frontend input state token $token", token in searchScreenSource)
+        }
+
+        listOf(
+            "detailState: BookDetailUiState? = null",
+            "BookDetailStateContent",
+            "detailState == null && uiState == null",
+            "state.detail",
+            "state.errorMessage",
+            "ReaderPermissionRequiredState"
+        ).forEach { token ->
+            assertTrue("BookDetailScreen must expose frontend input state token $token", token in detailScreenSource)
+        }
+    }
+}
