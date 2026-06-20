@@ -51,6 +51,14 @@ class ReaderShellStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/AutoPageDesignUiState.kt")))
     }
 
+    private val contentSearchScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ContentSearchDesignScreen.kt")))
+    }
+
+    private val contentSearchStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/reader/ContentSearchDesignUiState.kt")))
+    }
+
     @Test
     fun `reader shell compose previews expose reading entry and immersive state matrices`() {
         listOf(
@@ -86,7 +94,12 @@ class ReaderShellStateMatrixPreviewTest {
             "AutoPageDefaultPreview",
             "AutoPageRunningPreview",
             "AutoPagePausedPreview",
-            "AutoPageErrorPreview"
+            "AutoPageErrorPreview",
+            "ContentSearchDefaultPreview",
+            "ContentSearchLoadingPreview",
+            "ContentSearchEmptyPreview",
+            "ContentSearchErrorPreview",
+            "ContentSearchOfflinePreview"
         ).forEach { token ->
             assertTrue("Reader shell preview source must contain $token", token in previewSource)
         }
@@ -127,7 +140,12 @@ class ReaderShellStateMatrixPreviewTest {
             "AutoPageMapper.fromFixture",
             "AutoPageMapper.running",
             "AutoPageMapper.paused",
-            "AutoPageMapper.error"
+            "AutoPageMapper.error",
+            "ContentSearchMapper.fromFixture",
+            "ContentSearchMapper.loading",
+            "ContentSearchMapper.empty",
+            "ContentSearchMapper.error",
+            "ContentSearchMapper.offline"
         ).forEach { token ->
             assertTrue("Reader shell preview source must use $token", token in previewSource)
         }
@@ -348,6 +366,53 @@ class ReaderShellStateMatrixPreviewTest {
             "已停止自动翻页并保留阅读位置"
         ).forEach { token ->
             assertTrue("Auto page state source must include $token", token in autoPageStateSource)
+        }
+    }
+
+    @Test
+    fun `content search screen keeps readershell slots with empty module nav host`() {
+        listOf(
+            "ContentSearchScreen",
+            "ContentSearchReadingSurface",
+            "ContentSearchOverlay",
+            "ContentSearchBottomSheet",
+            "ContentSearchInput",
+            "ContentSearchResultRow",
+            "ContentSearchFeedbackPanel",
+            "ContentSearchOfflineBanner",
+            "HighlightedText",
+            "contentDescription = \"readingSurface\"",
+            "contentDescription = \"readerOverlayHost\"",
+            "contentDescription = \"bottomSheetHost\"",
+            "contentDescription = \"readerModuleNav\"",
+            "contentDescription = \"readerStateHost\""
+        ).forEach { token ->
+            assertTrue("Content search screen source must include $token", token in contentSearchScreenSource)
+        }
+        assertTrue("Content search must not render module navigation items", "ReaderBottomItem" !in contentSearchScreenSource)
+        assertTrue("Content search must not import global book search package", "com.reader.android.ui.search" !in contentSearchScreenSource)
+    }
+
+    @Test
+    fun `content search state model keeps frontend input contract text`() {
+        listOf(
+            "ContentSearchDisplayState",
+            "ContentSearchMapper",
+            "fun loading()",
+            "fun empty()",
+            "fun error()",
+            "fun offline()",
+            "搜索本书内容",
+            "输入关键词",
+            "本书内容搜索",
+            "无匹配结果",
+            "搜索失败，请重试",
+            "本地索引暂时不可用",
+            "已保留关键词和当前阅读位置",
+            "本地缓存正文仍可搜索",
+            "点击结果跳转并高亮"
+        ).forEach { token ->
+            assertTrue("Content search state source must include $token", token in contentSearchStateSource)
         }
     }
 }

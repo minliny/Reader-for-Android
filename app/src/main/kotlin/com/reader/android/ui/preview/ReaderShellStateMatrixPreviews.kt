@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.reader.AutoPageMapper
 import com.reader.android.ui.reader.AutoPageScreen
+import com.reader.android.ui.reader.ContentSearchMapper
+import com.reader.android.ui.reader.ContentSearchScreen
 import com.reader.android.ui.reader.ImmersiveReadingMapper
 import com.reader.android.ui.reader.ImmersiveReadingScreen
 import com.reader.android.ui.reader.ReadingAppearanceMapper
@@ -216,4 +218,34 @@ fun AutoPagePausedPreview() {
 @Composable
 fun AutoPageErrorPreview() {
     AutoPageScreen(state = AutoPageMapper.error())
+}
+
+@Preview(name = "Reader Shell / Content Search / Default", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentSearchDefaultPreview() {
+    ContentSearchScreen(state = ContentSearchMapper.fromFixture())
+}
+
+@Preview(name = "Reader Shell / Content Search / Loading", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentSearchLoadingPreview() {
+    ContentSearchScreen(state = ContentSearchMapper.loading())
+}
+
+@Preview(name = "Reader Shell / Content Search / Empty", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentSearchEmptyPreview() {
+    ContentSearchScreen(state = ContentSearchMapper.empty())
+}
+
+@Preview(name = "Reader Shell / Content Search / Error", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentSearchErrorPreview() {
+    ContentSearchScreen(state = ContentSearchMapper.error())
+}
+
+@Preview(name = "Reader Shell / Content Search / Offline", widthDp = ReaderShellPreviewWidth, heightDp = ReaderShellPreviewHeight, showBackground = true)
+@Composable
+fun ContentSearchOfflinePreview() {
+    ContentSearchScreen(state = ContentSearchMapper.offline())
 }
