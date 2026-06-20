@@ -7,7 +7,7 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 语义 token 映射（Compose Semantic Token Mapping） | 53 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 54 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
@@ -47,6 +47,7 @@
 | `CheckCircle` | `check` | 已映射 | 当前版本和更新状态通过 `ReaderIconToken.Check` 表达。 |
 | `Close` | `close` | 可映射 | 关闭、清除面板。 |
 | `CloudOff` | `offline` | 可映射 | 离线状态。 |
+| `CloudUpload` | `upload` | 已映射 | 同步备份导出、上传和云端备份动作通过 `ReaderIconToken.Upload` 表达。 |
 | `Code` | `code` | 已映射 | 开源许可、代码与协议说明可通过 `ReaderIconToken.Code` 表达。 |
 | `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `Delete` | `trash` | 已映射 | 删除、移除或危险清空通过 `ReaderIconToken.Trash` 表达。 |
@@ -168,6 +169,7 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Message -> Icons.Filled.ChatBubbleOutline
     ReaderIconToken.Code -> Icons.Filled.Code
     ReaderIconToken.Help -> Icons.AutoMirrored.Filled.HelpOutline
+    ReaderIconToken.Upload -> Icons.Filled.CloudUpload
 }
 ```
 

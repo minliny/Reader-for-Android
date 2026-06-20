@@ -51,8 +51,16 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/AboutFeedbackDesignUiState.kt")))
     }
 
+    private val syncBackupScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/SyncBackupDesignScreen.kt")))
+    }
+
+    private val syncBackupStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/SyncBackupDesignUiState.kt")))
+    }
+
     @Test
-    fun `settings secondary compose previews expose general about webdav backup sync and remote book states`() {
+    fun `settings secondary compose previews expose general about sync backup webdav and remote book states`() {
         listOf(
             "SettingsGeneralDefaultPreview",
             "SettingsGeneralOptionSheetPreview",
@@ -80,6 +88,13 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsAboutFeedbackErrorPreview",
             "SettingsAboutFeedbackConfirmPreview",
             "SettingsAboutFeedbackOfflinePreview",
+            "SettingsSyncBackupDefaultPreview",
+            "SettingsSyncBackupConfirmPreview",
+            "SettingsSyncBackupLoadingPreview",
+            "SettingsSyncBackupEmptyPreview",
+            "SettingsSyncBackupErrorPreview",
+            "SettingsSyncBackupOfflinePreview",
+            "SettingsSyncBackupPermissionPreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -126,6 +141,13 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "AboutFeedbackMapper.error",
             "AboutFeedbackMapper.confirm",
             "AboutFeedbackMapper.offline",
+            "SyncBackupMapper.fromFixture",
+            "SyncBackupMapper.confirm",
+            "SyncBackupMapper.loading",
+            "SyncBackupMapper.empty",
+            "SyncBackupMapper.error",
+            "SyncBackupMapper.offline",
+            "SyncBackupMapper.permission",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -437,6 +459,63 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "本应用不提供账户与登录功能"
         ).forEach { token ->
             assertTrue("About feedback state source must include $token", token in aboutFeedbackStateSource)
+        }
+    }
+
+    @Test
+    fun `sync backup screen keeps settingsshell slots backup records conflict and restore confirm`() {
+        listOf(
+            "SyncBackupScreen",
+            "ReaderAppTopBar",
+            "SyncBackupSection",
+            "BackupActionRow",
+            "BackupRecordRow",
+            "ConflictNotice",
+            "RestoreConfirmDialog",
+            "SyncBackupSettingRow",
+            "SyncBackupToastHost",
+            "SyncBackupFeedback",
+            "ReaderIconToken.Upload",
+            "contentDescription = \"SettingsShell 同步与备份\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("Sync backup screen source must include $token", token in syncBackupScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("Sync backup screen must not include $forbidden", forbidden !in syncBackupScreenSource)
+        }
+    }
+
+    @Test
+    fun `sync backup state model keeps frontend input contract text`() {
+        listOf(
+            "SyncBackupDisplayState",
+            "SyncBackupMapper",
+            "fun confirm()",
+            "fun loading()",
+            "fun empty()",
+            "fun error()",
+            "fun offline()",
+            "fun permission()",
+            "同步与备份",
+            "备份位置",
+            "立即备份",
+            "恢复备份",
+            "自动备份",
+            "备份记录",
+            "确认恢复",
+            "网络不可用，请稍后重试",
+            "需要文件访问权限"
+        ).forEach { token ->
+            assertTrue("Sync backup state source must include $token", token in syncBackupStateSource)
         }
     }
 }
