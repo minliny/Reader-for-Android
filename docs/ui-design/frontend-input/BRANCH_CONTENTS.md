@@ -93,8 +93,8 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 ## 当前待办（Open Work）
 
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
-2. 主导航代码收敛（Main Navigation Code Reconciliation）：把 Android 端 `书源 / 我的` 主入口改为 `RSS / 设置`，并确保底栏只有一套数据源。
-3. 图标素材同步执行（Icon Asset Sync Implementation）：按 `ICON_COMPOSE_MAPPING.md` 和 `ICON_LIBRARY_AUDIT.md` 把本地补齐 token 同步到 Figma `Icon/*` 主组件或缺源清单。
+2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`；下一步把临时 `StitchBottomNav` 替换为正式 MainTabShell Composable。
+3. 图标素材同步执行（Icon Asset Sync Implementation）：按 `ICON_COMPOSE_MAPPING.md` 和 `ICON_LIBRARY_AUDIT.md` 把本地补齐 token 同步到 Compose token wrapper 与 Figma `Icon/*` 主组件或缺源清单。
 4. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）

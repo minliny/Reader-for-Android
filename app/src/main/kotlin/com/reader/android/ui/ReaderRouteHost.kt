@@ -2,11 +2,7 @@ package com.reader.android.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -45,6 +41,7 @@ import com.reader.android.ui.search.SearchScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
 import com.reader.android.ui.stitch.StitchAppShell
 import com.reader.android.ui.stitch.StitchBottomNav
+import com.reader.android.ui.stitch.StitchTab
 import com.reader.android.ui.settings.MineScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
@@ -57,6 +54,10 @@ object ReaderRoutes {
     // Tab roots
     const val BOOKSHELF = "bookshelf"
     const val DISCOVER = "discover"
+    const val RSS = "rss"
+    const val SETTINGS = "settings"
+
+    // Legacy secondary roots retained until the settings flow is fully split.
     const val SOURCES = "sources"
     const val MINE = "mine"
 
@@ -180,6 +181,7 @@ fun ReaderRouteHost(
                 val selectedIndex = appScreens.indexOfFirst { it.route == currentRoute }
                     .coerceAtLeast(0)
                 StitchBottomNav(
+                    tabs = appScreens.map { screen -> StitchTab(screen.label, screen.icon) },
                     selectedIndex = selectedIndex,
                     onTabSelected = { index ->
                         val route = appScreens.getOrNull(index)?.route ?: return@StitchBottomNav
@@ -210,11 +212,33 @@ fun ReaderRouteHost(
                 )
             }
             composable(ReaderRoutes.DISCOVER) {
-                DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS_LIST, backStack) })
+                DiscoverScreen(onRssClick = { navController.navigateAndTrack(ReaderRoutes.RSS, backStack) })
+            }
+            composable(ReaderRoutes.RSS) {
+                RssListScreen(
+                    onSourceClick = { navController.navigateAndTrack("rss_detail/$it", backStack) }
+                )
+            }
+            composable(ReaderRoutes.SETTINGS) {
+                MineScreen(
+                    onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
+                    onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
+                    onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
+                    onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },
+                    onProgressSyncClick = { navController.navigateAndTrack(ReaderRoutes.PROGRESS_SYNC, backStack) },
+                    onRemoteBooksClick = { navController.navigateAndTrack(ReaderRoutes.REMOTE_WEBDAV_BOOKS, backStack) },
+                    onAboutClick = { navController.navigateAndTrack(ReaderRoutes.ABOUT, backStack) },
+                    onPrototypeGalleryClick = if (BuildConfig.DEBUG) {
+                        { navController.navigateAndTrack(ReaderRoutes.PROTOTYPE_GALLERY, backStack) }
+                    } else {
+                        null
+                    }
+                )
             }
             composable(ReaderRoutes.SOURCES) { BookSourceScreen() }
             composable(ReaderRoutes.MINE) {
                 MineScreen(
+                    onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
                     onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },

@@ -20,15 +20,14 @@ class PrototypeMainTabsDesignFixTest {
 
     @Test
     fun `prototype app shell uses the same four primary tabs as the app shell`() {
-        assertEquals(listOf("书架", "发现", "书源", "我的"), appScreens.map { it.label })
+        assertEquals(listOf("书架", "发现", "RSS", "设置"), appScreens.map { it.label })
         assertTrue("Prototype App Shell must render appScreens", "appScreens.map" in prototypeSource)
     }
 
     @Test
-    fun `prototype app shell does not show old search or settings primary tabs`() {
+    fun `prototype app shell does not show old search primary tab`() {
         listOf(
-            "Icons.Filled.Search to \"搜索\"",
-            "Icons.Filled.Settings to \"设置\""
+            "Icons.Filled.Search to \"搜索\""
         ).forEach { forbidden ->
             assertFalse("Prototype App Shell must not keep old main tab token $forbidden", forbidden in prototypeSource)
         }

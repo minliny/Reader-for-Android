@@ -15,6 +15,7 @@ import com.reader.android.ui.theme.ReaderTheme
 
 @Composable
 fun MineScreen(
+    onSourceManagementClick: () -> Unit = {},
     onGlobalSettingsClick: () -> Unit = {},
     onWebDavClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
@@ -25,7 +26,7 @@ fun MineScreen(
 ) {
     ReaderTheme {
         Column(modifier = Modifier.fillMaxSize()) {
-            ReaderAppTopBar(title = "我的")
+            ReaderAppTopBar(title = "设置")
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -56,6 +57,11 @@ fun MineScreen(
                 }
 
                 ReaderSettingsGroup(title = "阅读与应用设置") {
+                    ReaderSettingsRow(
+                        title = "书源管理",
+                        subtitle = "管理书源、检测状态与导入配置",
+                        onClick = onSourceManagementClick
+                    )
                     ReaderSettingsRow(
                         title = "全局阅读设置",
                         subtitle = "字号、行距、页边距与夜间模式",

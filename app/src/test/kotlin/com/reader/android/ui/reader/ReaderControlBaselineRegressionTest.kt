@@ -101,10 +101,10 @@ class ReaderControlBaselineRegressionTest {
         val navSource = String(Files.readAllBytes(Paths.get(
             "src/main/kotlin/com/reader/android/ui/AppNavigation.kt"
         )))
-        listOf("书架", "发现", "书源", "我的").forEach { tab ->
+        listOf("书架", "发现", "RSS", "设置").forEach { tab ->
             assertTrue("App main tab bar must have '$tab'", tab in navSource)
         }
-        listOf("设置", "WebDAV", "RSS").forEach { forbidden ->
+        listOf("书源", "我的", "WebDAV").forEach { forbidden ->
             assertFalse("App main tab bar must not have '$forbidden'",
                 forbidden in navSource.split("appScreens").first())
         }

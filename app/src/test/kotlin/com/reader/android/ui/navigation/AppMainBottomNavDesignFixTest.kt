@@ -15,21 +15,25 @@ class AppMainBottomNavDesignFixTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/ReaderRouteHost.kt")))
     }
 
-    @Test
-    fun `app main bottom nav has exactly four primary modules`() {
-        assertEquals(listOf("书架", "发现", "书源", "我的"), appScreens.map { it.label })
-        assertEquals(listOf("bookshelf", "discover", "sources", "mine"), appScreens.map { it.route })
+    private val stitchShellSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/stitch/StitchAppShell.kt")))
     }
 
     @Test
-    fun `app main bottom nav excludes search reader and settings`() {
+    fun `app main bottom nav has exactly four primary modules`() {
+        assertEquals(listOf("书架", "发现", "RSS", "设置"), appScreens.map { it.label })
+        assertEquals(listOf("bookshelf", "discover", "rss", "settings"), appScreens.map { it.route })
+    }
+
+    @Test
+    fun `app main bottom nav excludes search reader source and mine`() {
         val labels = appScreens.map { it.label }
         val routes = appScreens.map { it.route }
 
-        listOf("搜索", "阅读", "设置").forEach { forbidden ->
+        listOf("搜索", "阅读", "书源", "我的").forEach { forbidden ->
             assertFalse("$forbidden must not be a primary tab", forbidden in labels)
         }
-        listOf(ReaderRoutes.SEARCH, ReaderRoutes.READER_CONTENT, ReaderRoutes.GLOBAL_SETTINGS).forEach { route ->
+        listOf(ReaderRoutes.SEARCH, ReaderRoutes.READER_CONTENT, ReaderRoutes.SOURCES, ReaderRoutes.MINE, ReaderRoutes.GLOBAL_SETTINGS).forEach { route ->
             assertFalse("$route must not be a primary tab", route in routes)
         }
     }
@@ -38,5 +42,14 @@ class AppMainBottomNavDesignFixTest {
     fun `app main bottom bar only renders on primary tab routes`() {
         assertTrue("Route host must derive main tab routes from appScreens", "appScreens.map { it.route }.toSet()" in routeHostSource)
         assertTrue("Route host must hide main bottom bar outside primary tabs", "if (showMainBottomBar)" in routeHostSource)
+    }
+
+    @Test
+    fun `app main bottom nav selected state changes color without moving buttons`() {
+        assertTrue("Bottom nav must receive shared tabs instead of hardcoding labels", "tabs: List<StitchTab>" in stitchShellSource)
+        assertTrue("Selected button must keep fixed width", ".width(64.dp)" in stitchShellSource)
+        assertTrue("Selected button must keep fixed height", ".height(44.dp)" in stitchShellSource)
+        assertTrue("Selected button must deepen background", "background(ReaderTheme.colors.primary)" in stitchShellSource)
+        assertTrue("Selected icon must invert color", "ReaderTheme.colors.paperBg" in stitchShellSource)
     }
 }
