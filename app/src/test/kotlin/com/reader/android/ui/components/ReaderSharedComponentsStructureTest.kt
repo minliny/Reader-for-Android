@@ -16,6 +16,9 @@ class ReaderSharedComponentsStructureTest {
             .filter { it.toString().endsWith(".kt") }
             .joinToString(separator = "\n") { String(Files.readAllBytes(it)) }
 
+    private fun commonSource(): String =
+        String(Files.readAllBytes(componentDir.resolve("CommonComponents.kt")))
+
     @Test
     fun `slice 2 shared component package exposes required components`() {
         val source = componentSource()
@@ -81,6 +84,14 @@ class ReaderSharedComponentsStructureTest {
         ).forEach { semanticToken ->
             assertTrue("Shared components must expose $semanticToken", semanticToken in source)
         }
+    }
+
+    @Test
+    fun `shared top bar uses icon token for back action`() {
+        val source = commonSource()
+
+        assertTrue("ReaderAppTopBar must use Back icon token", "ReaderIconToken.Back.asImageVector()" in source)
+        assertTrue("ReaderAppTopBar must not hardcode ArrowBack", "Icons.AutoMirrored.Filled.ArrowBack" !in source)
     }
 
     @Test
