@@ -6,18 +6,23 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.reader.android.BuildConfig
 import com.reader.android.ui.components.ReaderAppTopBar
 import com.reader.android.ui.components.ReaderCard
 import com.reader.android.ui.components.ReaderChip
 import com.reader.android.ui.components.ReaderIconToken
 import com.reader.android.ui.components.ReaderIconButton
-import com.reader.android.ui.components.ReaderSecondaryButton
+import com.reader.android.ui.components.ReaderLoadingState
+import com.reader.android.ui.components.ReaderPermissionRequiredState
 import com.reader.android.ui.components.ReaderSectionHeader
 import com.reader.android.ui.components.ReaderSettingsGroup
 import com.reader.android.ui.components.ReaderSettingsRow
@@ -61,7 +66,15 @@ enum class SettingsTarget {
     PrototypeGallery
 }
 
+enum class SettingsHomeDisplayState {
+    Default,
+    LoadingOverview,
+    NoBackup,
+    PermissionNeeded
+}
+
 data class SettingsHomeState(
+    val displayState: SettingsHomeDisplayState = SettingsHomeDisplayState.Default,
     val overviewTitle: String = "本地概览",
     val overviewItems: List<SettingsOverviewItem> = listOf(
         SettingsOverviewItem("本地书籍", "42"),
@@ -201,6 +214,14 @@ fun SettingsRootScreen(
 
 @Composable
 private fun SettingsOverviewCard(settingsState: SettingsHomeState) {
+    val overviewItems = if (settingsState.displayState == SettingsHomeDisplayState.NoBackup) {
+        settingsState.overviewItems.map { item ->
+            if (item.label == "最近备份") item.copy(value = "未设置") else item
+        }
+    } else {
+        settingsState.overviewItems
+    }
+
     ReaderCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -208,22 +229,62 @@ private fun SettingsOverviewCard(settingsState: SettingsHomeState) {
         contentDescription = "设置本地概览"
     ) {
         ReaderSectionHeader(title = settingsState.overviewTitle, modifier = Modifier.fillMaxWidth())
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
-        ) {
-            settingsState.overviewItems.forEach { item ->
-                Column(modifier = Modifier.weight(1f)) {
-                    ReaderChip(text = item.value, selected = item.value != "未设置")
-                    ReaderSecondaryButton(
-                        text = item.label,
-                        onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = ReaderTheme.spacing.xs)
-                    )
+        when (settingsState.displayState) {
+            SettingsHomeDisplayState.LoadingOverview -> {
+                ReaderLoadingState(
+                    message = "本地概览加载中",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(148.dp)
+                )
+            }
+            SettingsHomeDisplayState.PermissionNeeded -> {
+                ReaderPermissionRequiredState(
+                    title = "需要存储权限",
+                    message = "授权后才能统计本地书籍、订阅源和最近备份状态。",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(148.dp)
+                )
+            }
+            SettingsHomeDisplayState.Default,
+            SettingsHomeDisplayState.NoBackup -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ReaderTheme.spacing.sm)
+                ) {
+                    overviewItems.forEach { item ->
+                        SettingsOverviewMetric(item = item, modifier = Modifier.weight(1f))
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsOverviewMetric(
+    item: SettingsOverviewItem,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        ReaderChip(text = item.value, selected = item.value != "未设置")
+        Text(
+            text = item.label,
+            modifier = Modifier.padding(top = ReaderTheme.spacing.xs),
+            color = ReaderTheme.colors.bodyText,
+            style = ReaderTheme.typography.bookMeta,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (item.value == "未设置") {
+            Text(
+                text = "还没有备份记录",
+                color = ReaderTheme.colors.bodyText,
+                style = ReaderTheme.typography.bookMeta,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -271,6 +332,7 @@ private fun dispatchSettingsTarget(
 @Composable
 fun MineScreen(
     onSourceManagementClick: () -> Unit = {},
+    onRssManagementClick: () -> Unit = {},
     onGlobalSettingsClick: () -> Unit = {},
     onWebDavClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
@@ -281,6 +343,7 @@ fun MineScreen(
 ) {
     SettingsRootScreen(
         onSourceManagementClick = onSourceManagementClick,
+        onRssManagementClick = onRssManagementClick,
         onGlobalSettingsClick = onGlobalSettingsClick,
         onWebDavClick = onWebDavClick,
         onBackupClick = onBackupClick,
