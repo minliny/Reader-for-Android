@@ -10,6 +10,16 @@
 - 验收方式（Acceptance Method）：同一页面先对齐 shell、导航、slot、状态矩阵和核心文案，再做动效和业务数据接入。
 - 专项清单（Specialized Checklists）：主导航收敛见 `MAIN_NAV_RECONCILIATION.md`，图标映射见 `ICON_COMPOSE_MAPPING.md`。
 
+## 阶段完成口径（Phase Done Criteria）
+
+当前大步骤的目标是把 UI 设计图转换成可继续开发的前端设计稿输入件，并建立 Android Compose 输入框架。达到以下程度可判定本阶段完成：
+
+- 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备。
+- 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接。
+- 状态输入闭合（State Input Closure）：每个正式页面至少有默认态和关键异常/展开态的 HTML 状态矩阵，并有 Compose preview 或 fixture-driven state 对应。
+- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 个正式页面都有 spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态。
+- 后续边界清楚（Remaining Boundary）：真实业务数据、完整事件链路、动效细节和端到端 UI test 属于下一阶段，不阻塞当前“输入件完成”结论。
+
 ## 输入优先级（Source Priority）
 
 | 优先级（Priority） | 文件（File） | 用途（Purpose） |
@@ -44,7 +54,7 @@
 | 主标签页内容状态（Main Tab Content State） | `bookshelf` 进入 `BookshelfScreen` + `BookshelfHomeUiState`，`discover` 进入 `DiscoverScreen` + `DiscoveryHomeUiState`，`rss` 进入 `RssHomeScreen` + `RssHomeDesignUiState`，`settings` 进入 `SettingsRootScreen` + `SettingsHomeMapper` | 四个主标签页均来自 `MainTabPageKit` 对应输入件 | 书架已补 default/filtering/loading/empty，发现页已补 default/subscription/loading/empty/error/offline，RSS 已补 default/loading/empty/unreadEmpty/error，设置已补 default/loadingOverview/noBackup/permissionNeeded；后续继续接真实业务数据。 |
 | 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | `ReaderControlBase.onSourceChangeClick` 已进入 `ReaderRoutes.SOURCE_SWITCH`，渲染 `SourceSwitchFlowScreen` | `换源` 是横屏 `FlowShell` | 后续接入真实候选来源与检测结果，继续保持不进入主导航。 |
-| 状态矩阵（State Matrix） | 主标签页、书源管理、设置二级页、阅读链路、FlowShell、书架空状态、书籍搜索、书籍详情、书籍目录、排序筛选、书籍操作底表、分组管理和本地书导入已建立第一批 Compose preview/test 状态 | 每页都有 `state-matrix.html` 和 manifest 状态 | 继续把剩余细节转成 Compose previews、UI tests 或 fixture-driven preview states，并补真实业务数据接入。 |
+| 状态矩阵（State Matrix） | 30 个正式页面均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
 
 ## Shell 到 Compose 映射（Shell to Compose Mapping）
 
@@ -84,7 +94,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
+7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页、阅读链路、书架链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；`FrontendInputComposeCoverageTest` 负责守住 30 个正式页面的 spec、manifest、Compose source 和 preview 覆盖。
 
 ## 开发禁用项（Do Not）
 

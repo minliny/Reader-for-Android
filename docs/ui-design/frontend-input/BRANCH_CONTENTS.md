@@ -7,8 +7,8 @@
 ## 分支范围（Branch Scope）
 
 - 目标：把本地 UI 设计图整理为可验证的 `frontend-input` 前端设计稿输入件。
-- 范围：30 个页面输入包、99 个本地 HTML、公共组件库、公共素材库、共享 shell kit、前端 demo 设计稿、manifest 校验和框架审计文档。
-- 非范围：真实 Android App 代码实现、Figma Make 继续生成、线上产品逻辑。
+- 范围：30 个页面输入包、99 个本地 HTML、公共组件库、公共素材库、共享 shell kit、前端 demo 设计稿、manifest 校验、框架审计文档，以及面向 Android Compose 的输入状态预览和覆盖守卫。
+- 非范围：真实业务数据接入、线上产品逻辑、完整交互动效实现、端到端 UI 自动化。
 
 ## 核心入口（Primary Entry Points）
 
@@ -22,6 +22,7 @@
 | 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/` | 组件、状态、底表、卡片、行和交互规则的可视化入口。 |
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 个正式页面都有 spec 状态声明、manifest preview/state-matrix 目标、Compose 输入源码和 Compose preview 状态。 |
 
 ## 页面输入包（Page Input Packages）
 
@@ -42,11 +43,22 @@
 | --- | ---: | --- | --- |
 | `ComponentLibraryShell` | 3 | 公共组件库、共享 Shell Kit、前端 Demo 设计稿 | 已通过 manifest 校验。 |
 | `AssetLibraryShell` | 1 | 公共素材库 | 已通过 manifest 校验。 |
-| `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补发现页 default/subscription/loading/empty/error/offline 状态。 |
+| `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补书架、发现、RSS、设置四个主标签页状态矩阵。 |
 | `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验。 |
 | `ReaderShell` | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验。 |
 | `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验。 |
 | `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验。 |
+
+## 阶段完成口径（Phase Done Criteria）
+
+这一大步骤完成到“可作为前端输入件和 Compose 输入框架”的程度即可，不等于线上功能全部完成。完成条件如下：
+
+1. 输入件闭环（Input Package Closure）：30 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
+2. 框架闭环（Shell Closure）：所有正式页面只能归入 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell`，且 manifest DOM slot 校验通过。
+3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，新增页面优先复用已有组件。
+4. Compose 输入闭环（Compose Input Closure）：30 个正式页面都有对应 Kotlin UI state、mapper/fixture 构造点或页面级 preview，且通过 `FrontendInputComposeCoverageTest` 守卫。
+5. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，Compose 侧至少通过覆盖守卫和相关 preview 结构测试。
+6. 留白明确（Explicit Remaining Work）：真实业务数据、完整点击链路、动效细节和端到端 UI test 可以留到下一阶段，但必须在文档中明确为后续工作。
 
 ## 目录归属（Directory Ownership）
 
@@ -96,7 +108,7 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
 2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，发现根路由已接入 `DiscoverScreen` + `DiscoveryHomeUiState` + `DiscoveryHomeDisplayState`，RSS 根路由已接入 `RssHomeScreen` + `RssHomeDesignUiState` + `RssHomeDisplayState`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeMapper` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix。
 3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中。
-4. 预览矩阵扩展（Preview Matrix Expansion）：MainTabShell 已补书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded Compose 状态；FlowShell 换源已新增 Compose 输入框架、6 态 preview，并从阅读控制层换源入口接入 `ReaderRoutes.SOURCE_SWITCH`；书源管理链路已补列表、详情、编辑、导入状态 preview；设置二级页已补 App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步和远程书籍状态 preview；阅读链路已补基础控制、快捷覆盖层、底部功能覆盖层、夜间、正文、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索和内容替换状态 preview；书架二级链路已补书架空状态、书籍搜索、书籍详情、书籍目录、排序筛选、书籍操作底表、分组管理和本地书导入状态 preview。
+4. 预览矩阵扩展（Preview Matrix Expansion）：30 个正式页面的 Compose 输入覆盖已由 `FrontendInputComposeCoverageTest` 守卫；后续扩展重点从“是否有状态输入”转为“真实数据、事件回调和 UI test 是否接入”。
 5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）
