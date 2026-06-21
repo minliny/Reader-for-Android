@@ -32,6 +32,10 @@ class FrontendInputComposeCoverageTest {
         workspaceSource("docs/ui-design/frontend-input/contracts.d.ts")
     }
 
+    private val validationReportSource: String by lazy {
+        workspaceSource("docs/ui-design/frontend-input-design-draft-validation.json")
+    }
+
     @Test
     fun `formal frontend input pages have compose state mapping coverage`() {
         coverageEntries.forEach { entry ->
@@ -175,6 +179,57 @@ class FrontendInputComposeCoverageTest {
         )
     }
 
+    @Test
+    fun `frontend input validation report matches manifest and component references`() {
+        val screenDirs = formalScreenDirs()
+        val manifestTargets = manifestHtmlTargets().sorted()
+        val reportHtmlTargets = validationReportHtmlTargets()
+        val reportManifestTargets = reportHtmlTargets
+            .filterNot { it.endsWith("/frontend-input/components.html") }
+            .sorted()
+        val reportComponentTargets = reportHtmlTargets
+            .filter { it.endsWith("/frontend-input/components.html") }
+            .sorted()
+        val expectedComponentTargets = screenDirs
+            .map { "docs/ui-design/$it/frontend-input/components.html" }
+            .sorted()
+
+        assertTrue(
+            "validation report must point at frontend input manifest",
+            """"manifest": "docs/ui-design/frontend-input/manifest.json"""" in validationReportSource
+        )
+        assertTrue(
+            "validation report must pass",
+            Regex(""""passed"\s*:\s*true""").containsMatchIn(validationReportSource)
+        )
+        assertTrue(
+            "validation report must not contain failed results",
+            !Regex(""""passed"\s*:\s*false""").containsMatchIn(validationReportSource)
+        )
+        listOf("failures", "failedRequests", "consoleErrors", "pageErrors").forEach { field ->
+            assertTrue(
+                "validation report must not contain $field entries",
+                !Regex("(?s)\"$field\"\\s*:\\s*\\[(?!\\s*\\])")
+                    .containsMatchIn(validationReportSource)
+            )
+        }
+        assertTrue(
+            "component reference smoke must expect 30 pages",
+            """"expectedCount": 30""" in validationReportSource
+        )
+        assertTrue(
+            "component reference smoke must find 30 pages",
+            """"actualCount": 30""" in validationReportSource
+        )
+        assertEquals("validation report target count", 64, reportManifestTargets.size)
+        assertEquals("validation report targets must match manifest targets", manifestTargets, reportManifestTargets)
+        assertEquals(
+            "validation report component reference smoke targets must match UI design screens",
+            expectedComponentTargets,
+            reportComponentTargets
+        )
+    }
+
     private fun workspacePath(path: String): Path =
         Paths.get("..").resolve(path)
 
@@ -272,6 +327,13 @@ class FrontendInputComposeCoverageTest {
     private fun manifestHtmlTargets(): List<String> {
         return Regex(""""html"\s*:\s*"([^"]+)"""")
             .findAll(manifestSource)
+            .map { it.groupValues[1] }
+            .toList()
+    }
+
+    private fun validationReportHtmlTargets(): List<String> {
+        return Regex(""""html"\s*:\s*"([^"]+)"""")
+            .findAll(validationReportSource)
             .map { it.groupValues[1] }
             .toList()
     }
