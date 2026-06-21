@@ -175,6 +175,20 @@ object SourceSwitchFlowFixture {
         SourceSwitchFlowUiState(state = state)
 }
 
+object SourceSwitchFlowMapper {
+    fun default(): SourceSwitchFlowUiState = SourceSwitchFlowUiState()
+
+    fun loading(): SourceSwitchFlowUiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Loading)
+
+    fun empty(): SourceSwitchFlowUiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Empty)
+
+    fun error(): SourceSwitchFlowUiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Error)
+
+    fun offline(): SourceSwitchFlowUiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Offline)
+
+    fun permission(): SourceSwitchFlowUiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Permission)
+}
+
 @Composable
 fun SourceSwitchFlowScreen(
     uiState: SourceSwitchFlowUiState = SourceSwitchFlowUiState(),
@@ -484,35 +498,35 @@ private fun SourceSwitchFeedbackCard(
 @Preview(name = "FlowShell / Source Switch / Default", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowDefaultPreview() {
-    SourceSwitchFlowScreen()
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.default())
 }
 
 @Preview(name = "FlowShell / Source Switch / Loading", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowLoadingPreview() {
-    SourceSwitchFlowScreen(uiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Loading))
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.loading())
 }
 
 @Preview(name = "FlowShell / Source Switch / Empty", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowEmptyPreview() {
-    SourceSwitchFlowScreen(uiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Empty))
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.empty())
 }
 
 @Preview(name = "FlowShell / Source Switch / Error", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowErrorPreview() {
-    SourceSwitchFlowScreen(uiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Error))
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.error())
 }
 
 @Preview(name = "FlowShell / Source Switch / Offline", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowOfflinePreview() {
-    SourceSwitchFlowScreen(uiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Offline))
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.offline())
 }
 
 @Preview(name = "FlowShell / Source Switch / Permission", widthDp = 1690, heightDp = 931, showBackground = true)
 @Composable
 fun SourceSwitchFlowPermissionPreview() {
-    SourceSwitchFlowScreen(uiState = SourceSwitchFlowFixture.state(SourceSwitchFlowState.Permission))
+    SourceSwitchFlowScreen(uiState = SourceSwitchFlowMapper.permission())
 }
