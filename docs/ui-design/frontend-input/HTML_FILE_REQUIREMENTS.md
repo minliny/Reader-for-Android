@@ -169,5 +169,5 @@
 - 组件参考烟测（Component Reference Smoke Test）：`validate-frontend-inputs.js` 批量打开 30 个 `components.html`，确认它们是独立 HTML 文档、无 console error、无 failed request、无缺失图片。
 - 文档一致性检查（Documentation Consistency Check）：检查 README、COMPONENT_SPEC、路线图和架构文档是否使用一致的 `中文名称（English Name）`。
 - 例外清单检查（Exception List Check）：确认 `preview 2.html` 不在 manifest 中，也没有被文档标记为正式输入件。
-- Manifest 目标集合检查（Manifest Target Set Check）：运行 `FrontendInputComposeCoverageTest`，确认 manifest 只包含正式页面预览、状态矩阵和公共库/示例目标。
+- Manifest 目标集合检查（Manifest Target Set Check）：运行 `FrontendInputComposeCoverageTest`，确认 manifest 只包含正式页面预览、状态矩阵和公共库/示例目标，并且每个 target 的 `shellName/pageRole/slots` 与正式 shell taxonomy 完全一致。
 - 验证报告同步检查（Validation Report Sync Check）：运行 `FrontendInputComposeCoverageTest`，确认 `frontend-input-design-draft-validation.json` 已通过、无失败数组，并且报告中的 64 个正式目标和 30 个组件参考页与当前 manifest/UI 设计图目录一致。

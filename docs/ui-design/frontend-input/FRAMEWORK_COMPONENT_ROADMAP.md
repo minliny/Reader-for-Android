@@ -16,7 +16,7 @@
 | 中文名称（English Name） | 当前状态（Current Status） | 证据与说明（Evidence and Notes） |
 |---|---|---|
 | 前端输入件交付格式（Frontend Input Delivery Format） | 已完成（Completed） | 30 个页面都有输入包、fixture、renderer、preview、state matrix、README、组件规格和 manifest 目标。 |
-| 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`。 |
+| 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`；`FrontendInputComposeCoverageTest` 守住正式 shell taxonomy 和目标数量。 |
 | 设置页框架（SettingsShell） | 已完成（Completed） | 7 个设置二级页已通过 `SettingsPageKit` 输出统一设置页结构和真实 DOM slots。 |
 | 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构；Compose 侧已补四个主标签页状态矩阵。 |
 | 书架链路框架（LibraryShell） | 已完成（Completed） | 8 个书架链路页面已通过 `LibraryPageKit` 输出统一 `StackFrame / BackTopBar / ContentRegion / BottomActionHost / SheetHost / DialogHost / StateHost`。 |
@@ -27,7 +27,7 @@
 | 公共素材库（Asset Library） | 已完成第一版（First Version Completed） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token。 |
 | 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
 | 横向流程框架（FlowShell） | 已完成（Completed） | 换源页面已通过 `ReaderShellKit.renderFlowShell(...)` 输出 `FlowFrame / StepRegion / ComparisonRegion / ResultRegion / StateHost`，并通过 DOM slot 校验。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态。 |
 
 ## 页面框架（Page Shells）
 
