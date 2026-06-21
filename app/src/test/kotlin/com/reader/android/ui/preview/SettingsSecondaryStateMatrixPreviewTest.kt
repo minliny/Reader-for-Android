@@ -59,8 +59,16 @@ class SettingsSecondaryStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/SyncBackupDesignUiState.kt")))
     }
 
+    private val sourceManagementScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/SourceManagementDesignScreen.kt")))
+    }
+
+    private val sourceManagementStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/SourceManagementDesignUiState.kt")))
+    }
+
     @Test
-    fun `settings secondary compose previews expose general about sync backup webdav and remote book states`() {
+    fun `settings secondary compose previews expose general about sync backup source management webdav and remote book states`() {
         listOf(
             "SettingsGeneralDefaultPreview",
             "SettingsGeneralOptionSheetPreview",
@@ -95,6 +103,15 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SettingsSyncBackupErrorPreview",
             "SettingsSyncBackupOfflinePreview",
             "SettingsSyncBackupPermissionPreview",
+            "SettingsSourceManagementDefaultPreview",
+            "SettingsSourceManagementEditPreview",
+            "SettingsSourceManagementLogPreview",
+            "SettingsSourceManagementConfirmPreview",
+            "SettingsSourceManagementLoadingPreview",
+            "SettingsSourceManagementEmptyPreview",
+            "SettingsSourceManagementErrorPreview",
+            "SettingsSourceManagementOfflinePreview",
+            "SettingsSourceManagementPermissionPreview",
             "SettingsWebDavNotConfiguredPreview",
             "SettingsWebDavConfiguredPreview",
             "SettingsWebDavAuthErrorPreview",
@@ -148,6 +165,15 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "SyncBackupMapper.error",
             "SyncBackupMapper.offline",
             "SyncBackupMapper.permission",
+            "SourceManagementDesignMapper.fromFixture",
+            "SourceManagementDesignMapper.edit",
+            "SourceManagementDesignMapper.log",
+            "SourceManagementDesignMapper.confirm",
+            "SourceManagementDesignMapper.loading",
+            "SourceManagementDesignMapper.empty",
+            "SourceManagementDesignMapper.error",
+            "SourceManagementDesignMapper.offline",
+            "SourceManagementDesignMapper.permission",
             "DiscoverRssWebDavMapper.webDavNotConfigured",
             "DiscoverRssWebDavMapper.webDavConfigured",
             "DiscoverRssWebDavMapper.webDavAuthError",
@@ -516,6 +542,69 @@ class SettingsSecondaryStateMatrixPreviewTest {
             "需要文件访问权限"
         ).forEach { token ->
             assertTrue("Sync backup state source must include $token", token in syncBackupStateSource)
+        }
+    }
+
+    @Test
+    fun `source management screen keeps settingsshell slots search source rows detect log and edit form`() {
+        listOf(
+            "SourceManagementDesignScreen",
+            "ReaderAppTopBar",
+            "ReaderSearchBox",
+            "SourceMetricStrip",
+            "SourceManagementSection",
+            "SourceRow",
+            "DetectButton",
+            "LogPanel",
+            "SourceEditForm",
+            "SourceDetailPanel",
+            "SourceDisableConfirmDialog",
+            "SourceFloatingAddButton",
+            "ReaderIconToken.Edit",
+            "contentDescription = \"SettingsShell 书源管理\"",
+            "contentDescription = \"settingsContent\"",
+            "contentDescription = \"toastHost\"",
+            "contentDescription = \"dialogHost\"",
+            "contentDescription = \"settingsStateHost\""
+        ).forEach { token ->
+            assertTrue("Source management screen source must include $token", token in sourceManagementScreenSource)
+        }
+
+        listOf(
+            "ReaderMainTabBar",
+            "ReaderMainTabShell",
+            "import androidx.compose.material.icons"
+        ).forEach { forbidden ->
+            assertTrue("Source management screen must not include $forbidden", forbidden !in sourceManagementScreenSource)
+        }
+    }
+
+    @Test
+    fun `source management state model keeps frontend input contract text`() {
+        listOf(
+            "SourceManagementDesignDisplayState",
+            "SourceManagementDesignMapper",
+            "fun edit()",
+            "fun log()",
+            "fun confirm()",
+            "fun loading()",
+            "fun empty()",
+            "fun error()",
+            "fun offline()",
+            "fun permission()",
+            "书源管理",
+            "书源列表",
+            "搜索框",
+            "启用开关",
+            "检测",
+            "详情",
+            "新增",
+            "编辑",
+            "错误日志",
+            "网络不可用，请稍后重试",
+            "需要网络权限"
+        ).forEach { token ->
+            assertTrue("Source management state source must include $token", token in sourceManagementStateSource)
         }
     }
 }

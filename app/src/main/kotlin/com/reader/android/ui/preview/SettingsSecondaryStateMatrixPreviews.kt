@@ -15,6 +15,8 @@ import com.reader.android.ui.settings.PrivacyPermissionsMapper
 import com.reader.android.ui.settings.PrivacyPermissionsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
+import com.reader.android.ui.settings.SourceManagementDesignMapper
+import com.reader.android.ui.settings.SourceManagementDesignScreen
 import com.reader.android.ui.settings.SyncBackupMapper
 import com.reader.android.ui.settings.SyncBackupScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
@@ -222,6 +224,60 @@ fun SettingsSyncBackupOfflinePreview() {
 @Composable
 fun SettingsSyncBackupPermissionPreview() {
     SyncBackupScreen(state = SyncBackupMapper.permission())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Default", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementDefaultPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.fromFixture())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Edit", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementEditPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.edit())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Log", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementLogPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.log())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Confirm", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementConfirmPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.confirm())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Loading", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementLoadingPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.loading())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Empty", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementEmptyPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.empty())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Error", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementErrorPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.error())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Offline", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementOfflinePreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.offline())
+}
+
+@Preview(name = "Settings Secondary / Source Management / Permission", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)
+@Composable
+fun SettingsSourceManagementPermissionPreview() {
+    SourceManagementDesignScreen(state = SourceManagementDesignMapper.permission())
 }
 
 @Preview(name = "Settings Secondary / WebDAV / Not Configured", widthDp = SettingsPreviewWidth, heightDp = SettingsPreviewHeight, showBackground = true)

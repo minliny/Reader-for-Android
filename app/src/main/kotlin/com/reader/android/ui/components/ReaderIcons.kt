@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FileOpen
@@ -105,7 +106,8 @@ enum class ReaderIconToken {
     Message,
     Code,
     Help,
-    Upload
+    Upload,
+    Edit
 }
 
 fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
@@ -163,4 +165,5 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Code -> Icons.Filled.Code
     ReaderIconToken.Help -> Icons.AutoMirrored.Filled.HelpOutline
     ReaderIconToken.Upload -> Icons.Filled.CloudUpload
+    ReaderIconToken.Edit -> Icons.Filled.Edit
 }

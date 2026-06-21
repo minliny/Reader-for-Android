@@ -7,7 +7,7 @@
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
 | 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
-| Compose 语义 token 映射（Compose Semantic Token Mapping） | 54 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
+| Compose 语义 token 映射（Compose Semantic Token Mapping） | 55 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
 
@@ -52,7 +52,7 @@
 | `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
 | `Delete` | `trash` | 已映射 | 删除、移除或危险清空通过 `ReaderIconToken.Trash` 表达。 |
 | `Download` | `download` | 已映射 | 自动缓存或下载缓存通过 `ReaderIconToken.Download` 表达。 |
-| `Edit` | `edit` | 可映射 | Figma 当前标为缺源；Compose 可先走语义 token。 |
+| `Edit` | `edit` | 已映射 | 书源编辑和规则编辑通过 `ReaderIconToken.Edit` 表达。 |
 | `ErrorOutline` | `warning` | 可映射 | 错误或警告状态。 |
 | `Explore` | `discover` | 可映射 | 发现。 |
 | `FileOpen` | `file` | 可映射 | 文件选择或导入。 |
@@ -170,6 +170,7 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
     ReaderIconToken.Code -> Icons.Filled.Code
     ReaderIconToken.Help -> Icons.AutoMirrored.Filled.HelpOutline
     ReaderIconToken.Upload -> Icons.Filled.CloudUpload
+    ReaderIconToken.Edit -> Icons.Filled.Edit
 }
 ```
 
