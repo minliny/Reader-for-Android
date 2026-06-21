@@ -214,6 +214,12 @@
 
 当前公共库已经覆盖本轮已转化页面需要的框架组件；后续新增页面仍按准入规则先补组件再生成页面。
 
+## 库存守卫
+
+- 当前公共组件库预览输出 49 个组件卡，覆盖 Foundations、App Shell、Basic Controls、Cards & Rows、Sheets & Panels、States 六个 section。
+- `FrontendInputComponentLibraryInventoryTest` 守住 `render.js`、`fixture.json`、`fixture.js`、`manifest.json`、`frontend-input-design-draft-validation.json` 和素材库图标 token 的同步关系。
+- 新增页面优先复用已有组件；如果必须新增公共组件，需要同步组件规格、fixture、renderer、manifest 阈值、验证报告和 Compose 映射守卫。
+
 ## 准入规则
 
 后续每转换一个页面：
@@ -222,4 +228,5 @@
 3. 页面完成后必须加入 `manifest.json`。
 4. 页面必须提供 `fixture.json`、`fixture.js`、`render.js`、`preview.html`、`state-matrix.html` 或说明为什么不需要状态矩阵。
 5. 运行 `validate-frontend-inputs.js` 通过后，才算转化完成。
-6. 危险操作必须使用危险色、说明影响范围，并经过 `ConfirmDialog` 二次确认；不得把 `确认移除` 这类结果文案替换为 `确定`。
+6. 运行 `FrontendInputComponentLibraryInventoryTest`，确认公共组件库仍保持 49 个组件卡和素材 token 对齐。
+7. 危险操作必须使用危险色、说明影响范围，并经过 `ConfirmDialog` 二次确认；不得把 `确认移除` 这类结果文案替换为 `确定`。
