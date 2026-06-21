@@ -80,6 +80,7 @@ fun RssHomeScreen(
     rssState: RssListUiState = DiscoverRssWebDavMapper.rssList(),
     modifier: Modifier = Modifier,
     uiState: ReaderUiState? = null,
+    rssHomeState: RssHomeDesignUiState? = null,
     statusFilters: List<RssHomeFilter> = defaultStatusFilters,
     sourceFilters: List<RssHomeFilter> = defaultSourceFilters,
     onRefresh: () -> Unit = {},
@@ -91,7 +92,10 @@ fun RssHomeScreen(
     onRetry: () -> Unit = {},
     onMoreClick: () -> Unit = {}
 ) {
-    val activeStatusFilterType = statusFilters.firstOrNull { it.active }?.type
+    val effectiveRssState = rssHomeState?.rssState ?: rssState
+    val effectiveStatusFilters = rssHomeState?.statusFilters ?: statusFilters
+    val effectiveSourceFilters = rssHomeState?.sourceFilters ?: sourceFilters
+    val activeStatusFilterType = effectiveStatusFilters.firstOrNull { it.active }?.type
 
     ReaderTheme {
         Column(modifier = modifier.fillMaxSize()) {
@@ -111,23 +115,23 @@ fun RssHomeScreen(
             ) {
                 item {
                     RssSummaryCard(
-                        feedCount = rssState.summaryFeedCountLabel,
-                        unreadCount = rssState.unreadCountLabel,
-                        latestLabel = rssState.latestUpdateLabel,
+                        feedCount = effectiveRssState.summaryFeedCountLabel,
+                        unreadCount = effectiveRssState.unreadCountLabel,
+                        latestLabel = effectiveRssState.latestUpdateLabel,
                         onRefresh = onRefresh
                     )
                 }
                 item {
                     RssFilterSection(
                         title = "阅读状态",
-                        filters = statusFilters,
+                        filters = effectiveStatusFilters,
                         onFilterClick = onStatusFilterChange
                     )
                 }
                 item {
                     RssFilterSection(
                         title = "来源筛选",
-                        filters = sourceFilters,
+                        filters = effectiveSourceFilters,
                         onFilterClick = onSourceFilterChange
                     )
                 }
@@ -135,7 +139,7 @@ fun RssHomeScreen(
                     ReaderSectionHeader(title = "最新订阅")
                 }
                 when {
-                    uiState is ReaderUiState.Loading || rssState.isLoading -> item {
+                    uiState is ReaderUiState.Loading || effectiveRssState.isLoading -> item {
                         ReaderLoadingState(
                             message = "订阅流刷新中",
                             modifier = Modifier
@@ -153,27 +157,27 @@ fun RssHomeScreen(
                                 .height(220.dp)
                         )
                     }
-                    rssState.offline -> item {
+                    effectiveRssState.offline -> item {
                         ReaderErrorState(
                             title = "当前离线",
-                            message = rssState.error?.message ?: "保留上次订阅框架，可以稍后重试。",
+                            message = effectiveRssState.error?.message ?: "保留上次订阅框架，可以稍后重试。",
                             onRetryClick = onRetry,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
                         )
                     }
-                    rssState.error != null -> item {
+                    effectiveRssState.error != null -> item {
                         ReaderErrorState(
-                            title = rssState.error.title,
-                            message = rssState.error.message,
+                            title = effectiveRssState.error.title,
+                            message = effectiveRssState.error.message,
                             onRetryClick = onRetry,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
                         )
                     }
-                    rssState.articles.isEmpty() && activeStatusFilterType == "unread" -> item {
+                    effectiveRssState.articles.isEmpty() && activeStatusFilterType == "unread" -> item {
                         ReaderEmptyState(
                             title = "当前没有未读内容",
                             message = "筛选条件仍保留，可以切回全部查看历史订阅。",
@@ -184,7 +188,7 @@ fun RssHomeScreen(
                                 .height(220.dp)
                         )
                     }
-                    rssState.articles.isEmpty() -> item {
+                    effectiveRssState.articles.isEmpty() -> item {
                         ReaderEmptyState(
                             title = "还没有订阅内容",
                             message = "添加订阅源后，最新内容会显示在这里。",
@@ -196,10 +200,10 @@ fun RssHomeScreen(
                         )
                     }
                     else -> {
-                        items(rssState.articles, key = { it.id }) { article ->
+                        items(effectiveRssState.articles, key = { it.id }) { article ->
                             RssEntryRow(
                                 article = article,
-                                feedTitle = rssState.feeds.firstOrNull { it.id == article.feedId }?.title ?: article.feedId,
+                                feedTitle = effectiveRssState.feeds.firstOrNull { it.id == article.feedId }?.title ?: article.feedId,
                                 unread = true,
                                 onClick = { onEntryClick(article) },
                                 onMoreClick = { onEntryMoreClick(article) }
@@ -208,7 +212,7 @@ fun RssHomeScreen(
                         }
                         item {
                             Text(
-                                text = "已显示最新 ${rssState.visibleCountLabel} 条",
+                                text = "已显示最新 ${effectiveRssState.visibleCountLabel} 条",
                                 modifier = Modifier.padding(
                                     horizontal = ReaderTheme.spacing.screenPadding,
                                     vertical = ReaderTheme.spacing.sm

@@ -171,7 +171,7 @@
 1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构。
 2. 主导航差异收敛（Main Navigation Reconciliation）：Android 代码中的主入口已收敛到 `书架 / 发现 / RSS / 设置`；后续变更不得恢复 `书源 / 我的` 作为主 tab。
 3. 图标映射收敛（Icon Mapping Reconciliation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；后续重点是防止页面重新直连 Material Icons，并同步素材库缺源状态。
-4. 状态矩阵落地（State Matrix Implementation）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS 和设置根页第一批状态）、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架搜索/详情/目录/排序筛选/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续继续把这些状态接入真实导航与可交互 UI test。
+4. 状态矩阵落地（State Matrix Implementation）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置根页第一批状态）、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架搜索/详情/目录/排序筛选/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续继续把这些状态接入真实导航与可交互 UI test。
 
 ## 本地 HTML 要求（Local HTML Requirements）
 
