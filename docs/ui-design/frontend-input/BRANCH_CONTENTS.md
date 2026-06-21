@@ -27,6 +27,7 @@
 | 素材库库存守卫（Asset Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputAssetLibraryInventoryTest.kt` | 确认素材库 `fixture.json`、`fixture.js`、`icons.js`、实际 UI 图/封面文件、manifest 和验证报告中的 30 张 UI 图、6 张封面、79 个图标 token、25 个补齐图标和 60 张验证截图登记一致。 |
 | 组件库库存守卫（Component Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComponentLibraryInventoryTest.kt` | 确认公共组件库 `render.js`、`fixture.json`、`fixture.js`、manifest 和验证报告中的 49 个组件卡、6 个 section、17 个 fixture 图标 token 与素材库登记一致。 |
 | FlowShell 库存守卫（FlowShell Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputFlowShellInventoryTest.kt` | 确认换源输入包、`ReaderShellKit.renderFlowShell(...)`、非空 `FlowShell StateHost`、manifest、验证报告、文档和 Compose preview 锚点同步。 |
+| 阶段完成摘要守卫（Phase Completion Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputPhaseCompletionGuardTest.kt` | 确认阶段完成口径、验证报告数字、守卫命令、后续边界和交接入口保持同步。 |
 | Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、事件到 Compose 回调映射、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
 | 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，并守住 manifest 中 `MainTabShell`、`LibraryShell`、`ReaderShell`、`FlowShell`、`SettingsShell` 到 Compose 骨架、slot 和 preview 的追溯关系。 |
 | 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
@@ -113,6 +114,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
   --tests com.reader.android.ui.preview.FrontendInputAssetLibraryInventoryTest \
   --tests com.reader.android.ui.preview.FrontendInputComponentLibraryInventoryTest \
   --tests com.reader.android.ui.preview.FrontendInputFlowShellInventoryTest \
+  --tests com.reader.android.ui.preview.FrontendInputPhaseCompletionGuardTest \
   --tests com.reader.android.ui.components.ReaderSharedComponentsStructureTest \
   --tests com.reader.android.ui.components.ReaderIconTokenMappingTest \
   --tests com.reader.android.ui.components.ReaderIconImportBoundaryTest \
@@ -135,22 +137,16 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
 - failed targets: `0`
 - ReaderShell targets: `20/20`
 - icon tokens: `79`
-- Compose guard scope: HTML inventory, asset library inventory, frontend coverage, event callback mapping, runtime shell anchors, icon token/import boundary, MainTab/Library/ReaderControl/ReaderShell/Settings/FlowShell state matrix.
+- Compose guard scope: HTML inventory, asset library inventory, component library inventory, FlowShell inventory, phase completion summary, frontend coverage, event callback mapping, runtime shell anchors, icon token/import boundary, MainTab/Library/ReaderControl/ReaderShell/Settings/FlowShell state matrix.
 
-## 当前待办（Open Work）
+## 下一阶段边界（Next Phase Boundary）
 
-1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
-2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，发现根路由已接入 `DiscoverScreen` + `DiscoveryHomeUiState` + `DiscoveryHomeDisplayState`，RSS 根路由已接入 `RssHomeScreen` + `RssHomeDesignUiState` + `RssHomeDisplayState`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeMapper` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix。
-3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中，并由 `ReaderIconImportBoundaryTest` 守卫。
-4. 预览矩阵扩展（Preview Matrix Expansion）：30 个正式页面的 Compose 输入覆盖已由 `FrontendInputComposeCoverageTest` 守卫，五个 runtime shell 的 Compose 骨架锚点已由 `ReaderSharedComponentsStructureTest` 守卫；后续扩展重点从“是否有状态输入”转为“真实数据、事件回调和 UI test 是否接入”。
-5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
+当前大步骤交付的是可继续开发的前端设计稿输入件和 Android Compose 输入框架。以下内容属于下一阶段，不阻塞当前输入件完成口径：
 
-## 建议提交分组（Suggested Commit Groups）
-
-1. 框架契约与验证（Shell Contracts and Validation）：`contracts.d.ts`、`manifest.json`、`validate-frontend-inputs.js`、验证报告。
-2. 共享框架与公共库（Shared Kits and Libraries）：`shared-shell-kit/`、`asset-library/`、`component-library/`、各链路 shared kit。
-3. 页面输入件（Page Inputs）：30 个页面的 `frontend-input/` 包和验证截图。
-4. 架构文档（Architecture Docs）：框架审计、路线图、组件目录、HTML 要求、图标风格和素材审计。
+1. 真实业务数据接入（Real Data Wiring）：把 fixture/state 映射到真实书架、发现、RSS、阅读、设置和换源数据源。
+2. 完整事件链路接入（Full Event Wiring）：把 `EVENT_CALLBACK_MAPPING.md` 的回调接入 ViewModel、副作用、导航和持久化。
+3. 动效细节实现（Motion Implementation）：按现有选中态和弹层规则补齐真实运行时动效，不改变 shell slot 和组件边界。
+4. 可交互 UI test（Interactive UI Tests）：在当前 preview/state matrix 守卫基础上补真实点击、滚动、权限和失败恢复测试。
 
 ## 人工审计建议（Manual Review Order）
 
@@ -164,7 +160,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
 
 ## 当前注意事项（Current Notes）
 
-- 本分支包含大量生成型 `frontend-input` 文件，未跟踪目录应作为本分支交付内容一起审计，不应随意清理。
+- 本分支包含大量生成型 `frontend-input` 文件，应作为本分支交付内容一起审计，不应随意清理。
 - `preview 2.html` 这类历史临时页不进入 manifest，不作为正式输入件。
 - `components.html` 是组件参考输入，不进入正式 manifest 目标；正式目标集合由 `FrontendInputComposeCoverageTest` 守卫。
 - 后续真实前端开发应以 shell kit、manifest、contracts 和页面 `COMPONENT_SPEC.md` 为准，不应直接按截图拆布局。
