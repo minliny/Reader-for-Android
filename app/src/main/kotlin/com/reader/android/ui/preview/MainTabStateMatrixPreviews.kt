@@ -5,6 +5,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.reader.android.ui.bookshelf.BookshelfLayoutMode
 import com.reader.android.ui.bookshelf.BookshelfMapper
 import com.reader.android.ui.bookshelf.BookshelfScreen
+import com.reader.android.ui.discover.DiscoverScreen
+import com.reader.android.ui.discover.DiscoveryHomeMapper
 import com.reader.android.ui.discover.RssHomeFilter
 import com.reader.android.ui.discover.RssHomeScreen
 import com.reader.android.ui.settings.SettingsHomeDisplayState
@@ -25,6 +27,42 @@ fun BookshelfMainTabDefaultPreview() {
 @Composable
 fun BookshelfMainTabEmptyPreview() {
     BookshelfScreen(bookshelfState = BookshelfMapper.empty(BookshelfLayoutMode.Cover))
+}
+
+@Preview(name = "MainTab / Discover / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabDefaultPreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.fromFixture())
+}
+
+@Preview(name = "MainTab / Discover / Subscription", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabSubscriptionPreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.subscription())
+}
+
+@Preview(name = "MainTab / Discover / Loading", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabLoadingPreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.loading())
+}
+
+@Preview(name = "MainTab / Discover / Empty", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabEmptyPreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.empty())
+}
+
+@Preview(name = "MainTab / Discover / Error", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabErrorPreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.error())
+}
+
+@Preview(name = "MainTab / Discover / Offline", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun DiscoverMainTabOfflinePreview() {
+    DiscoverScreen(discoveryHomeState = DiscoveryHomeMapper.offline())
 }
 
 @Preview(name = "MainTab / RSS / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)

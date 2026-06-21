@@ -18,7 +18,7 @@
 | 前端输入件交付格式（Frontend Input Delivery Format） | 已完成（Completed） | 30 个页面都有输入包、fixture、renderer、preview、state matrix、README、组件规格和 manifest 目标。 |
 | 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`。 |
 | 设置页框架（SettingsShell） | 已完成（Completed） | 7 个设置二级页已通过 `SettingsPageKit` 输出统一设置页结构和真实 DOM slots。 |
-| 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构。 |
+| 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构；Compose 侧已补发现页 default/subscription/loading/empty/error/offline 状态矩阵。 |
 | 书架链路框架（LibraryShell） | 已完成（Completed） | 8 个书架链路页面已通过 `LibraryPageKit` 输出统一 `StackFrame / BackTopBar / ContentRegion / BottomActionHost / SheetHost / DialogHost / StateHost`。 |
 | 主导航交互规则（Main Navigation Interaction Rule） | 已完成并已校验（Completed and Validated） | 四个按钮固定为书架、发现、RSS、设置；选中态只改变背景、图标颜色和文字颜色，不改变位置。 |
 | 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理（Documented） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层。 |
