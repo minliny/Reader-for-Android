@@ -5,7 +5,7 @@
 ## 当前结论（Current Conclusion）
 
 - 前端输入件（Frontend Inputs）：当前 manifest 有 64 个验证目标，包括 30 个页面的 `preview.html` 和 `state-matrix.html`、1 个公共组件库预览、1 个共享 Shell Kit 预览、1 个公共素材库预览，以及 1 个前端 Demo 设计稿预览。
-- 本地 HTML（Local HTML）：当前共有 99 个本地 HTML；其中 96 个位于 `frontend-input` 范围，2 个 `preview 2.html` 和 3 个早期独立复刻页不作为正式输入件。
+- 本地 HTML（Local HTML）：当前共有 99 个本地 HTML；其中 96 个位于 `frontend-input` 范围（90 个正式页面 HTML、2 个历史临时预览页、4 个公共库/示例 HTML），另有 3 个早期独立复刻页；`preview 2.html` 和早期独立复刻页不作为正式输入件。
 - 已有共享 kit（Implemented Shared Kits）：主标签页框架（MainTabShell）、书架链路框架（LibraryShell）、设置页框架（SettingsShell）、阅读器框架（ReaderShell）、横向流程框架（FlowShell）和中心化共享 Shell Kit（Shared Shell Kit）已经可用。
 - 已完成共享 kit（Completed Shared Kits）：阅读器框架（ReaderShell）10 页已接入中心化 `ReaderShellKit`；横向流程框架（FlowShell）1 页已接入中心化 `ReaderShellKit.renderFlowShell(...)`。
 - 组件库状态（Component Library Status）：公共组件库已经覆盖当前 30 个页面需要的基础控件、书籍组件、阅读组件、设置组件、底表面板和状态组件；核心语义名已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
