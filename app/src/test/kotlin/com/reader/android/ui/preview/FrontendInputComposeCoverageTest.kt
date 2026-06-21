@@ -105,14 +105,7 @@ class FrontendInputComposeCoverageTest {
 
     @Test
     fun `ui design screens have formal frontend input packages`() {
-        val uiDesignRoot = workspacePath("docs/ui-design").toAbsolutePath().normalize()
-        val screenDirs = Files.walk(uiDesignRoot).use { stream ->
-            stream
-                .filter { it.fileName.toString() == "UI设计图.png" }
-                .map { uiDesignRoot.relativize(it.parent).toString().replace('\\', '/') }
-                .sorted()
-                .collect(Collectors.toList())
-        }
+        val screenDirs = formalScreenDirs()
         val coveredScreenDirs = coverageEntries
             .map { it.specPath.removePrefix("docs/ui-design/").removeSuffix("/frontend-input/COMPONENT_SPEC.md") }
             .sorted()
@@ -130,6 +123,56 @@ class FrontendInputComposeCoverageTest {
             assertTrue("$dir preview target must be in manifest", "docs/ui-design/$dir/frontend-input/preview.html" in manifestSource)
             assertTrue("$dir state matrix target must be in manifest", "docs/ui-design/$dir/frontend-input/state-matrix.html" in manifestSource)
         }
+    }
+
+    @Test
+    fun `manifest target set only contains formal frontend input pages and library previews`() {
+        val screenDirs = formalScreenDirs()
+        val manifestTargets = manifestHtmlTargets()
+        val expectedPreviewTargets = screenDirs
+            .map { "docs/ui-design/$it/frontend-input/preview.html" }
+            .sorted()
+        val expectedStateMatrixTargets = screenDirs
+            .map { "docs/ui-design/$it/frontend-input/state-matrix.html" }
+            .sorted()
+        val expectedLibraryTargets = listOf(
+            "docs/ui-design/frontend-input/component-library/preview.html",
+            "docs/ui-design/frontend-input/shared-shell-kit/preview.html",
+            "docs/ui-design/frontend-input/asset-library/preview.html",
+            "docs/ui-design/frontend-input/frontend-demo-draft/index.html"
+        ).sorted()
+
+        assertEquals("manifest target count", 64, manifestTargets.size)
+        assertEquals("manifest html targets must be unique", manifestTargets.size, manifestTargets.distinct().size)
+        assertEquals(
+            "manifest page preview targets must match UI design screens",
+            expectedPreviewTargets,
+            manifestTargets
+                .filter { it.startsWith("docs/ui-design/0") && it.endsWith("/frontend-input/preview.html") }
+                .sorted()
+        )
+        assertEquals(
+            "manifest state matrix targets must match UI design screens",
+            expectedStateMatrixTargets,
+            manifestTargets
+                .filter { it.startsWith("docs/ui-design/0") && it.endsWith("/frontend-input/state-matrix.html") }
+                .sorted()
+        )
+        assertEquals(
+            "manifest non-page targets must stay limited to shared libraries and demo draft",
+            expectedLibraryTargets,
+            manifestTargets
+                .filter { it.startsWith("docs/ui-design/frontend-input/") }
+                .sorted()
+        )
+        assertTrue(
+            "manifest must not include legacy temporary preview pages",
+            manifestTargets.none { it.contains("preview 2.html") }
+        )
+        assertTrue(
+            "manifest must not include component reference pages",
+            manifestTargets.none { it.endsWith("/frontend-input/components.html") }
+        )
     }
 
     private fun workspacePath(path: String): Path =
@@ -211,6 +254,24 @@ class FrontendInputComposeCoverageTest {
 
         return Regex("""type:\s*"([^"]+)"""")
             .findAll(section)
+            .map { it.groupValues[1] }
+            .toList()
+    }
+
+    private fun formalScreenDirs(): List<String> {
+        val uiDesignRoot = workspacePath("docs/ui-design").toAbsolutePath().normalize()
+        return Files.walk(uiDesignRoot).use { stream ->
+            stream
+                .filter { it.fileName.toString() == "UI设计图.png" }
+                .map { uiDesignRoot.relativize(it.parent).toString().replace('\\', '/') }
+                .sorted()
+                .collect(Collectors.toList())
+        }
+    }
+
+    private fun manifestHtmlTargets(): List<String> {
+        return Regex(""""html"\s*:\s*"([^"]+)"""")
+            .findAll(manifestSource)
             .map { it.groupValues[1] }
             .toList()
     }

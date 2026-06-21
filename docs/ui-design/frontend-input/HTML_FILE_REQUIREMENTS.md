@@ -7,7 +7,7 @@
 - 可见 UI 文案（Visible UI Text）：必须匹配 UI 设计图和文字稿，不为了双语格式把 App 内真实界面文字改成中英混排。
 - 文件说明文案（Artifact Documentation Text）：HTML 标题、组件拆分页标题、README、组件规格、审计文档和路线图应使用 `中文名称（English Name）`。
 - 文件名（File Name）：保持 `preview.html`、`state-matrix.html`、`components.html` 稳定，不为了双语格式重命名文件。
-- 前端输入件（Frontend Input）：只认 manifest 管理的预览、状态矩阵、组件库预览和素材库预览；历史临时 HTML 不作为输入件。
+- 前端输入件（Frontend Input）：只认 manifest 管理的预览、状态矩阵、组件库预览、共享 Shell Kit、素材库预览和前端 demo 设计稿；历史临时 HTML 不作为输入件。
 
 ## 当前本地 HTML 清单（Current Local HTML Inventory）
 
@@ -17,20 +17,25 @@
 | 状态矩阵页（State Matrix Page） | 30 | 是（Yes） | 每个页面一个 `state-matrix.html`，覆盖关键状态、异常和变体。 |
 | 组件拆分页（Component Reference Page） | 30 | 辅助输入（Reference Only） | 每个页面一个 `components.html`，用于拆分组件、复制结构和人工审计；默认不进入 manifest 截图目标。 |
 | 组件库预览页（Component Library Preview Page） | 1 | 是（Yes） | `frontend-input/component-library/preview.html` 是公共组件库预览目标。 |
+| 共享 Shell Kit 预览页（Shared Shell Kit Preview Page） | 1 | 是（Yes） | `frontend-input/shared-shell-kit/preview.html` 是五类 shell slot 结构预览目标。 |
 | 素材库预览页（Asset Library Preview Page） | 1 | 是（Yes） | `frontend-input/asset-library/preview.html` 是 UI 设计图、封面和图标素材库预览目标。 |
+| 前端 Demo 设计稿（Frontend Demo Draft Page） | 1 | 是（Yes） | `frontend-input/frontend-demo-draft/index.html` 是统一 shell 拼装的开发参考稿。 |
 | 历史临时预览页（Legacy Preview Candidate） | 2 | 否（No） | `preview 2.html` 是历史临时文件，不进入 manifest，不作为真实前端输入件。 |
-| 全部本地 HTML（All Local HTML） | 94 | 混合（Mixed） | 92 个标准/参考 HTML + 2 个历史临时 HTML。 |
+| 历史独立复刻页（Legacy Standalone Reproduction Page） | 3 | 否（No） | 早期独立 HTML 复刻页，仅作历史参考，不进入 manifest。 |
+| 全部本地 HTML（All Local HTML） | 99 | 混合（Mixed） | 96 个 `frontend-input` 范围 HTML + 3 个历史独立复刻页。 |
 
 ## 页面组分布（Page Group Distribution）
 
 | 中文名称（English Name） | 本地 HTML 数量（Local HTML Count） | 标准结构（Standard Structure） | 例外（Exceptions） |
 |---|---:|---|---|
-| 主标签页（Main Tabs） | 13 | 4 页 x `preview.html / state-matrix.html / components.html` | `书架/frontend-input/preview 2.html` 为历史临时预览。 |
+| 主标签页（Main Tabs） | 15 | 4 页 x `preview.html / state-matrix.html / components.html` | `书架/frontend-input/preview 2.html`、`bookshelf-cover-mode.html`、`frontend-demo/index.html` 为历史参考。 |
 | 书架链路（Library Flow） | 24 | 8 页 x `preview.html / state-matrix.html / components.html` | 无（None）。 |
-| 阅读链路（Reader Flow） | 34 | 11 页 x `preview.html / state-matrix.html / components.html` | `阅读控制层/frontend-input/preview 2.html` 为历史临时预览。 |
+| 阅读链路（Reader Flow） | 35 | 11 页 x `preview.html / state-matrix.html / components.html` | `阅读控制层/frontend-input/preview 2.html`、`reader-control-layer.html` 为历史参考。 |
 | 设置链路（Settings Flow） | 21 | 7 页 x `preview.html / state-matrix.html / components.html` | 无（None）。 |
 | 公共组件库（Component Library） | 1 | `component-library/preview.html` | 无（None）。 |
+| 共享 Shell Kit（Shared Shell Kit） | 1 | `shared-shell-kit/preview.html` | 无（None）。 |
 | 公共素材库（Asset Library） | 1 | `asset-library/preview.html` | 无（None）。 |
+| 前端 Demo 设计稿（Frontend Demo Draft） | 1 | `frontend-demo-draft/index.html` | 无（None）。 |
 
 ## HTML 文件角色（HTML File Roles）
 
@@ -100,6 +105,16 @@
 - 不作为前端输入件、组件拆分依据或截图验收依据。
 - 后续清理时单独确认是否删除；未确认前只作为历史参考保留。
 
+### 历史独立复刻页（Legacy Standalone Reproduction Page）
+
+文件名（File Name）：`bookshelf-cover-mode.html`、`frontend-demo/index.html`、`reader-control-layer.html`
+
+处理规则（Handling Rule）：
+
+- 不进入 `manifest.json`。
+- 不作为当前阶段的正式前端输入件。
+- 只用于追溯早期本地复刻结果；后续删除或迁移必须单独确认。
+
 ## 相关文档要求（Related Documentation Requirements）
 
 ### 页面 README（Page README）
@@ -146,10 +161,12 @@
 5. 同一页面不得出现多个互相竞争的正式预览页；`preview 2.html` 这类临时文件不得作为输入件。
 6. 共享 shell 已存在时，HTML 必须先加载共享 kit，再加载 fixture 和 renderer。
 7. 页面文档必须说明使用哪个页面框架（Page Shell）和哪些组件类别。
+8. manifest 正式目标集合必须保持 64 个目标：30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标；不得加入 `preview 2.html` 或 `components.html`。
 
 ## 验证要求（Validation Requirements）
 
-- 全量渲染验证（Full Render Validation）：运行 `validate-frontend-inputs.js`，覆盖 manifest 中的 preview、state matrix、component-library preview 和 asset-library preview。
+- 全量渲染验证（Full Render Validation）：运行 `validate-frontend-inputs.js`，覆盖 manifest 中的 preview、state matrix、组件库、共享 Shell Kit、素材库和前端 demo 设计稿。
 - 组件参考烟测（Component Reference Smoke Test）：`validate-frontend-inputs.js` 批量打开 30 个 `components.html`，确认它们是独立 HTML 文档、无 console error、无 failed request、无缺失图片。
 - 文档一致性检查（Documentation Consistency Check）：检查 README、COMPONENT_SPEC、路线图和架构文档是否使用一致的 `中文名称（English Name）`。
 - 例外清单检查（Exception List Check）：确认 `preview 2.html` 不在 manifest 中，也没有被文档标记为正式输入件。
+- Manifest 目标集合检查（Manifest Target Set Check）：运行 `FrontendInputComposeCoverageTest`，确认 manifest 只包含正式页面预览、状态矩阵和公共库/示例目标。

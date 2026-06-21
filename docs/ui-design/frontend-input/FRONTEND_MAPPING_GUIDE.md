@@ -14,18 +14,18 @@
 
 当前大步骤的目标是把 UI 设计图转换成可继续开发的前端设计稿输入件，并建立 Android Compose 输入框架。达到以下程度可判定本阶段完成：
 
-- 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备。
+- 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备；manifest 正式目标必须固定为 30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标。
 - 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接。
 - 状态输入闭合（State Input Closure）：每个正式页面至少有默认态和关键异常/展开态的 HTML 状态矩阵，`COMPONENT_SPEC.md` 状态名和 manifest 状态卡数量必须与 `contracts.d.ts` 对应 State union 一致，并有 Compose preview 或 fixture-driven state 对应。
 - 事件契约闭合（Event Contract Closure）：每个页面 `COMPONENT_SPEC.md` 必须声明前端事件入口，且事件名必须与 `contracts.d.ts` 对应 Event union 一致；后续 Compose 实现按明确回调接入，不从截图倒推交互。
-- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、spec 状态与事件声明、状态名、事件名、manifest preview/state-matrix 目标和状态卡数量、Compose 源码落点和 preview 状态完全一致。
+- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、spec 状态与事件声明、状态名、事件名、manifest 64 个正式目标集合、preview/state-matrix 目标和状态卡数量、Compose 源码落点和 preview 状态完全一致。
 - 后续边界清楚（Remaining Boundary）：真实业务数据、完整事件链路、动效细节和端到端 UI test 属于下一阶段，不阻塞当前“输入件完成”结论。
 
 ## 输入优先级（Source Priority）
 
 | 优先级（Priority） | 文件（File） | 用途（Purpose） |
 | --- | --- | --- |
-| 1 | `docs/ui-design/frontend-input/manifest.json` | 验证目标、viewport、shellName、slots、状态模型和必需文案。 |
+| 1 | `docs/ui-design/frontend-input/manifest.json` | 验证目标、viewport、shellName、slots、状态模型和必需文案；正式目标集合不得包含 `preview 2.html` 或 `components.html`。 |
 | 2 | `docs/ui-design/frontend-input/contracts.d.ts` | 页面数据结构、状态枚举和事件语义。 |
 | 3 | `docs/ui-design/frontend-input/shared-shell-kit/` | 五类 shell 的固定 slot 结构和不应漂移的骨架。 |
 | 4 | 页面 `fixture.json` / `fixture.js` | 页面默认数据、状态矩阵数据和可见文案。 |
@@ -55,7 +55,7 @@
 | 主标签页内容状态（Main Tab Content State） | `bookshelf` 进入 `BookshelfScreen` + `BookshelfHomeUiState`，`discover` 进入 `DiscoverScreen` + `DiscoveryHomeUiState`，`rss` 进入 `RssHomeScreen` + `RssHomeDesignUiState`，`settings` 进入 `SettingsRootScreen` + `SettingsHomeMapper` | 四个主标签页均来自 `MainTabPageKit` 对应输入件 | 书架已补 default/filtering/loading/empty，发现页已补 default/subscription/loading/empty/error/offline，RSS 已补 default/loading/empty/unreadEmpty/error，设置已补 default/loadingOverview/noBackup/permissionNeeded；后续继续接真实业务数据。 |
 | 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 79 个统一语义图标 token；`ReaderIconImportBoundaryTest` 守卫生产 UI 不再直连 Material Icons | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | `ReaderControlBase.onSourceChangeClick` 已进入 `ReaderRoutes.SOURCE_SWITCH`，渲染 `SourceSwitchFlowScreen` | `换源` 是横屏 `FlowShell` | 后续接入真实候选来源与检测结果，继续保持不进入主导航。 |
-| 状态矩阵（State Matrix） | 30 张 UI 设计图和 30 个正式输入包均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
+| 状态矩阵（State Matrix） | 30 张 UI 设计图和 30 个正式输入包均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态，manifest 目标集合锁定为 64 个正式目标 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
 
 ## Shell 到 Compose 映射（Shell to Compose Mapping）
 
@@ -97,7 +97,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页、阅读链路、书架链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；`FrontendInputComposeCoverageTest` 负责守住 30 个正式页面的 spec、manifest、Compose source 和 preview 覆盖。
+7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页、阅读链路、书架链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；`FrontendInputComposeCoverageTest` 负责守住 30 个正式页面的 spec、manifest 64 个正式目标集合、Compose source 和 preview 覆盖。
 
 ## 开发禁用项（Do Not）
 
