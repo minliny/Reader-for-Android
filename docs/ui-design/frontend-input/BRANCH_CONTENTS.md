@@ -23,6 +23,7 @@
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
 | Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、manifest preview/state-matrix 目标、spec 状态声明、Compose 输入源码和 Compose preview 状态一致。 |
+| 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
 
 ## 页面输入包（Page Input Packages）
 
@@ -107,7 +108,7 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
 2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，发现根路由已接入 `DiscoverScreen` + `DiscoveryHomeUiState` + `DiscoveryHomeDisplayState`，RSS 根路由已接入 `RssHomeScreen` + `RssHomeDesignUiState` + `RssHomeDisplayState`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeMapper` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix。
-3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中。
+3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中，并由 `ReaderIconImportBoundaryTest` 守卫。
 4. 预览矩阵扩展（Preview Matrix Expansion）：30 个正式页面的 Compose 输入覆盖已由 `FrontendInputComposeCoverageTest` 守卫；后续扩展重点从“是否有状态输入”转为“真实数据、事件回调和 UI test 是否接入”。
 5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
