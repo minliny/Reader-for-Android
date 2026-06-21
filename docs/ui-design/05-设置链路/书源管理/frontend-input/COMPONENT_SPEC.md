@@ -33,6 +33,21 @@
 - Props：`source`
 - Acceptance：详情必须包含状态、分组和检测入口。
 
+## Events
+
+- `back`：返回设置页。
+- `queryChange(value)`：更新书源搜索关键词。
+- `groupFilterChange(group)`：切换书源分组筛选。
+- `toggleSource(source, enabled)`：启用或停用书源。
+- `detectSource(source)`：检测单个书源。
+- `detectAll`：批量检测当前筛选范围。
+- `openSourceDetail(source)`：打开书源详情面板。
+- `openSourceEdit(source)`：进入编辑表单。
+- `addSource`：新建书源。
+- `saveSource(source)`：保存新增或编辑内容。
+- `openLog(source)`：打开检测日志。
+- `retry`：重试当前错误状态。
+
 ## Acceptance
 
 - 必须覆盖 `书源列表`、`搜索框`、`启用开关`、`检测`、`详情`、`新增`、`编辑`、`错误日志`。

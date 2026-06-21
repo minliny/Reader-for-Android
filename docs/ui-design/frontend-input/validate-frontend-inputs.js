@@ -26,6 +26,27 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function walkFiles(dir, fileName, results = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const absolutePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(absolutePath, fileName, results);
+    } else if (entry.name === fileName) {
+      results.push(absolutePath);
+    }
+  }
+  return results;
+}
+
+function discoverComponentReferencePages(repoRoot) {
+  const uiDesignRoot = path.join(repoRoot, "docs/ui-design");
+  return walkFiles(uiDesignRoot, "components.html")
+    .map((filePath) => path.relative(repoRoot, filePath).split(path.sep).join("/"))
+    .filter((filePath) => filePath.endsWith("/frontend-input/components.html"))
+    .filter((filePath) => !filePath.startsWith("docs/ui-design/frontend-input/"))
+    .sort();
+}
+
 const shellSlots = {
   AssetLibraryShell: ["foundations", "screenAssets", "iconAssets", "bookCoverAssets", "missingSupplements", "usageRules"],
   ComponentLibraryShell: ["foundations", "appShell", "basicControls", "cardsRows", "sheetsPanels", "states"],
@@ -80,6 +101,7 @@ async function validateTarget(browser, repoRoot, target) {
   const failures = [];
   const failedRequests = [];
   const consoleErrors = [];
+  const pageErrors = [];
   validateShellMetadata(target, failures);
   const page = await browser.newPage({
     viewport: target.viewport,
@@ -97,6 +119,10 @@ async function validateTarget(browser, repoRoot, target) {
     if (message.type() === "error") {
       consoleErrors.push(message.text());
     }
+  });
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
   });
 
   const htmlPath = path.join(repoRoot, target.html);
@@ -220,6 +246,7 @@ async function validateTarget(browser, repoRoot, target) {
   assert(actual.requiredTextPresent, "required text was not fully rendered", failures);
   assert(failedRequests.length === 0, `${failedRequests.length} request(s) failed`, failures);
   assert(consoleErrors.length === 0, `${consoleErrors.length} console error(s) found`, failures);
+  assert(pageErrors.length === 0, `${pageErrors.length} page error(s) found`, failures);
 
   if (target.expectedFrame) {
     assert(Boolean(actual.frame), "expected frame was not found", failures);
@@ -335,6 +362,71 @@ async function validateTarget(browser, repoRoot, target) {
     failures,
     failedRequests,
     consoleErrors,
+    pageErrors,
+    actual
+  };
+}
+
+async function validateComponentReferencePage(browser, repoRoot, html) {
+  const failures = [];
+  const failedRequests = [];
+  const consoleErrors = [];
+  const pageErrors = [];
+  const htmlPath = path.join(repoRoot, html);
+  const source = fs.readFileSync(htmlPath, "utf8").trimStart();
+
+  assert(/^<!doctype html>/i.test(source), `${html} is not a standalone HTML document`, failures);
+
+  const page = await browser.newPage({
+    viewport: { width: 1180, height: 1800 },
+    deviceScaleFactor: 1
+  });
+
+  page.on("requestfailed", (request) => {
+    failedRequests.push({
+      url: request.url(),
+      failure: request.failure() ? request.failure().errorText : ""
+    });
+  });
+
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+
+  await page.goto(`file://${htmlPath}`, { waitUntil: "load" });
+  await page.waitForFunction(() => document.body.innerText.trim().length > 0, undefined, { timeout: 5000 }).catch(() => {});
+
+  const actual = await page.evaluate(() => {
+    const images = Array.from(document.images);
+    return {
+      title: document.title,
+      bodyTextLength: document.body.innerText.trim().length,
+      imageCount: images.length,
+      missingImages: images.filter((image) => !image.complete || image.naturalWidth === 0).length
+    };
+  });
+
+  assert(actual.bodyTextLength > 0, `${html} rendered an empty component reference`, failures);
+  assert(failedRequests.length === 0, `${html} has ${failedRequests.length} failed request(s)`, failures);
+  assert(consoleErrors.length === 0, `${html} has ${consoleErrors.length} console error(s)`, failures);
+  assert(pageErrors.length === 0, `${html} has ${pageErrors.length} page error(s)`, failures);
+  assert(actual.missingImages === 0, `${html} has ${actual.missingImages} missing image(s)`, failures);
+
+  await page.close();
+
+  return {
+    html,
+    passed: failures.length === 0,
+    failures,
+    failedRequests,
+    consoleErrors,
+    pageErrors,
     actual
   };
 }
@@ -348,18 +440,35 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const results = [];
+  const componentReferencePages = discoverComponentReferencePages(repoRoot);
+  const componentReferenceResults = [];
   try {
     for (const target of manifest.targets) {
       results.push(await validateTarget(browser, repoRoot, target));
+    }
+    for (const html of componentReferencePages) {
+      componentReferenceResults.push(await validateComponentReferencePage(browser, repoRoot, html));
     }
   } finally {
     await browser.close();
   }
 
+  const componentReferenceSmoke = {
+    expectedCount: 30,
+    actualCount: componentReferencePages.length,
+    passed:
+      componentReferencePages.length === 30 &&
+      componentReferenceResults.every((result) => result.passed),
+    results: componentReferenceResults
+  };
+
   const report = {
     generatedAt: new Date().toISOString(),
     manifest: path.relative(repoRoot, manifestPath),
-    passed: results.every((result) => result.passed),
+    passed:
+      results.every((result) => result.passed) &&
+      componentReferenceSmoke.passed,
+    componentReferenceSmoke,
     results
   };
 

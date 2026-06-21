@@ -59,8 +59,8 @@
 1. 输入件闭环（Input Package Closure）：30 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
 2. 框架闭环（Shell Closure）：所有正式页面只能归入 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell`，且 manifest DOM slot 校验通过。
 3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，核心公共组件通过 `ReaderSharedComponentsStructureTest` 映射到 Compose 实现锚点，新增页面优先复用已有组件。
-4. Compose 输入闭环（Compose Input Closure）：30 张 UI 设计图、30 个输入包和 30 个正式页面都有对应 Kotlin UI state、mapper/fixture 构造点或页面级 preview，且通过 `FrontendInputComposeCoverageTest` 守卫。
-5. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，Compose 侧至少通过覆盖守卫和相关 preview 结构测试。
+4. Compose 输入闭环（Compose Input Closure）：30 张 UI 设计图、30 个输入包和 30 个正式页面都有对应 Kotlin UI state、mapper/fixture 构造点、页面级 preview 和页面事件契约，且通过 `FrontendInputComposeCoverageTest` 守卫。
+5. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，30 个 `components.html` 组件参考页通过独立文档烟测，Compose 侧至少通过覆盖守卫和相关 preview 结构测试。
 6. 留白明确（Explicit Remaining Work）：真实业务数据、完整点击链路、动效细节和端到端 UI test 可以留到下一阶段，但必须在文档中明确为后续工作。
 
 ## 目录归属（Directory Ownership）
