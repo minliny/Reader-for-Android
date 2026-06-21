@@ -31,6 +31,22 @@ class LibraryFlowStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfSortFilterUiState.kt")))
     }
 
+    private val bookshelfEmptyScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfEmptyDesignScreen.kt")))
+    }
+
+    private val bookshelfEmptyStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfEmptyDesignUiState.kt")))
+    }
+
+    private val bookActionSheetScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfActionSheetDesignScreen.kt")))
+    }
+
+    private val bookActionSheetStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfActionSheetDesignUiState.kt")))
+    }
+
     private val groupManagementScreenSource: String by lazy {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfGroupManagementScreen.kt")))
     }
@@ -50,6 +66,12 @@ class LibraryFlowStateMatrixPreviewTest {
     @Test
     fun `library flow compose previews expose search detail directory and sort filter state matrices`() {
         listOf(
+            "LibraryBookshelfEmptyDefaultPreview",
+            "LibraryBookshelfEmptyAllEmptyPreview",
+            "LibraryBookshelfEmptyLoadingPreview",
+            "LibraryBookshelfEmptyErrorPreview",
+            "LibraryBookshelfEmptyOfflinePreview",
+            "LibraryBookshelfEmptyPermissionPreview",
             "LibrarySearchHomePreview",
             "LibrarySearchResultsPreview",
             "LibrarySearchLoadingPreview",
@@ -71,6 +93,10 @@ class LibraryFlowStateMatrixPreviewTest {
             "LibrarySortFilterSelectedPreview",
             "LibrarySortFilterEmptyPreview",
             "LibrarySortFilterErrorPreview",
+            "LibraryBookActionSheetDefaultPreview",
+            "LibraryBookActionSheetDangerPreview",
+            "LibraryBookActionSheetLoadingPreview",
+            "LibraryBookActionSheetErrorPreview",
             "LibraryGroupManagementDefaultPreview",
             "LibraryGroupManagementNewPreview",
             "LibraryGroupManagementRenamePreview",
@@ -92,6 +118,12 @@ class LibraryFlowStateMatrixPreviewTest {
     @Test
     fun `library flow previews use adapter shell and mapper fixture states`() {
         listOf(
+            "BookshelfEmptyDesignMapper.currentGroupEmpty",
+            "BookshelfEmptyDesignMapper.allEmpty",
+            "BookshelfEmptyDesignMapper.loading",
+            "BookshelfEmptyDesignMapper.error",
+            "BookshelfEmptyDesignMapper.offline",
+            "BookshelfEmptyDesignMapper.permission",
             "SearchAdapterShell.searchHome",
             "SearchAdapterShell.searchResults",
             "SearchAdapterShell.searchLoading",
@@ -109,6 +141,10 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookshelfSortFilterMapper.selected",
             "BookshelfSortFilterMapper.empty",
             "BookshelfSortFilterMapper.error",
+            "BookshelfActionSheetMapper.fromFixture",
+            "BookshelfActionSheetMapper.danger",
+            "BookshelfActionSheetMapper.loading",
+            "BookshelfActionSheetMapper.error",
             "BookshelfGroupManagementMapper.fromFixture",
             "BookshelfGroupManagementMapper.newGroup",
             "BookshelfGroupManagementMapper.rename",
@@ -166,6 +202,43 @@ class LibraryFlowStateMatrixPreviewTest {
         }
 
         listOf(
+            "BookshelfEmptyDesignUiState",
+            "BookshelfEmptyGroupRow",
+            "BookshelfEmptyStateHost",
+            "BookshelfEmptyStateCard",
+            "ReaderMainTabBar",
+            "ReaderIconToken.Bookshelf",
+            "ReaderIconToken.Discover",
+            "ReaderIconToken.Rss",
+            "ReaderIconToken.Settings",
+            "ReaderPrimaryButton",
+            "ReaderSecondaryButton",
+            "LibraryShell，书架空状态"
+        ).forEach { token ->
+            assertTrue("BookshelfEmptyDesignScreen must expose frontend input state token $token", token in bookshelfEmptyScreenSource)
+        }
+
+        listOf(
+            "BookshelfEmptyDisplayState.Default",
+            "BookshelfEmptyDisplayState.AllEmpty",
+            "BookshelfEmptyDisplayState.Loading",
+            "BookshelfEmptyDisplayState.Error",
+            "BookshelfEmptyDisplayState.Offline",
+            "BookshelfEmptyDisplayState.Permission",
+            "BookshelfEmptyDesignMapper",
+            "fun allEmpty()",
+            "fun loading()",
+            "fun error()",
+            "fun offline()",
+            "fun permission()",
+            "当前分组没有书籍",
+            "本地导入不是 P0 强制流程",
+            "不提前请求全盘权限"
+        ).forEach { token ->
+            assertTrue("BookshelfEmptyDesignUiState must expose frontend input state token $token", token in bookshelfEmptyStateSource)
+        }
+
+        listOf(
             "BookshelfSortFilterUiState",
             "SortFilterBackdrop",
             "SortFilterBottomSheet",
@@ -192,6 +265,38 @@ class LibraryFlowStateMatrixPreviewTest {
             "BookshelfGroupFilterSort.apply"
         ).forEach { token ->
             assertTrue("BookshelfSortFilterUiState must expose frontend input state token $token", token in sortFilterStateSource)
+        }
+
+        listOf(
+            "BookshelfActionSheetDesignUiState",
+            "BookshelfActionBackdrop",
+            "BookshelfActionBottomSheet",
+            "BookshelfActionConfirmDialog",
+            "BookActionSummary",
+            "BookActionSheetItem",
+            "DialogHost，删除书架记录确认",
+            "BottomSheet，书籍操作底表",
+            "ReaderIconToken.Edit",
+            "ReaderIconToken.Delete"
+        ).forEach { token ->
+            assertTrue("BookshelfActionSheetDesignScreen must expose frontend input state token $token", token in bookActionSheetScreenSource)
+        }
+
+        listOf(
+            "BookshelfActionSheetDisplayState.Default",
+            "BookshelfActionSheetDisplayState.Danger",
+            "BookshelfActionSheetDisplayState.Loading",
+            "BookshelfActionSheetDisplayState.Error",
+            "BookshelfActionSheetMapper",
+            "fun danger()",
+            "fun loading()",
+            "fun error()",
+            "确认移除",
+            "不会删除本地文件或网络来源",
+            "请勿重复点击确认移除",
+            "保留当前书架"
+        ).forEach { token ->
+            assertTrue("BookshelfActionSheetDesignUiState must expose frontend input state token $token", token in bookActionSheetStateSource)
         }
 
         listOf(

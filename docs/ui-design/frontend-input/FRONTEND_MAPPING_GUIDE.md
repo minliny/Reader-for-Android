@@ -44,7 +44,7 @@
 | 主标签页内容状态（Main Tab Content State） | `bookshelf` 进入 `BookshelfScreen`，`discover` 进入 `DiscoverScreen` + `DiscoveryHomeUiState`，`rss` 进入 `RssHomeScreen`，`settings` 进入 `SettingsRootScreen` | 四个主标签页均来自 `MainTabPageKit` 对应输入件 | 发现页已补 default/subscription/loading/empty/error/offline Compose state matrix；后续继续把书架根数据收敛到正式 fixture/state 驱动。 |
 | 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | `ReaderControlBase.onSourceChangeClick` 已进入 `ReaderRoutes.SOURCE_SWITCH`，渲染 `SourceSwitchFlowScreen` | `换源` 是横屏 `FlowShell` | 后续接入真实候选来源与检测结果，继续保持不进入主导航。 |
-| 状态矩阵（State Matrix） | Compose 现有状态覆盖分散在 screen/state 文件 | 每页都有 `state-matrix.html` 和 manifest 状态 | 应转成 Compose previews、UI tests 或 fixture-driven preview states。 |
+| 状态矩阵（State Matrix） | 主标签页、书源管理、设置二级页、阅读链路、FlowShell、书架空状态、书籍搜索、书籍详情、书籍目录、排序筛选、书籍操作底表、分组管理和本地书导入已建立第一批 Compose preview/test 状态 | 每页都有 `state-matrix.html` 和 manifest 状态 | 继续把剩余细节转成 Compose previews、UI tests 或 fixture-driven preview states，并补真实业务数据接入。 |
 
 ## Shell 到 Compose 映射（Shell to Compose Mapping）
 
@@ -84,7 +84,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架搜索/详情/目录/排序筛选/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
+7. 验证覆盖（Validation Coverage）：主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；后续每个页面至少保留默认、加载、空、错误或模块展开态的 Compose preview / UI test / prototype gallery 状态。
 
 ## 开发禁用项（Do Not）
 
