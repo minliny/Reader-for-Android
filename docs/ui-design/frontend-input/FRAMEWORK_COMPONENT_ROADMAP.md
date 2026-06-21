@@ -27,7 +27,7 @@
 | 公共素材库（Asset Library） | 已完成第一版（First Version Completed） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 71 个统一图标 token。 |
 | 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
 | 横向流程框架（FlowShell） | 已完成（Completed） | 换源页面已通过 `ReaderShellKit.renderFlowShell(...)` 输出 `FlowFrame / StepRegion / ComparisonRegion / ResultRegion / StateHost`，并通过 DOM slot 校验。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 个正式页面的 spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态。 |
 
 ## 页面框架（Page Shells）
 
@@ -172,7 +172,7 @@
 1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构。
 2. 主导航差异收敛（Main Navigation Reconciliation）：Android 代码中的主入口已收敛到 `书架 / 发现 / RSS / 设置`；后续变更不得恢复 `书源 / 我的` 作为主 tab。
 3. 图标映射收敛（Icon Mapping Reconciliation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；后续重点是防止页面重新直连 Material Icons，并同步素材库缺源状态。
-4. 状态矩阵落地（State Matrix Implementation）：30 个正式页面已建立第一批 Compose preview/state matrix 输入，并由 `FrontendInputComposeCoverageTest` 守卫 spec、manifest、Compose source 和 preview 覆盖；后续继续把这些状态接入真实导航、真实业务数据和可交互 UI test。
+4. 状态矩阵落地（State Matrix Implementation）：30 张 UI 设计图和 30 个正式输入包已建立第一批 Compose preview/state matrix 输入，并由 `FrontendInputComposeCoverageTest` 守卫输入包、spec、manifest、Compose source 和 preview 覆盖；后续继续把这些状态接入真实导航、真实业务数据和可交互 UI test。
 
 ## 本地 HTML 要求（Local HTML Requirements）
 

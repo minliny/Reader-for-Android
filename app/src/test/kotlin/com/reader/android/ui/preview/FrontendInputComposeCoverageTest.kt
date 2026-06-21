@@ -1,9 +1,12 @@
 package com.reader.android.ui.preview
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.stream.Collectors
 
 class FrontendInputComposeCoverageTest {
 
@@ -42,8 +45,40 @@ class FrontendInputComposeCoverageTest {
         }
     }
 
+    @Test
+    fun `ui design screens have formal frontend input packages`() {
+        val uiDesignRoot = workspacePath("docs/ui-design").toAbsolutePath().normalize()
+        val screenDirs = Files.walk(uiDesignRoot).use { stream ->
+            stream
+                .filter { it.fileName.toString() == "UI设计图.png" }
+                .map { uiDesignRoot.relativize(it.parent).toString().replace('\\', '/') }
+                .sorted()
+                .collect(Collectors.toList())
+        }
+        val coveredScreenDirs = coverageEntries
+            .map { it.specPath.removePrefix("docs/ui-design/").removeSuffix("/frontend-input/COMPONENT_SPEC.md") }
+            .sorted()
+
+        assertEquals("formal UI design screen count", 30, screenDirs.size)
+        assertEquals("coverage entries must match UI design screens", screenDirs, coveredScreenDirs)
+
+        screenDirs.forEach { dir ->
+            requiredInputFiles.forEach { fileName ->
+                assertTrue(
+                    "$dir frontend input package must contain $fileName",
+                    Files.exists(workspacePath("docs/ui-design/$dir/frontend-input/$fileName"))
+                )
+            }
+            assertTrue("$dir preview target must be in manifest", "docs/ui-design/$dir/frontend-input/preview.html" in manifestSource)
+            assertTrue("$dir state matrix target must be in manifest", "docs/ui-design/$dir/frontend-input/state-matrix.html" in manifestSource)
+        }
+    }
+
+    private fun workspacePath(path: String): Path =
+        Paths.get("..").resolve(path)
+
     private fun workspaceSource(path: String): String =
-        String(Files.readAllBytes(Paths.get("..").resolve(path)))
+        String(Files.readAllBytes(workspacePath(path)))
 
     private fun appSource(path: String): String =
         String(Files.readAllBytes(Paths.get(path)))
@@ -54,6 +89,17 @@ class FrontendInputComposeCoverageTest {
         private const val ReaderPreview = "src/main/kotlin/com/reader/android/ui/preview/ReaderShellStateMatrixPreviews.kt"
         private const val ReaderControlPreview = "src/main/kotlin/com/reader/android/ui/preview/ReaderControlStateMatrixPreviews.kt"
         private const val SettingsPreview = "src/main/kotlin/com/reader/android/ui/preview/SettingsSecondaryStateMatrixPreviews.kt"
+
+        private val requiredInputFiles = listOf(
+            "fixture.json",
+            "fixture.js",
+            "render.js",
+            "preview.html",
+            "state-matrix.html",
+            "components.html",
+            "README.md",
+            "COMPONENT_SPEC.md"
+        )
 
         private val coverageEntries = listOf(
             CoverageEntry(
