@@ -2,6 +2,10 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.reader.android.ui.bookshelf.BookshelfActionSheetDesignScreen
+import com.reader.android.ui.bookshelf.BookshelfActionSheetMapper
+import com.reader.android.ui.bookshelf.BookshelfEmptyDesignMapper
+import com.reader.android.ui.bookshelf.BookshelfEmptyDesignScreen
 import com.reader.android.ui.bookshelf.BookshelfGroupManagementMapper
 import com.reader.android.ui.bookshelf.BookshelfGroupManagementScreen
 import com.reader.android.ui.bookshelf.BookshelfLocalImportMapper
@@ -18,6 +22,42 @@ import com.reader.android.ui.toc.TOCScreen
 
 private const val LibraryPreviewWidth = 390
 private const val LibraryPreviewHeight = 844
+
+@Preview(name = "Library Flow / Bookshelf Empty / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyDefaultPreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.currentGroupEmpty())
+}
+
+@Preview(name = "Library Flow / Bookshelf Empty / All Empty", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyAllEmptyPreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.allEmpty())
+}
+
+@Preview(name = "Library Flow / Bookshelf Empty / Loading", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyLoadingPreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.loading())
+}
+
+@Preview(name = "Library Flow / Bookshelf Empty / Error", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyErrorPreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.error())
+}
+
+@Preview(name = "Library Flow / Bookshelf Empty / Offline", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyOfflinePreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.offline())
+}
+
+@Preview(name = "Library Flow / Bookshelf Empty / Permission", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookshelfEmptyPermissionPreview() {
+    BookshelfEmptyDesignScreen(state = BookshelfEmptyDesignMapper.permission())
+}
 
 @Preview(name = "Library Flow / Search / Home", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
 @Composable
@@ -193,6 +233,30 @@ fun LibrarySortFilterEmptyPreview() {
 @Composable
 fun LibrarySortFilterErrorPreview() {
     BookshelfSortFilterScreen(state = BookshelfSortFilterMapper.error())
+}
+
+@Preview(name = "Library Flow / Book Action Sheet / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookActionSheetDefaultPreview() {
+    BookshelfActionSheetDesignScreen(state = BookshelfActionSheetMapper.fromFixture())
+}
+
+@Preview(name = "Library Flow / Book Action Sheet / Danger", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookActionSheetDangerPreview() {
+    BookshelfActionSheetDesignScreen(state = BookshelfActionSheetMapper.danger())
+}
+
+@Preview(name = "Library Flow / Book Action Sheet / Loading", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookActionSheetLoadingPreview() {
+    BookshelfActionSheetDesignScreen(state = BookshelfActionSheetMapper.loading())
+}
+
+@Preview(name = "Library Flow / Book Action Sheet / Error", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
+@Composable
+fun LibraryBookActionSheetErrorPreview() {
+    BookshelfActionSheetDesignScreen(state = BookshelfActionSheetMapper.error())
 }
 
 @Preview(name = "Library Flow / Group Management / Default", widthDp = LibraryPreviewWidth, heightDp = LibraryPreviewHeight, showBackground = true)
