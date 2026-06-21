@@ -43,7 +43,7 @@
       ],
       "expectedDomCount": {
         "selector": ".rl-component-card",
-        "min": 16
+        "min": 49
       },
       "expectedImages": {
         "min": 1,

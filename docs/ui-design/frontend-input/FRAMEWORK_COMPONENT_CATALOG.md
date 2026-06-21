@@ -8,7 +8,7 @@
 - 本地 HTML（Local HTML）：当前共有 99 个本地 HTML；其中 96 个位于 `frontend-input` 范围（90 个正式页面 HTML、2 个历史临时预览页、4 个公共库/示例 HTML），另有 3 个早期独立复刻页；`preview 2.html` 和早期独立复刻页不作为正式输入件。
 - 已有共享 kit（Implemented Shared Kits）：主标签页框架（MainTabShell）、书架链路框架（LibraryShell）、设置页框架（SettingsShell）、阅读器框架（ReaderShell）、横向流程框架（FlowShell）和中心化共享 Shell Kit（Shared Shell Kit）已经可用。
 - 已完成共享 kit（Completed Shared Kits）：阅读器框架（ReaderShell）10 页已接入中心化 `ReaderShellKit`；横向流程框架（FlowShell）1 页已接入中心化 `ReaderShellKit.renderFlowShell(...)`。
-- 组件库状态（Component Library Status）：公共组件库已经覆盖当前 30 个页面需要的基础控件、书籍组件、阅读组件、设置组件、底表面板和状态组件；核心语义名已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
+- 组件库状态（Component Library Status）：公共组件库已经覆盖当前 30 个页面需要的基础控件、书籍组件、阅读组件、设置组件、底表面板和状态组件；49 个组件卡和 fixture/manifest/report 同步由 `FrontendInputComponentLibraryInventoryTest` 守卫，核心语义名已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
 - 素材库状态（Asset Library Status）：公共素材库已经登记 30 张 UI 设计图、6 张书籍封面和 79 个统一图标 token，并由 `FrontendInputAssetLibraryInventoryTest` 守住 fixture、图标注册表、manifest 和验证报告同步。
 
 ## 输入件规模（Input Scale）
@@ -45,7 +45,7 @@
 | 书架链路共享 kit（Library Shared Kit） | `docs/ui-design/03-书架链路/shared-library-kit/kit.js`、`kit.css` | 输出书架栈画布、返回顶栏、内容区、底部操作宿主、底表宿主、弹窗宿主和状态宿主。 | 已覆盖 8 个书架链路页面（In Use Across 8 Pages） |
 | 设置页共享 kit（Settings Shared Kit） | `docs/ui-design/05-设置链路/shared-settings-kit/kit.js`、`kit.css` | 输出设置页返回顶栏、设置内容、分组、底表、弹窗、toast 和状态矩阵。 | 已使用（In Use） |
 | 中心化共享 Shell Kit（Shared Shell Kit） | `docs/ui-design/frontend-input/shared-shell-kit/kit.js`、`kit.css` | 输出 MainTabShell、LibraryShell、ReaderShell、SettingsShell、FlowShell 的公共槽位结构。 | ReaderShell 10 页和 FlowShell 1 页已使用（In Use For 10 Reader Pages and 1 Flow Page） |
-| 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/render.js`、`library.css`、`fixture.json` | 展示和约束跨页面组件、状态、底表、卡片、行和交互规则。 | 已使用（In Use） |
+| 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/render.js`、`library.css`、`fixture.json` | 展示和约束跨页面组件、状态、底表、卡片、行和交互规则。 | 已使用并由库存守卫校验（In Use and Inventory Guarded） |
 | 公共素材库（Asset Library） | `docs/ui-design/frontend-input/asset-library/icons.js`、`render.js`、`fixture.json`、`asset-library.css` | 登记 UI 设计图、封面资源、图标 token 和补齐图标。 | 已使用（In Use） |
 | 全局设计 token（Global Design Tokens） | `docs/ui-design/frontend-input/tokens.css` | 颜色、字体、圆角、阴影、focus 和跨页面基础变量。 | 已使用（In Use） |
 | 前端输入契约（Frontend Input Contracts） | `docs/ui-design/frontend-input/contracts.d.ts` | 定义数据、状态和事件契约。 | 已使用（In Use） |

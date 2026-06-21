@@ -11,6 +11,9 @@
 - `COMPONENT_LIBRARY.md`：组件规格、复用边界和缺口。
 - `CONVERSION_PRIORITY.md`：后续 UI 设计图转前端设计稿的页面顺序。
 
+验证：
+- `FrontendInputComponentLibraryInventoryTest` 守住 49 个组件卡、6 个公共组件库 section、17 个 fixture 图标 token、manifest 目标和验证报告同步。
+
 使用规则：
 - 新页面转换时，先查 `COMPONENT_LIBRARY.md`。
 - 命中已有组件时必须复用 `rl-` 公共组件语义。
