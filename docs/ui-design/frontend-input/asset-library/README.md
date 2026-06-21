@@ -24,3 +24,4 @@
 - 新增图标必须先进入素材库，再进入页面 renderer。
 - UI 设计图作为源图引用；验证截图作为验收证据引用；二者不得混用。
 - `preview.html` 是正式前端输入件，必须进入 manifest。
+- 素材库变更后必须运行 `FrontendInputAssetLibraryInventoryTest`，确认 fixture、图标注册表、实际文件、manifest 和验证报告仍一致。
