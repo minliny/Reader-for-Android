@@ -47,13 +47,15 @@ interface BookmarkRowInput {
 
 - `back`
 - `sourceChange`
-- `segmentChange`
-- `chapterJump`
-- `bookmarkJump`
+- `moreOpen`
+- `tabChange`
 - `searchChange`
-- `moreMenuOpen`
-- `cacheCurrentVolume`
-- `filterUnread`
+- `openFullDirectory`
+- `openChapter`
+- `openBookmark`
+- `moreAction`
+- `moduleChange`
+- `brightnessChange`
 - `retry`
 
 ## Acceptance
