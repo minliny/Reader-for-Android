@@ -17,7 +17,7 @@
 - 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备。
 - 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接。
 - 状态输入闭合（State Input Closure）：每个正式页面至少有默认态和关键异常/展开态的 HTML 状态矩阵，并有 Compose preview 或 fixture-driven state 对应。
-- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 个正式页面都有 spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态。
+- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、spec 状态声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态完全一致。
 - 后续边界清楚（Remaining Boundary）：真实业务数据、完整事件链路、动效细节和端到端 UI test 属于下一阶段，不阻塞当前“输入件完成”结论。
 
 ## 输入优先级（Source Priority）
@@ -54,7 +54,7 @@
 | 主标签页内容状态（Main Tab Content State） | `bookshelf` 进入 `BookshelfScreen` + `BookshelfHomeUiState`，`discover` 进入 `DiscoverScreen` + `DiscoveryHomeUiState`，`rss` 进入 `RssHomeScreen` + `RssHomeDesignUiState`，`settings` 进入 `SettingsRootScreen` + `SettingsHomeMapper` | 四个主标签页均来自 `MainTabPageKit` 对应输入件 | 书架已补 default/filtering/loading/empty，发现页已补 default/subscription/loading/empty/error/offline，RSS 已补 default/loading/empty/unreadEmpty/error，设置已补 default/loadingOverview/noBackup/permissionNeeded；后续继续接真实业务数据。 |
 | 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | `ReaderControlBase.onSourceChangeClick` 已进入 `ReaderRoutes.SOURCE_SWITCH`，渲染 `SourceSwitchFlowScreen` | `换源` 是横屏 `FlowShell` | 后续接入真实候选来源与检测结果，继续保持不进入主导航。 |
-| 状态矩阵（State Matrix） | 30 个正式页面均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
+| 状态矩阵（State Matrix） | 30 张 UI 设计图和 30 个正式输入包均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
 
 ## Shell 到 Compose 映射（Shell to Compose Mapping）
 
