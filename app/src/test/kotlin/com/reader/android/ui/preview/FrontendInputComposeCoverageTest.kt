@@ -19,8 +19,17 @@ class FrontendInputComposeCoverageTest {
         val previewTokens: List<String>
     )
 
+    private data class ContractEntry(
+        val specPath: String,
+        val typeName: String
+    )
+
     private val manifestSource: String by lazy {
         workspaceSource("docs/ui-design/frontend-input/manifest.json")
+    }
+
+    private val contractsSource: String by lazy {
+        workspaceSource("docs/ui-design/frontend-input/contracts.d.ts")
     }
 
     @Test
@@ -43,6 +52,28 @@ class FrontendInputComposeCoverageTest {
             entry.previewTokens.forEach { token ->
                 assertTrue("${entry.name} preview source must contain $token", token in previewSource)
             }
+        }
+    }
+
+    @Test
+    fun `formal frontend input pages have global data state event contracts`() {
+        val coverageSpecPaths = coverageEntries.map { it.specPath }.sorted()
+        val contractSpecPaths = contractEntries.map { it.specPath }.sorted()
+        assertEquals("contract entries must match coverage entries", coverageSpecPaths, contractSpecPaths)
+
+        contractEntries.forEach { entry ->
+            assertTrue(
+                "${entry.specPath} must declare ${entry.typeName}Fixture",
+                "interface ${entry.typeName}Fixture" in contractsSource
+            )
+            assertTrue(
+                "${entry.specPath} must declare ${entry.typeName}State",
+                "type ${entry.typeName}State" in contractsSource
+            )
+            assertTrue(
+                "${entry.specPath} must declare ${entry.typeName}Event",
+                "type ${entry.typeName}Event" in contractsSource
+            )
         }
     }
 
@@ -112,6 +143,129 @@ class FrontendInputComposeCoverageTest {
             "components.html",
             "README.md",
             "COMPONENT_SPEC.md"
+        )
+
+        private val contractEntries = listOf(
+            ContractEntry(
+                specPath = "docs/ui-design/02-主标签页/书架/frontend-input/COMPONENT_SPEC.md",
+                typeName = "Bookshelf"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/02-主标签页/发现/frontend-input/COMPONENT_SPEC.md",
+                typeName = "DiscoveryHome"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/02-主标签页/RSS/frontend-input/COMPONENT_SPEC.md",
+                typeName = "RssHome"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/02-主标签页/设置/frontend-input/COMPONENT_SPEC.md",
+                typeName = "SettingsHome"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/书架空状态/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookshelfEmpty"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/书籍搜索/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookSearch"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/书籍详情/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookDetail"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/书籍目录/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookDirectory"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/排序与筛选/frontend-input/COMPONENT_SPEC.md",
+                typeName = "SortFilter"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/书籍操作底表/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookActionSheet"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/分组管理/frontend-input/COMPONENT_SPEC.md",
+                typeName = "GroupManagement"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/03-书架链路/本地书导入/frontend-input/COMPONENT_SPEC.md",
+                typeName = "LocalImport"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReaderControl"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/阅读入口/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReadingEntry"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/沉浸阅读/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ImmersiveReading"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/目录与书签/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReadingTocBookmark"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/阅读外观/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReadingAppearance"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/朗读/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReadingAloud"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/阅读设置/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ReadingSettings"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/自动翻页/frontend-input/COMPONENT_SPEC.md",
+                typeName = "AutoPage"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/内容搜索/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ContentSearch"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/内容替换/frontend-input/COMPONENT_SPEC.md",
+                typeName = "ContentReplacement"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/04-阅读链路/换源/frontend-input/COMPONENT_SPEC.md",
+                typeName = "SourceSwitch"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/App通用设置/frontend-input/COMPONENT_SPEC.md",
+                typeName = "GeneralSettings"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/书架与搜索设置/frontend-input/COMPONENT_SPEC.md",
+                typeName = "BookshelfSearchSettings"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/隐私与权限/frontend-input/COMPONENT_SPEC.md",
+                typeName = "PrivacyPermissions"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/缓存管理/frontend-input/COMPONENT_SPEC.md",
+                typeName = "CacheManagement"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/关于与反馈/frontend-input/COMPONENT_SPEC.md",
+                typeName = "AboutFeedback"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/同步与备份/frontend-input/COMPONENT_SPEC.md",
+                typeName = "SyncBackup"
+            ),
+            ContractEntry(
+                specPath = "docs/ui-design/05-设置链路/书源管理/frontend-input/COMPONENT_SPEC.md",
+                typeName = "SourceManagement"
+            )
         )
 
         private val coverageEntries = listOf(

@@ -1039,6 +1039,76 @@ export type AboutFeedbackState = "default" | "loading" | "error" | "confirm" | "
 export type SyncBackupState = "default" | "confirm" | "loading" | "empty" | "error" | "offline" | "permission";
 export type SourceManagementState = "default" | "edit" | "log" | "loading" | "empty" | "error" | "offline" | "permission";
 
+export type BookshelfSearchSettingsEvent =
+  | { type: "back" }
+  | { type: "layoutChange"; value: string }
+  | { type: "columnCountChange"; value: number }
+  | { type: "selectOpen"; key: string }
+  | { type: "selectOption"; key: string; value: string }
+  | { type: "switchChange"; key: string; enabled: boolean }
+  | { type: "clearHistoryOpen" }
+  | { type: "clearHistoryConfirm" }
+  | { type: "retry" }
+  | { type: "openSystemSettings" };
+
+export type PrivacyPermissionsEvent =
+  | { type: "back" }
+  | { type: "openSystemSettings"; permission: string }
+  | { type: "togglePrivacyOption"; key: string; enabled: boolean }
+  | { type: "openPrivacyPolicy" }
+  | { type: "clearPrivacyDataOpen" }
+  | { type: "clearPrivacyDataCancel" }
+  | { type: "clearPrivacyDataConfirm" }
+  | { type: "retry" };
+
+export type CacheManagementEvent =
+  | { type: "back" }
+  | { type: "calculateCache" }
+  | { type: "openCleanupConfirm"; category: string }
+  | { type: "cleanupCancel" }
+  | { type: "cleanupConfirm"; category: string }
+  | { type: "toggleCacheStrategy"; key: string; enabled: boolean }
+  | { type: "openCacheLocation" }
+  | { type: "retry" };
+
+export type AboutFeedbackEvent =
+  | { type: "back" }
+  | { type: "checkUpdate" }
+  | { type: "openFeedback" }
+  | { type: "openSuggestion" }
+  | { type: "openLicense" }
+  | { type: "openPrivacyPolicy" }
+  | { type: "openHelp" }
+  | { type: "retry" };
+
+export type SyncBackupEvent =
+  | { type: "back" }
+  | { type: "selectBackupLocation" }
+  | { type: "runBackupNow" }
+  | { type: "exportBackup" }
+  | { type: "restoreBackup"; record: SyncBackupFixture["records"][number] }
+  | { type: "restoreCancel" }
+  | { type: "restoreConfirm"; record: SyncBackupFixture["records"][number] }
+  | { type: "toggleAutoBackup"; enabled: boolean }
+  | { type: "openWebDavSettings" }
+  | { type: "resolveConflict"; choice: string }
+  | { type: "retry" }
+  | { type: "grantPermission" };
+
+export type SourceManagementEvent =
+  | { type: "back" }
+  | { type: "queryChange"; value: string }
+  | { type: "groupFilterChange"; group: string }
+  | { type: "toggleSource"; source: SourceManagementFixture["sources"][number]; enabled: boolean }
+  | { type: "detectSource"; source: SourceManagementFixture["sources"][number] }
+  | { type: "detectAll" }
+  | { type: "openSourceDetail"; source: SourceManagementFixture["sources"][number] }
+  | { type: "openSourceEdit"; source: SourceManagementFixture["sources"][number] }
+  | { type: "addSource" }
+  | { type: "saveSource"; source: SourceManagementFixture["sources"][number] }
+  | { type: "openLog"; source: SourceManagementFixture["sources"][number] }
+  | { type: "retry" };
+
 export type SettingsTone = "blue" | "orange" | "green" | "purple";
 
 export interface SettingsOverviewItemInput {
