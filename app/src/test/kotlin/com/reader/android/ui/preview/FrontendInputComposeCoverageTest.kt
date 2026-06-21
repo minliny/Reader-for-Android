@@ -24,6 +24,18 @@ class FrontendInputComposeCoverageTest {
         val typeName: String
     )
 
+    private data class ManifestTarget(
+        val html: String,
+        val shellName: String,
+        val pageRole: String,
+        val slots: List<String>
+    )
+
+    private data class ShellContract(
+        val pageRole: String,
+        val slots: List<String>
+    )
+
     private val manifestSource: String by lazy {
         workspaceSource("docs/ui-design/frontend-input/manifest.json")
     }
@@ -176,6 +188,36 @@ class FrontendInputComposeCoverageTest {
         assertTrue(
             "manifest must not include component reference pages",
             manifestTargets.none { it.endsWith("/frontend-input/components.html") }
+        )
+    }
+
+    @Test
+    fun `manifest shell metadata matches formal shell taxonomy`() {
+        val targets = manifestTargets()
+        assertEquals("manifest metadata target count", 64, targets.size)
+
+        targets.forEach { target ->
+            assertTrue(
+                "${target.html} shellName must be a formal shell",
+                target.shellName in shellContracts
+            )
+            val contract = shellContracts.getValue(target.shellName)
+            assertEquals("${target.html} pageRole must match ${target.shellName}", contract.pageRole, target.pageRole)
+            assertEquals("${target.html} slots must match ${target.shellName}", contract.slots, target.slots)
+        }
+
+        assertEquals(
+            "manifest shell target counts",
+            mapOf(
+                "ComponentLibraryShell" to 3,
+                "AssetLibraryShell" to 1,
+                "MainTabShell" to 8,
+                "LibraryShell" to 16,
+                "ReaderShell" to 20,
+                "FlowShell" to 2,
+                "SettingsShell" to 14
+            ),
+            targets.groupingBy { it.shellName }.eachCount()
         )
     }
 
@@ -338,6 +380,48 @@ class FrontendInputComposeCoverageTest {
             .toList()
     }
 
+    private fun manifestTargets(): List<ManifestTarget> {
+        return manifestTargetSections().map { section ->
+            ManifestTarget(
+                html = manifestField(section, "html"),
+                shellName = manifestField(section, "shellName"),
+                pageRole = manifestField(section, "pageRole"),
+                slots = manifestSlots(section)
+            )
+        }
+    }
+
+    private fun manifestTargetSections(): List<String> {
+        val targetsStart = manifestSource.indexOf(""""targets"""")
+        assertTrue("manifest must contain targets", targetsStart >= 0)
+
+        return Regex("""(?ms)\n    \{\n      "name":.*?(?=\n    \{\n      "name":|\n  \]\n\})""")
+            .findAll(manifestSource.substring(targetsStart))
+            .map { it.value }
+            .toList()
+    }
+
+    private fun manifestField(section: String, fieldName: String): String {
+        return Regex(""""${Regex.escape(fieldName)}"\s*:\s*"([^"]+)"""")
+            .find(section)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+    }
+
+    private fun manifestSlots(section: String): List<String> {
+        val slotsSource = Regex("""(?ms)"slots"\s*:\s*\[(.*?)\]""")
+            .find(section)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+
+        return Regex(""""([^"]+)"""")
+            .findAll(slotsSource)
+            .map { it.groupValues[1] }
+            .toList()
+    }
+
     private companion object {
         private const val MainTabPreview = "src/main/kotlin/com/reader/android/ui/preview/MainTabStateMatrixPreviews.kt"
         private const val LibraryPreview = "src/main/kotlin/com/reader/android/ui/preview/LibraryFlowStateMatrixPreviews.kt"
@@ -354,6 +438,37 @@ class FrontendInputComposeCoverageTest {
             "components.html",
             "README.md",
             "COMPONENT_SPEC.md"
+        )
+
+        private val shellContracts = mapOf(
+            "ComponentLibraryShell" to ShellContract(
+                pageRole = "component-library",
+                slots = listOf("foundations", "appShell", "basicControls", "cardsRows", "sheetsPanels", "states")
+            ),
+            "AssetLibraryShell" to ShellContract(
+                pageRole = "asset-library",
+                slots = listOf("foundations", "screenAssets", "iconAssets", "bookCoverAssets", "missingSupplements", "usageRules")
+            ),
+            "MainTabShell" to ShellContract(
+                pageRole = "main-tab-root",
+                slots = listOf("appFrame", "statusBar", "appTopBar", "contentRegion", "mainNav", "stateHost")
+            ),
+            "LibraryShell" to ShellContract(
+                pageRole = "library-stack",
+                slots = listOf("stackFrame", "backTopBar", "contentRegion", "bottomActionHost", "sheetHost", "dialogHost", "stateHost")
+            ),
+            "ReaderShell" to ShellContract(
+                pageRole = "reader-flow",
+                slots = listOf("readerFrame", "readingSurface", "readerOverlayHost", "readerModuleNav", "bottomSheetHost", "readerStateHost")
+            ),
+            "FlowShell" to ShellContract(
+                pageRole = "landscape-flow",
+                slots = listOf("flowFrame", "stepRegion", "comparisonRegion", "resultRegion", "stateHost")
+            ),
+            "SettingsShell" to ShellContract(
+                pageRole = "settings-stack",
+                slots = listOf("settingsFrame", "backTopBar", "settingsContent", "settingSection", "toastHost", "dialogHost", "settingsStateHost")
+            )
         )
 
         private val contractEntries = listOf(
