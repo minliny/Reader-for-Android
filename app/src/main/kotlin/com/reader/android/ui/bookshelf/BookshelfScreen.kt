@@ -34,11 +34,34 @@ fun BookshelfScreen(
     onSearchClick: () -> Unit = {},
     uiState: ReaderUiState? = null,
     bookshelfState: BookshelfUiState = BookshelfMapper.empty(),
+    bookshelfHomeState: BookshelfHomeUiState? = null,
     onLayoutModeChange: (BookshelfLayoutMode) -> Unit = {},
     onBookClick: (BookshelfBookUiModel) -> Unit = {},
-    onBookMoreClick: (BookshelfBookUiModel) -> Unit = {}
+    onBookMoreClick: (BookshelfBookUiModel) -> Unit = {},
+    onHomeGroupChange: (BookshelfHomeGroupUiModel) -> Unit = {},
+    onHomeBookOpen: (BookshelfHomeBookUiModel) -> Unit = {},
+    onHomeRead: (BookshelfHomeBookUiModel) -> Unit = {},
+    onSortFilterClick: () -> Unit = {},
+    onBookshelfSettingsClick: () -> Unit = {},
+    onRefreshUpdates: () -> Unit = {},
+    onImportLocal: () -> Unit = {}
 ) {
     ReaderTheme {
+        if (bookshelfHomeState != null) {
+            BookshelfHomeDesignContent(
+                state = bookshelfHomeState,
+                onSearchClick = onSearchClick,
+                onMoreClick = {},
+                onGroupChange = onHomeGroupChange,
+                onRead = onHomeRead,
+                onSortFilter = onSortFilterClick,
+                onBookshelfSettings = onBookshelfSettingsClick,
+                onOpenBook = onHomeBookOpen,
+                onRefreshUpdates = onRefreshUpdates,
+                onImportLocal = onImportLocal
+            )
+            return@ReaderTheme
+        }
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 ReaderAppTopBar(
