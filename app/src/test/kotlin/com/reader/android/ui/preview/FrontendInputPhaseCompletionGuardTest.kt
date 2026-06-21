@@ -26,6 +26,10 @@ class FrontendInputPhaseCompletionGuardTest {
         workspaceSource("docs/ui-design/frontend-input-design-draft-validation.json")
     }
 
+    private val eventCallbackMappingSource: String by lazy {
+        workspaceSource("docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md")
+    }
+
     @Test
     fun `phase completion summary stays backed by current manifest and validation report`() {
         val screenCount = formalScreenDirs().size
@@ -90,10 +94,42 @@ class FrontendInputPhaseCompletionGuardTest {
             "component library inventory",
             "FlowShell inventory",
             "phase completion summary",
+            "event callback mapping",
             "runtime shell anchors",
             "icon token/import boundary"
         ).forEach { scopeToken ->
             assertTrue("branch guard scope must mention $scopeToken", scopeToken in branchContents)
+        }
+    }
+
+    @Test
+    fun `event callback mapping stays listed as a protected handoff input`() {
+        val rows = eventCallbackRows()
+        val eventCount = rows.sumOf { markdownCodeValues(it.cells[1]).size }
+        val callbackCount = rows.sumOf { markdownCodeValues(it.cells[2]).size }
+
+        assertEquals("event callback mapping must cover every formal page", 30, rows.size)
+        assertEquals("event callback mapping event count", 281, eventCount)
+        assertEquals("event callback mapping callback count", eventCount, callbackCount)
+
+        listOf(
+            "事件回调映射（Event Callback Mapping）",
+            "`docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md`",
+            "281 个事件",
+            "`EVENT_CALLBACK_MAPPING.md` | 页面事件到 Android Compose 回调名的映射表",
+            "event callback mapping",
+            "完整事件链路接入（Full Event Wiring）",
+            "把 `EVENT_CALLBACK_MAPPING.md` 的回调接入 ViewModel、副作用、导航和持久化"
+        ).forEach { token ->
+            assertTrue("branch contents must keep event callback handoff token $token", token in branchContents)
+        }
+
+        listOf(
+            "`docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md`",
+            "页面事件到 Compose 回调名的映射",
+            "按 `EVENT_CALLBACK_MAPPING.md` 转成"
+        ).forEach { token ->
+            assertTrue("mapping guide must keep event callback source token $token", token in mappingGuide)
         }
     }
 
@@ -181,4 +217,27 @@ class FrontendInputPhaseCompletionGuardTest {
             ?.get(1)
             ?.toInt()
             ?: error("Missing numeric token in $token")
+
+    private fun eventCallbackRows(): List<EventCallbackRow> =
+        eventCallbackMappingSource.lines()
+            .filter { it.startsWith("| ") && it.contains("<br>`") }
+            .map { line ->
+                EventCallbackRow(
+                    cells = line.trim()
+                        .removePrefix("|")
+                        .removeSuffix("|")
+                        .split("|")
+                        .map { it.trim() }
+                )
+            }
+
+    private fun markdownCodeValues(source: String): List<String> =
+        Regex("""`([^`]+)`""")
+            .findAll(source)
+            .map { it.groupValues[1] }
+            .toList()
+
+    private data class EventCallbackRow(
+        val cells: List<String>
+    )
 }
