@@ -62,6 +62,12 @@ class FrontendInputComposeCoverageTest {
         assertEquals("contract entries must match coverage entries", coverageSpecPaths, contractSpecPaths)
 
         contractEntries.forEach { entry ->
+            val spec = workspaceSource(entry.specPath)
+            val specEvents = eventContractLines(spec)
+                .map { eventName(it) }
+                .sorted()
+            val contractEvents = contractEventNames(entry.typeName).sorted()
+
             assertTrue(
                 "${entry.specPath} must declare ${entry.typeName}Fixture",
                 "interface ${entry.typeName}Fixture" in contractsSource
@@ -73,6 +79,11 @@ class FrontendInputComposeCoverageTest {
             assertTrue(
                 "${entry.specPath} must declare ${entry.typeName}Event",
                 "type ${entry.typeName}Event" in contractsSource
+            )
+            assertEquals(
+                "${entry.specPath} events must match ${entry.typeName}Event",
+                specEvents,
+                contractEvents
             )
         }
     }
@@ -125,6 +136,28 @@ class FrontendInputComposeCoverageTest {
         return section.lines()
             .map { it.trim() }
             .filter { it.startsWith("- `") }
+    }
+
+    private fun eventName(line: String): String {
+        val raw = Regex("""`([^`]+)`""")
+            .find(line)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+        return raw.substringBefore("(")
+    }
+
+    private fun contractEventNames(typeName: String): List<String> {
+        val section = Regex("""(?ms)^export type ${Regex.escape(typeName)}Event\s*=\s*(.*?)(?=^export |\z)""")
+            .find(contractsSource)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+
+        return Regex("""type:\s*"([^"]+)"""")
+            .findAll(section)
+            .map { it.groupValues[1] }
+            .toList()
     }
 
     private companion object {

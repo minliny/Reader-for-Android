@@ -17,8 +17,8 @@
 - 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备。
 - 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接。
 - 状态输入闭合（State Input Closure）：每个正式页面至少有默认态和关键异常/展开态的 HTML 状态矩阵，并有 Compose preview 或 fixture-driven state 对应。
-- 事件契约闭合（Event Contract Closure）：每个页面 `COMPONENT_SPEC.md` 必须声明前端事件入口，`contracts.d.ts` 必须提供对应 Fixture/State/Event，后续 Compose 实现按明确回调接入，不从截图倒推交互。
-- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、spec 状态与事件声明、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态完全一致。
+- 事件契约闭合（Event Contract Closure）：每个页面 `COMPONENT_SPEC.md` 必须声明前端事件入口，且事件名必须与 `contracts.d.ts` 对应 Event union 一致；后续 Compose 实现按明确回调接入，不从截图倒推交互。
+- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、spec 状态与事件声明、事件名、manifest preview/state-matrix 目标、Compose 源码落点和 preview 状态完全一致。
 - 后续边界清楚（Remaining Boundary）：真实业务数据、完整事件链路、动效细节和端到端 UI test 属于下一阶段，不阻塞当前“输入件完成”结论。
 
 ## 输入优先级（Source Priority）
