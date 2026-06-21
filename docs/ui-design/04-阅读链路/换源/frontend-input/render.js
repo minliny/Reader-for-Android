@@ -164,6 +164,30 @@
       </section>`;
   }
 
+  function flowStateHost(data, key) {
+    const labels = {
+      flow: "4 步横向换源流程",
+      sheet: "默认候选源",
+      loading: "来源加载中",
+      empty: "无可用来源",
+      error: "检测失败",
+      offline: "网络不可用",
+      permission: "等待网络权限"
+    };
+    const reader = data.reader || {};
+    const sheet = data.sheet || {};
+    const sourceCount = (data.sources || []).length;
+    const filterCount = (sheet.filters || []).length;
+    return `
+      <aside class="sw-flow-status-strip is-${esc(key)}" aria-label="FlowShell 状态容器">
+        <strong>FlowShell StateHost</strong>
+        <span><em>${esc(labels[key] || "换源状态")}</em></span>
+        <span>${esc(sourceCount)} 个来源 · ${esc(filterCount)} 个筛选</span>
+        <span>${esc(reader.currentSource)} → ${esc(reader.switchedSource || reader.currentSource)}</span>
+        <span>阅读位置已保留</span>
+      </aside>`;
+  }
+
   function phone(data, mode) {
     const source = mode === "success" ? (data.reader || {}).switchedSource : (data.reader || {}).currentSource;
     return `
@@ -210,7 +234,7 @@
       resultHtml: `
         ${flowArrow()}
         ${flowStep(data, "success", "4. 切换成功，回到阅读页")}`,
-      stateHostHtml: ""
+      stateHostHtml: flowStateHost(data, "flow")
     });
   }
 
@@ -252,7 +276,7 @@
                     stepHtml: "",
                     comparisonHtml: phone(data, state.key),
                     resultHtml: "",
-                    stateHostHtml: ""
+                    stateHostHtml: flowStateHost(data, state.key)
                   })}
                 </div>
               </div>

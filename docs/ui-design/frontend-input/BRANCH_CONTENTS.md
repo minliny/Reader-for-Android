@@ -26,6 +26,7 @@
 | HTML 库存守卫（HTML Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputHtmlInventoryTest.kt` | 确认 99 个本地 HTML、96 个 `frontend-input` 范围 HTML、30 个正式预览页、30 个状态矩阵、30 个组件参考页、2 个历史 `preview 2.html`、4 个公共库/示例页和 3 个历史独立复刻页分类一致，并确认 manifest 不接收历史/参考页。 |
 | 素材库库存守卫（Asset Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputAssetLibraryInventoryTest.kt` | 确认素材库 `fixture.json`、`fixture.js`、`icons.js`、实际 UI 图/封面文件、manifest 和验证报告中的 30 张 UI 图、6 张封面、79 个图标 token、25 个补齐图标和 60 张验证截图登记一致。 |
 | 组件库库存守卫（Component Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComponentLibraryInventoryTest.kt` | 确认公共组件库 `render.js`、`fixture.json`、`fixture.js`、manifest 和验证报告中的 49 个组件卡、6 个 section、17 个 fixture 图标 token 与素材库登记一致。 |
+| FlowShell 库存守卫（FlowShell Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputFlowShellInventoryTest.kt` | 确认换源输入包、`ReaderShellKit.renderFlowShell(...)`、非空 `FlowShell StateHost`、manifest、验证报告、文档和 Compose preview 锚点同步。 |
 | Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、事件到 Compose 回调映射、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
 | 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，并守住 manifest 中 `MainTabShell`、`LibraryShell`、`ReaderShell`、`FlowShell`、`SettingsShell` 到 Compose 骨架、slot 和 preview 的追溯关系。 |
 | 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
@@ -52,7 +53,7 @@
 | `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补书架、发现、RSS、设置四个主标签页状态矩阵，并由组件映射守卫追溯到 `ReaderMainTabShell` / `ReaderMainTabBar`。 |
 | `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验，并由组件映射守卫追溯到返回顶栏、底部导航、状态宿主和书架链路 preview。 |
 | `ReaderShell` | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验，并由组件映射守卫追溯到阅读正文、覆盖层、底表、模块导航和阅读状态宿主。 |
-| `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验，并由组件映射守卫追溯到换源 Compose 横向流程。 |
+| `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验，`FlowShell StateHost` 已固化为非空状态摘要，并由 FlowShell 库存守卫和组件映射守卫追溯到换源 Compose 横向流程。 |
 | `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验，并由组件映射守卫追溯到设置内容区、底表、弹窗和状态宿主。 |
 
 ## 阶段完成口径（Phase Done Criteria）
@@ -111,6 +112,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
   --tests com.reader.android.ui.preview.FrontendInputHtmlInventoryTest \
   --tests com.reader.android.ui.preview.FrontendInputAssetLibraryInventoryTest \
   --tests com.reader.android.ui.preview.FrontendInputComponentLibraryInventoryTest \
+  --tests com.reader.android.ui.preview.FrontendInputFlowShellInventoryTest \
   --tests com.reader.android.ui.components.ReaderSharedComponentsStructureTest \
   --tests com.reader.android.ui.components.ReaderIconTokenMappingTest \
   --tests com.reader.android.ui.components.ReaderIconImportBoundaryTest \

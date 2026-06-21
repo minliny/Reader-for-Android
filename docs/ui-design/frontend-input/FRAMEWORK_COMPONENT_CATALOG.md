@@ -34,7 +34,7 @@
 | 主标签页框架（MainTabShell） | 8 | 书架、发现、RSS、设置（Bookshelf, Discover, RSS, Settings） | `appFrame`、`statusBar`、`appTopBar`、`contentRegion`、`mainNav`、`stateHost` | 已完成共享 kit（Shared Kit Implemented） |
 | 书架链路框架（LibraryShell） | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入（Library empty, book search, book detail, directory, sort/filter, action sheet, group management, local import） | `stackFrame`、`backTopBar`、`contentRegion`、`bottomActionHost`、`sheetHost`、`dialogHost`、`stateHost` | 已完成共享 kit（Shared Kit Implemented） |
 | 阅读器框架（ReaderShell） | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读（Reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, in-book search, replacement, entry, immersive reading） | `readerFrame`、`readingSurface`、`readerOverlayHost`、`readerModuleNav`、`bottomSheetHost`、`readerStateHost` | 10 页已接入中心化 kit（10 Pages In Shared Kit） |
-| 横向流程框架（FlowShell） | 2 | 换源（Source switching） | `flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost` | 已接入中心化 FlowShell（Central FlowShell Implemented） |
+| 横向流程框架（FlowShell） | 2 | 换源（Source switching） | `flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost` | 已接入中心化 FlowShell，且 StateHost 非空守卫（Central FlowShell With Non-empty StateHost Guard） |
 | 设置页框架（SettingsShell） | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理（General settings, bookshelf/search settings, privacy/permissions, cache, about/feedback, sync/backup, source management） | `settingsFrame`、`backTopBar`、`settingsContent`、`settingSection`、`toastHost`、`dialogHost`、`settingsStateHost` | 已完成共享 kit 第一版（Shared Kit First Version Implemented） |
 
 ## 共享实现文件（Shared Implementation Files）

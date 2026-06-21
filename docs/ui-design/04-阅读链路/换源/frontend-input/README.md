@@ -40,6 +40,7 @@
 - `components.html`：组件拆分预览入口。
 - `../../../frontend-input/shared-shell-kit/kit.js`：统一 `FlowShell` 来源。
 - `../../../frontend-input/asset-library/icons.js`：统一语义图标来源。
+- `FlowShell StateHost`：横向流程底部状态容器，必须展示流程阶段、来源数量、筛选数量、来源切换方向和阅读位置保留结果。
 
 ## 状态覆盖
 
@@ -61,6 +62,8 @@
 
 - 预览页根节点必须来自 `ReaderShellKit.renderFlowShell(...)`。
 - DOM 必须包含并只使用统一语义 slot：`flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost`。
+- `stateHost` 不能是空壳，必须渲染 `FlowShell StateHost` 状态摘要。
 - 四步横向流程必须保持：基线阅读控制层、打开换源底表、内联检测中、切换成功返回阅读页。
 - 状态矩阵必须包含 default、loading、empty、error、offline、permission 六张状态卡，且每张卡内部也必须通过 `FlowShell` 输出。
 - 图标必须来自公共素材库，不允许保留页面级内联 SVG。
+- `FrontendInputFlowShellInventoryTest` 必须通过，守住换源输入包、FlowShell renderer、manifest、验证报告、文档和 Compose preview 锚点同步。

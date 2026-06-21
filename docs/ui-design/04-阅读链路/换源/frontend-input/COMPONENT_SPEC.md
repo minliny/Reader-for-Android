@@ -7,6 +7,7 @@
 - 默认画布：`1690 x 931`
 - Shell：`ReaderShellKit.renderFlowShell(...)`
 - Slots：`flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost`
+- StateHost：必须渲染 `FlowShell StateHost`，展示流程阶段、来源数量、筛选数量、来源切换方向和阅读位置保留结果。
 
 ## Fixture
 
@@ -71,5 +72,6 @@ interface SourceSwitchFixture {
 - 预览必须保持 `1690 x 931` 横向流程画布。
 - 状态矩阵必须包含 6 张状态卡。
 - 预览和状态矩阵必须由 `ReaderShellKit` 输出统一 `FlowShell`，不能再复制独立横向 frame。
+- `stateHost` 必须有真实内容，不能只保留空 slot。
 - 页面图标必须来自 `asset-library/icons.js`，不能保留页面级内联 SVG。
 - 切换成功必须返回阅读页并保留阅读位置。
