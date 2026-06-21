@@ -52,7 +52,7 @@
 | --- | --- | --- | --- |
 | 主导航标签（Main Navigation Labels） | `AppScreen` 已使用 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell` | `MainNavType` 固定为 `书架 / 发现 / RSS / 设置` | 已完成主导航代码收敛；后续继续迁移 MainTabShell 内部页面内容。 |
 | 主标签页内容状态（Main Tab Content State） | `bookshelf` 进入 `BookshelfScreen` + `BookshelfHomeUiState`，`discover` 进入 `DiscoverScreen` + `DiscoveryHomeUiState`，`rss` 进入 `RssHomeScreen` + `RssHomeDesignUiState`，`settings` 进入 `SettingsRootScreen` + `SettingsHomeMapper` | 四个主标签页均来自 `MainTabPageKit` 对应输入件 | 书架已补 default/filtering/loading/empty，发现页已补 default/subscription/loading/empty/error/offline，RSS 已补 default/loading/empty/unreadEmpty/error，设置已补 default/loadingOverview/noBackup/permissionNeeded；后续继续接真实业务数据。 |
-| 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 71 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
+| 图标体系（Icon System） | 主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已通过 `ReaderIconToken` 映射；`ui/stitch/*` prototype 仍保留历史直连 Material Icons | 本地素材库登记 79 个统一语义图标 token | 新增图标先补 `ReaderIconToken` 和素材库语义，不在页面内临时直连 Material Icons。 |
 | 换源落点（Source Switching Target） | `ReaderControlBase.onSourceChangeClick` 已进入 `ReaderRoutes.SOURCE_SWITCH`，渲染 `SourceSwitchFlowScreen` | `换源` 是横屏 `FlowShell` | 后续接入真实候选来源与检测结果，继续保持不进入主导航。 |
 | 状态矩阵（State Matrix） | 30 张 UI 设计图和 30 个正式输入包均已建立第一批 Compose 输入状态，并由 `FrontendInputComposeCoverageTest` 守卫 | 每页都有 `state-matrix.html` 和 manifest 状态 | 后续重点转为真实业务数据、事件回调、动效和可交互 UI test 接入。 |
 

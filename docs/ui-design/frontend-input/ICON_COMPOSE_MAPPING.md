@@ -6,7 +6,7 @@
 
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
-| 本地素材库图标 token（Local Icon Tokens） | 71 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
+| 本地素材库图标 token（Local Icon Tokens） | 79 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
 | Compose 语义 token 映射（Compose Semantic Token Mapping） | 55 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
 | Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
@@ -92,11 +92,11 @@
 
 | 建议 token（Suggested Token） | 用途（Usage） | 来源（Current Trigger） |
 | --- | --- | --- |
-| `stop` | 停止自动翻页或停止朗读 | `Stop`。 |
-| `night-mode` | 夜间模式切换 | Compose 已有 `ReaderIconToken.NightMode`，Figma 源图标状态仍需回流审计。 |
-| `folder-off` | 文件夹空态或不可用 | Compose 已有 `ReaderIconToken.FolderOff`，Figma 源图标状态仍需回流审计。 |
-| `current-location` | 当前章节定位、当前位置 | Compose 已有 `ReaderIconToken.CurrentLocation`，Figma 源图标状态仍需回流审计。 |
-| `chevron-left` | 左向翻页或返回以外的左向动作 | Compose 已有 `ReaderIconToken.ChevronLeft`，Figma 可复用旋转规则或补方向 variant。 |
+| `stop` | 停止自动翻页或停止朗读 | 已补入本地素材库；如后续页面需要独立停止语义，再新增 `ReaderIconToken.Stop`。 |
+| `night-mode` | 夜间模式切换 | 已补入本地素材库，并映射到 `ReaderIconToken.NightMode`；Figma 主组件仍需回流审计。 |
+| `folder-off` | 文件夹空态或不可用 | 已补入本地素材库，并映射到 `ReaderIconToken.FolderOff`；Figma 主组件仍需回流审计。 |
+| `current-location` | 当前章节定位、当前位置 | 已补入本地素材库，并映射到 `ReaderIconToken.CurrentLocation`；Figma 主组件仍需回流审计。 |
+| `chevron-left` | 左向翻页或返回以外的左向动作 | 已补入本地素材库，并映射到 `ReaderIconToken.ChevronLeft`；Figma 主组件仍需回流审计。 |
 
 ## 代码落点（Code Targets）
 

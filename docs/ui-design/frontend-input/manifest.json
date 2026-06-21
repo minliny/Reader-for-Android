@@ -119,12 +119,12 @@
         "图标素材",
         "补齐图标",
         "30 个 UI 设计图",
-        "71 个图标 token",
+        "79 个图标 token",
         "书籍封面素材"
       ],
       "expectedDomCount": {
         "selector": ".asset-icon-card",
-        "min": 68
+        "min": 79
       },
       "expectedImages": {
         "min": 36,

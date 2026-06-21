@@ -9,7 +9,7 @@
 - 已有共享 kit（Implemented Shared Kits）：主标签页框架（MainTabShell）、书架链路框架（LibraryShell）、设置页框架（SettingsShell）、阅读器框架（ReaderShell）、横向流程框架（FlowShell）和中心化共享 Shell Kit（Shared Shell Kit）已经可用。
 - 已完成共享 kit（Completed Shared Kits）：阅读器框架（ReaderShell）10 页已接入中心化 `ReaderShellKit`；横向流程框架（FlowShell）1 页已接入中心化 `ReaderShellKit.renderFlowShell(...)`。
 - 组件库状态（Component Library Status）：公共组件库已经覆盖当前 30 个页面需要的基础控件、书籍组件、阅读组件、设置组件、底表面板和状态组件。
-- 素材库状态（Asset Library Status）：公共素材库已经登记 30 张 UI 设计图、6 张书籍封面和 71 个统一图标 token。
+- 素材库状态（Asset Library Status）：公共素材库已经登记 30 张 UI 设计图、6 张书籍封面和 79 个统一图标 token。
 
 ## 输入件规模（Input Scale）
 
