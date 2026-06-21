@@ -21,9 +21,10 @@
 | 公共素材库（Asset Library） | `docs/ui-design/frontend-input/asset-library/` | UI 设计图、封面素材和 79 个统一语义图标 token。 |
 | 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/` | 组件、状态、底表、卡片、行和交互规则的可视化入口。 |
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
+| 事件回调映射（Event Callback Mapping） | `docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md` | 将 30 个页面 `Event` union 中的 281 个事件映射到稳定 Compose 回调名。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
-| 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、事件到 Compose 回调映射、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
+| 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，并守住 manifest 中 `MainTabShell`、`LibraryShell`、`ReaderShell`、`FlowShell`、`SettingsShell` 到 Compose 骨架、slot 和 preview 的追溯关系。 |
 | 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
 
 ## 页面输入包（Page Input Packages）
@@ -45,11 +46,11 @@
 | --- | ---: | --- | --- |
 | `ComponentLibraryShell` | 3 | 公共组件库、共享 Shell Kit、前端 Demo 设计稿 | 已通过 manifest 校验。 |
 | `AssetLibraryShell` | 1 | 公共素材库 | 已通过 manifest 校验。 |
-| `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补书架、发现、RSS、设置四个主标签页状态矩阵。 |
-| `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验。 |
-| `ReaderShell` | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验。 |
-| `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验。 |
-| `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验。 |
+| `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补书架、发现、RSS、设置四个主标签页状态矩阵，并由组件映射守卫追溯到 `ReaderMainTabShell` / `ReaderMainTabBar`。 |
+| `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验，并由组件映射守卫追溯到返回顶栏、底部导航、状态宿主和书架链路 preview。 |
+| `ReaderShell` | 20 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验，并由组件映射守卫追溯到阅读正文、覆盖层、底表、模块导航和阅读状态宿主。 |
+| `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验，并由组件映射守卫追溯到换源 Compose 横向流程。 |
+| `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验，并由组件映射守卫追溯到设置内容区、底表、弹窗和状态宿主。 |
 
 ## 阶段完成口径（Phase Done Criteria）
 
@@ -57,7 +58,7 @@
 
 1. 输入件闭环（Input Package Closure）：30 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
 2. 框架闭环（Shell Closure）：所有正式页面只能归入 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell`，且 manifest DOM slot 校验通过。
-3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，核心公共组件通过 `ReaderSharedComponentsStructureTest` 映射到 Compose 实现锚点，新增页面优先复用已有组件。
+3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，核心公共组件和五个 runtime shell 通过 `ReaderSharedComponentsStructureTest` 映射到 Compose 实现锚点，新增页面优先复用已有组件。
 4. Compose 输入闭环（Compose Input Closure）：30 张 UI 设计图、30 个输入包和 30 个正式页面都有对应 `contracts.d.ts` Fixture/State/Event、Kotlin UI state、mapper/fixture 构造点、页面级 preview 和页面事件契约，且通过 `FrontendInputComposeCoverageTest` 守卫。
 5. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，manifest 目标集合只能由 30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标组成，manifest 的 `shellName/pageRole/slots` 必须匹配正式 shell taxonomy，验证报告必须与 manifest 和 30 个 `components.html` 组件参考页同步，Compose 侧至少通过覆盖守卫和相关 preview 结构测试。
 6. 留白明确（Explicit Remaining Work）：真实业务数据、完整点击链路、动效细节和端到端 UI test 可以留到下一阶段，但必须在文档中明确为后续工作。
@@ -81,6 +82,7 @@
 | `FRAMEWORK_COMPONENT_CATALOG.md` | 框架、组件、页面归属和抽象边界总目录。 |
 | `FRAMEWORK_COMPONENT_ROADMAP.md` | 已完成内容和后续真实前端映射顺序。 |
 | `FRONTEND_MAPPING_GUIDE.md` | 本地输入件到 Android Compose 前端实现的映射指南。 |
+| `EVENT_CALLBACK_MAPPING.md` | 页面事件到 Android Compose 回调名的映射表。 |
 | `MAIN_NAV_RECONCILIATION.md` | 主导航从 `书源 / 我的` 收敛到 `RSS / 设置` 的实施清单。 |
 | `ICON_COMPOSE_MAPPING.md` | 本地图标 token 到 Compose Material Icons 的映射和缺口清单。 |
 | `FRAMEWORK_COMPONENT_ICON_STYLE_GUIDE.md` | UI 风格、图标、组件化和框架化规则。 |
@@ -112,7 +114,7 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 1. 真实前端映射执行（Frontend Mapping Implementation）：按 `FRONTEND_MAPPING_GUIDE.md`、`MAIN_NAV_RECONCILIATION.md` 和 `ICON_COMPOSE_MAPPING.md` 把输入件落实到 Android Compose。
 2. 正式 MainTabShell 落地（MainTabShell Implementation）：主导航代码已收敛到 `书架 / 发现 / RSS / 设置`，运行时底栏已切到 `ReaderMainTabShell`，书架根路由已脱离 `StitchAppShell`，发现根路由已接入 `DiscoverScreen` + `DiscoveryHomeUiState` + `DiscoveryHomeDisplayState`，RSS 根路由已接入 `RssHomeScreen` + `RssHomeDesignUiState` + `RssHomeDisplayState`，设置根页已接入 `SettingsRootScreen` + `SettingsHomeState` + `SettingsHomeMapper` + `SettingsHomeDisplayState`，并已补主标签页 Compose preview/state matrix。
 3. 图标素材同步执行（Icon Asset Sync Implementation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；剩余直接 Material Icons 仅保留在 `ui/stitch/*` prototype 历史参考中，并由 `ReaderIconImportBoundaryTest` 守卫。
-4. 预览矩阵扩展（Preview Matrix Expansion）：30 个正式页面的 Compose 输入覆盖已由 `FrontendInputComposeCoverageTest` 守卫；后续扩展重点从“是否有状态输入”转为“真实数据、事件回调和 UI test 是否接入”。
+4. 预览矩阵扩展（Preview Matrix Expansion）：30 个正式页面的 Compose 输入覆盖已由 `FrontendInputComposeCoverageTest` 守卫，五个 runtime shell 的 Compose 骨架锚点已由 `ReaderSharedComponentsStructureTest` 守卫；后续扩展重点从“是否有状态输入”转为“真实数据、事件回调和 UI test 是否接入”。
 5. 提交整理（Commit Planning）：按下面建议提交分组整理 staged 内容，避免把审计文档、验证产物和页面输入包混在不可读提交里。
 
 ## 建议提交分组（Suggested Commit Groups）

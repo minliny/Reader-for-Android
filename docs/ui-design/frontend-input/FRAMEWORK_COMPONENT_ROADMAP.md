@@ -16,18 +16,18 @@
 | 中文名称（English Name） | 当前状态（Current Status） | 证据与说明（Evidence and Notes） |
 |---|---|---|
 | 前端输入件交付格式（Frontend Input Delivery Format） | 已完成（Completed） | 30 个页面都有输入包、fixture、renderer、preview、state matrix、README、组件规格和 manifest 目标。 |
-| 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`；`FrontendInputComposeCoverageTest` 守住正式 shell taxonomy 和目标数量。 |
+| 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`；`FrontendInputComposeCoverageTest` 守住正式 shell taxonomy 和目标数量，`ReaderSharedComponentsStructureTest` 守住五个 runtime shell 到 Compose 骨架、slot 和 preview 的锚点。 |
 | 设置页框架（SettingsShell） | 已完成（Completed） | 7 个设置二级页已通过 `SettingsPageKit` 输出统一设置页结构和真实 DOM slots。 |
 | 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构；Compose 侧已补四个主标签页状态矩阵。 |
 | 书架链路框架（LibraryShell） | 已完成（Completed） | 8 个书架链路页面已通过 `LibraryPageKit` 输出统一 `StackFrame / BackTopBar / ContentRegion / BottomActionHost / SheetHost / DialogHost / StateHost`。 |
 | 主导航交互规则（Main Navigation Interaction Rule） | 已完成并已校验（Completed and Validated） | 四个按钮固定为书架、发现、RSS、设置；选中态只改变背景、图标颜色和文字颜色，不改变位置。 |
 | 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理（Documented） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层。 |
 | 框架与组件总目录（Framework and Component Catalog） | 已梳理（Documented） | `FRAMEWORK_COMPONENT_CATALOG.md` 已按 Shell、共享 kit、页面归属、组件类别和固定交互规则整理。 |
-| 公共组件库（Component Library） | 已覆盖当前输入件（Covered for Current Inputs） | 当前公共库已经覆盖本轮已转化页面需要的框架组件和高复用组件，并由 `ReaderSharedComponentsStructureTest` 守卫核心语义组件的 Compose 实现锚点。 |
+| 公共组件库（Component Library） | 已覆盖当前输入件（Covered for Current Inputs） | 当前公共库已经覆盖本轮已转化页面需要的框架组件和高复用组件，并由 `ReaderSharedComponentsStructureTest` 守卫核心语义组件及五个 runtime shell 的 Compose 实现锚点。 |
 | 公共素材库（Asset Library） | 已完成第一版（First Version Completed） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token。 |
 | 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
 | 横向流程框架（FlowShell） | 已完成（Completed） | 换源页面已通过 `ReaderShellKit.renderFlowShell(...)` 输出 `FlowFrame / StepRegion / ComparisonRegion / ResultRegion / StateHost`，并通过 DOM slot 校验。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态；`ReaderSharedComponentsStructureTest` 已覆盖 runtime shell taxonomy 到 Compose 骨架/slot/preview 锚点。 |
 
 ## 页面框架（Page Shells）
 
@@ -169,7 +169,7 @@
 
 ## 后续开发顺序（Development Order）
 
-1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构；公共组件库核心语义已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
+1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构；公共组件库核心语义和五个 runtime shell 已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
 2. 主导航差异收敛（Main Navigation Reconciliation）：Android 代码中的主入口已收敛到 `书架 / 发现 / RSS / 设置`；后续变更不得恢复 `书源 / 我的` 作为主 tab。
 3. 图标映射收敛（Icon Mapping Reconciliation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；生产 UI 直连 Material Icons 已由 `ReaderIconImportBoundaryTest` 守卫，后续重点是同步素材库缺源状态。
 4. 状态矩阵落地（State Matrix Implementation）：30 张 UI 设计图和 30 个正式输入包已建立第一批 Compose preview/state matrix 输入，并由 `FrontendInputComposeCoverageTest` 守卫输入包、spec、manifest、Compose source 和 preview 覆盖；后续继续把这些状态接入真实导航、真实业务数据和可交互 UI test。
