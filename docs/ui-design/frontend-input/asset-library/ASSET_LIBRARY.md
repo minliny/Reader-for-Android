@@ -46,3 +46,4 @@
 - 页面 renderer 不能再临时新增同义图标 token。
 - 如果页面必须使用局部图标，必须在素材库中标注为页面专属。
 - `preview.html` 必须通过 manifest 验证。
+- `FrontendInputAssetLibraryInventoryTest` 必须通过，确保 `fixture.json`、`fixture.js`、`icons.js`、实际文件、manifest 和验证报告同步。

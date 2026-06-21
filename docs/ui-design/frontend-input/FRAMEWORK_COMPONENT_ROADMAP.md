@@ -24,7 +24,7 @@
 | 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理并守卫（Documented and Guarded） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层，并由 `FrontendInputHtmlInventoryTest` 守住库存分类和 manifest 排除规则。 |
 | 框架与组件总目录（Framework and Component Catalog） | 已梳理（Documented） | `FRAMEWORK_COMPONENT_CATALOG.md` 已按 Shell、共享 kit、页面归属、组件类别和固定交互规则整理。 |
 | 公共组件库（Component Library） | 已覆盖当前输入件（Covered for Current Inputs） | 当前公共库已经覆盖本轮已转化页面需要的框架组件和高复用组件，并由 `ReaderSharedComponentsStructureTest` 守卫核心语义组件及五个 runtime shell 的 Compose 实现锚点。 |
-| 公共素材库（Asset Library） | 已完成第一版（First Version Completed） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token。 |
+| 公共素材库（Asset Library） | 已完成第一版并守卫（First Version Completed and Guarded） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token，并由 `FrontendInputAssetLibraryInventoryTest` 守住 fixture、图标注册表、manifest 和验证报告同步。 |
 | 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
 | 横向流程框架（FlowShell） | 已完成（Completed） | 换源页面已通过 `ReaderShellKit.renderFlowShell(...)` 输出 `FlowFrame / StepRegion / ComparisonRegion / ResultRegion / StateHost`，并通过 DOM slot 校验。 |
 | Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态；`ReaderSharedComponentsStructureTest` 已覆盖 runtime shell taxonomy 到 Compose 骨架/slot/preview 锚点。 |
