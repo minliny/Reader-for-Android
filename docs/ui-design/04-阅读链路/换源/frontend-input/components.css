@@ -57,6 +57,7 @@ button:disabled {
 }
 
 .sw-flow-frame {
+  position: relative;
   width: 1690px;
   height: 931px;
   grid-template-columns: 802px 422px 422px;
@@ -85,6 +86,37 @@ button:disabled {
 
 .sw-flow-state-host {
   display: contents;
+}
+
+.sw-flow-status-strip {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 14px;
+  border: 1px solid rgba(180, 166, 151, 0.36);
+  border-radius: 10px;
+  background: rgba(255, 252, 248, 0.9);
+  box-shadow: 0 8px 18px rgba(80, 60, 42, 0.08);
+  color: var(--sw-muted);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.sw-flow-status-strip strong {
+  color: var(--sw-ink);
+  font-size: 13px;
+}
+
+.sw-flow-status-strip em {
+  color: var(--sw-primary);
+  font-style: normal;
+  font-weight: 800;
 }
 
 .sw-flow-step {
