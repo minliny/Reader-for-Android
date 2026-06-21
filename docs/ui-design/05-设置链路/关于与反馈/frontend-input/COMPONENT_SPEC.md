@@ -28,6 +28,14 @@
 - Props：`label`、`status`
 - Acceptance：检查更新失败或离线时必须保留当前版本信息。
 
+## States
+
+- `default`：版本、反馈入口、协议链接和检查更新入口完整展示。
+- `loading`：检查更新或反馈入口加载中。
+- `error`：检查更新失败。
+- `confirm`：反馈或外部链接确认弹窗打开。
+- `offline`：网络不可用但保留当前版本信息。
+
 ## Events
 
 - `back`：返回设置页。
@@ -42,4 +50,4 @@
 ## Acceptance
 
 - 必须覆盖 `当前版本`、`检查更新`、`问题反馈`、`开源许可`、`隐私协议`。
-- 状态矩阵必须覆盖 default、loading、error、offline。
+- 状态矩阵必须覆盖 `default`、`loading`、`error`、`confirm`、`offline`。

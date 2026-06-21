@@ -22,7 +22,7 @@
 | 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/` | 组件、状态、底表、卡片、行和交互规则的可视化入口。 |
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、manifest preview/state-matrix 目标、spec 状态与事件声明及事件名、Compose 输入源码和 Compose preview 状态一致。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、manifest preview/state-matrix 目标、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
 | 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件。 |
 | 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
 
