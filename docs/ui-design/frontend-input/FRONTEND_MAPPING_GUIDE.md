@@ -78,6 +78,8 @@
 | `SettingRow`、`SettingGroupCard`、`StatusBadge`、`DangerActionRow` | `ui/components/SettingsComponents.kt` | 设置链路和阅读设置都应复用同一语义。 |
 | `SourceCandidateRow`、`DetectStatusBadge`、`SwitchSourceButton` | `ui/reader/source/SourceSwitchFlowScreen.kt` | 属于 FlowShell，不应混成普通列表行；当前先作为换源输入框架私有组件落地。 |
 
+当前组件映射守卫（Current Component Mapping Guard）：`ReaderSharedComponentsStructureTest` 已检查公共组件库中的核心语义组件能追溯到 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件。
+
 ## 状态与事件映射（State and Event Mapping）
 
 - 数据模型（Data Model）：把 `contracts.d.ts` 的 fixture interface 转成 Kotlin `data class` 或现有 `UiState` 字段，不从 HTML class 名反推数据。
