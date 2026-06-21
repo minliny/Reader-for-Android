@@ -26,6 +26,7 @@ fun ReaderSettingsRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     contentDescription: String = title,
+    leading: @Composable (() -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
     onClick: (() -> Unit)? = null
 ) {
@@ -33,6 +34,7 @@ fun ReaderSettingsRow(
         title = title,
         subtitle = subtitle,
         modifier = modifier,
+        leading = leading,
         trailing = trailing,
         contentDescription = contentDescription,
         onClick = onClick

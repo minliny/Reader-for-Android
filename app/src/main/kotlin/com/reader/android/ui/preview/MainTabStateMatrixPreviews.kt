@@ -8,8 +8,7 @@ import com.reader.android.ui.discover.DiscoverScreen
 import com.reader.android.ui.discover.DiscoveryHomeMapper
 import com.reader.android.ui.discover.RssHomeDesignMapper
 import com.reader.android.ui.discover.RssHomeScreen
-import com.reader.android.ui.settings.SettingsHomeDisplayState
-import com.reader.android.ui.settings.SettingsHomeState
+import com.reader.android.ui.settings.SettingsHomeMapper
 import com.reader.android.ui.settings.SettingsRootScreen
 
 private const val PreviewWidth = 390
@@ -108,23 +107,23 @@ fun RssMainTabErrorPreview() {
 @Preview(name = "MainTab / Settings / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun SettingsMainTabDefaultPreview() {
-    SettingsRootScreen(settingsState = SettingsHomeState())
+    SettingsRootScreen(settingsState = SettingsHomeMapper.fromFixture())
 }
 
 @Preview(name = "MainTab / Settings / Loading Overview", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun SettingsMainTabLoadingOverviewPreview() {
-    SettingsRootScreen(settingsState = SettingsHomeState(displayState = SettingsHomeDisplayState.LoadingOverview))
+    SettingsRootScreen(settingsState = SettingsHomeMapper.loadingOverview())
 }
 
 @Preview(name = "MainTab / Settings / No Backup", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun SettingsMainTabNoBackupPreview() {
-    SettingsRootScreen(settingsState = SettingsHomeState(displayState = SettingsHomeDisplayState.NoBackup))
+    SettingsRootScreen(settingsState = SettingsHomeMapper.noBackup())
 }
 
 @Preview(name = "MainTab / Settings / Permission Needed", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun SettingsMainTabPermissionNeededPreview() {
-    SettingsRootScreen(settingsState = SettingsHomeState(displayState = SettingsHomeDisplayState.PermissionNeeded))
+    SettingsRootScreen(settingsState = SettingsHomeMapper.permissionNeeded())
 }
