@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-20T14:18:45.404Z",
+  "generatedAt": "2026-06-21T01:34:12.879Z",
   "manifest": "docs/ui-design/frontend-input/manifest.json",
   "passed": true,
   "results": [
@@ -100,10 +100,10 @@
       "actual": {
         "title": "Reader 素材库",
         "bodyWidth": 1180,
-        "bodyHeight": 9103,
+        "bodyHeight": 9492,
         "frame": {
           "width": 1180,
-          "height": 9103
+          "height": 9492
         },
         "requiredTextPresent": true,
         "rendererLoaded": true,
@@ -129,7 +129,7 @@
         "readerShellDom": null,
         "flowShellDom": null,
         "settingsShellDom": null,
-        "expectedDomCount": 71
+        "expectedDomCount": 79
       }
     },
     {
