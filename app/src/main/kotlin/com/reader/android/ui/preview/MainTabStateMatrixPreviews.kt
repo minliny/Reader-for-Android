@@ -2,8 +2,7 @@ package com.reader.android.ui.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.reader.android.ui.bookshelf.BookshelfLayoutMode
-import com.reader.android.ui.bookshelf.BookshelfMapper
+import com.reader.android.ui.bookshelf.BookshelfHomeMapper
 import com.reader.android.ui.bookshelf.BookshelfScreen
 import com.reader.android.ui.discover.DiscoverScreen
 import com.reader.android.ui.discover.DiscoveryHomeMapper
@@ -20,13 +19,25 @@ private const val PreviewHeight = 844
 @Preview(name = "MainTab / Bookshelf / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun BookshelfMainTabDefaultPreview() {
-    BookshelfScreen(bookshelfState = BookshelfMapper.fakeFallback(BookshelfLayoutMode.Cover))
+    BookshelfScreen(bookshelfHomeState = BookshelfHomeMapper.fromFixture())
+}
+
+@Preview(name = "MainTab / Bookshelf / Filtering", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun BookshelfMainTabFilteringPreview() {
+    BookshelfScreen(bookshelfHomeState = BookshelfHomeMapper.filtering())
+}
+
+@Preview(name = "MainTab / Bookshelf / Loading", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun BookshelfMainTabLoadingPreview() {
+    BookshelfScreen(bookshelfHomeState = BookshelfHomeMapper.loading())
 }
 
 @Preview(name = "MainTab / Bookshelf / Empty", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun BookshelfMainTabEmptyPreview() {
-    BookshelfScreen(bookshelfState = BookshelfMapper.empty(BookshelfLayoutMode.Cover))
+    BookshelfScreen(bookshelfHomeState = BookshelfHomeMapper.empty())
 }
 
 @Preview(name = "MainTab / Discover / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
