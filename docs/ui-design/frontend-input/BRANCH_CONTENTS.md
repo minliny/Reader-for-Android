@@ -91,10 +91,29 @@
 
 ## 验证命令（Validation Command）
 
+HTML 输入件渲染校验（HTML Input Render Validation）：
+
 ```bash
 NODE_PATH=/Users/minliny/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
 /Users/minliny/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node \
 docs/ui-design/frontend-input/validate-frontend-inputs.js
+```
+
+Compose 输入框架守卫（Compose Input Framework Guards）：
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+./gradlew testDebugUnitTest \
+  --tests com.reader.android.ui.preview.FrontendInputComposeCoverageTest \
+  --tests com.reader.android.ui.components.ReaderSharedComponentsStructureTest \
+  --tests com.reader.android.ui.components.ReaderIconTokenMappingTest \
+  --tests com.reader.android.ui.components.ReaderIconImportBoundaryTest \
+  --tests com.reader.android.ui.preview.MainTabStateMatrixPreviewTest \
+  --tests com.reader.android.ui.preview.LibraryFlowStateMatrixPreviewTest \
+  --tests com.reader.android.ui.preview.ReaderControlStateMatrixPreviewTest \
+  --tests com.reader.android.ui.preview.ReaderShellStateMatrixPreviewTest \
+  --tests com.reader.android.ui.preview.SettingsSecondaryStateMatrixPreviewTest \
+  --tests com.reader.android.ui.reader.source.SourceSwitchFlowStructureTest
 ```
 
 当前最近一次验证结果：
@@ -108,6 +127,7 @@ docs/ui-design/frontend-input/validate-frontend-inputs.js
 - failed targets: `0`
 - ReaderShell targets: `20/20`
 - icon tokens: `79`
+- Compose guard scope: frontend coverage, event callback mapping, runtime shell anchors, icon token/import boundary, MainTab/Library/ReaderControl/ReaderShell/Settings/FlowShell state matrix.
 
 ## 当前待办（Open Work）
 
