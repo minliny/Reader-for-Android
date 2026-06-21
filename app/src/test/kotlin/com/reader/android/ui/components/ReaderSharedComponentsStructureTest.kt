@@ -1,5 +1,6 @@
 package com.reader.android.ui.components
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -12,6 +13,12 @@ class ReaderSharedComponentsStructureTest {
 
     private data class ComponentMapping(
         val componentName: String,
+        val sourcePaths: List<String>,
+        val requiredTokens: List<String>
+    )
+
+    private data class ShellComposeAnchor(
+        val shellName: String,
         val sourcePaths: List<String>,
         val requiredTokens: List<String>
     )
@@ -359,6 +366,150 @@ class ReaderSharedComponentsStructureTest {
     }
 
     @Test
+    fun `manifest runtime shell taxonomy has compose implementation anchors`() {
+        assertEquals(
+            "manifest shell counts must stay aligned with the frontend input shell taxonomy",
+            mapOf(
+                "ComponentLibraryShell" to 3,
+                "AssetLibraryShell" to 1,
+                "MainTabShell" to 8,
+                "LibraryShell" to 16,
+                "ReaderShell" to 20,
+                "FlowShell" to 2,
+                "SettingsShell" to 14
+            ),
+            manifestShellCounts()
+        )
+
+        val anchors = listOf(
+            ShellComposeAnchor(
+                shellName = "MainTabShell",
+                sourcePaths = listOf(
+                    "src/main/kotlin/com/reader/android/ui/components/CommonComponents.kt",
+                    "src/main/kotlin/com/reader/android/ui/ReaderRouteHost.kt",
+                    "src/main/kotlin/com/reader/android/ui/preview/MainTabStateMatrixPreviews.kt"
+                ),
+                requiredTokens = listOf(
+                    "fun ReaderMainTabShell(",
+                    "fun ReaderMainTabBar(",
+                    "showMainNav = showMainBottomBar",
+                    "BookshelfMainTabDefaultPreview",
+                    "RssMainTabDefaultPreview",
+                    "SettingsMainTabDefaultPreview"
+                )
+            ),
+            ShellComposeAnchor(
+                shellName = "LibraryShell",
+                sourcePaths = listOf(
+                    "src/main/kotlin/com/reader/android/ui/preview/LibraryFlowStateMatrixPreviews.kt",
+                    "src/main/kotlin/com/reader/android/ui/bookshelf/BookshelfEmptyDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/search/SearchScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/detail/BookDetailScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/toc/TOCScreen.kt"
+                ),
+                requiredTokens = listOf(
+                    "LibraryShell，书架空状态",
+                    "ReaderAppTopBar",
+                    "ReaderMainTabBar",
+                    "ReaderPermissionRequiredState",
+                    "LibraryBookshelfEmptyDefaultPreview",
+                    "LibrarySearchHomePreview",
+                    "LibraryBookDetailDefaultPreview",
+                    "LibraryBookDirectoryDefaultPreview",
+                    "LibrarySortFilterDefaultPreview",
+                    "LibraryBookActionSheetDefaultPreview",
+                    "LibraryGroupManagementDefaultPreview",
+                    "LibraryLocalImportDefaultPreview"
+                )
+            ),
+            ShellComposeAnchor(
+                shellName = "ReaderShell",
+                sourcePaths = listOf(
+                    "src/main/kotlin/com/reader/android/ui/preview/ReaderShellStateMatrixPreviews.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ReaderShellDesignScreens.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ReadingTocBookmarkDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ReadingAppearanceDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ReadingAloudDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ReadingSettingsDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/AutoPageDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ContentSearchDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/reader/ContentReplacementDesignScreen.kt"
+                ),
+                requiredTokens = listOf(
+                    "ReadingEntryDefaultPreview",
+                    "ImmersiveReadingDefaultPreview",
+                    "ReadingTocBookmarkDefaultPreview",
+                    "ReadingAppearanceDefaultPreview",
+                    "ReadingAloudDefaultPreview",
+                    "ReadingSettingsDefaultPreview",
+                    "AutoPageDefaultPreview",
+                    "ContentSearchDefaultPreview",
+                    "ContentReplacementDefaultPreview",
+                    "contentDescription = \"readingSurface\"",
+                    "contentDescription = \"readerOverlayHost\"",
+                    "contentDescription = \"bottomSheetHost\"",
+                    "contentDescription = \"readerModuleNav\"",
+                    "contentDescription = \"readerStateHost\""
+                )
+            ),
+            ShellComposeAnchor(
+                shellName = "FlowShell",
+                sourcePaths = listOf("src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt"),
+                requiredTokens = listOf(
+                    "fun SourceSwitchFlowScreen(",
+                    "FlowShell flowFrame",
+                    "slotName = \"stepRegion\"",
+                    "slotName = \"comparisonRegion\"",
+                    "slotName = \"resultRegion\"",
+                    "slotName = \"stateHost\"",
+                    "SourceSwitchFlowDefaultPreview",
+                    "SourceSwitchFlowPermissionPreview"
+                )
+            ),
+            ShellComposeAnchor(
+                shellName = "SettingsShell",
+                sourcePaths = listOf(
+                    "src/main/kotlin/com/reader/android/ui/preview/SettingsSecondaryStateMatrixPreviews.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/GeneralSettingsDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/BookshelfSearchSettingsDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/PrivacyPermissionsDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/CacheManagementDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/AboutFeedbackDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/SyncBackupDesignScreen.kt",
+                    "src/main/kotlin/com/reader/android/ui/settings/SourceManagementDesignScreen.kt"
+                ),
+                requiredTokens = listOf(
+                    "SettingsGeneralDefaultPreview",
+                    "SettingsBookshelfSearchDefaultPreview",
+                    "SettingsPrivacyPermissionsDefaultPreview",
+                    "SettingsCacheManagementDefaultPreview",
+                    "SettingsAboutFeedbackDefaultPreview",
+                    "SettingsSyncBackupDefaultPreview",
+                    "SettingsSourceManagementDefaultPreview",
+                    "ReaderAppTopBar",
+                    "contentDescription = \"settingsContent\"",
+                    "contentDescription = \"sheetHost\"",
+                    "contentDescription = \"dialogHost\"",
+                    "contentDescription = \"settingsStateHost\""
+                )
+            )
+        )
+
+        assertEquals(
+            "runtime shell anchors must cover every runtime shell exactly",
+            setOf("MainTabShell", "LibraryShell", "ReaderShell", "FlowShell", "SettingsShell"),
+            anchors.map { it.shellName }.toSet()
+        )
+
+        anchors.forEach { anchor ->
+            val source = projectSource(anchor.sourcePaths)
+            anchor.requiredTokens.forEach { token ->
+                assertTrue("${anchor.shellName} must have Compose anchor $token", token in source)
+            }
+        }
+    }
+
+    @Test
     fun `slice 2 shared components do not reintroduce stitch or webview runtime`() {
         val source = componentSource()
 
@@ -381,4 +532,11 @@ class ReaderSharedComponentsStructureTest {
             assertTrue("Forbidden Slice 2 token must not appear: $forbidden", forbidden !in source)
         }
     }
+
+    private fun manifestShellCounts(): Map<String, Int> =
+        Regex(""""shellName"\s*:\s*"([^"]+)"""")
+            .findAll(workspaceSource("docs/ui-design/frontend-input/manifest.json"))
+            .map { it.groupValues[1] }
+            .groupingBy { it }
+            .eachCount()
 }

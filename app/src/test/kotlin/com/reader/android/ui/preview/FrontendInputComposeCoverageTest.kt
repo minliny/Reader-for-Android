@@ -36,6 +36,11 @@ class FrontendInputComposeCoverageTest {
         val slots: List<String>
     )
 
+    private data class EventCallbackMappingRow(
+        val eventNames: List<String>,
+        val callbackNames: List<String>
+    )
+
     private val manifestSource: String by lazy {
         workspaceSource("docs/ui-design/frontend-input/manifest.json")
     }
@@ -46,6 +51,10 @@ class FrontendInputComposeCoverageTest {
 
     private val validationReportSource: String by lazy {
         workspaceSource("docs/ui-design/frontend-input-design-draft-validation.json")
+    }
+
+    private val eventCallbackMappingSource: String by lazy {
+        workspaceSource("docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md")
     }
 
     @Test
@@ -115,6 +124,33 @@ class FrontendInputComposeCoverageTest {
                 "${entry.specPath} events must match ${entry.typeName}Event",
                 specEvents,
                 contractEvents
+            )
+        }
+    }
+
+    @Test
+    fun `frontend event contracts have documented compose callback mapping`() {
+        val rows = eventCallbackMappingRows()
+        assertEquals(
+            "event callback mapping must cover every frontend contract type",
+            contractEntries.map { it.typeName }.sorted(),
+            rows.keys.sorted()
+        )
+
+        contractEntries.forEach { entry ->
+            val eventNames = contractEventNames(entry.typeName)
+            val callbackNames = eventNames.map { composeCallbackName(it) }
+            val row = rows.getValue(entry.typeName)
+
+            assertEquals(
+                "${entry.typeName} event mapping must match ${entry.typeName}Event",
+                eventNames,
+                row.eventNames
+            )
+            assertEquals(
+                "${entry.typeName} callback mapping must derive stable Compose callback names",
+                callbackNames,
+                row.callbackNames
             )
         }
     }
@@ -353,6 +389,34 @@ class FrontendInputComposeCoverageTest {
             .findAll(section)
             .map { it.groupValues[1] }
             .toList()
+    }
+
+    private fun eventCallbackMappingRows(): Map<String, EventCallbackMappingRow> {
+        return eventCallbackMappingSource.lines()
+            .filter { it.startsWith("| ") && it.contains("<br>`") }
+            .associate { line ->
+                val cells = line.trim().removePrefix("|").removeSuffix("|").split("|").map { it.trim() }
+                val typeName = markdownCodeValues(cells[0]).single()
+                typeName to EventCallbackMappingRow(
+                    eventNames = markdownCodeValues(cells[1]),
+                    callbackNames = markdownCodeValues(cells[2])
+                )
+            }
+    }
+
+    private fun markdownCodeValues(source: String): List<String> {
+        return Regex("""`([^`]+)`""")
+            .findAll(source)
+            .map { it.groupValues[1] }
+            .toList()
+    }
+
+    private fun composeCallbackName(eventName: String): String {
+        assertTrue(
+            "$eventName must be lower camel case so it can map to a Compose callback",
+            Regex("""^[a-z][A-Za-z0-9]*$""").matches(eventName)
+        )
+        return "on" + eventName.substring(0, 1).uppercase() + eventName.substring(1)
     }
 
     private fun formalScreenDirs(): List<String> {

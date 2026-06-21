@@ -15,10 +15,10 @@
 当前大步骤的目标是把 UI 设计图转换成可继续开发的前端设计稿输入件，并建立 Android Compose 输入框架。达到以下程度可判定本阶段完成：
 
 - 设计输入闭合（Design Input Closure）：30 个页面的 preview、state matrix、components、fixture、renderer、README、COMPONENT_SPEC 和 manifest 目标齐备；manifest 正式目标必须固定为 30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标。
-- 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接。
+- 框架输入闭合（Shell Input Closure）：页面都落在五类 shell 中，slot、导航、状态宿主和弹层宿主由共享 kit 或对应 Compose shell 承接；manifest 中五个 runtime shell 的分类必须能追溯到 Compose 骨架、slot 或 preview 锚点。
 - 状态输入闭合（State Input Closure）：每个正式页面至少有默认态和关键异常/展开态的 HTML 状态矩阵，`COMPONENT_SPEC.md` 状态名和 manifest 状态卡数量必须与 `contracts.d.ts` 对应 State union 一致，并有 Compose preview 或 fixture-driven state 对应。
 - 事件契约闭合（Event Contract Closure）：每个页面 `COMPONENT_SPEC.md` 必须声明前端事件入口，且事件名必须与 `contracts.d.ts` 对应 Event union 一致；后续 Compose 实现按明确回调接入，不从截图倒推交互。
-- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、spec 状态与事件声明、状态名、事件名、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、Compose 源码落点和 preview 状态完全一致。
+- 覆盖守卫闭合（Coverage Guard Closure）：`FrontendInputComposeCoverageTest` 必须证明 30 张 UI 设计图、30 个输入包、30 个正式页面、`contracts.d.ts` 全局契约、事件到 Compose 回调映射、spec 状态与事件声明、状态名、事件名、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、Compose 源码落点和 preview 状态完全一致；`ReaderSharedComponentsStructureTest` 必须证明五个 runtime shell 的 manifest taxonomy 能追溯到 Compose 实现锚点。
 - 后续边界清楚（Remaining Boundary）：真实业务数据、完整事件链路、动效细节和端到端 UI test 属于下一阶段，不阻塞当前“输入件完成”结论。
 
 ## 输入优先级（Source Priority）
@@ -27,10 +27,11 @@
 | --- | --- | --- |
 | 1 | `docs/ui-design/frontend-input/manifest.json` | 验证目标、viewport、shellName、slots、状态模型和必需文案；正式目标集合不得包含 `preview 2.html` 或 `components.html`。 |
 | 2 | `docs/ui-design/frontend-input/contracts.d.ts` | 页面数据结构、状态枚举和事件语义。 |
-| 3 | `docs/ui-design/frontend-input/shared-shell-kit/` | 五类 shell 的固定 slot 结构和不应漂移的骨架。 |
-| 4 | 页面 `fixture.json` / `fixture.js` | 页面默认数据、状态矩阵数据和可见文案。 |
-| 5 | 页面 `COMPONENT_SPEC.md` / `README.md` | 页面级组件、事件、状态覆盖和验收标准。 |
-| 6 | `verify/*.png` | 视觉走查证据，不作为组件拆分的唯一来源。 |
+| 3 | `docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md` | 页面事件到 Compose 回调名的映射，禁止用泛化 `onClick` 替代明确事件入口。 |
+| 4 | `docs/ui-design/frontend-input/shared-shell-kit/` | 五类 shell 的固定 slot 结构和不应漂移的骨架。 |
+| 5 | 页面 `fixture.json` / `fixture.js` | 页面默认数据、状态矩阵数据和可见文案。 |
+| 6 | 页面 `COMPONENT_SPEC.md` / `README.md` | 页面级组件、事件、状态覆盖和验收标准。 |
+| 7 | `verify/*.png` | 视觉走查证据，不作为组件拆分的唯一来源。 |
 
 ## 当前 Android 落点（Current Android Targets）
 
@@ -79,13 +80,13 @@
 | `SettingRow`、`SettingGroupCard`、`StatusBadge`、`DangerActionRow` | `ui/components/SettingsComponents.kt` | 设置链路和阅读设置都应复用同一语义。 |
 | `SourceCandidateRow`、`DetectStatusBadge`、`SwitchSourceButton` | `ui/reader/source/SourceSwitchFlowScreen.kt` | 属于 FlowShell，不应混成普通列表行；当前先作为换源输入框架私有组件落地。 |
 
-当前组件映射守卫（Current Component Mapping Guard）：`ReaderSharedComponentsStructureTest` 已检查公共组件库中的核心语义组件能追溯到 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件。
+当前组件映射守卫（Current Component Mapping Guard）：`ReaderSharedComponentsStructureTest` 已检查公共组件库中的核心语义组件能追溯到 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件；同时守住 `MainTabShell`、`LibraryShell`、`ReaderShell`、`FlowShell`、`SettingsShell` 的 manifest 计数和 Compose 骨架/slot/preview 锚点。
 
 ## 状态与事件映射（State and Event Mapping）
 
 - 数据模型（Data Model）：把 `contracts.d.ts` 的 Fixture/State/Event 转成 Kotlin `data class`、状态枚举或事件回调；全局契约由 `FrontendInputComposeCoverageTest` 守卫，不从 HTML class 名反推数据。
 - 状态模型（State Model）：把 `state-matrix.html` 的状态转成 Compose preview states、UI test fixtures 或 debug gallery entries。
-- 事件回调（Event Callback）：页面 `COMPONENT_SPEC.md` 中的事件应转成 `onSearchClick`、`onBookClick`、`onRetry`、`onModuleChange` 等明确回调。
+- 事件回调（Event Callback）：页面 `COMPONENT_SPEC.md` 中的事件应按 `EVENT_CALLBACK_MAPPING.md` 转成 `onSearch`、`onOpenBook`、`onRetry`、`onModuleChange` 等明确回调；payload 必须保留对应 Event union 的语义。
 - 可见文案（Visible Text）：默认使用 `fixture.json` 和页面规格中的文案；示例正文只作为示例时，不应当成不可替换产品文案。
 - 错误与空态（Error and Empty States）：状态卡在对应 shell 的 `StateHost` 内显示，不应清空导航、顶栏或根画布。
 
@@ -97,7 +98,7 @@
 4. Primitive 组件（Primitive Components）：沉淀按钮、搜索、chip、分段控件、开关、弹窗、状态卡。
 5. 页面状态（Page State）：按 `contracts.d.ts` 和 `fixture.json` 建 Kotlin state，禁止页面直接硬编码大段示例数据。
 6. 页面实现（Page Implementation）：把页面内容填入 shell slots，先主标签页，再书架链路，再阅读链路，再设置链路，最后 FlowShell。
-7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页、阅读链路、书架链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；`FrontendInputComposeCoverageTest` 负责守住 30 个正式页面的 spec、manifest 64 个正式目标集合、shell taxonomy、验证报告目标集合、Compose source 和 preview 覆盖。
+7. 验证覆盖（Validation Coverage）：主标签页（书架 default/filtering/loading/empty、发现 default/subscription/loading/empty/error/offline、RSS default/loading/empty/unreadEmpty/error、设置 default/loadingOverview/noBackup/permissionNeeded）、书源管理链路、设置二级页、阅读链路、书架链路和换源 FlowShell 已建立第一批 Compose preview/state matrix；`FrontendInputComposeCoverageTest` 负责守住 30 个正式页面的 spec、manifest 64 个正式目标集合、shell taxonomy、验证报告目标集合、Compose source 和 preview 覆盖，`ReaderSharedComponentsStructureTest` 负责守住 runtime shell 到 Compose 锚点的追溯关系。
 
 ## 开发禁用项（Do Not）
 
