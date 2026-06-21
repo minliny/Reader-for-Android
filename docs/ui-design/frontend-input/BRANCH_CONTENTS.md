@@ -23,6 +23,8 @@
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、阅读入口、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
 | Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、manifest preview/state-matrix 目标、spec 状态声明、Compose 输入源码和 Compose preview 状态一致。 |
+| 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，覆盖主导航、按钮、搜索、书籍、设置、状态、阅读控件和 FlowShell 换源组件。 |
+| 组件锚点守卫（Component Anchor Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库核心语义名能追溯到 Compose 组件或页面级实现锚点。 |
 | 图标边界守卫（Icon Boundary Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt` | 只允许生产 UI 通过 `ReaderIcons.kt` 映射 Material Icons；`ui/stitch/*` 作为历史原型例外保留。 |
 
 ## 页面输入包（Page Input Packages）
@@ -56,7 +58,7 @@
 
 1. 输入件闭环（Input Package Closure）：30 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
 2. 框架闭环（Shell Closure）：所有正式页面只能归入 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell`，且 manifest DOM slot 校验通过。
-3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，新增页面优先复用已有组件。
+3. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，核心公共组件通过 `ReaderSharedComponentsStructureTest` 映射到 Compose 实现锚点，新增页面优先复用已有组件。
 4. Compose 输入闭环（Compose Input Closure）：30 张 UI 设计图、30 个输入包和 30 个正式页面都有对应 Kotlin UI state、mapper/fixture 构造点或页面级 preview，且通过 `FrontendInputComposeCoverageTest` 守卫。
 5. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，Compose 侧至少通过覆盖守卫和相关 preview 结构测试。
 6. 留白明确（Explicit Remaining Work）：真实业务数据、完整点击链路、动效细节和端到端 UI test 可以留到下一阶段，但必须在文档中明确为后续工作。
