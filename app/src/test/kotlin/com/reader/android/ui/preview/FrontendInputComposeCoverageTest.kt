@@ -67,6 +67,7 @@ class FrontendInputComposeCoverageTest {
                 .map { contractName(it) }
                 .sorted()
             val contractStates = contractStateNames(entry.typeName).sorted()
+            val manifestStateCardCounts = manifestStateCardCounts(entry.specPath)
             val specEvents = eventContractLines(spec)
                 .map { contractName(it) }
                 .sorted()
@@ -88,6 +89,11 @@ class FrontendInputComposeCoverageTest {
                 "${entry.specPath} states must match ${entry.typeName}State",
                 specStates,
                 contractStates
+            )
+            assertEquals(
+                "${entry.specPath} manifest state matrix card counts must match ${entry.typeName}State",
+                listOf(contractStates.size, contractStates.size),
+                manifestStateCardCounts
             )
             assertEquals(
                 "${entry.specPath} events must match ${entry.typeName}Event",
@@ -174,6 +180,25 @@ class FrontendInputComposeCoverageTest {
         return Regex(""""([^"]*)"""")
             .findAll(section)
             .map { it.groupValues[1] }
+            .toList()
+    }
+
+    private fun manifestStateCardCounts(specPath: String): List<Int> {
+        val stateMatrixPath = specPath.removeSuffix("COMPONENT_SPEC.md") + "state-matrix.html"
+        val htmlNeedle = "\"$stateMatrixPath\""
+        val htmlIndex = manifestSource.indexOf(htmlNeedle)
+        assertTrue("$stateMatrixPath must be in manifest", htmlIndex >= 0)
+
+        val nextTargetIndex = manifestSource.indexOf("\n    {\n      \"name\"", startIndex = htmlIndex + htmlNeedle.length)
+        val targetSource = if (nextTargetIndex >= 0) {
+            manifestSource.substring(htmlIndex, nextTargetIndex)
+        } else {
+            manifestSource.substring(htmlIndex)
+        }
+
+        return Regex(""""expectedStateCards"\s*:\s*(\d+)""")
+            .findAll(targetSource)
+            .map { it.groupValues[1].toInt() }
             .toList()
     }
 
