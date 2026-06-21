@@ -117,7 +117,7 @@ export interface ReaderControlFixture {
   };
 }
 
-export type ReaderControlState = "" | "directory" | "tts" | "appearance" | "settings";
+export type ReaderControlState = "default" | "directory" | "tts" | "appearance" | "settings";
 
 export type ReaderControlEvent =
   | { type: "back" }

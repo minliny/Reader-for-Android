@@ -63,8 +63,12 @@ class FrontendInputComposeCoverageTest {
 
         contractEntries.forEach { entry ->
             val spec = workspaceSource(entry.specPath)
+            val specStates = stateContractLines(spec)
+                .map { contractName(it) }
+                .sorted()
+            val contractStates = contractStateNames(entry.typeName).sorted()
             val specEvents = eventContractLines(spec)
-                .map { eventName(it) }
+                .map { contractName(it) }
                 .sorted()
             val contractEvents = contractEventNames(entry.typeName).sorted()
 
@@ -79,6 +83,11 @@ class FrontendInputComposeCoverageTest {
             assertTrue(
                 "${entry.specPath} must declare ${entry.typeName}Event",
                 "type ${entry.typeName}Event" in contractsSource
+            )
+            assertEquals(
+                "${entry.specPath} states must match ${entry.typeName}State",
+                specStates,
+                contractStates
             )
             assertEquals(
                 "${entry.specPath} events must match ${entry.typeName}Event",
@@ -127,24 +136,45 @@ class FrontendInputComposeCoverageTest {
         String(Files.readAllBytes(Paths.get(path)))
 
     private fun eventContractLines(spec: String): List<String> {
-        val section = Regex("""(?ms)^## Events\s*\n(.*?)(?=^## |\z)""")
+        return contractLines(spec, "Events")
+    }
+
+    private fun stateContractLines(spec: String): List<String> {
+        return contractLines(spec, "States") + contractLines(spec, "状态")
+    }
+
+    private fun contractLines(spec: String, heading: String): List<String> {
+        val content = Regex("""(?ms)^## ${Regex.escape(heading)}\s*\n(.*?)(?=^## |\z)""")
             .find(spec)
             ?.groupValues
             ?.get(1)
             .orEmpty()
 
-        return section.lines()
+        return content.lines()
             .map { it.trim() }
             .filter { it.startsWith("- `") }
     }
 
-    private fun eventName(line: String): String {
+    private fun contractName(line: String): String {
         val raw = Regex("""`([^`]+)`""")
             .find(line)
             ?.groupValues
             ?.get(1)
             .orEmpty()
         return raw.substringBefore("(")
+    }
+
+    private fun contractStateNames(typeName: String): List<String> {
+        val section = Regex("""(?ms)^export type ${Regex.escape(typeName)}State\s*=\s*(.*?);""")
+            .find(contractsSource)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+
+        return Regex(""""([^"]*)"""")
+            .findAll(section)
+            .map { it.groupValues[1] }
+            .toList()
     }
 
     private fun contractEventNames(typeName: String): List<String> {

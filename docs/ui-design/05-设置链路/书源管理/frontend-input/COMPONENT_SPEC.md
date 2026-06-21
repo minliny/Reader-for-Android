@@ -33,6 +33,17 @@
 - Props：`source`
 - Acceptance：详情必须包含状态、分组和检测入口。
 
+## States
+
+- `default`：书源列表、搜索、筛选和当前来源状态完整展示。
+- `edit`：新增或编辑书源表单打开。
+- `log`：检测日志面板打开。
+- `loading`：正在加载或检测书源。
+- `empty`：当前筛选下没有书源。
+- `error`：书源加载或检测失败。
+- `offline`：网络不可用，检测入口不可提交。
+- `permission`：检测或导入前需要权限说明。
+
 ## Events
 
 - `back`：返回设置页。
@@ -51,4 +62,4 @@
 ## Acceptance
 
 - 必须覆盖 `书源列表`、`搜索框`、`启用开关`、`检测`、`详情`、`新增`、`编辑`、`错误日志`。
-- 状态矩阵必须覆盖 default、loading、empty、error、offline、permission，并补充 edit 和 log。
+- 状态矩阵必须覆盖 `default`、`edit`、`log`、`loading`、`empty`、`error`、`offline`、`permission`。

@@ -28,6 +28,14 @@
 - Props：`title`、`copy`
 - Acceptance：清理完成必须显示结果反馈，不改变页面结构。
 
+## States
+
+- `default`：缓存占用、缓存分类和清理入口完整展示。
+- `loading`：正在计算缓存占用。
+- `empty`：暂无可清理缓存。
+- `confirm`：清理缓存确认弹窗打开。
+- `error`：缓存计算或清理失败。
+
 ## Events
 
 - `back`：返回设置页。
@@ -42,4 +50,4 @@
 ## Acceptance
 
 - 必须覆盖 `缓存占用`、`正在计算`、`清理缓存`、`缓存分类`、`确认清理`。
-- 状态矩阵必须覆盖 default、loading、empty、confirm、error。
+- 状态矩阵必须覆盖 `default`、`loading`、`empty`、`confirm`、`error`。

@@ -28,6 +28,16 @@
 - Props：`title`、`copy`、`confirmLabel`
 - Acceptance：必须说明恢复会覆盖当前数据，确认按钮为 `确认恢复`。
 
+## States
+
+- `default`：同步、备份、恢复和备份记录完整展示。
+- `confirm`：恢复备份确认弹窗打开。
+- `loading`：正在同步或备份。
+- `empty`：没有备份记录。
+- `error`：同步或备份失败。
+- `offline`：网络不可用。
+- `permission`：同步或备份前需要权限说明。
+
 ## Events
 
 - `back`：返回设置页。
@@ -46,4 +56,4 @@
 ## Acceptance
 
 - 必须覆盖 `备份位置`、`立即备份`、`恢复备份`、`自动备份`、`备份记录`。
-- 状态矩阵必须覆盖 default、loading、empty、error、offline、permission。
+- 状态矩阵必须覆盖 `default`、`confirm`、`loading`、`empty`、`error`、`offline`、`permission`。
