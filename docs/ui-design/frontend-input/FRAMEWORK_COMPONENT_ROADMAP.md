@@ -21,7 +21,7 @@
 | 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构；Compose 侧已补四个主标签页状态矩阵。 |
 | 书架链路框架（LibraryShell） | 已完成（Completed） | 8 个书架链路页面已通过 `LibraryPageKit` 输出统一 `StackFrame / BackTopBar / ContentRegion / BottomActionHost / SheetHost / DialogHost / StateHost`。 |
 | 主导航交互规则（Main Navigation Interaction Rule） | 已完成并已校验（Completed and Validated） | 四个按钮固定为书架、发现、RSS、设置；选中态只改变背景、图标颜色和文字颜色，不改变位置。 |
-| 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理（Documented） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层。 |
+| 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理并守卫（Documented and Guarded） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层，并由 `FrontendInputHtmlInventoryTest` 守住库存分类和 manifest 排除规则。 |
 | 框架与组件总目录（Framework and Component Catalog） | 已梳理（Documented） | `FRAMEWORK_COMPONENT_CATALOG.md` 已按 Shell、共享 kit、页面归属、组件类别和固定交互规则整理。 |
 | 公共组件库（Component Library） | 已覆盖当前输入件（Covered for Current Inputs） | 当前公共库已经覆盖本轮已转化页面需要的框架组件和高复用组件，并由 `ReaderSharedComponentsStructureTest` 守卫核心语义组件及五个 runtime shell 的 Compose 实现锚点。 |
 | 公共素材库（Asset Library） | 已完成第一版（First Version Completed） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token。 |
