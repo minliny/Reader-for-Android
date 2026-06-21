@@ -28,6 +28,21 @@
 - Props：`title`、`copy`、`confirmLabel`
 - Acceptance：必须说明恢复会覆盖当前数据，确认按钮为 `确认恢复`。
 
+## Events
+
+- `back`：返回设置页。
+- `selectBackupLocation`：选择备份位置。
+- `runBackupNow`：立即备份。
+- `exportBackup`：导出备份文件。
+- `restoreBackup(record)`：请求恢复指定备份。
+- `restoreCancel`：取消恢复确认。
+- `restoreConfirm(record)`：确认恢复备份。
+- `toggleAutoBackup(enabled)`：开启或关闭自动备份。
+- `openWebDavSettings`：打开 WebDAV 配置。
+- `resolveConflict(choice)`：处理同步冲突。
+- `retry`：重试当前错误状态。
+- `grantPermission`：进入权限授权流程。
+
 ## Acceptance
 
 - 必须覆盖 `备份位置`、`立即备份`、`恢复备份`、`自动备份`、`备份记录`。

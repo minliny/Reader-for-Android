@@ -64,6 +64,7 @@
 必须满足（Must Have）：
 
 - 用于展示组件拆分，不等同完整前端页面。
+- 必须是独立 HTML 文档，包含 `<!doctype html>`、`html`、`head`、`body` 和本页 `components.css` 引用。
 - 组件标题、注释和分组名使用 `中文名称（English Name）`。
 - 可直接打开，不应有控制台错误或资源请求失败。
 - 如果组件来自共享 shell 或公共组件库，应写明来源，例如 `主导航（MainNav）`、`设置行（SettingRow）`。
@@ -149,6 +150,6 @@
 ## 验证要求（Validation Requirements）
 
 - 全量渲染验证（Full Render Validation）：运行 `validate-frontend-inputs.js`，覆盖 manifest 中的 preview、state matrix、component-library preview 和 asset-library preview。
-- 组件参考烟测（Component Reference Smoke Test）：批量打开 `components.html`，确认无 console error 和 failed request。
+- 组件参考烟测（Component Reference Smoke Test）：`validate-frontend-inputs.js` 批量打开 30 个 `components.html`，确认它们是独立 HTML 文档、无 console error、无 failed request、无缺失图片。
 - 文档一致性检查（Documentation Consistency Check）：检查 README、COMPONENT_SPEC、路线图和架构文档是否使用一致的 `中文名称（English Name）`。
 - 例外清单检查（Exception List Check）：确认 `preview 2.html` 不在 manifest 中，也没有被文档标记为正式输入件。

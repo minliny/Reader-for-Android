@@ -23,6 +23,17 @@
 - Props：`label`
 - Acceptance：文案必须是 `去设置`，不得替换成含糊的 `确定`。
 
+## Events
+
+- `back`：返回设置页。
+- `openSystemSettings(permission)`：打开系统权限设置。
+- `togglePrivacyOption(key, enabled)`：切换隐私选项。
+- `openPrivacyPolicy`：打开隐私协议说明。
+- `clearPrivacyDataOpen`：打开清除隐私数据确认。
+- `clearPrivacyDataCancel`：取消清除隐私数据。
+- `clearPrivacyDataConfirm`：确认清除隐私数据。
+- `retry`：重试当前错误状态。
+
 ## Acceptance
 
 - 必须覆盖 `文件访问`、`通知权限`、`网络访问说明`、`去设置`、`隐私开关` 语义。

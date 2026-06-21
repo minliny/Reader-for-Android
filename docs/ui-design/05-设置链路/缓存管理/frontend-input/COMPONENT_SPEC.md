@@ -28,6 +28,17 @@
 - Props：`title`、`copy`
 - Acceptance：清理完成必须显示结果反馈，不改变页面结构。
 
+## Events
+
+- `back`：返回设置页。
+- `calculateCache`：重新计算缓存占用。
+- `openCleanupConfirm(category)`：打开缓存清理确认。
+- `cleanupCancel`：取消清理。
+- `cleanupConfirm(category)`：确认清理缓存。
+- `toggleCacheStrategy(key, enabled)`：切换缓存策略。
+- `openCacheLocation`：打开缓存目录设置。
+- `retry`：重试当前错误状态。
+
 ## Acceptance
 
 - 必须覆盖 `缓存占用`、`正在计算`、`清理缓存`、`缓存分类`、`确认清理`。

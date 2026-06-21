@@ -28,6 +28,7 @@ class FrontendInputComposeCoverageTest {
         coverageEntries.forEach { entry ->
             val spec = workspaceSource(entry.specPath)
             assertTrue("${entry.name} spec must declare states", "## States" in spec || "## 状态" in spec || "状态矩阵" in spec)
+            assertTrue("${entry.name} spec must declare event contract entries", eventContractLines(spec).isNotEmpty())
 
             val basePath = entry.specPath.removeSuffix("COMPONENT_SPEC.md")
             assertTrue("${entry.name} preview target must be in manifest", "${basePath}preview.html" in manifestSource)
@@ -82,6 +83,18 @@ class FrontendInputComposeCoverageTest {
 
     private fun appSource(path: String): String =
         String(Files.readAllBytes(Paths.get(path)))
+
+    private fun eventContractLines(spec: String): List<String> {
+        val section = Regex("""(?ms)^## Events\s*\n(.*?)(?=^## |\z)""")
+            .find(spec)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+
+        return section.lines()
+            .map { it.trim() }
+            .filter { it.startsWith("- `") }
+    }
 
     private companion object {
         private const val MainTabPreview = "src/main/kotlin/com/reader/android/ui/preview/MainTabStateMatrixPreviews.kt"
