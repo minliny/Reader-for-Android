@@ -1,6 +1,7 @@
 package com.reader.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,11 +9,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reader.android.BuildConfig
@@ -31,20 +38,26 @@ import com.reader.android.ui.theme.ReaderTheme
 
 data class SettingsOverviewItem(
     val label: String,
-    val value: String
+    val value: String,
+    val iconToken: ReaderIconToken,
+    val tone: SettingsHomeTone
 )
 
 data class SettingsQuickEntry(
     val title: String,
     val meta: String,
-    val target: SettingsTarget
+    val target: SettingsTarget,
+    val iconToken: ReaderIconToken,
+    val tone: SettingsHomeTone
 )
 
 data class SettingsHomeRow(
     val title: String,
     val meta: String,
     val target: SettingsTarget,
-    val state: String = ""
+    val state: String = "",
+    val iconToken: ReaderIconToken,
+    val tone: SettingsHomeTone
 )
 
 data class SettingsHomeSection(
@@ -73,36 +86,62 @@ enum class SettingsHomeDisplayState {
     PermissionNeeded
 }
 
+enum class SettingsHomeTone {
+    Blue,
+    Orange,
+    Green,
+    Purple
+}
+
 data class SettingsHomeState(
     val displayState: SettingsHomeDisplayState = SettingsHomeDisplayState.Default,
     val overviewTitle: String = "本地概览",
     val overviewItems: List<SettingsOverviewItem> = listOf(
-        SettingsOverviewItem("本地书籍", "42"),
-        SettingsOverviewItem("订阅源", "12"),
-        SettingsOverviewItem("书源可用", "8/12"),
-        SettingsOverviewItem("最近备份", "昨天")
+        SettingsOverviewItem("本地书籍", "42", ReaderIconToken.Bookshelf, SettingsHomeTone.Blue),
+        SettingsOverviewItem("订阅源", "12", ReaderIconToken.Rss, SettingsHomeTone.Orange),
+        SettingsOverviewItem("书源可用", "8/12", ReaderIconToken.SourceSwitch, SettingsHomeTone.Green),
+        SettingsOverviewItem("最近备份", "昨天", ReaderIconToken.Clock, SettingsHomeTone.Purple)
     ),
     val quickEntries: List<SettingsQuickEntry> = listOf(
-        SettingsQuickEntry("书源管理", "8 个可用", SettingsTarget.SourceManagement),
-        SettingsQuickEntry("RSS/订阅管理", "12 个订阅源", SettingsTarget.RssManagement),
-        SettingsQuickEntry("阅读偏好", "默认行为", SettingsTarget.ReadingPreference),
-        SettingsQuickEntry("缓存管理", "1.2 GB", SettingsTarget.CacheManagement)
+        SettingsQuickEntry("书源管理", "8 个可用", SettingsTarget.SourceManagement, ReaderIconToken.Storage, SettingsHomeTone.Blue),
+        SettingsQuickEntry("RSS/订阅管理", "12 个订阅源", SettingsTarget.RssManagement, ReaderIconToken.Rss, SettingsHomeTone.Orange),
+        SettingsQuickEntry("阅读偏好", "默认行为", SettingsTarget.ReadingPreference, ReaderIconToken.Directory, SettingsHomeTone.Green),
+        SettingsQuickEntry("缓存管理", "1.2 GB", SettingsTarget.CacheManagement, ReaderIconToken.Storage, SettingsHomeTone.Purple)
     ),
     val sections: List<SettingsHomeSection> = listOf(
         SettingsHomeSection(
             title = "全部设置",
             rows = listOf(
-                SettingsHomeRow("通用", "语言、启动页、主题跟随系统", SettingsTarget.General),
-                SettingsHomeRow("阅读", "默认阅读行为、完整阅读设置", SettingsTarget.ReadingPreference),
-                SettingsHomeRow("书架与搜索", "展示方式、搜索范围、历史记录", SettingsTarget.BookshelfSearch),
-                SettingsHomeRow("书源与订阅", "书源、订阅源、来源检测", SettingsTarget.SourceSubscription, "可用"),
-                SettingsHomeRow("同步与备份", "本地备份、WebDAV、导入导出", SettingsTarget.SyncBackup, "未设置"),
-                SettingsHomeRow("隐私与权限", "存储、通知、隐私清理", SettingsTarget.PrivacyPermissions, "待授权"),
-                SettingsHomeRow("关于与反馈", "版本、更新日志、反馈", SettingsTarget.AboutFeedback)
+                SettingsHomeRow("通用", "语言、启动页、主题跟随系统", SettingsTarget.General, iconToken = ReaderIconToken.Settings, tone = SettingsHomeTone.Blue),
+                SettingsHomeRow("阅读", "默认阅读行为、完整阅读设置", SettingsTarget.ReadingPreference, iconToken = ReaderIconToken.Directory, tone = SettingsHomeTone.Orange),
+                SettingsHomeRow("书架与搜索", "展示方式、搜索范围、历史记录", SettingsTarget.BookshelfSearch, iconToken = ReaderIconToken.Search, tone = SettingsHomeTone.Green),
+                SettingsHomeRow("书源与订阅", "书源、订阅源、来源检测", SettingsTarget.SourceSubscription, "可用", ReaderIconToken.SourceSwitch, SettingsHomeTone.Blue),
+                SettingsHomeRow("同步与备份", "本地备份、WebDAV、导入导出", SettingsTarget.SyncBackup, "未设置", ReaderIconToken.Upload, SettingsHomeTone.Purple),
+                SettingsHomeRow("隐私与权限", "存储、通知、隐私清理", SettingsTarget.PrivacyPermissions, "待授权", ReaderIconToken.Shield, SettingsHomeTone.Green),
+                SettingsHomeRow("关于与反馈", "版本、更新日志、反馈", SettingsTarget.AboutFeedback, iconToken = ReaderIconToken.Info, tone = SettingsHomeTone.Orange)
             )
         )
-    )
+    ),
+    val bottomNavLabels: List<String> = listOf("书架", "发现", "RSS", "设置")
 )
+
+object SettingsHomeMapper {
+    fun fromFixture(): SettingsHomeState = SettingsHomeState()
+
+    fun loadingOverview(): SettingsHomeState =
+        fromFixture().copy(displayState = SettingsHomeDisplayState.LoadingOverview)
+
+    fun noBackup(): SettingsHomeState =
+        fromFixture().copy(
+            displayState = SettingsHomeDisplayState.NoBackup,
+            overviewItems = fromFixture().overviewItems.map { item ->
+                if (item.label == "最近备份") item.copy(value = "未设置") else item
+            }
+        )
+
+    fun permissionNeeded(): SettingsHomeState =
+        fromFixture().copy(displayState = SettingsHomeDisplayState.PermissionNeeded)
+}
 
 @Composable
 fun SettingsRootScreen(
@@ -172,6 +211,7 @@ fun SettingsRootScreen(
                                 ReaderSettingsRow(
                                     title = row.title,
                                     subtitle = row.meta,
+                                    leading = { SettingsHomeIcon(token = row.iconToken, tone = row.tone) },
                                     trailing = {
                                         if (row.state.isNotBlank()) {
                                             ReaderChip(text = row.state, selected = row.state == "可用")
@@ -267,8 +307,19 @@ private fun SettingsOverviewMetric(
     item: SettingsOverviewItem,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier) {
-        ReaderChip(text = item.value, selected = item.value != "未设置")
+    Column(
+        modifier = modifier.semantics { contentDescription = "${item.label}，${item.value}" },
+        horizontalAlignment = Alignment.Start
+    ) {
+        SettingsHomeIcon(token = item.iconToken, tone = item.tone)
+        Text(
+            text = item.value,
+            modifier = Modifier.padding(top = ReaderTheme.spacing.xs),
+            color = item.tone.color(),
+            style = ReaderTheme.typography.sectionTitle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Text(
             text = item.label,
             modifier = Modifier.padding(top = ReaderTheme.spacing.xs),
@@ -297,10 +348,40 @@ private fun SettingsQuickEntryRow(
     ReaderSettingsRow(
         title = entry.title,
         subtitle = entry.meta,
+        leading = { SettingsHomeIcon(token = entry.iconToken, tone = entry.tone) },
         trailing = { ReaderChip(text = "常用", selected = true) },
         onClick = onClick
     )
 }
+
+@Composable
+private fun SettingsHomeIcon(
+    token: ReaderIconToken,
+    tone: SettingsHomeTone
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .semantics { contentDescription = "设置图标，${token.name}" },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = token.asImageVector(),
+            contentDescription = null,
+            tint = tone.color(),
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun SettingsHomeTone.color(): Color =
+    when (this) {
+        SettingsHomeTone.Blue -> ReaderTheme.colors.primary
+        SettingsHomeTone.Orange -> Color(0xFFB54708)
+        SettingsHomeTone.Green -> Color(0xFF1F7A4D)
+        SettingsHomeTone.Purple -> Color(0xFF6F4FA3)
+    }
 
 private fun dispatchSettingsTarget(
     target: SettingsTarget,

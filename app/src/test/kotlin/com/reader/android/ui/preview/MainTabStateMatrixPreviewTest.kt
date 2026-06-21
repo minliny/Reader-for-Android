@@ -39,6 +39,10 @@ class MainTabStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/discover/RssHomeDesignUiState.kt")))
     }
 
+    private val settingsRootSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/settings/MineScreen.kt")))
+    }
+
     @Test
     fun `main tab compose previews expose default and state matrix entries`() {
         listOf(
@@ -85,9 +89,10 @@ class MainTabStateMatrixPreviewTest {
             "RssHomeDesignMapper.empty",
             "RssHomeDesignMapper.unreadEmpty",
             "RssHomeDesignMapper.error",
-            "SettingsHomeDisplayState.LoadingOverview",
-            "SettingsHomeDisplayState.NoBackup",
-            "SettingsHomeDisplayState.PermissionNeeded"
+            "SettingsHomeMapper.fromFixture",
+            "SettingsHomeMapper.loadingOverview",
+            "SettingsHomeMapper.noBackup",
+            "SettingsHomeMapper.permissionNeeded"
         ).forEach { token ->
             assertTrue("Main tab preview source must use $token", token in previewSource)
         }
@@ -271,6 +276,42 @@ class MainTabStateMatrixPreviewTest {
             "保留上次订阅框架"
         ).forEach { token ->
             assertTrue("RSS home state source must contain $token", token in rssHomeStateSource)
+        }
+    }
+
+    @Test
+    fun `settings main tab state model keeps frontend input contract text`() {
+        listOf(
+            "SettingsHomeMapper",
+            "fun loadingOverview()",
+            "fun noBackup()",
+            "fun permissionNeeded()",
+            "SettingsHomeTone",
+            "bottomNavLabels",
+            "本地概览",
+            "本地书籍",
+            "订阅源",
+            "书源可用",
+            "最近备份",
+            "书源管理",
+            "RSS/订阅管理",
+            "阅读偏好",
+            "缓存管理",
+            "全部设置",
+            "通用",
+            "书架与搜索",
+            "书源与订阅",
+            "同步与备份",
+            "隐私与权限",
+            "关于与反馈",
+            "待授权",
+            "ReaderIconToken.Bookshelf",
+            "ReaderIconToken.Rss",
+            "ReaderIconToken.SourceSwitch",
+            "ReaderIconToken.Shield",
+            "SettingsHomeIcon"
+        ).forEach { token ->
+            assertTrue("Settings root source must contain $token", token in settingsRootSource)
         }
     }
 }
