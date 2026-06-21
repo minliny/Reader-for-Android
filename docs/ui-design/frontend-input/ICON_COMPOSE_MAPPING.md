@@ -80,7 +80,7 @@
 | `Shield` | `shield` | 已映射 | 隐私说明和安全说明通过 `ReaderIconToken.Shield` 表达。 |
 | `Sort` | `sort` | 已映射 | 搜索结果排序通过 `ReaderIconToken.Sort` 表达。 |
 | `Storage` | `storage` | 已映射 | 缓存占用、存储策略和清理结果通过 `ReaderIconToken.Storage` 表达。 |
-| `Stop` | 待补 `stop` | 缺口 | 停止自动翻页或朗读。 |
+| `Stop` | `stop` | 本地已补 / Compose 待用 | 停止自动翻页或朗读；当前素材库已补 token，Compose 尚未新增独立 `ReaderIconToken.Stop`。 |
 | `SwapHoriz` | `replace` / `source` | 需按上下文 | 内容替换用 `replace`，换源用 `source`。 |
 | `TextFormat` | `typo` | 可映射 | 字体、排版。 |
 | `Tune` | `appearance` | 可映射 | 界面/显示调整。 |
@@ -104,7 +104,7 @@
 | --- | --- | --- |
 | `AppNavigation.kt` | `AppScreen` 已持有 `ReaderIconToken`，并通过 `asImageVector()` 暴露兼容图标。 | 后续禁止主 tab 直接新增 `ImageVector` 字段。 |
 | `ReaderRouteHost.kt` | 底栏读取 `appScreens`，图标从 `ReaderIconToken` 解析，并由 `ReaderMainTabShell` 输出统一主导航。 | 后续主 tab 只能扩展 `ReaderMainTabShell`，不再恢复临时 `StitchBottomNav`。 |
-| `ui/components/*` | 顶栏返回、搜索、设置下拉、状态组件和 reader setting chevron 已接入 `ReaderIconToken`。 | 后续新增共享组件不得直接 import Material Icons。 |
+| `ui/components/*` | 顶栏返回、搜索、设置下拉、状态组件和 reader setting chevron 已接入 `ReaderIconToken`；生产 UI 图标导入边界由 `ReaderIconImportBoundaryTest` 守卫。 | 后续新增共享组件不得直接 import Material Icons。 |
 | `ui/bookshelf/*` | 书架布局切换、搜索 FAB 和更多操作已接入 `ReaderIconToken`。 | 后续书架操作继续从 token 扩展。 |
 | `ui/reader/components/*` | 阅读顶部栏、亮度条、快捷操作、页内翻页、底栏、目录指示和清除按钮已接入 `ReaderIconToken`。 | 后续新增阅读控制图标必须先扩展 token。 |
 | `ui/stitch/*` | 原型代码大量直接引用 Material Icons。 | 保留为历史参考，不作为最终图标规则来源。 |
@@ -181,4 +181,5 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
 - 新增页面不得直接新增散落的 `Icons.Filled.*` 使用点。
 - 主导航、阅读模块导航、设置入口必须用语义 token。
 - 没有本地 token 的 Material icon 必须先进入“需要补 token 的缺口”。
+- 生产 UI 只能在 `ReaderIcons.kt` 内映射 Material Icons；`ui/stitch/*` 仅作为历史原型例外。
 - Figma 缺源图标仍按 `ICON_LIBRARY_AUDIT.md` 处理，不因为 Compose 有 Material icon 就视为 Figma 已完成。
