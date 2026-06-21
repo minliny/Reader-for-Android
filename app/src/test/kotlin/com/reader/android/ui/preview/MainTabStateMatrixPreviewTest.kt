@@ -31,6 +31,14 @@ class MainTabStateMatrixPreviewTest {
         String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/discover/DiscoveryHomeDesignUiState.kt")))
     }
 
+    private val rssHomeScreenSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/discover/RssScreens.kt")))
+    }
+
+    private val rssHomeStateSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/ui/discover/RssHomeDesignUiState.kt")))
+    }
+
     @Test
     fun `main tab compose previews expose default and state matrix entries`() {
         listOf(
@@ -49,6 +57,7 @@ class MainTabStateMatrixPreviewTest {
             "RssMainTabLoadingPreview",
             "RssMainTabEmptyPreview",
             "RssMainTabUnreadEmptyPreview",
+            "RssMainTabErrorPreview",
             "SettingsMainTabDefaultPreview",
             "SettingsMainTabLoadingOverviewPreview",
             "SettingsMainTabNoBackupPreview",
@@ -71,9 +80,11 @@ class MainTabStateMatrixPreviewTest {
             "DiscoveryHomeMapper.empty",
             "DiscoveryHomeMapper.error",
             "DiscoveryHomeMapper.offline",
-            "DiscoverRssWebDavMapper.rssList",
-            "DiscoverRssWebDavMapper.rssLoading",
-            "DiscoverRssWebDavMapper.rssEmpty",
+            "RssHomeDesignMapper.fromFixture",
+            "RssHomeDesignMapper.loading",
+            "RssHomeDesignMapper.empty",
+            "RssHomeDesignMapper.unreadEmpty",
+            "RssHomeDesignMapper.error",
             "SettingsHomeDisplayState.LoadingOverview",
             "SettingsHomeDisplayState.NoBackup",
             "SettingsHomeDisplayState.PermissionNeeded"
@@ -206,6 +217,60 @@ class MainTabStateMatrixPreviewTest {
             "设置"
         ).forEach { token ->
             assertTrue("Discovery home state source must contain $token", token in discoveryHomeStateSource)
+        }
+    }
+
+    @Test
+    fun `rss main tab screen accepts fixture driven home state`() {
+        listOf(
+            "rssHomeState: RssHomeDesignUiState? = null",
+            "effectiveRssState",
+            "effectiveStatusFilters",
+            "effectiveSourceFilters",
+            "订阅概览",
+            "阅读状态",
+            "来源筛选",
+            "最新订阅",
+            "还没有订阅内容",
+            "当前没有未读内容",
+            "订阅流加载失败",
+            "保留上次订阅框架",
+            "查看全部",
+            "添加订阅源"
+        ).forEach { token ->
+            assertTrue("RssHomeScreen must contain $token", token in rssHomeScreenSource)
+        }
+    }
+
+    @Test
+    fun `rss main tab state model keeps frontend input contract text`() {
+        listOf(
+            "RssHomeDisplayState",
+            "RssHomeDesignMapper",
+            "fun loading()",
+            "fun empty()",
+            "fun unreadEmpty()",
+            "fun error()",
+            "书架",
+            "发现",
+            "RSS",
+            "设置",
+            "全部",
+            "未读",
+            "收藏",
+            "稍后读",
+            "书单",
+            "全部来源",
+            "小说更新",
+            "技术文章",
+            "书单推送",
+            "刷新中",
+            "暂无更新",
+            "加载失败",
+            "订阅流加载失败",
+            "保留上次订阅框架"
+        ).forEach { token ->
+            assertTrue("RSS home state source must contain $token", token in rssHomeStateSource)
         }
     }
 }

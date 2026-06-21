@@ -6,12 +6,11 @@ import com.reader.android.ui.bookshelf.BookshelfHomeMapper
 import com.reader.android.ui.bookshelf.BookshelfScreen
 import com.reader.android.ui.discover.DiscoverScreen
 import com.reader.android.ui.discover.DiscoveryHomeMapper
-import com.reader.android.ui.discover.RssHomeFilter
+import com.reader.android.ui.discover.RssHomeDesignMapper
 import com.reader.android.ui.discover.RssHomeScreen
 import com.reader.android.ui.settings.SettingsHomeDisplayState
 import com.reader.android.ui.settings.SettingsHomeState
 import com.reader.android.ui.settings.SettingsRootScreen
-import com.reader.android.ui.sync.DiscoverRssWebDavMapper
 
 private const val PreviewWidth = 390
 private const val PreviewHeight = 844
@@ -79,34 +78,31 @@ fun DiscoverMainTabOfflinePreview() {
 @Preview(name = "MainTab / RSS / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun RssMainTabDefaultPreview() {
-    RssHomeScreen(rssState = DiscoverRssWebDavMapper.rssList())
+    RssHomeScreen(rssHomeState = RssHomeDesignMapper.fromFixture())
 }
 
 @Preview(name = "MainTab / RSS / Loading", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun RssMainTabLoadingPreview() {
-    RssHomeScreen(rssState = DiscoverRssWebDavMapper.rssLoading())
+    RssHomeScreen(rssHomeState = RssHomeDesignMapper.loading())
 }
 
 @Preview(name = "MainTab / RSS / Empty", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun RssMainTabEmptyPreview() {
-    RssHomeScreen(rssState = DiscoverRssWebDavMapper.rssEmpty())
+    RssHomeScreen(rssHomeState = RssHomeDesignMapper.empty())
 }
 
 @Preview(name = "MainTab / RSS / Unread Empty", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
 @Composable
 fun RssMainTabUnreadEmptyPreview() {
-    RssHomeScreen(
-        rssState = DiscoverRssWebDavMapper.rssEmpty(),
-        statusFilters = listOf(
-            RssHomeFilter("全部", "all"),
-            RssHomeFilter("未读", "unread", active = true),
-            RssHomeFilter("收藏", "favorite"),
-            RssHomeFilter("稍后读", "later"),
-            RssHomeFilter("书单", "booklist")
-        )
-    )
+    RssHomeScreen(rssHomeState = RssHomeDesignMapper.unreadEmpty())
+}
+
+@Preview(name = "MainTab / RSS / Error", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
+@Composable
+fun RssMainTabErrorPreview() {
+    RssHomeScreen(rssHomeState = RssHomeDesignMapper.error())
 }
 
 @Preview(name = "MainTab / Settings / Default", widthDp = PreviewWidth, heightDp = PreviewHeight, showBackground = true)
