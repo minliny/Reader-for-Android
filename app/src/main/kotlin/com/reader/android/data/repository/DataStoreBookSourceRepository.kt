@@ -5,8 +5,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.storage.dataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -32,35 +34,49 @@ class DataStoreBookSourceRepository(context: Context) : BookSourceRepository {
     override fun getByUrl(url: String): BookSource? = cached.find { it.sourceUrl == url }
 
     override fun add(source: BookSource) {
-        cached = cached + source
+        cached = (cached.filterNot { it.sourceUrl == source.sourceUrl } + source)
+            .sortedBy { it.sourceName }
+        saveBlocking()
     }
 
     override fun remove(url: String) {
         cached = cached.filter { it.sourceUrl != url }
+        saveBlocking()
     }
 
     override fun setEnabled(url: String, enabled: Boolean) {
         cached = cached.map { if (it.sourceUrl == url) it.copy(enabled = enabled) else it }
+        saveBlocking()
     }
 
     override fun importJson(jsonString: String): Int {
         val newSources = parseSourceList(jsonString)
-        cached = cached + newSources
+        val byUrl = linkedMapOf<String, BookSource>()
+        cached.forEach { byUrl[it.sourceUrl] = it }
+        newSources.forEach { byUrl[it.sourceUrl] = it }
+        cached = byUrl.values.sortedBy { it.sourceName }
+        saveBlocking()
         return newSources.size
     }
 
     suspend fun load() {
-        dataStore.data.collect { prefs ->
-            val json = prefs[KEY_SOURCES] ?: "[]"
-            cached = parseSourceList(json)
-            return@collect
-        }
+        val prefs = dataStore.data.first()
+        val json = prefs[KEY_SOURCES] ?: "[]"
+        cached = parseSourceList(json)
+    }
+
+    fun loadBlocking() {
+        runBlocking { load() }
     }
 
     suspend fun save() {
         dataStore.edit { prefs ->
             prefs[KEY_SOURCES] = toJson(cached)
         }
+    }
+
+    fun saveBlocking() {
+        runBlocking { save() }
     }
 
     private fun parseSourceList(json: String): List<BookSource> {

@@ -99,9 +99,26 @@ class FrontendInputHtmlInventoryTest {
                 .filter { Files.isRegularFile(it) }
                 .filter { it.fileName.toString().endsWith(".html") }
                 .map { workspaceRoot.relativize(it.toAbsolutePath().normalize()).toString().replace('\\', '/') }
+                .filter { isTrackedHtmlInventoryPath(it) }
                 .sorted()
                 .collect(Collectors.toList())
         }
+    }
+
+    private fun isTrackedHtmlInventoryPath(path: String): Boolean {
+        if ("/frontend-input 2/" in path) return false
+        if ("/asset-library 2/" in path) return false
+        if ("/component-library 2/" in path) return false
+        if ("/shared-shell-kit 2/" in path) return false
+        if ("/frontend-demo-draft 2/" in path) return false
+        if ("/frontend-demo 2/" in path) return false
+        if ("/interactive-demo/" in path) return false
+        if ("/91-历史归档/" in path) return false
+        if (path.endsWith(" 2.html")) {
+            return path.endsWith("02-主标签页/书架/frontend-input/preview 2.html") ||
+                path.endsWith("04-阅读链路/阅读控制层/frontend-input/preview 2.html")
+        }
+        return true
     }
 
     private fun formalScreenDirs(): List<String> {

@@ -7,32 +7,32 @@
 ## 分支范围（Branch Scope）
 
 - 目标：把本地 UI 设计图整理为可验证的 `frontend-input` 前端设计稿输入件。
-- 范围：29 个页面输入包、97 个本地 HTML、公共组件库、公共素材库、共享 shell kit、前端 demo 设计稿、manifest 校验、框架审计文档，以及面向 Android Compose 的输入状态预览和覆盖守卫。
+- 范围：30 个页面输入包、100 个本地 HTML、公共组件库、公共素材库、共享 shell kit、前端 demo 设计稿、manifest 校验、框架审计文档，以及面向 Android Compose 的输入状态预览和覆盖守卫。
 - 非范围：真实业务数据接入、线上产品逻辑、完整交互动效实现、端到端 UI 自动化。
 
 ## 核心入口（Primary Entry Points）
 
 | 内容（Content） | 路径（Path） | 用途（Purpose） |
 | --- | --- | --- |
-| 验证清单（Validation Manifest） | `docs/ui-design/frontend-input/manifest.json` | 62 个正式验证目标：29 个页面预览、29 个状态矩阵、4 个公共库/示例目标；不包含 `preview 2.html` 或 `components.html`。 |
+| 验证清单（Validation Manifest） | `docs/ui-design/frontend-input/manifest.json` | 64 个正式验证目标：30 个页面预览、30 个状态矩阵、4 个公共库/示例目标；不包含 `preview 2.html` 或 `components.html`。 |
 | 设计 Token 契约（Design Token Contract） | `docs/ui-design/frontend-input/design-tokens.json`、`docs/ui-design/frontend-input/tokens.css` | 70 个 token，连接 HTML CSS 变量和 Compose theme 源文件，覆盖颜色、基础间距、frame、安全区、shell 尺寸、z-index、文本范围、字号、圆角、阴影和 focus。 |
 | 全量验证脚本（Validation Script） | `docs/ui-design/frontend-input/validate-frontend-inputs.js` | 渲染所有正式 HTML，生成截图和 `frontend-input-design-draft-validation.json`。 |
-| 验证报告（Validation Report） | `docs/ui-design/frontend-input-design-draft-validation.json` | 最近一次全量校验结果。当前为 62/62 通过，并校验 token 契约、manifest inventory、详版页面规划、29 个组件参考页和 demo 单一应用画布、页面内路由、返回栈、键盘、底表、弹窗交互。 |
+| 验证报告（Validation Report） | `docs/ui-design/frontend-input-design-draft-validation.json` | 最近一次全量校验结果。当前为 64/64 通过，并校验 token 契约、manifest inventory、详版页面规划、30 个组件参考页和 demo 单一应用画布、页面内路由、返回栈、键盘、底表、弹窗交互。 |
 | 可执行规划契约（Executable Planning Contract） | `docs/ui-design/frontend-input/FRONTEND_EXECUTABLE_PLANNING_CONTRACT.md` | 规划层总收口，明确页面、Shell、组件、覆盖、导航栈、状态替换、动效、无障碍、素材裁切和验收规划，作为进入实现前的结构依据。 |
-| 详版页面规划（Detailed Page Planning） | `docs/ui-design/frontend-input/FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md` | 29 个正式页面的详版字段矩阵，覆盖结构与覆盖、入口返回、上下文事件、适配文本、组件和验收，并由验证脚本守住。 |
+| 详版页面规划（Detailed Page Planning） | `docs/ui-design/frontend-input/FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md` | 30 个正式页面的详版字段矩阵，覆盖结构与覆盖、入口返回、上下文事件、适配文本、组件和验收，并由验证脚本守住。 |
 | 共享 Shell Kit（Shared Shell Kit） | `docs/ui-design/frontend-input/shared-shell-kit/` | 输出 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell` 的公共 slot 结构。 |
 | 公共素材库（Asset Library） | `docs/ui-design/frontend-input/asset-library/` | UI 设计图、封面素材和 79 个统一语义图标 token。 |
 | 公共组件库（Component Library） | `docs/ui-design/frontend-input/component-library/` | 组件、状态、底表、卡片、行和交互规则的可视化入口。 |
 | 前端 Demo 设计稿（Frontend Demo Draft） | `docs/ui-design/frontend-input/frontend-demo-draft/` | 使用统一 shell 拼出的前端开发参考稿。 |
 | 书架页 Demo（Bookshelf Page Demo） | `docs/ui-design/frontend-input/bookshelf-demo/index.html` | 复用书架输入件、MainTabShell、书籍组件和状态切换的人工审视页，不进入正式 manifest。 |
-| 事件回调映射（Event Callback Mapping） | `docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md` | 将 29 个页面 `Event` union 映射到稳定 Compose 回调名。 |
+| 事件回调映射（Event Callback Mapping） | `docs/ui-design/frontend-input/EVENT_CALLBACK_MAPPING.md` | 将 30 个页面、281 个事件 `Event` union 映射到稳定 Compose 回调名。 |
 | Compose 状态预览（Compose State Previews） | `app/src/main/kotlin/com/reader/android/ui/preview/`、`app/src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt` | 主标签页、书源管理链路、设置二级页（App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理、WebDAV、备份、进度同步、远程书籍）、阅读控制层、沉浸阅读、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、书架空状态/搜索/详情/目录/排序筛选/书籍操作底表/分组管理/本地书导入链路，以及 FlowShell 换源横向流程的 Android Compose preview 状态。 |
-| HTML 库存守卫（HTML Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputHtmlInventoryTest.kt` | 确认 97 个本地 HTML、94 个 `frontend-input` 范围 HTML、29 个正式预览页、29 个状态矩阵、29 个组件参考页、2 个历史 `preview 2.html`、4 个公共库/示例页、1 个人工审视 demo 和 3 个历史独立复刻页分类一致，并确认 manifest 不接收历史/参考页。 |
-| 素材库库存守卫（Asset Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputAssetLibraryInventoryTest.kt` | 确认素材库 `fixture.json`、`fixture.js`、`icons.js`、实际 UI 图/封面文件、manifest 和验证报告中的 29 张 UI 图、6 张封面、79 个图标 token、25 个补齐图标和验证截图登记一致。 |
+| HTML 库存守卫（HTML Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputHtmlInventoryTest.kt` | 确认 100 个本地 HTML、97 个 `frontend-input` 范围 HTML、30 个正式预览页、30 个状态矩阵、30 个组件参考页、2 个历史 `preview 2.html`、4 个公共库/示例页、1 个人工审视 demo 和 3 个历史独立复刻页分类一致，并确认 manifest 不接收历史/参考页。 |
+| 素材库库存守卫（Asset Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputAssetLibraryInventoryTest.kt` | 确认素材库 `fixture.json`、`fixture.js`、`icons.js`、实际 UI 图/封面文件、manifest 和验证报告中的 30 张 UI 图、6 张封面、90 个图标 token、35 个补齐图标和验证截图登记一致。 |
 | 组件库库存守卫（Component Library Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComponentLibraryInventoryTest.kt` | 确认公共组件库 `render.js`、`fixture.json`、`fixture.js`、manifest 和验证报告中的 49 个组件卡、6 个 section、17 个 fixture 图标 token 与素材库登记一致。 |
 | FlowShell 库存守卫（FlowShell Inventory Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputFlowShellInventoryTest.kt` | 确认换源输入包、`ReaderShellKit.renderFlowShell(...)`、非空 `FlowShell StateHost`、manifest、验证报告、文档和 Compose preview 锚点同步。 |
 | 阶段完成摘要守卫（Phase Completion Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputPhaseCompletionGuardTest.kt` | 确认阶段完成口径、验证报告数字、守卫命令、后续边界和交接入口保持同步。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 29 张 UI 设计图、29 个输入包、`contracts.d.ts` 的 Fixture/State/Event、事件到 Compose 回调映射、manifest 62 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | `app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt` | 确认 30 张 UI 设计图、30 个输入包、`contracts.d.ts` 的 Fixture/State/Event、事件到 Compose 回调映射、manifest 64 个正式目标集合、`shellName/pageRole/slots` 正式 taxonomy、验证报告目标集合、preview/state-matrix 目标和状态卡数量、spec 状态与事件声明及状态名/事件名、Compose 输入源码和 Compose preview 状态一致。 |
 | Token 契约守卫（Token Contract Guard） | `app/src/test/kotlin/com/reader/android/ui/theme/ReaderDesignTokenContractTest.kt` | 确认 `design-tokens.json`、`tokens.css` 和 Compose theme token 源文件同步，并守住结构 token 组。 |
 | Compose UI Test 首版（Compose UI Test First Pass） | `app/src/androidTest/kotlin/com/reader/android/ui/ReaderShellComposeUiTest.kt` | 覆盖主导航四按钮选择和阅读控制层模块/快捷操作语义；当前已通过 androidTest Kotlin 编译。 |
 | 组件映射守卫（Component Mapping Guard） | `app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt` | 确认公共组件库中的核心语义组件都有 Compose 实现锚点，并守住 manifest 中 `MainTabShell`、`LibraryShell`、`ReaderShell`、`FlowShell`、`SettingsShell` 到 Compose 骨架、slot 和 preview 的追溯关系。 |
@@ -59,7 +59,7 @@
 | `AssetLibraryShell` | 1 | 公共素材库 | 已通过 manifest 校验。 |
 | `MainTabShell` | 8 | 书架、发现、RSS、设置 | 4 个主标签页预览 + 4 个状态矩阵已通过 DOM slot 校验；Compose 侧已补书架、发现、RSS、设置四个主标签页状态矩阵，并由组件映射守卫追溯到 `ReaderMainTabShell` / `ReaderMainTabBar`。 |
 | `LibraryShell` | 16 | 书架空状态、书籍搜索、书籍详情、书籍目录、排序与筛选、书籍操作底表、分组管理、本地书导入 | 8 个书架链路页面预览 + 8 个状态矩阵已通过 DOM slot 校验，并由组件映射守卫追溯到返回顶栏、底部导航、状态宿主和书架链路 preview。 |
-| `ReaderShell` | 18 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读 | 9 个阅读链路页面预览 + 9 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验，并由组件映射守卫追溯到阅读正文、覆盖层、底表、模块导航和阅读状态宿主。 |
+| `ReaderShell` | 20 | 阅读控制层、阅读入口、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读 | 10 个阅读链路页面预览 + 10 个状态矩阵已通过 `ReaderShellKit` 强校验和 DOM slot 校验，并由组件映射守卫追溯到阅读正文、覆盖层、底表、模块导航和阅读状态宿主。 |
 | `FlowShell` | 2 | 换源 | 横向流程预览 + 状态矩阵已通过 `ReaderShellKit.renderFlowShell(...)` 和 DOM slot 强校验，`FlowShell StateHost` 已固化为非空状态摘要，并由 FlowShell 库存守卫和组件映射守卫追溯到换源 Compose 横向流程。 |
 | `SettingsShell` | 14 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | 7 个设置链路页面预览 + 7 个状态矩阵已通过 `SettingsPageKit` 和 DOM slot 强校验，并由组件映射守卫追溯到设置内容区、底表、弹窗和状态宿主。 |
 
@@ -67,12 +67,12 @@
 
 这一大步骤完成到“可作为前端输入件和 Compose 输入框架”的程度即可，不等于线上功能全部完成。完成条件如下：
 
-1. 规划闭环（Planning Closure）：29 个页面都有页面规划卡和详版字段矩阵，五类 Shell、公共组件、覆盖关系、导航栈、状态替换、运行时适配、动效、无障碍、素材裁切和验收规则已由 `FRONTEND_EXECUTABLE_PLANNING_CONTRACT.md` 收口。
-2. 输入件闭环（Input Package Closure）：29 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
+1. 规划闭环（Planning Closure）：30 个页面都有页面规划卡和详版字段矩阵，五类 Shell、公共组件、覆盖关系、导航栈、状态替换、运行时适配、动效、无障碍、素材裁切和验收规则已由 `FRONTEND_EXECUTABLE_PLANNING_CONTRACT.md` 收口。
+2. 输入件闭环（Input Package Closure）：30 个页面都有 `preview.html`、`state-matrix.html`、`components.html`、fixture、renderer、README 和 `COMPONENT_SPEC.md`。
 3. 框架闭环（Shell Closure）：所有正式页面只能归入 `MainTabShell`、`LibraryShell`、`ReaderShell`、`SettingsShell`、`FlowShell`，且 manifest DOM slot 校验通过。
 4. 组件与素材闭环（Component and Asset Closure）：公共组件库、共享 shell kit、素材库、图标 token 和封面素材可追溯，公共组件库 49 个组件卡由 `FrontendInputComponentLibraryInventoryTest` 守住，核心公共组件和五个 runtime shell 通过 `ReaderSharedComponentsStructureTest` 映射到 Compose 实现锚点，新增页面优先复用已有组件。
-5. Compose 输入闭环（Compose Input Closure）：29 张 UI 设计图、29 个输入包和 29 个正式页面都有对应 `contracts.d.ts` Fixture/State/Event、Kotlin UI state、mapper/fixture 构造点、页面级 preview 和页面事件契约，且通过 `FrontendInputComposeCoverageTest` 守卫。
-6. 验证闭环（Validation Closure）：HTML manifest 校验保持 62/62 通过，manifest 目标集合只能由 29 个页面预览、29 个状态矩阵和 4 个公共库/示例目标组成，manifest 的 `shellName/pageRole/slots` 必须匹配正式 shell taxonomy，验证报告必须与 manifest、token 契约、29 页详版规划、30 个 `components.html` 组件参考页和 demo 首批交互同步，Compose 侧至少通过覆盖守卫、token 契约守卫、相关 preview 结构测试和 androidTest 编译。
+5. Compose 输入闭环（Compose Input Closure）：30 张 UI 设计图、30 个输入包和 30 个正式页面都有对应 `contracts.d.ts` Fixture/State/Event、Kotlin UI state、mapper/fixture 构造点、页面级 preview 和页面事件契约，且通过 `FrontendInputComposeCoverageTest` 守卫。
+6. 验证闭环（Validation Closure）：HTML manifest 校验保持 64/64 通过，manifest 目标集合只能由 30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标组成，manifest 的 `shellName/pageRole/slots` 必须匹配正式 shell taxonomy，验证报告必须与 manifest、token 契约、30 页详版规划、30 个 `components.html` 组件参考页和 demo 首批交互同步，Compose 侧至少通过覆盖守卫、token 契约守卫、相关 preview 结构测试和 androidTest 编译。
 7. 留白明确（Explicit Remaining Work）：真实业务数据、完整点击链路、动效细节和端到端 UI test 可以留到下一阶段，但必须在文档中明确为实现和验收深化，不再写成规划缺口。
 
 ## 目录归属（Directory Ownership）

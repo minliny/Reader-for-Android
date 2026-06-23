@@ -1,12 +1,12 @@
 # 全量详版页面规划卡（Full Detailed Page Planning Cards）
 
-本文补齐 29 个正式页面的详版规划字段。`FRONTEND_PAGE_PLANNING_CARDS.md` 负责页面任务、P0/P1/P2 和压缩验收；本文负责把每页展开到可实现层：固定区、滚动区、覆盖区、状态区、可覆盖内容、必须完整展示、入口、返回、上下文、事件、适配、文本、组件和验收。
+本文补齐 30 个正式页面的详版规划字段。`FRONTEND_PAGE_PLANNING_CARDS.md` 负责页面任务、P0/P1/P2 和压缩验收；本文负责把每页展开到可实现层：固定区、滚动区、覆盖区、状态区、可覆盖内容、必须完整展示、入口、返回、上下文、事件、适配、文本、组件和验收。
 
 ## 使用规则（Usage Rules）
 
 - 本文不是视觉示例图说明，而是应用页面实现前的结构输入。
 - 页面实现必须先满足本文的 Shell、slot、覆盖、上下文和验收字段，再处理具体视觉细节。
-- 首批 4 页的完整单页卡仍见 `FRONTEND_FIRST_PAGE_PLANNING_CARDS.md`；本文把同一字段口径推广到 29 页。
+- 首批 4 页的完整单页卡仍见 `FRONTEND_FIRST_PAGE_PLANNING_CARDS.md`；本文把同一字段口径推广到 30 页。
 - 表中 `StateHost` 只表示状态宿主或状态替换 slot，不允许替换根 Shell。
 
 ## 结构与覆盖（Structure and Overlay）
@@ -25,6 +25,7 @@
 | 书籍操作底表（Book Action Sheet） | 非页面路由；归属来源 Shell | 来源页面结构、操作列表宿主、危险确认入口 | 修改信息、移动分组、移除书架、辅助说明 | `DialogHost`；必要时使用来源页 `SheetHost` | 来源页面内容、辅助说明 | 操作列表、编辑、分组、删除请求、删除确认 / 取消 |
 | 分组管理（Group Management） | LibraryShell | `BackTopBar`、新建动作、可选保存动作 | 分组列表、重命名、排序说明 | `DialogHost`、`SheetHost`、`StateHost` | 列表尾部、弱说明 | 分组行、新建、重命名、删除、排序手柄、命名保存 |
 | 本地书导入（Local Import） | LibraryShell | `BackTopBar`、完成动作 | 文件选择、进度、结果列表、失败原因 | `StateHost`、系统文件选择器边界 | 格式说明、结果尾部 | 文件选择、导入进度、失败重试、结果项、完成 |
+| 阅读入口（Reading Entry） | ReaderShell | `ReadingSurface`、`ReaderStateHost` 入口浮层、继续 / 开始动作 | 阅读背景正文、来源上下文、入口卡片内容 | `ReaderStateHost`、加载 / 错误 / 离线状态 | 非当前阅读焦点段落、来源说明 | 继续阅读、开始阅读、正在打开、失败修复、离线继续、返回来源 |
 | 沉浸阅读（Immersive Reading） | ReaderShell | `ReadingSurface`、点击热区、页脚读数、`RuntimeCapsuleHost` | 正文分页内容、打开 / 错误 / 离线状态 | `ReaderStateHost`、临时提示、自动翻页 / 朗读运行胶囊 | 非当前阅读焦点段落、页脚弱信息；运行胶囊只能覆盖正文安全空区 | 当前正文、点击热区、阅读进度、返回来源、打开失败修复、运行胶囊暂停 / 停止入口 |
 | 阅读控制层（Reader Control Layer） | ReaderShell | `ReaderOverlayHost`、`ReaderTopBar`、`ReaderModuleNav`、亮度栏 | 底部面板内容、章节进度 | `BottomSheetHost`、`ReaderStateHost` | 正文顶部 / 底部过渡段落 | 返回、换源、章节进度、四模块按钮、底部面板主动作、重复点击当前模块关闭面板 |
 | 目录与书签（TOC and Bookmarks） | ReaderShell | `ReaderModuleNav`、面板标题 / tabs | 目录列表、书签列表、搜索结果 | `BottomSheetHost`、`ReaderStateHost`、更多菜单 | 列表尾部、卷说明 | 当前章节、目录行只显示章节名、书签行、打开动作、面板关闭 |
@@ -59,6 +60,7 @@
 | 书籍操作底表（Book Action Sheet） | 书架管理态、书籍详情页、书籍长按浮层 | 不跳转页面；关闭回来源状态；删除确认后回书架并刷新集合 | `BookContext`、`LibraryContext`、来源页面、删除影响范围 | `edit(book)`、`moveGroup(book)`、`deleteRequest(book)`、`deleteCancel`、`deleteConfirm(book)`、`dismiss` |
 | 分组管理（Group Management） | 书架分组入口、设置书架入口 | 返回书架并保留 group/sort/filter；命名弹窗关闭回列表 | `LibraryContext.groups/currentGroup/order` | `addGroupOpen`、`groupRenameOpen(group)`、`groupDeleteOpen(group)`、`groupReorder(from,to)`、`dialogSave(value)`、`dialogCancel` |
 | 本地书导入（Local Import） | 书架空态、书架更多、系统分享入口 | 完成回书架并刷新集合；取消回来源页 | `LibraryContext.targetGroup`、`ImportContext.files/progress/results`、`BookContext` | `openSystemFilePicker`、`importProgress(event)`、`resultRowOpen(result)`、`chooseAgain`、`done`、`retryFailed` |
+| 阅读入口（Reading Entry） | 书架继续阅读、书籍详情阅读、目录章节、换源成功后修复入口 | 继续 / 开始进入沉浸阅读；失败可回来源或进入换源；离线可继续缓存章节 | `ReaderContext.bookId/chapterId/progress/sourceId/openState`、`BookContext`、`SourceContext` | `backToSource`、`continueReading`、`startReading`、`openLoading`、`retryOpen`、`switchSource`、`continueCached` |
 | 沉浸阅读（Immersive Reading） | 书架继续阅读、封面点击、书籍详情阅读、目录章节、控制层关闭、换源成功、自动翻页 / 朗读启动后返回 | 中心点击打开控制层；返回关闭阅读或回来源；运行胶囊展开时返回先收起胶囊；失败可返回来源或进入换源 | `ReaderContext.bookId/chapterId/progress/sourceId/appearance/runtimeCapsule`、`BookContext` | `tapPrevious`、`tapCenter`、`tapNext`、`pageChange(progress)`、`retry`、`openControls`、`switchSource`、`continueCached`、`backToSource`、`pauseRuntimeCapsule`、`stopRuntimeCapsule`、`dragRuntimeCapsule(anchor)` |
 | 阅读控制层（Reader Control Layer） | 沉浸阅读中心点击、阅读模块返回、打开书籍后进入沉浸阅读 | 正文中部点击关闭控制层回沉浸阅读；重复点击当前 active 模块回默认控制层；换源进入 FlowShell 后回 ReaderShell | `ReaderContext.bookId/chapterId/progress/sourceId/appearance/ttsState` | `back`、`sourceChange`、`more`、`quickAction(actionType)`、`chapterChange(direction)`、`progressChange(value)`、`moduleChange(moduleType)`、`brightnessChange(value)`、`dismissControlLayer` |
 | 目录与书签（TOC and Bookmarks） | 阅读控制层目录模块、阅读目录入口 | 打开章节后回沉浸阅读定位；重复点击目录模块回控制层 | `ReaderContext`、`ChapterContext.currentChapter`、`BookmarkContext` | `tabChange(tab)`、`openChapter(chapter)`、`openBookmark(bookmark)`、`moreAction(action)`、`dismiss` |
@@ -93,6 +95,7 @@
 | 书籍操作底表（Book Action Sheet） | 操作列表随来源页布局；确认弹窗高于来源页面；无键盘 | 操作项单行或两行摘要，危险说明最多两行 | `ActionRow.Edit`、`ActionRow.Group`、`DangerActionRow`、`ConfirmDialog` | 不出现独立路由；Dialog 高于来源页面；删除影响范围明确 |
 | 分组管理（Group Management） | 命名输入时保存动作位于键盘上方；列表底部 inset | 分组名单行截断，说明短两行 | `GroupRow`、`ReorderHandle`、`TextField`、`ConfirmDialog` | 命名不被键盘遮挡；删除后书籍去向明确；拖拽不改变语义 |
 | 本地书导入（Local Import） | 系统文件选择器为外部边界；进度 / 结果列表底部 inset | 文件名两行，失败原因两行，按钮完整 | `ProgressBar`、`BookRow`、`ErrorState`、`PrimaryActionButton` | 失败可重试；结果末项可达；完成回书架并刷新 |
+| 阅读入口（Reading Entry） | 入口浮层使用 ReaderStateHost；加载、失败、离线状态不替换 ReaderShell 根；无键盘 | 标题两行内，来源 / 进度短文本单行，继续 / 开始按钮完整 | `ReadingSurface`、`ReaderStateHost`、`StartReadingButton`、`ContinueReadingButton`、`ErrorState`、`OfflineState` | 继续和开始动作首屏可见；失败可重试和换源；离线继续保留章节和进度上下文 |
 | 沉浸阅读（Immersive Reading） | 正文按阅读排版单位适配；点击热区稳定；打开 / 错误状态在 ReaderStateHost；运行胶囊锚定正文安全空区，必要时收起到边缘；无键盘 | 正文遵循阅读字号 / 行距，页脚短文本；错误标题两行，来源说明短文本；胶囊文案一行短句 | `ReadingSurface`、`ReadingParagraph`、`FooterProgressInfo`、`RuntimeCapsule`、`LoadingState`、`ErrorState`、`SourceStatusBar`、`TextActionButton` | 正文不被截断；运行胶囊不触发正文重新分页；胶囊不遮挡首段首两行、末段末两行和页脚；点击热区明确；失败不丢书籍和进度 |
 | 阅读控制层（Reader Control Layer） | 覆盖层不改变正文布局；底部面板和 `ReaderModuleNav` 避让安全区；搜索 / 替换模块另行接管键盘 | 书名 / 来源单行，章节标题两行，模块标签单行 | `ReaderTopBar`、`QuickAction`、`ChapterProgressCard`、`BrightnessSlider`、`ReaderModuleButton` | 四模块 active 只变颜色和背景；尺寸 / 间距 / 相对位置不变；切模块不重置正文；重复点击当前模块关闭模块面板 |
 | 目录与书签（TOC and Bookmarks） | 面板列表滚动；`ReaderModuleNav` 固定；搜索出现时键盘避让输入和结果导航 | 当前 demo 中目录章节名单行、无下方小字；书签可显示摘要、时间 / 位置单行 | `TocPanel`、`ChapterRow`、`BookmarkRow`、`SegmentControl` | 面板末项可达；打开章节回正文定位；更多菜单不遮挡主动作 |
@@ -113,7 +116,7 @@
 
 ## 规划闭合判断（Planning Closure Judgment）
 
-- 29 个页面均有 owner Shell、固定 / 滚动 / 覆盖 / 状态归属。
-- 29 个页面均有入口、返回、上下文和事件字段。
-- 29 个页面均有断点 / 安全区 / 键盘、文本、组件和验收字段。
+- 30 个页面均有 owner Shell、固定 / 滚动 / 覆盖 / 状态归属。
+- 30 个页面均有入口、返回、上下文和事件字段。
+- 30 个页面均有断点 / 安全区 / 键盘、文本、组件和验收字段。
 - 当前闭合的是“页面规划输入”；真实实现仍需要 ViewModel、Navigation、真实业务状态、极端文本、无障碍和设备验证继续闭合。

@@ -40,7 +40,7 @@ class ReaderIconTokenMappingTest {
 
     @Test
     fun `local asset library exposes current icon token inventory`() {
-        assertEquals("local asset icon token count", 79, assetIconTokens.size)
+        assertEquals("local asset icon token count", 90, assetIconTokens.size)
 
         listOf(
             "chevron-left",

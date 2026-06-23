@@ -18,7 +18,7 @@ class ReadingSettingsDesignUiStateMappingTest {
         assertEquals(listOf("跟随系统方向", "覆盖翻页", "屏幕常亮关闭"), state.quickPresets.map { it.title })
         assertEquals(listOf("屏幕与显示", "翻页与手势", "阅读辅助", "进度与信息"), state.groups.map { it.title })
         assertEquals("高级设置", state.advancedTitle)
-        assertEquals(listOf("自动加载下一章", "章节失败自动重试", "缓存优先", "误触保护"), state.advanced.map { it.title })
+        assertEquals(listOf("自动加载后续章节", "章节失败自动重试", "缓存优先", "误触保护"), state.advanced.map { it.title })
         assertEquals("恢复默认阅读设置", state.restore.title)
         assertTrue("不会删除书籍或阅读进度" in state.restore.copy)
 

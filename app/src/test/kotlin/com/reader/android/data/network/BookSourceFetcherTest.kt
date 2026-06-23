@@ -3,6 +3,7 @@ package com.reader.android.data.network
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -19,6 +20,7 @@ class BookSourceFetcherTest {
 
     @Test
     fun fetchAllBookSources() {
+        assumeLiveSourceSmokeEnabled()
         val url = "https://shuyuan-api.yiove.com/import/book-source-collection/a8adf570-e115-4b99-87e3-ccaf298ae361"
 
         val request = Request.Builder()
@@ -36,6 +38,7 @@ class BookSourceFetcherTest {
 
     @Test
     fun parseAndFilterNovelSources() {
+        assumeLiveSourceSmokeEnabled()
         val file = File("/tmp/book-sources-all.json")
         if (!file.exists()) {
             println("File not found. Run fetchAllBookSources first.")
@@ -99,6 +102,7 @@ class BookSourceFetcherTest {
 
     @Test
     fun smokeTestNovelSources() {
+        assumeLiveSourceSmokeEnabled()
         val file = File("/tmp/novel-sources-http.txt")
         if (!file.exists()) {
             println("File not found. Run parseAndFilterNovelSources first.")
@@ -173,6 +177,13 @@ class BookSourceFetcherTest {
         println("Working sources saved to ${workingFile.absolutePath}")
     }
 
+    private fun assumeLiveSourceSmokeEnabled() {
+        assumeTrue(
+            "Live source smoke is opt-in; set READER_ANDROID_LIVE_SOURCE_SMOKE=1 after confirming authorization.",
+            System.getenv("READER_ANDROID_LIVE_SOURCE_SMOKE") == "1"
+        )
+    }
+
     private data class SmokeResult(
         val name: String,
         val url: String,
@@ -207,6 +218,7 @@ class BookSourceFetcherTest {
 
     @Test
     fun quickSmokeTestNovelSources() {
+        assumeLiveSourceSmokeEnabled()
         val file = File("/tmp/novel-sources-http.txt")
         if (!file.exists()) {
             println("File not found. Run parseAndFilterNovelSources first.")

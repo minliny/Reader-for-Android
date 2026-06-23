@@ -1,5 +1,6 @@
 package com.reader.android.ui
 
+import com.reader.android.AppProvider
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.model.BookSource
 import com.reader.android.data.model.SearchQuery
@@ -12,6 +13,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -24,6 +27,16 @@ class UiCapabilitySmokeTest {
         sourceUrl = "https://www.biquges123.com",
         sourceName = "新笔趣阁"
     )
+
+    @Before
+    fun setUp() {
+        AppProvider.initForTesting()
+    }
+
+    @After
+    fun tearDown() {
+        AppProvider.close()
+    }
 
     // ===== Search =====
 

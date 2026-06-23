@@ -210,14 +210,14 @@ window.READER_FRONTEND_DEMO_DRAFT_FIXTURE = {
     },
     themeDefault: "paper",
     themeOptions: [
-      { value: "paper", label: "纸色", swatch: "#fff7ec", paperStart: "#fff9f0", paperEnd: "#f7ead9", ink: "#2b241d" },
-      { value: "warm", label: "暖白", swatch: "#fff1df", paperStart: "#fff4e8", paperEnd: "#f2dfc8", ink: "#2e241b" },
-      { value: "sepia", label: "旧纸", swatch: "#ead7b8", paperStart: "#f3e5ca", paperEnd: "#dfc59d", ink: "#332515" },
-      { value: "night", label: "夜间", swatch: "#3f3f3d", paperStart: "#363330", paperEnd: "#252321", ink: "#e8dfd2" },
-      { value: "green", label: "护眼", swatch: "#dbecc9", paperStart: "#eef7df", paperEnd: "#dcebc8", ink: "#253421" },
-      { value: "mint", label: "青绿", swatch: "#d7eee6", paperStart: "#eaf7f2", paperEnd: "#d5e9e1", ink: "#1f332f" },
-      { value: "blue", label: "浅蓝", swatch: "#dce9f3", paperStart: "#edf5fb", paperEnd: "#d9e7f1", ink: "#21313b" },
-      { value: "gray", label: "灰白", swatch: "#eceeef", paperStart: "#f3f4f4", paperEnd: "#e5e7e8", ink: "#25292b" }
+      { value: "paper", label: "纸色", scheme: "day", pair: "paper-night", swatch: "#fff7ec", paperStart: "#fff9f0", paperEnd: "#f7ead9", ink: "#2b241d" },
+      { value: "warm", label: "暖白", scheme: "day", pair: "warm-night", swatch: "#fff1df", paperStart: "#fff4e8", paperEnd: "#f2dfc8", ink: "#2e241b" },
+      { value: "green", label: "护眼", scheme: "day", pair: "green-night", swatch: "#dbecc9", paperStart: "#eef7df", paperEnd: "#dcebc8", ink: "#253421" },
+      { value: "blue", label: "浅蓝", scheme: "day", pair: "blue-night", swatch: "#dce9f3", paperStart: "#edf5fb", paperEnd: "#d9e7f1", ink: "#21313b" },
+      { value: "paper-night", label: "夜纸", scheme: "night", pair: "paper", swatch: "#3b352f", paperStart: "#37312c", paperEnd: "#24211e", ink: "#eadfd0" },
+      { value: "warm-night", label: "暖夜", scheme: "night", pair: "warm", swatch: "#3d3027", paperStart: "#3a2d25", paperEnd: "#241f1b", ink: "#f0ded0" },
+      { value: "green-night", label: "墨绿", scheme: "night", pair: "green", swatch: "#24362d", paperStart: "#25372f", paperEnd: "#18231f", ink: "#dce9d5" },
+      { value: "blue-night", label: "深蓝", scheme: "night", pair: "blue", swatch: "#263541", paperStart: "#263642", paperEnd: "#171f28", ink: "#dce8f1" }
     ],
     fontOptions: [
       { label: "系统", value: "system", fontStack: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" },
@@ -341,8 +341,7 @@ window.READER_FRONTEND_DEMO_DRAFT_FIXTURE = {
     rows: [
       { icon: "palette", title: "主题与外观", meta: "跟随系统 · 暖纸背景", value: "默认" },
       { icon: "globe", title: "网络与书源", meta: "移动网络允许搜索", value: "已开启" },
-      { icon: "shield", title: "隐私与权限", meta: "本地书、通知、剪贴板", value: "管理" },
-      { icon: "storage", title: "缓存管理", meta: "封面、章节、日志缓存", value: "1.2 GB" }
+      { icon: "shield", title: "隐私与权限", meta: "本地书、通知、剪贴板", value: "管理" }
     ]
   },
   flow: {

@@ -119,16 +119,16 @@
         "UI 设计图",
         "图标素材",
         "补齐图标",
-        "29 个 UI 设计图",
-        "81 个图标 token",
+        "30 个 UI 设计图",
+        "90 个图标 token",
         "书籍封面素材"
       ],
       "expectedDomCount": {
         "selector": ".asset-icon-card",
-        "min": 81
+        "min": 90
       },
       "expectedImages": {
-        "min": 35,
+        "min": 36,
         "missing": 0
       }
     },
@@ -1869,6 +1869,95 @@
         "操作失败，请重试"
       ],
       "expectedStateCards": 5,
+      "expectedImages": {
+        "min": 0,
+        "missing": 0
+      }
+    },
+    {
+      "name": "reading-entry-preview",
+      "html": "docs/ui-design/04-阅读链路/阅读入口/frontend-input/preview.html",
+      "screenshot": "docs/ui-design/04-阅读链路/阅读入口/frontend-input/verify/design-draft-preview.png",
+      "viewport": {
+        "width": 835,
+        "height": 1884
+      },
+      "selector": ".re-page-frame",
+      "rendererGlobal": "ReadingEntryInput",
+      "shellName": "ReaderShell",
+      "pageRole": "reader-flow",
+      "slots": [
+        "readerFrame",
+        "readingSurface",
+        "readerOverlayHost",
+        "readerModuleNav",
+        "bottomSheetHost",
+        "readerStateHost"
+      ],
+      "stateModel": {
+        "type": "preview"
+      },
+      "requiredText": [
+        "长夜余火",
+        "第 32 章",
+        "雨夜",
+        "38%",
+        "第 32 / 128 章",
+        "阅读入口",
+        "继续阅读",
+        "开始阅读"
+      ],
+      "expectedFrame": {
+        "width": 835,
+        "height": 1884
+      },
+      "expectedImages": {
+        "min": 0,
+        "missing": 0
+      },
+      "expectedDomCount": {
+        "selector": ".re-entry-action-card",
+        "min": 2
+      }
+    },
+    {
+      "name": "reading-entry-state-matrix",
+      "html": "docs/ui-design/04-阅读链路/阅读入口/frontend-input/state-matrix.html",
+      "screenshot": "docs/ui-design/04-阅读链路/阅读入口/frontend-input/verify/design-draft-state-matrix.png",
+      "viewport": {
+        "width": 1180,
+        "height": 2600
+      },
+      "selector": ".re-state-workbench",
+      "rendererGlobal": "ReadingEntryInput",
+      "shellName": "ReaderShell",
+      "pageRole": "reader-flow",
+      "slots": [
+        "readerFrame",
+        "readingSurface",
+        "readerOverlayHost",
+        "readerModuleNav",
+        "bottomSheetHost",
+        "readerStateHost"
+      ],
+      "stateModel": {
+        "type": "state-matrix",
+        "expectedStateCards": 4
+      },
+      "requiredText": [
+        "入口可点击态",
+        "正在打开态",
+        "内容加载异常态",
+        "离线缓存态",
+        "继续阅读",
+        "开始阅读",
+        "正在打开",
+        "内容加载异常",
+        "更换来源",
+        "重试",
+        "网络不可用，请稍后重试"
+      ],
+      "expectedStateCards": 4,
       "expectedImages": {
         "min": 0,
         "missing": 0

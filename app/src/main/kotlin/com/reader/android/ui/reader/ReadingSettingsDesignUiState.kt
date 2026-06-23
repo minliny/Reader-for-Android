@@ -105,7 +105,7 @@ object ReadingSettingsMapper {
             ),
             advancedTitle = "高级设置",
             advanced = listOf(
-                ReadingSettingsSwitchUiModel("自动加载下一章", "章节末尾自动加载下一章内容", enabled = true),
+                ReadingSettingsSwitchUiModel("自动加载后续章节", "章节末尾自动加载后续内容", enabled = true),
                 ReadingSettingsSwitchUiModel("章节失败自动重试", "加载失败时自动重试", enabled = true),
                 ReadingSettingsSwitchUiModel("缓存优先", "优先使用本地缓存内容", enabled = true),
                 ReadingSettingsSwitchUiModel("误触保护", "阅读时屏蔽边缘区域的误触", enabled = false)

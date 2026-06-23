@@ -33,7 +33,7 @@ class FrontendInputAssetLibraryInventoryTest {
 
         assertEquals("fixture screenCount meta", 30, fixtureMetaCount("screenCount"))
         assertEquals("fixture bookCoverCount meta", 6, fixtureMetaCount("bookCoverCount"))
-        assertEquals("fixture fixtureIconTokenCount meta", 54, fixtureMetaCount("fixtureIconTokenCount"))
+        assertEquals("fixture fixtureIconTokenCount meta", 55, fixtureMetaCount("fixtureIconTokenCount"))
         assertEquals("fixture validationScreenshotCount meta", 60, fixtureMetaCount("validationScreenshotCount"))
         assertEquals("asset fixture must list every UI design screen", expectedScreenPaths, screenPaths)
         assertEquals("asset fixture must list every book cover asset", expectedCoverPaths, coverPaths)
@@ -65,13 +65,13 @@ class FrontendInputAssetLibraryInventoryTest {
         val iconGroupNames = fixtureIconGroupNames()
         val supplementedIcons = fixtureSupplementedIconNames()
 
-        assertEquals("local asset icon token count", 79, iconRegistryNames.size)
+        assertEquals("local asset icon token count", 90, iconRegistryNames.size)
         assertEquals("icon groups must list every local asset icon token once", iconRegistryNames, iconGroupNames)
-        assertEquals("supplemented icon count", 25, supplementedIcons.size)
+        assertEquals("supplemented icon count", 35, supplementedIcons.size)
         assertTrue("supplemented icons must exist in the local icon registry", iconRegistryNames.containsAll(supplementedIcons))
         assertEquals(
             "fixture scanned icons plus supplemented icons must equal local icon inventory",
-            79,
+            90,
             fixtureMetaCount("fixtureIconTokenCount") + supplementedIcons.size
         )
 
@@ -84,14 +84,14 @@ class FrontendInputAssetLibraryInventoryTest {
         listOf(
             "UI 设计图（UI Design Screens） | 30",
             "书籍封面素材（Book Cover Assets） | 6",
-            "fixture 图标 token（Fixture Icon Tokens） | 54",
-            "补齐图标（Supplemented Icons） | 25",
-            "本地总图标 token（Total Local Icon Tokens） | 79",
+            "fixture 图标 token（Fixture Icon Tokens） | 55",
+            "补齐图标（Supplemented Icons） | 35",
+            "本地总图标 token（Total Local Icon Tokens） | 90",
             "验证截图（Validation Screenshots） | 60"
         ).forEach { token ->
             assertTrue("ASSET_LIBRARY.md must document $token", token in assetLibraryMarkdown)
         }
-        listOf("30 张 `UI设计图.png`", "6 张书架封面图片", "共 79 个本地 token", "60 张 `design-draft-*.png`").forEach { token ->
+        listOf("30 张 `UI设计图.png`", "6 张书架封面图片", "共 90 个本地 token", "60 张 `design-draft-*.png`").forEach { token ->
             assertTrue("asset-library README must document $token", token in assetReadme)
         }
     }
@@ -115,9 +115,9 @@ class FrontendInputAssetLibraryInventoryTest {
             "\"shellName\": \"AssetLibraryShell\"",
             "\"pageRole\": \"asset-library\"",
             "\"type\": \"asset-library\"",
-            "\"79 个图标 token\"",
+            "\"90 个图标 token\"",
             "\"selector\": \".asset-icon-card\"",
-            "\"min\": 79"
+            "\"min\": 90"
         ).forEach { token ->
             assertTrue("asset-library manifest target must contain $token", token in manifestAssetTarget)
         }
@@ -129,7 +129,7 @@ class FrontendInputAssetLibraryInventoryTest {
             "\"type\": \"asset-library\"",
             "\"imageCount\": 36",
             "\"missingImages\": 0",
-            "\"expectedDomCount\": 79"
+            "\"expectedDomCount\": 90"
         ).forEach { token ->
             assertTrue("asset-library validation report target must contain $token", token in validationAssetTarget)
         }
@@ -197,6 +197,7 @@ class FrontendInputAssetLibraryInventoryTest {
         return Files.walk(uiDesignRoot).use { stream ->
             stream
                 .filter { Files.isRegularFile(it) }
+                .filter { !it.toString().contains("frontend-input 2") }
                 .filter { it.parent.fileName.toString() == "verify" }
                 .filter { it.fileName.toString().startsWith("design-draft-") && it.fileName.toString().endsWith(".png") }
                 .map { uiDesignRoot.relativize(it.toAbsolutePath().normalize()).toString().replace('\\', '/') }

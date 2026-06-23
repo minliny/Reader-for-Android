@@ -8,12 +8,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Paths
 
 /**
  * AppProvider wiring tests. DAO/DB covered by Room unit tests above.
  * Tests provider lifecycle, network gate, and repository wiring.
  */
 class RuntimeWiringIntegrationTest {
+
+    private val appProviderSource: String by lazy {
+        String(Files.readAllBytes(Paths.get("src/main/kotlin/com/reader/android/AppProvider.kt")))
+    }
 
     @After
     fun tearDown() {
@@ -34,6 +40,17 @@ class RuntimeWiringIntegrationTest {
         AppProvider.initForTesting()
         val repo = AppProvider.bookSourceRepository
         assertNotNull(repo)
+    }
+
+    @Test
+    fun `production provider wires persistent book source repository`() {
+        val productionInitBlock = appProviderSource
+            .substringAfter("fun init(context: Context): AppProvider")
+            .substringBefore("/** For tests")
+
+        assertTrue("Production init must use DataStore repository", "DataStoreBookSourceRepository(" in productionInitBlock)
+        assertTrue("Production init must load persisted book sources", ".loadBlocking()" in productionInitBlock)
+        assertTrue("Production init must not use fake repository", "FakeBookSourceRepository()" !in productionInitBlock)
     }
 
     // ── P1-2: Fake repository works ──

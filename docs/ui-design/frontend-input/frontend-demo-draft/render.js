@@ -122,10 +122,19 @@
     "settings-general": { title: "App 通用设置（General Settings）", shell: "SettingsShell" },
     "bookshelf-search-settings": { title: "书架与搜索设置（Bookshelf and Search Settings）", shell: "SettingsShell" },
     "privacy-permissions": { title: "隐私与权限（Privacy and Permissions）", shell: "SettingsShell" },
-    "cache-management": { title: "缓存管理（Cache Management）", shell: "SettingsShell" },
     "about-feedback": { title: "关于与反馈（About and Feedback）", shell: "SettingsShell" },
     "sync-backup": { title: "同步与备份（Sync and Backup）", shell: "SettingsShell" },
-    "source-management": { title: "书源管理（Source Management）", shell: "SettingsShell" }
+    "webdav-config": { title: "WebDAV 配置（WebDAV Configuration）", shell: "SettingsShell" },
+    "source-management": { title: "书源管理（Source Management）", shell: "SettingsShell" },
+    "source-import-options": { title: "添加书源（Add Source）", shell: "SettingsShell" },
+    "source-import-preview": { title: "导入书源（Import Sources）", shell: "SettingsShell" },
+    "source-batch": { title: "批量管理（Batch Source Management）", shell: "SettingsShell" },
+    "source-groups": { title: "分组管理（Source Groups）", shell: "SettingsShell" },
+    "source-detail": { title: "书源详情（Source Detail）", shell: "SettingsShell" },
+    "source-edit-debug": { title: "编辑与调试（Source Edit and Debug）", shell: "SettingsShell" },
+    "source-logs": { title: "错误日志（Source Error Logs）", shell: "SettingsShell" },
+    "source-code-view": { title: "源码查看（Source Code View）", shell: "SettingsShell" },
+    "source-delete-confirm": { title: "删除书源（Delete Sources）", shell: "SettingsShell" }
   };
 
   function bookCard(data, book) {
@@ -296,9 +305,8 @@
       { icon: "settings", title: "App 通用设置", meta: "主题、网络、基础行为", route: "settings-general" },
       { icon: "bookshelf", title: "书架与搜索设置", meta: "布局、列数、搜索历史", route: "bookshelf-search-settings" },
       { icon: "shield", title: "隐私与权限", meta: "本地书、通知、剪贴板", route: "privacy-permissions" },
-      { icon: "storage", title: "缓存管理", meta: "封面、章节、日志缓存", route: "cache-management" },
       { icon: "source", title: "书源管理", meta: "启用、检测、日志", route: "source-management" },
-      { icon: "sync", title: "同步与备份", meta: "WebDAV、备份、恢复", route: "sync-backup" },
+      { icon: "sync", title: "同步与备份", meta: "本地恢复、远程恢复", route: "sync-backup" },
       { icon: "info", title: "关于与反馈", meta: "版本、协议、帮助", route: "about-feedback" }
     ];
 
@@ -921,6 +929,16 @@
     return options.find((item) => item.value === value) || options[0];
   }
 
+  function readerQuickThemeOptions(data) {
+    const options = readerThemeOptions(data);
+    const dayThemes = options.filter((item) => item.scheme === "day").slice(0, 2);
+    const nightThemes = dayThemes
+      .map((item) => options.find((option) => option.value === item.pair))
+      .filter(Boolean);
+    const pairedThemes = dayThemes.concat(nightThemes);
+    return pairedThemes.length === 4 ? pairedThemes : options.slice(0, 4);
+  }
+
   function readerThemeStyle(data, appState) {
     const theme = currentReaderTheme(data, appState);
     return [
@@ -1139,6 +1157,29 @@
       </section>`;
   }
 
+  function readerTextSelectionLayer(appState) {
+    if (!appState?.readerTextSelectionOpen) {
+      return "";
+    }
+    const selectedText = appState.readerSelectedText || "雨，下了一整夜。";
+    return `
+      <section class="fd-reader-selection-layer" data-reader-selection-layer data-dev-region="TextSelectionLayer" aria-label="文本选择层">
+        <button class="fd-reader-selection-backdrop" type="button" data-reader-selection-close aria-label="关闭文本选择"></button>
+        <div class="fd-reader-selection-toolbar" role="toolbar" aria-label="文本选择操作">
+          <button type="button" data-reader-selection-action="copy">复制</button>
+          <button type="button" data-reader-selection-action="highlight">划线</button>
+          <button type="button" data-reader-selection-action="note">笔记</button>
+          <button type="button" data-reader-selection-action="search">搜索</button>
+        </div>
+        <div class="fd-reader-selection-range" aria-label="已选择文本：${esc(selectedText)}">
+          <i class="fd-reader-selection-line is-first"></i>
+          <i class="fd-reader-selection-line is-second"></i>
+          <b class="fd-reader-selection-handle is-start" aria-hidden="true"></b>
+          <b class="fd-reader-selection-handle is-end" aria-hidden="true"></b>
+        </div>
+      </section>`;
+  }
+
   function readerImmersiveStatusCapsule(appState) {
     const ttsSession = Boolean(appState?.readerTtsSession || appState?.readerTts?.playing);
     const ttsPlaying = Boolean(appState?.readerTts?.playing);
@@ -1147,20 +1188,22 @@
     if (!ttsSession && !autoSession) {
       return "";
     }
-    const label = ttsSession && autoSession
-      ? "朗读 · 自动"
-      : ttsSession
-        ? (ttsPlaying ? "朗读中" : "朗读暂停")
-        : (autoPlaying ? "自动翻页" : "自动暂停");
-    const controls = [
-      ttsSession ? `<button type="button" data-reader-tts-action="toggle" aria-label="${ttsPlaying ? "暂停朗读" : "继续朗读"}">${icon(ttsPlaying ? "pause" : "play", "fd-small-icon")}</button>` : "",
-      autoSession ? `<button type="button" data-reader-setting-toggle="autoPage" aria-label="${autoPlaying ? "暂停自动翻页" : "继续自动翻页"}">${icon(autoPlaying ? "pause" : "play", "fd-small-icon")}</button>` : ""
-    ].join("");
+    const activeType = ttsSession ? "tts" : "autoPage";
+    const isTts = activeType === "tts";
+    const label = isTts ? "朗读" : "自动翻页";
+    const isPlaying = isTts ? ttsPlaying : autoPlaying;
+    const autoCountdown = Math.max(1, Math.min(99, Number(appState?.readerAutoPageCountdown || 8)));
+    const leading = isTts
+      ? icon("tts", "fd-small-icon")
+      : `<span class="fd-ir-countdown-dot" aria-label="自动翻页倒计时 ${esc(autoCountdown)} 秒">${esc(autoCountdown)}</span>`;
+    const control = isTts
+      ? `<button type="button" data-reader-tts-action="toggle" aria-label="${ttsPlaying ? "暂停朗读" : "继续朗读"}">${icon(ttsPlaying ? "pause" : "play", "fd-small-icon")}</button>`
+      : `<button type="button" data-reader-setting-toggle="autoPage" aria-label="${autoPlaying ? "暂停自动翻页" : "继续自动翻页"}">${icon(autoPlaying ? "pause" : "play", "fd-small-icon")}</button>`;
     return `
-      <span class="fd-ir-status-capsule" data-reader-immersive-status>
-        ${icon(ttsSession ? "tts" : "reader-auto-page", "fd-small-icon")}
+      <span class="fd-ir-status-capsule" data-reader-immersive-status data-reader-immersive-status-type="${esc(activeType)}" data-reader-immersive-status-playing="${isPlaying ? "true" : "false"}">
+        ${leading}
         <b>${esc(label)}</b>
-        <span class="fd-ir-status-controls">${controls}</span>
+        <span class="fd-ir-status-controls">${control}</span>
       </span>`;
   }
 
@@ -1204,7 +1247,9 @@
       ${readerMoreMenuHtml(appState)}`;
   }
 
-  function readerQuickActionPanel(type) {
+  function readerQuickActionPanel(type, appState, data) {
+    const autoPageEnabled = Boolean(appState?.readerSettings?.autoPage);
+    const chapterState = data ? currentReaderChapter(data, appState) : { index: 0, count: 1, chapter: {} };
     const panels = {
       search: {
         title: "内容搜索",
@@ -1218,11 +1263,24 @@
       },
       "auto-page": {
         title: "自动翻页",
-        meta: "启动后回到沉浸阅读并保留退出入口",
+        meta: "启动后进入沉浸阅读，底部胶囊控制暂停继续",
+        hideHeader: true,
         body: `
-          <div class="fd-reader-step-row"><strong>翻页速度</strong><span><button type="button">-</button><em>8 秒</em><button type="button">+</button></span></div>
-          <div class="fd-reader-segment-row"><button class="is-active" type="button">连续</button><button type="button">单页</button><button type="button">跟随朗读</button></div>
-          <button class="fd-reader-primary-action" type="button" data-route="immersive-reading">开始自动翻页</button>`
+          <section class="fd-reader-auto-control" aria-label="自动翻页控制">
+            <button class="fd-reader-auto-chapter" type="button" data-reader-chapter-action="prev" aria-label="上一章" aria-disabled="${chapterState.index === 0 ? "true" : "false"}">
+              ${icon("chevron-left", "fd-small-icon")}<span>上一章</span>
+            </button>
+            <button class="fd-reader-auto-toggle ${autoPageEnabled ? "is-on" : ""}" type="button" data-reader-setting-toggle="autoPage" aria-pressed="${autoPageEnabled ? "true" : "false"}">
+              <i>${icon(autoPageEnabled ? "pause" : "play", "fd-small-icon")}</i>
+              <strong>自动翻页</strong>
+              <small>${autoPageEnabled ? "运行中" : "未启动"}</small>
+            </button>
+            <button class="fd-reader-auto-chapter" type="button" data-reader-chapter-action="next" aria-label="下一章" aria-disabled="${chapterState.index >= chapterState.count - 1 ? "true" : "false"}">
+              ${icon("chevron", "fd-small-icon")}<span>下一章</span>
+            </button>
+          </section>
+          <div class="fd-reader-step-row fd-reader-auto-speed" aria-label="翻页速度"><strong>翻页速度</strong><span><button type="button" aria-label="减慢自动翻页">-</button><em>8 秒</em><button type="button" aria-label="加快自动翻页">+</button></span></div>
+          <div class="fd-reader-segment-row fd-reader-auto-mode" aria-label="自动翻页方式"><button class="is-active" type="button">连续</button><button type="button">单页</button></div>`
       },
       replace: {
         title: "内容替换",
@@ -1255,11 +1313,11 @@
     const panel = panels[type];
     if (!panel) return "";
     return `
-        <section class="fd-reader-module-panel fd-reader-quick-detail" data-dev-region="ReaderQuickPanel" aria-label="${esc(panel.title)}">
-        <header>
+        <section class="fd-reader-module-panel fd-reader-quick-detail ${panel.hideHeader ? "fd-reader-quick-no-header" : ""}" data-dev-region="ReaderQuickPanel" aria-label="${esc(panel.title)}">
+        ${panel.hideHeader ? "" : `<header>
           <span><strong>${esc(panel.title)}</strong><small>${esc(panel.meta)}</small></span>
           <button type="button" data-route="reader">关闭</button>
-        </header>
+        </header>`}
         ${panel.body}
       </section>`;
   }
@@ -1331,7 +1389,7 @@
     if (type === "appearance") {
       const typography = appState?.readerTypography || normalizeReaderTypography(data);
       const activeTheme = currentReaderTheme(data, appState);
-      const quickThemes = readerThemeOptions(data).slice(0, 4);
+      const quickThemes = readerQuickThemeOptions(data);
       const quickFonts = readerFontOptions(data).slice(0, 3);
       return `
         <section class="fd-reader-module-panel fd-reader-appearance-panel" data-dev-region="ReaderModulePanel" aria-label="阅读外观">
@@ -1341,7 +1399,7 @@
               <strong>阅读主题</strong>
               <div class="fd-reader-theme-palette">
                 ${quickThemes.map((item) => `
-                  <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" aria-label="${esc(item.label)}" aria-pressed="${activeTheme.value === item.value ? "true" : "false"}">
+                  <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" data-reader-theme-scheme="${esc(item.scheme || "")}" aria-label="${esc(item.label)}" aria-pressed="${activeTheme.value === item.value ? "true" : "false"}">
                     <span style="--swatch:${esc(item.swatch)}"></span>
                   </button>
                 `).join("")}
@@ -1490,8 +1548,8 @@
         <section class="fd-reader-full-setting-block">
           <header><strong>阅读主题</strong><em>${esc(activeTheme.label)}</em></header>
           <div class="fd-reader-full-theme-grid">
-            ${readerThemeOptions(data).map((item) => `
-              <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" aria-label="${esc(item.label)}">
+            ${readerThemeOptions(data).map((item, index) => `
+              <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" data-reader-theme-scheme="${esc(item.scheme || (index < 4 ? "day" : "night"))}" data-reader-theme-pair="${esc(item.pair || "")}" aria-label="${esc(index < 4 ? "白天主题" : "夜晚主题")}：${esc(item.label)}">
                 <span style="--swatch:${esc(item.swatch)}"></span><small>${esc(item.label)}</small>
               </button>
             `).join("")}
@@ -1645,7 +1703,7 @@
     if (isLoading) {
       bodyHtml = readerLoadingPanel(route);
     } else if (state.mode === "quick") {
-      bodyHtml = readerQuickActionPanel(state.quick);
+      bodyHtml = readerQuickActionPanel(state.quick, appState, data);
     } else if (state.mode === "module") {
       bodyHtml = readerModulePanel(state.module, appState, data);
     } else {
@@ -1693,7 +1751,7 @@
       stateHostHtml: `<div class="fd-reader-global-brightness-dim" data-reader-brightness-dim aria-hidden="true" style="${readerBrightnessStyle(data, appState)}"></div>`,
       ariaLabel: (routes[route] || routes.reader).title,
       readingSurfaceHtml: sharedReaderSurface(data, isImmersive ? "" : "immersive-reading", appState),
-      overlayHtml: isImmersive ? `${readerInfoOverlay(data, appState)}${readerTapZones(data, appState)}` : readerTopOverlay(data, appState),
+      overlayHtml: isImmersive ? `${readerInfoOverlay(data, appState)}${readerTextSelectionLayer(appState)}${readerTapZones(data, appState)}` : readerTopOverlay(data, appState),
       bottomSheetHtml: readerBottomSheetHtml(data, state, route, isLoading, appState),
       moduleNavHtml: isImmersive ? "" : readerModuleNavHtml(data, activeModule)
     });
@@ -1900,12 +1958,16 @@
               { type: "switch", icon: "top", title: "点击当前底栏回顶部", meta: "再次点击当前底栏按钮时回到页面顶部", enabled: true },
               { type: "switch", icon: "motion", title: "减少动态效果", meta: "降低动画效果以提升流畅度", enabled: true },
               { type: "switch", icon: "bug", title: "崩溃日志", meta: "仅保存本地诊断日志，便于排查问题", enabled: true, status: "已开启", statusTone: "good" },
-              { type: "select", icon: "play", title: "动画效果", meta: "设置界面内的动画播放效果强度", value: "标准", options: ["减少", "标准", "增强"] }
+              { type: "select", icon: "play", title: "动画效果", meta: "设置界面内的动画播放效果强度", value: "标准", options: ["减少", "标准", "增强"] },
+              { type: "danger", tone: "danger", icon: "trash", title: "缓存清理", meta: "当前缓存 1.28 GB", actionLabel: "清理", overlay: "dialog:cache-clear" }
             ]
           }
         ],
         actions: [{ tone: "danger", icon: "refresh", title: "恢复默认", meta: "恢复通用设置默认值", overlay: "dialog" }],
-        confirm: { title: "恢复通用设置？", copy: "恢复后将重置 App 主题、语言、启动页面和行为偏好。", confirmLabel: "确认恢复" }
+        confirm: { title: "恢复通用设置？", copy: "恢复后将重置 App 主题、语言、启动页面和行为偏好。", confirmLabel: "确认恢复" },
+        confirms: {
+          "cache-clear": { title: "清理缓存？", copy: "将清除封面、章节和临时文件缓存，不会删除书籍与阅读进度。", confirmLabel: "确认清理" }
+        }
       },
       "bookshelf-search-settings": {
         title: "书架与搜索",
@@ -1917,8 +1979,7 @@
               { type: "stepper", icon: "columns", title: "封面列数", value: "3列", minLabel: "-", maxLabel: "+" },
               { type: "select", icon: "folder", title: "默认分组", value: "全部", options: ["全部", "长篇追读", "资料", "未分组"] },
               { type: "switch", icon: "badge", title: "显示更新标记", meta: "在书籍封面上显示更新标记", enabled: true }
-            ],
-            preview: { coverTitle: "封面模式预览", listTitle: "列表模式预览", books: previewBooks }
+            ]
           },
           {
             title: "搜索",
@@ -1965,33 +2026,6 @@
         actions: [{ tone: "danger", icon: "trash", title: "清除隐私数据", meta: "清除所有隐私相关数据与记录", overlay: "dialog" }],
         confirm: { title: "清除隐私数据？", copy: "清除后将移除搜索历史、阅读痕迹和本地隐私记录。", confirmLabel: "确认清除" }
       },
-      "cache-management": {
-        title: "缓存管理",
-        storage: { title: "缓存占用", value: "1.28 GB", percent: "62%", copy: "正在计算各类缓存占用，分类结果会在下方同步更新。" },
-        sections: [
-          {
-            title: "缓存分类",
-            rows: [
-              { type: "link", icon: "clock", title: "总缓存", meta: "所有缓存数据占用的存储空间", value: "1.28 GB" },
-              { type: "link", icon: "book", title: "书籍缓存", meta: "章节内容、目录等阅读数据", value: "892 MB" },
-              { type: "link", icon: "image", title: "封面缓存", meta: "书籍封面图片缓存", value: "126 MB" },
-              { type: "link", icon: "search", title: "搜索缓存", meta: "搜索记录、索引和结果缓存", value: "84 MB" },
-              { type: "link", icon: "source", title: "RSS 缓存", meta: "订阅内容、图片和附件缓存", value: "178 MB" }
-            ]
-          },
-          {
-            title: "缓存策略",
-            rows: [
-              { type: "switch", icon: "storage", title: "优先读取缓存", meta: "优先使用本地缓存提升阅读速度", enabled: true },
-              { type: "switch", icon: "download", title: "自动缓存后续章节", meta: "预读并缓存后续章节以便离线阅读", enabled: true },
-              { type: "select", icon: "list", title: "缓存范围", meta: "设置预读并缓存的章节数量", value: "5 章", options: ["3 章", "5 章", "10 章"] },
-              { type: "select", icon: "folder", title: "下载与缓存位置", meta: "选择下载和缓存文件的存储位置", value: "内部存储", options: ["内部存储", "外部存储"] }
-            ]
-          }
-        ],
-        actions: [{ tone: "danger", icon: "trash", title: "清理缓存", meta: "删除所有缓存数据，释放存储空间", overlay: "dialog" }],
-        confirm: { title: "确认清理缓存？", copy: "清理后会删除章节、封面、搜索和 RSS 缓存，不会删除书架记录。", confirmLabel: "确认清理" }
-      },
       "about-feedback": {
         title: "关于与反馈",
         metrics: [
@@ -2029,36 +2063,49 @@
         title: "同步与备份",
         sections: [
           {
-            title: "本地备份",
+            title: "恢复数据",
             rows: [
-              { type: "link", icon: "clock", title: "立即备份", meta: "手动备份所有数据到本地", value: "今天 10:30" },
-              { type: "switch", icon: "clock", title: "自动备份", meta: "每天保留最近 7 份备份", enabled: true },
-              { type: "select", icon: "folder", title: "备份位置", meta: "选择本地备份文件存储位置", value: "内部存储", options: ["内部存储", "外部文件夹", "WebDAV"] },
-              { type: "link", icon: "upload", title: "导出数据", meta: "将数据导出为文件到本地" },
-              { type: "link", icon: "download", title: "恢复备份", meta: "从备份文件导入数据并恢复", overlay: "dialog" }
+              { type: "select", icon: "folder", title: "本地恢复", meta: "从本机备份文件中选择需要恢复的数据", value: "选择备份数据", options: ["2026-06-23 10:30 · 本地完整备份 · 12.8 MB", "2026-06-22 21:15 · 书架与设置 · 8.6 MB", "2026-06-20 09:40 · 阅读进度 · 2.4 MB"] },
+              { type: "select", icon: "cloud", title: "远程恢复", meta: "从远程同步位置中选择需要恢复的数据", value: "选择远程数据", options: ["WebDAV · 2026-06-23 08:00 · 完整备份", "WebDAV · 2026-06-21 22:30 · 书架与设置", "WebDAV · 2026-06-18 19:10 · 阅读进度"] }
             ]
           },
           {
-            title: "WebDAV",
+            title: "远程配置",
             rows: [
-              { type: "link", icon: "source", title: "WebDAV 未配置", meta: "配置 WebDAV 以同步数据", actionLabel: "去配置" },
-              { type: "switch", icon: "refresh", title: "自动同步阅读进度", meta: "通过 WebDAV 自动同步阅读进度", enabled: false },
-              { type: "select", icon: "warning", title: "同步冲突处理", meta: "当出现数据冲突时如何处理", value: "询问我", options: ["询问我", "保留本地", "使用远端"] }
+              { type: "link", icon: "cloud", title: "WebDAV 配置", meta: "配置远程恢复使用的服务器、账号和目录", route: "webdav-config" }
+            ]
+          }
+        ]
+      },
+      "webdav-config": {
+        title: "WebDAV 配置",
+        sections: [
+          {
+            title: "连接信息",
+            rows: [
+              { type: "link", icon: "link", title: "服务器地址", meta: "WebDAV 服务地址", value: "https://dav.example.com" },
+              { type: "link", icon: "people", title: "账号", meta: "用于连接远程备份空间", value: "reader@example.com" },
+              { type: "link", icon: "shield", title: "密码", meta: "本地加密保存", value: "••••••••" },
+              { type: "link", icon: "folder", title: "同步目录", meta: "远程备份数据所在目录", value: "/ReaderBackup" }
             ]
           },
           {
-            title: "同步状态",
+            title: "恢复范围",
             rows: [
-              { type: "link", icon: "refresh", title: "上次同步：尚未同步", meta: "暂无同步记录", actionLabel: "立即同步" },
-              { type: "link", icon: "warning", title: "同步失败", meta: "WebDAV 未配置时无法自动同步", status: "待配置", statusTone: "warn" }
+              { type: "switch", icon: "bookshelf", title: "书架与分组", meta: "恢复书架书籍、分组和排序", enabled: true },
+              { type: "switch", icon: "clock", title: "阅读进度", meta: "恢复章节位置和阅读进度", enabled: true },
+              { type: "switch", icon: "settings", title: "阅读与 App 设置", meta: "恢复主题、排版和通用设置", enabled: true }
             ]
           }
         ],
-        records: [
-          { icon: "file", title: "备份记录 2026-06-20 10:30", meta: "本地备份 · 12.8 MB", status: "可恢复", tone: "good" },
-          { icon: "file", title: "备份记录 2026-06-19 22:10", meta: "本地备份 · 12.4 MB", status: "已校验", tone: "info" }
+        actions: [
+          { icon: "refresh", title: "测试连接", meta: "验证服务器地址和账号是否可用", overlay: "dialog:webdav-test" },
+          { icon: "check", title: "保存配置", meta: "保存后远程恢复使用此 WebDAV", overlay: "dialog:webdav-save" }
         ],
-        confirm: { title: "恢复备份？", copy: "恢复备份会覆盖当前书架、阅读进度和设置，请确认已完成当前数据备份。", confirmLabel: "确认恢复" }
+        confirms: {
+          "webdav-test": { title: "测试 WebDAV 连接？", copy: "将使用当前服务器地址和账号发起一次连接验证。", confirmLabel: "开始测试" },
+          "webdav-save": { title: "保存 WebDAV 配置？", copy: "保存后，远程恢复会从该 WebDAV 目录读取备份数据。", confirmLabel: "保存" }
+        }
       },
       "source-management": {
         title: "书源管理",
@@ -2166,7 +2213,7 @@
   function settingsRowHtml(row, route, appState) {
     const key = row.options ? settingsOptionKey(route, row.title) : "";
     const optionOpen = row.options && appState?.settingsExpandedOption === key;
-    const overlayAttr = row.overlay ? ` data-settings-overlay="${esc(row.overlay)}"` : row.options ? ` data-settings-option-key="${esc(key)}"` : "";
+    const overlayAttr = row.overlay ? ` data-settings-overlay="${esc(row.overlay)}"` : row.options ? ` data-settings-option-key="${esc(key)}"` : row.route ? ` data-route="${esc(row.route)}"` : "";
     return `
       <article class="fd-setting-row${row.tone === "danger" ? " is-danger" : ""}${optionOpen ? " is-option-open" : ""}"${overlayAttr} role="${overlayAttr ? "button" : "group"}" tabindex="${overlayAttr ? "0" : "-1"}">
         <span>${icon(row.icon || "settings", "fd-small-icon")}</span>
@@ -2292,8 +2339,9 @@
       </section>`;
   }
 
-  function settingsDialogHtml(page) {
-    const confirm = page.confirm || {};
+  function settingsDialogHtml(page, overlay) {
+    const overlayKey = String(overlay || "").startsWith("dialog:") ? String(overlay).slice("dialog:".length) : "";
+    const confirm = overlayKey && page.confirms ? page.confirms[overlayKey] || {} : page.confirm || {};
     if (!confirm.title) return "";
     return `
       <section class="fd-demo-dialog fd-settings-confirm-dialog" aria-hidden="false">
@@ -2320,7 +2368,7 @@
       });
     });
     const overlay = appState?.settingsOverlay || "";
-    const frameState = overlay === "sheet" ? " has-sheet" : overlay === "dialog" ? " has-dialog" : "";
+    const frameState = overlay === "sheet" ? " has-sheet" : overlay.startsWith("dialog") ? " has-dialog" : "";
     const contentHtml = `
       ${settingsMetricsHtml(page.metrics)}
       ${settingsStorageHtml(page.storage)}
@@ -2344,8 +2392,242 @@
       stateHostClass: "fd-settings-state-host",
       contentHtml,
       toastHtml: page.toast ? `<section class="fd-settings-toast">${esc(page.toast)}</section>` : "",
-      dialogHtml: `${overlay === "sheet" ? settingsOptionSheetHtml(page) : ""}${overlay === "dialog" ? settingsDialogHtml(page) : ""}`
+      dialogHtml: `${overlay === "sheet" ? settingsOptionSheetHtml(page) : ""}${overlay.startsWith("dialog") ? settingsDialogHtml(page, overlay) : ""}`
     }));
+  }
+
+  const sourceItems = [
+    { title: "起点中文网", domain: "qidian.com", group: "起点导入", status: "可用", tone: "good", enabled: true },
+    { title: "笔趣阁", domain: "biquge.example", group: "玄幻书源", status: "异常", tone: "warn", enabled: true, selected: true },
+    { title: "本地导入源", domain: "本地文件导入", group: "自定义", status: "未检测", tone: "muted", enabled: false },
+    { title: "测试书源", domain: "test.example", group: "测试书源", status: "可用", tone: "good", enabled: true },
+    { title: "轻小说文库", domain: "lightnovel.example", group: "测试书源", status: "可用", tone: "good", enabled: true },
+    { title: "旧规则源", domain: "old.example", group: "自定义", status: "异常", tone: "warn", enabled: true, selected: true },
+    { title: "飞卢小说网", domain: "faloo.com", group: "玄幻书源", status: "可用", tone: "good", enabled: true },
+    { title: "晋江文学城", domain: "jjwx.example", group: "起点导入", status: "可用", tone: "good", enabled: true },
+    { title: "纵横中文网", domain: "zongheng.com", group: "玄幻书源", status: "未检测", tone: "muted", enabled: false },
+    { title: "豆瓣阅读", domain: "read.douban.com", group: "自定义", status: "可用", tone: "good", enabled: true },
+    { title: "失效示例源", domain: "dead.example", group: "测试书源", status: "异常", tone: "warn", enabled: false, selected: true }
+  ];
+
+  function sourceShell(data, title, contentHtml, options) {
+    const trailingHtml = options?.trailingHtml;
+    return shellKit().renderSettingsShell(Object.assign(phoneShellClasses("fd-settings-phone fd-source-demo-phone"), {
+      data,
+      title,
+      ariaLabel: title,
+      topBarClass: "fd-back-bar",
+      trailingHtml,
+      contentClass: "fd-phone-content fd-settings-content fd-source-demo-content",
+      toastHostClass: "fd-toast-host",
+      dialogHostClass: "fd-dialog-host",
+      stateHostClass: "fd-settings-state-host",
+      contentHtml,
+      dialogHtml: options?.dialogHtml || ""
+    }));
+  }
+
+  function sourceBadge(item) {
+    return `<em class="fd-source-badge is-${esc(item.tone || "muted")}"><i></i>${esc(item.status || "")}</em>`;
+  }
+
+  function sourceSwitch(enabled) {
+    return `<span class="fd-source-switch${enabled ? " is-on" : ""}" aria-hidden="true"><i></i></span>`;
+  }
+
+  function sourceSearchAndFilters() {
+    return `
+      <label class="fd-source-search">${icon("search", "fd-small-icon")}<span>搜索书源名称或域名</span></label>
+      <p class="fd-source-stat-line">12 个书源 · 8 个启用 · 4 个异常 · 10:30 检测</p>
+      <nav class="fd-source-chip-row" aria-label="书源状态筛选">
+        ${["全部", "已启用", "异常", "未检测", "自定义"].map((item, index) => `<button class="${index === 0 ? "is-active" : ""}" type="button">${esc(item)}</button>`).join("")}
+      </nav>
+      <nav class="fd-source-chip-row is-group" aria-label="书源分组筛选">
+        ${["全部分组", "玄幻书源", "起点导入", "测试书源"].map((item, index) => `<button class="${index === 0 ? "is-active" : ""}" type="button" data-route="${index === 0 ? "source-groups" : "source-management"}">${esc(item)}</button>`).join("")}
+      </nav>`;
+  }
+
+  function sourceRow(item, mode) {
+    const isBatch = mode === "batch";
+    const selected = Boolean(item.selected);
+    return `
+      <article class="fd-source-row${selected ? " is-selected" : ""}"${isBatch ? "" : ' role="button" tabindex="0" data-route="source-detail"'}>
+        ${isBatch ? `<button class="fd-source-check${selected ? " is-checked" : ""}" type="button" aria-label="${esc(item.title)}${selected ? "已选择" : "未选择"}">${selected ? icon("check", "fd-small-icon") : ""}</button>` : ""}
+        <span class="fd-source-row-main"><strong>${esc(item.title)}</strong><small>${esc(item.domain)} · ${esc(item.group)}</small></span>
+        ${sourceBadge(item)}
+        ${sourceSwitch(item.enabled)}
+        ${isBatch ? "" : `<button class="fd-source-row-test" type="button" data-route="source-edit-debug" aria-label="检测 ${esc(item.title)}">${icon("activity", "fd-small-icon")}</button>`}
+      </article>`;
+  }
+
+  function sourceList(items, mode) {
+    return `<section class="fd-source-list" aria-label="书源列表">${items.map((item) => sourceRow(item, mode)).join("")}</section>`;
+  }
+
+  function sourceHomeContent(menuOpen) {
+    return `
+      <section class="fd-source-home">
+        <div class="fd-source-top-actions">
+          <button type="button" data-source-menu-toggle>${icon("more", "fd-small-icon")}<span>更多</span></button>
+          <button type="button" data-route="source-logs">日志</button>
+          ${menuOpen ? `
+            <nav class="fd-source-more-menu" aria-label="书源更多操作">
+              <button type="button" data-route="source-import-preview">网络导入</button>
+              <button type="button" data-route="source-import-preview">本地导入</button>
+              <button type="button" data-route="source-edit-debug">新建书源</button>
+              <button type="button" data-route="source-batch">批量管理</button>
+              <button type="button" data-route="source-groups">分组管理</button>
+              <button type="button" data-route="source-batch">校验所选</button>
+              <button type="button" data-route="source-logs">错误日志</button>
+            </nav>` : ""}
+        </div>
+        ${sourceSearchAndFilters()}
+        ${sourceList(sourceItems, "home")}
+        <div class="fd-source-bottom-bar">
+          <button type="button" data-route="source-batch">检测全部</button>
+          <button type="button" data-route="source-import-options">新增书源</button>
+        </div>
+      </section>`;
+  }
+
+  function sourceManagementScreen(data, appState) {
+    return sourceShell(data, "书源管理", sourceHomeContent(Boolean(appState?.sourceMenuOpen)), {
+      trailingHtml: `<button type="button" aria-label="更多" data-source-menu-toggle>${icon("more", "fd-small-icon")}</button>`
+    });
+  }
+
+  function sourceImportOptionsScreen(data) {
+    return sourceShell(data, "书源管理", `${sourceHomeContent(false)}
+      <section class="fd-source-bottom-sheet" aria-label="添加书源">
+        <div class="fd-sheet-grabber"></div>
+        <h2>添加书源</h2>
+        ${[
+          ["cloud", "网络导入", "从 URL 拉取书源包", "source-import-preview"],
+          ["folder", "本地导入", "选择本地 JSON 或 TXT 文件", "source-import-preview"],
+          ["file", "剪贴板导入", "解析剪贴板中的书源内容", "source-import-preview"],
+          ["edit", "手动新建", "进入空白书源编辑页", "source-edit-debug"]
+        ].map(([itemIcon, title, meta, route]) => `<button type="button" data-route="${esc(route)}">${icon(itemIcon, "fd-small-icon")}<span><strong>${esc(title)}</strong><small>${esc(meta)}</small></span>${chevron("fd-small-icon")}</button>`).join("")}
+        <button class="is-cancel" type="button" data-route="source-management" data-route-replace>取消</button>
+      </section>`);
+  }
+
+  function sourceImportPreviewScreen(data) {
+    const rows = [
+      ["起点中文网", "qidian.com · 起点导入", "新增", "good"],
+      ["晋江文学城", "jjwx.example · 起点导入", "重复", "muted"],
+      ["轻小说文库", "lightnovel.example · 测试书源", "新增", "good"],
+      ["旧规则源", "old.example · 自定义", "重复", "muted"],
+      ["失效示例源", "dead.example · 测试书源", "异常", "warn"],
+      ["豆瓣阅读", "read.douban.com · 自定义", "新增", "good"],
+      ["开源书源示例", "opensource.example · 测试书源", "新增", "good"]
+    ];
+    const content = `
+      <section class="fd-source-import">
+        <article class="fd-source-import-origin"><span><strong>网络导入</strong><small>https://example.com/booksource.json</small></span><button type="button" data-route="source-import-options">更换</button></article>
+        <p class="fd-source-stat-line">共 24 个书源 · 18 个新增 · 4 个重复 · 2 个异常</p>
+        <h2 class="fd-source-section-title">冲突处理</h2>
+        <nav class="fd-source-segment" aria-label="冲突处理"><button class="is-active" type="button">跳过重复</button><button type="button">覆盖旧源</button><button type="button">保留两份</button></nav>
+        <article class="fd-source-form-row"><span><strong>导入到分组</strong><small>可在导入后批量调整分组</small></span><em>保持原分组</em>${chevron("fd-small-icon")}</article>
+        <section class="fd-source-preview-list" aria-label="导入预览">
+          ${rows.map(([title, meta, status, tone]) => `<article><span><strong>${esc(title)}</strong><small>${esc(meta)}</small></span>${sourceBadge({ status, tone })}</article>`).join("")}
+        </section>
+        <div class="fd-source-bottom-bar"><button type="button" data-route="source-management">取消</button><button type="button" data-route="source-management">确认导入</button></div>
+      </section>`;
+    return sourceShell(data, "导入书源", content);
+  }
+
+  function sourceBatchScreen(data) {
+    return sourceShell(data, "已选 3 个", `
+      <section class="fd-source-home fd-source-batch">
+        <div class="fd-source-batch-top"><button type="button" data-route="source-management">取消</button><strong>已选 3 个</strong><button type="button">全选</button></div>
+        ${sourceSearchAndFilters()}
+        ${sourceList(sourceItems, "batch")}
+        <div class="fd-source-batch-actions">
+          <button type="button">${icon("check", "fd-small-icon")}启用</button>
+          <button type="button">${icon("close", "fd-small-icon")}禁用</button>
+          <button type="button">${icon("activity", "fd-small-icon")}检测</button>
+          <button type="button" data-route="source-groups">${icon("folder", "fd-small-icon")}分组</button>
+          <button class="is-danger" type="button" data-route="source-delete-confirm">${icon("trash", "fd-small-icon")}删除</button>
+        </div>
+      </section>`);
+  }
+
+  function sourceGroupsScreen(data) {
+    const groups = [["全部分组", "12 个书源"], ["玄幻书源", "4 个书源"], ["起点导入", "3 个书源"], ["测试书源", "3 个书源"], ["自定义", "2 个书源"], ["未分组", "1 个书源"]];
+    return sourceShell(data, "分组管理", `
+      <section class="fd-source-groups">
+        <p class="fd-source-note">分组用于筛选和批量整理书源，删除分组不会删除书源。</p>
+        <section class="fd-source-group-list">${groups.map(([title, meta], index) => `<article><span><strong>${esc(title)}</strong><small>${esc(meta)}</small></span><button type="button">${icon("edit", "fd-small-icon")}</button><button type="button">${icon("drag", "fd-small-icon")}</button>${index === 1 ? "<em>当前筛选</em>" : ""}</article>`).join("")}</section>
+        <div class="fd-source-bottom-bar"><button type="button">批量移动</button><button type="button">新增分组</button></div>
+        <section class="fd-source-mini-sheet" aria-label="重命名分组"><div class="fd-sheet-grabber"></div><h2>重命名分组</h2><label><span>分组名称</span><strong>玄幻书源</strong></label><div><button type="button">取消</button><button type="button">保存</button></div></section>
+      </section>`, { trailingHtml: `<button type="button">新增</button>` });
+  }
+
+  function sourceDetailScreen(data) {
+    const modules = [["基本", "已配置", "good"], ["搜索", "异常", "warn"], ["发现", "已配置", "good"], ["目录", "已配置", "good"], ["正文", "异常", "warn"], ["高级", "已配置", "muted"]];
+    return sourceShell(data, "书源详情", `
+      <section class="fd-source-detail">
+        <article class="fd-source-detail-head"><span><strong>笔趣阁</strong><small>biquge.example · 玄幻书源</small></span>${sourceSwitch(true)}</article>
+        <p class="fd-source-stat-line"><b>异常</b> · 最近检测 10:30 · 规则版本 3</p>
+        <section class="fd-source-module-list">${modules.map(([title, status, tone]) => `<article><strong>${esc(title)}</strong>${sourceBadge({ status, tone })}</article>`).join("")}</section>
+        <article class="fd-source-detect-card"><h2>最近检测结果</h2><p>目录解析成功 · 正文解析失败 · 耗时 1260ms</p><small>失败原因：正文规则返回空内容。</small></article>
+        <section class="fd-source-action-grid">
+          <button type="button">${icon("activity", "fd-small-icon")}检测此源</button>
+          <button type="button" data-route="source-edit-debug">${icon("bug", "fd-small-icon")}调试规则</button>
+          <button type="button">${icon("copy", "fd-small-icon")}复制书源</button>
+          <button type="button">${icon("upload", "fd-small-icon")}导出书源</button>
+          <button class="is-danger" type="button" data-route="source-delete-confirm">${icon("trash", "fd-small-icon")}删除书源</button>
+        </section>
+        <div class="fd-source-bottom-bar"><button type="button" data-route="source-edit-debug">调试</button><button type="button" data-route="source-edit-debug">编辑规则</button></div>
+      </section>`, { trailingHtml: `<button type="button" data-route="source-edit-debug">编辑</button>` });
+  }
+
+  function sourceEditDebugScreen(data) {
+    const rows = [["搜索地址", "/search?q={{key}}"], ["书籍列表规则", ".book-list > li"], ["书名规则", ".title"], ["作者规则", ".author"], ["详情页 URL", "a@href"]];
+    return sourceShell(data, "编辑书源", `
+      <section class="fd-source-edit">
+        <article class="fd-source-detail-head"><span><strong>笔趣阁</strong><small>玄幻书源 · biquge.example</small></span>${sourceSwitch(true)}</article>
+        <nav class="fd-source-module-tabs">${["基本", "搜索", "发现", "目录", "正文", "高级"].map((item) => `<button class="${item === "搜索" ? "is-active" : ""}" type="button">${esc(item)}</button>`).join("")}</nav>
+        <section class="fd-source-rule-form">${rows.map(([label, value]) => `<article><span>${esc(label)}</span><strong>${esc(value)}</strong></article>`).join("")}</section>
+        <div class="fd-source-inline-actions"><button type="button" data-route="source-code-view">查看源码</button><button type="button">调试搜索</button><button type="button">清空</button></div>
+        <section class="fd-source-debug-panel"><div class="fd-sheet-grabber"></div><header><strong>搜索调试</strong><button type="button" data-route="source-detail">关闭</button></header><label><span>关键词</span><strong>斗破苍穹</strong></label><p>耗时 368ms · 返回 12 条</p><article><strong>斗破苍穹</strong><small>天蚕土豆 · /book/123</small></article><article><strong>斗破苍穹前传</strong><small>示例作者 · /book/124</small></article><div><button type="button">复制日志</button><button type="button">应用结果</button></div></section>
+      </section>`, { trailingHtml: `<button type="button">保存</button>` });
+  }
+
+  function sourceLogsScreen(data) {
+    const logs = [["笔趣阁", "ERROR", "10:30", "正文", "正文规则返回空内容"], ["旧规则源", "ERROR", "10:22", "搜索", "HTTP 403"], ["本地导入源", "WARN", "09:50", "目录", "尚未检测"], ["失效示例源", "ERROR", "昨天", "详情", "详情页 URL 为空"]];
+    return sourceShell(data, "错误日志", `
+      <section class="fd-source-logs">
+        <nav class="fd-source-chip-row"><button class="is-active" type="button">全部</button><button type="button">异常</button><button type="button">警告</button><button type="button">今日</button></nav>
+        <label class="fd-source-search">${icon("search", "fd-small-icon")}<span>搜索书源或错误内容</span></label>
+        <p class="fd-source-stat-line">4 条异常 · 1 条警告</p>
+        <section class="fd-source-log-list">${logs.map(([source, level, time, module, message]) => `<article role="button" tabindex="0" data-route="source-edit-debug"><span><strong>${esc(source)} · ${esc(level)}</strong><small>${esc(time)} · ${esc(module)} · ${esc(message)}</small></span>${chevron("fd-small-icon")}</article>`).join("")}</section>
+        <div class="fd-source-bottom-bar"><button type="button">复制全部</button><button type="button">重新检测异常</button></div>
+      </section>`, { trailingHtml: `<button type="button" data-route="source-delete-confirm">清空</button>` });
+  }
+
+  function sourceCodeViewScreen(data) {
+    const code = ["<html>", "  <body>", "    <ul class=\"book-list\">", "      <li><a href=\"/book/123\">斗破苍穹</a><span class=\"author\">天蚕土豆</span></li>", "      <li><a href=\"/book/124\">斗破苍穹前传</a><span class=\"author\">示例作者</span></li>", "    </ul>", "  </body>", "</html>"];
+    return sourceShell(data, "源码查看", `
+      <section class="fd-source-code">
+        <p class="fd-source-stat-line">笔趣阁 · 搜索规则 · 368ms · 200 OK</p>
+        <article class="fd-source-request">GET https://biquge.example/search?q=斗破苍穹</article>
+        <nav class="fd-source-segment"><button class="is-active" type="button">源码</button><button type="button">解析结果</button><button type="button">错误</button></nav>
+        <pre>${code.map((line, index) => `${String(index + 1).padStart(2, "0")}  ${esc(line)}`).join("\n")}</pre>
+        <div class="fd-source-bottom-bar"><button type="button">重新请求</button><button type="button" data-route="source-edit-debug">回到调试</button></div>
+      </section>`, { trailingHtml: `<button type="button">复制</button>` });
+  }
+
+  function sourceDeleteConfirmScreen(data) {
+    return sourceShell(data, "已选 3 个", `
+      <section class="fd-source-home fd-source-batch fd-source-dialog-backdrop">
+        <div class="fd-source-batch-top"><button type="button" data-route="source-batch">取消</button><strong>已选 3 个</strong><button type="button">全选</button></div>
+        ${sourceSearchAndFilters()}
+        ${sourceList(sourceItems, "batch")}
+        <div class="fd-source-batch-actions"><button type="button">启用</button><button type="button">禁用</button><button type="button">检测</button><button type="button">分组</button><button class="is-danger" type="button">删除</button></div>
+      </section>`, {
+        dialogHtml: `<section class="fd-demo-dialog fd-source-delete-dialog" aria-hidden="false"><h2>删除书源？</h2><p>将删除已选 3 个书源。不会删除书架书籍，但这些书源将不再参与搜索、发现和换源。</p><label><input type="checkbox"> 同时清除相关检测日志</label><div><button type="button" data-route="source-batch">取消</button><button type="button" data-route="source-management">删除</button></div></section>`
+      });
   }
 
   function sourceSwitchFilterTabs(filters) {
@@ -2541,12 +2823,31 @@
       case "source-switch":
         return flowScreen(data, appState);
       case "source-management":
+        return sourceManagementScreen(data, appState);
+      case "source-import-options":
+        return sourceImportOptionsScreen(data);
+      case "source-import-preview":
+        return sourceImportPreviewScreen(data);
+      case "source-batch":
+        return sourceBatchScreen(data);
+      case "source-groups":
+        return sourceGroupsScreen(data);
+      case "source-detail":
+        return sourceDetailScreen(data);
+      case "source-edit-debug":
+        return sourceEditDebugScreen(data);
+      case "source-logs":
+        return sourceLogsScreen(data);
+      case "source-code-view":
+        return sourceCodeViewScreen(data);
+      case "source-delete-confirm":
+        return sourceDeleteConfirmScreen(data);
       case "settings-general":
       case "bookshelf-search-settings":
       case "privacy-permissions":
-      case "cache-management":
       case "about-feedback":
       case "sync-backup":
+      case "webdav-config":
         return settingsScreen(data, route, appState);
       default:
         return mainTabBookshelf(data, appState);
@@ -2581,8 +2882,12 @@
       readerTtsExpandedOption: "",
       readerSettings: Object.assign({}, readerControlSettingsConfig(data).defaults),
       readerAutoPageSession: false,
+      readerAutoPageCountdown: 8,
+      readerTextSelectionOpen: false,
+      readerSelectedText: "雨，下了一整夜。",
       readerSettingsExpandedOption: "",
       sourceSwitchSelectedSource: "",
+      sourceMenuOpen: true,
       settingsOverlay: "",
       settingsExpandedOption: "",
       settingsValues: {},
@@ -2882,6 +3187,18 @@
   function attachScreenInteractions(screenHost, goTo, goBack, goTab, replaceTopRoute, exitReader, appState, data, renderCurrentRoute) {
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const roundTo = (value, digits) => Number(value.toFixed(digits));
+    const openReaderTextSelection = () => {
+      appState.readerTextSelectionOpen = true;
+      appState.readerSelectedText = "雨，下了一整夜。";
+      renderCurrentRoute();
+    };
+    const closeReaderTextSelection = () => {
+      if (!appState.readerTextSelectionOpen) {
+        return;
+      }
+      appState.readerTextSelectionOpen = false;
+      renderCurrentRoute();
+    };
     const applyReaderPageAction = (action) => {
       const pageCount = readerPages(data, appState).length;
       const currentIndex = Number.isFinite(Number(appState.readerPageIndex)) ? Number(appState.readerPageIndex) : 0;
@@ -3007,6 +3324,8 @@
         appState.readerTtsSession = true;
         tts.playing = !tts.playing;
         if (tts.playing) {
+          appState.readerAutoPageSession = false;
+          appState.readerSettings.autoPage = false;
           replaceTopRoute("immersive-reading");
           return;
         }
@@ -3045,7 +3364,10 @@
       appState.readerSettings[key] = !appState.readerSettings[key];
       if (key === "autoPage") {
         appState.readerAutoPageSession = true;
+        appState.readerAutoPageCountdown = 8;
         if (appState.readerSettings[key]) {
+          appState.readerTtsSession = false;
+          appState.readerTts.playing = false;
           replaceTopRoute("immersive-reading");
           return;
         }
@@ -3231,7 +3553,7 @@
         }
         return;
       }
-      if (overlay === "sheet" || overlay === "dialog") {
+      if (overlay === "sheet" || overlay === "dialog" || overlay.startsWith("dialog:")) {
         appState.settingsOverlay = overlay;
         renderCurrentRoute();
       }
@@ -3305,6 +3627,52 @@
       });
     });
 
+    screenHost.querySelectorAll("[data-reader-selection-close], [data-reader-selection-action]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeReaderTextSelection();
+      });
+    });
+
+    screenHost.querySelectorAll(".fd-immersive-hotzone, .fd-ir-reading-layer").forEach((targetEl) => {
+      let textSelectionTimer = null;
+      let textSelectionTriggered = false;
+      const clearTextSelectionTimer = () => {
+        if (textSelectionTimer) {
+          window.clearTimeout(textSelectionTimer);
+          textSelectionTimer = null;
+        }
+      };
+      targetEl.addEventListener("pointerdown", (event) => {
+        if (event.button && event.button !== 0) {
+          return;
+        }
+        textSelectionTriggered = false;
+        clearTextSelectionTimer();
+        textSelectionTimer = window.setTimeout(() => {
+          textSelectionTriggered = true;
+          openReaderTextSelection();
+        }, 620);
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+        targetEl.addEventListener(eventName, clearTextSelectionTimer);
+      });
+      targetEl.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        textSelectionTriggered = true;
+        openReaderTextSelection();
+      });
+      targetEl.addEventListener("click", (event) => {
+        clearTextSelectionTimer();
+        if (textSelectionTriggered) {
+          event.preventDefault();
+          event.stopPropagation();
+          textSelectionTriggered = false;
+        }
+      }, true);
+    });
+
     screenHost.querySelectorAll("[data-source-name]").forEach((targetEl) => {
       const selectSource = () => {
         appState.sourceSwitchSelectedSource = targetEl.getAttribute("data-source-name") || "";
@@ -3319,6 +3687,15 @@
           event.preventDefault();
           selectSource();
         }
+      });
+    });
+
+    screenHost.querySelectorAll("[data-source-menu-toggle]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        appState.sourceMenuOpen = !appState.sourceMenuOpen;
+        renderCurrentRoute();
       });
     });
 

@@ -1,6 +1,6 @@
 # 全量页面规划卡（Full Page Planning Cards）
 
-本文按 `FRONTEND_PLANNING_REQUIREMENTS_TEMPLATE.md` 补齐 29 个正式页面的规划卡。每一行都是一张压缩规划卡，覆盖页面身份、Shell、核心任务、P0/P1/P2、结构与覆盖、上下文与事件、适配与验收。首批 4 张详版卡见 `FRONTEND_FIRST_PAGE_PLANNING_CARDS.md`，29 页详版字段矩阵见 `FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md`。
+本文按 `FRONTEND_PLANNING_REQUIREMENTS_TEMPLATE.md` 补齐 30 个正式页面的规划卡。每一行都是一张压缩规划卡，覆盖页面身份、Shell、核心任务、P0/P1/P2、结构与覆盖、上下文与事件、适配与验收。首批 4 张详版卡见 `FRONTEND_FIRST_PAGE_PLANNING_CARDS.md`，30 页详版字段矩阵见 `FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md`。
 
 ## 字段覆盖规则（Field Coverage Rule）
 
@@ -42,6 +42,7 @@
 
 | 页面（Page） | 页面 id / 路径（Page ID / Path） | 核心任务与 P0（Primary Task and P0） | P1/P2 | 结构与覆盖（Structure and Overlay） | 上下文与关键事件（Context and Key Events） | 适配与验收（Adaptation and Acceptance） |
 |---|---|---|---|---|---|---|
+| 阅读入口（Reading Entry） | `reading-entry-preview` / `docs/ui-design/04-阅读链路/阅读入口/frontend-input/` | 从书籍上下文进入阅读；P0 为继续阅读、开始阅读、加载中、失败修复和离线继续。 | P1 来源上下文；P2 弱提示。 | `ReaderShell` 的 ReaderStateHost 浮层，保留 ReadingSurface 背景，不生成独立详情页。 | ReaderContext、BookContext、SourceContext；`continueReading`、`startReading`、`retryOpen`、`switchSource`、`continueCached`。 | 入口浮层不遮挡正文关键内容；失败/离线保留来源和章节上下文；继续/开始动作首屏可见。 |
 | 沉浸阅读（Immersive Reading） | `immersive-reading-preview` / `docs/ui-design/04-阅读链路/沉浸阅读/frontend-input/` | 阅读正文并翻页；P0 为正文、点击热区、阅读进度、返回来源，并承载打开/失败/离线状态。 | P1 页脚信息；P2 弱提示。 | `ReaderShell` 的 ReadingSurface；覆盖层关闭时正文位置不变；ReaderStateHost 处理打开、错误和缓存继续状态。 | ReaderContext；`tapPrevious`、`tapCenter`、`tapNext`、`retry`、`continueCached`。 | 点击热区明确；正文不被截断；页脚信息不遮挡正文主阅读区；打开状态不形成独立页面。 |
 | 阅读控制层（Reader Control Layer） | `reader-control-preview` / `docs/ui-design/04-阅读链路/阅读控制层/frontend-input/` | 在阅读中控制模块；P0 为顶部控制、章节进度、四模块导航、正文位置保留。 | P1 快捷操作、亮度、底部读数；P2 背景正文。 | `ReaderShell`：ReadingSurface + ReaderOverlayHost + BottomSheetHost + ReaderModuleNav。 | ReaderContext；`sourceChange`、`quickAction`、`chapterChange`、`progressChange`、`moduleChange`、`brightnessChange`。 | 四模块 active 不改变尺寸/间距/相对位置；切模块不重置正文；重复点击当前模块回默认控制层。 |
 | 目录与书签（TOC and Bookmarks） | `reading-toc-bookmark-preview` / `docs/ui-design/04-阅读链路/目录与书签/frontend-input/` | 选择章节或书签定位；P0 为目录/书签列表、打开章节/书签、当前进度。 | P1 搜索、更多；P2 卷说明。 | `ReaderShell` BottomSheetHost 面板滚动；ReaderModuleNav 保持固定。 | ReaderContext、ChapterContext；`tabChange`、`searchChange`、`openChapter`、`openBookmark`、`moreAction`。 | 面板内列表末项可达；打开章节回到正文定位；更多菜单不遮挡主动作。 |
@@ -67,9 +68,9 @@
 
 ## 全量规划验收（Full Planning Acceptance）
 
-- 29 个正式 preview 页面都有页面 id、输入包路径、Shell、核心任务和 P0/P1/P2。
-- 29 个页面都明确固定区、滚动区、覆盖区或状态区的归属。
-- 29 个页面的详版固定区、滚动区、覆盖区、状态区、入口、返回、上下文、事件、适配、文本、组件和验收字段见 `FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md`。
+- 30 个正式 preview 页面都有页面 id、输入包路径、Shell、核心任务和 P0/P1/P2。
+- 30 个页面都明确固定区、滚动区、覆盖区或状态区的归属。
+- 30 个页面的详版固定区、滚动区、覆盖区、状态区、入口、返回、上下文、事件、适配、文本、组件和验收字段见 `FRONTEND_DETAILED_PAGE_PLANNING_CARDS.md`。
 - 输入型页面明确键盘归属，底部固定层页面明确最后一项可达。
 - 阅读链路页面统一保留 ReaderContext，设置链路页面统一保留 SettingsContext。
 - FlowShell 只用于换源横向流程，不进入主导航。

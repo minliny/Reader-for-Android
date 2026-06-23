@@ -7,6 +7,7 @@ import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.bridge.RealCoreBridge
 import com.reader.android.data.network.OkHttpTransport
 import com.reader.android.data.repository.BookSourceRepository
+import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.data.storage.AppDatabase
 import com.reader.android.data.storage.BookmarkDao
@@ -84,7 +85,9 @@ object AppProvider {
         db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "reader.db")
             .fallbackToDestructiveMigration()
             .build()
-        _bookSourceRepo = FakeBookSourceRepository() // TODO: DataStoreBookSourceRepository(context)
+        _bookSourceRepo = DataStoreBookSourceRepository(context.applicationContext).also {
+            it.loadBlocking()
+        }
         initialized = true
         return this
     }

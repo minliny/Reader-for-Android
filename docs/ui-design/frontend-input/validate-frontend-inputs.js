@@ -149,9 +149,9 @@ function validateManifestInventory(repoRoot, manifest) {
   const expectedPagePreviews = screenDirs.map((dir) => `docs/ui-design/${dir}/frontend-input/preview.html`).sort();
   const expectedStateMatrices = screenDirs.map((dir) => `docs/ui-design/${dir}/frontend-input/state-matrix.html`).sort();
 
-  assert(screenDirs.length === 29, `formal UI design screen count ${screenDirs.length} !== 29`, failures);
-  assert(pagePreviewTargets.length === 29, `manifest preview target count ${pagePreviewTargets.length} !== 29`, failures);
-  assert(stateMatrixTargets.length === 29, `manifest state matrix target count ${stateMatrixTargets.length} !== 29`, failures);
+  assert(screenDirs.length === 30, `formal UI design screen count ${screenDirs.length} !== 30`, failures);
+  assert(pagePreviewTargets.length === 30, `manifest preview target count ${pagePreviewTargets.length} !== 30`, failures);
+  assert(stateMatrixTargets.length === 30, `manifest state matrix target count ${stateMatrixTargets.length} !== 30`, failures);
 
   for (const html of expectedPagePreviews) {
     assert(manifestHtmlTargets.includes(html), `manifest missing page preview ${html}`, failures);
@@ -233,9 +233,9 @@ function validatePlanningDocumentation(repoRoot) {
 
   const uniquePageLabels = new Set(pageRows.map((row) => row.label));
   const uniquePageIds = new Set(pageRows.map((row) => row.id));
-  assert(pageRows.length === 29, `page planning card row count ${pageRows.length} !== 29`, failures);
-  assert(uniquePageLabels.size === 29, `page planning card unique label count ${uniquePageLabels.size} !== 29`, failures);
-  assert(uniquePageIds.size === 29, `page planning card unique id count ${uniquePageIds.size} !== 29`, failures);
+  assert(pageRows.length === 30, `page planning card row count ${pageRows.length} !== 30`, failures);
+  assert(uniquePageLabels.size === 30, `page planning card unique label count ${uniquePageLabels.size} !== 30`, failures);
+  assert(uniquePageIds.size === 30, `page planning card unique id count ${uniquePageIds.size} !== 30`, failures);
 
   const detailedSections = {
     structureAndOverlay: {
@@ -265,7 +265,7 @@ function validatePlanningDocumentation(repoRoot) {
         return rowRegex.test(sectionSource);
       }).length;
       detailedSectionCounts[sectionName] = rowCount;
-      assert(rowCount === 29, `detailed planning ${sectionName} row count ${rowCount} !== 29`, failures);
+      assert(rowCount === 30, `detailed planning ${sectionName} row count ${rowCount} !== 30`, failures);
       for (const row of pageRows) {
         const rowRegex = new RegExp(`^\\| ${escapeRegExp(row.label)} \\|`, "m");
         assert(rowRegex.test(sectionSource), `detailed planning ${sectionName} missing ${row.label}`, failures);
@@ -1940,10 +1940,10 @@ async function main() {
   }
 
   const componentReferenceSmoke = {
-    expectedCount: 29,
+    expectedCount: 30,
     actualCount: componentReferencePages.length,
     passed:
-      componentReferencePages.length === 29 &&
+      componentReferencePages.length === 30 &&
       componentReferenceResults.every((result) => result.passed),
     results: componentReferenceResults
   };

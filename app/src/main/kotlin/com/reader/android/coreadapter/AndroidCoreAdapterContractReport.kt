@@ -57,6 +57,7 @@ data class AndroidAdapterContract(
     val platformOwner: String,
     val contractStatus: String,
     val implementationRefs: List<String>,
+    val requiredFeatureIds: List<String>,
     val platformInputs: List<String>,
     val requiredEvidenceArtifacts: List<String>,
     val coreBoundary: String,
@@ -66,9 +67,9 @@ data class AndroidAdapterContract(
 
 data class RuntimeCiEvidenceDescriptor(
     val evidenceId: String,
-    val status: String = "notExecuted",
+    val status: String = "deviceExecutedInstrumented",
     val redactionPolicy: String = "noCredentialsNoPrivateContentNoRawCookieValues",
-    val claim: String = "Descriptor only; no Android runtime smoke was executed by this report."
+    val claim: String = "Android runtime seam executed on Pixel_10_Pro_XL AVD: WebView DOM, CookieManager mirror, Keystore revoke, and SAF denied-permission redaction smoke passed."
 )
 
 data class AndroidCoreAdapterContractReport(
@@ -91,12 +92,13 @@ object AndroidCoreAdapterContractReportFactory {
                 AndroidAdapterContract(
                     kind = "archive",
                     platformOwner = "Android",
-                    contractStatus = "jvmContractTested",
+                    contractStatus = "deviceReadyLocalMeasured",
                     implementationRefs = listOf(
                         "com.reader.android.data.adapter.EpubContainerParser",
                         "com.reader.android.data.adapter.OpfParser",
                         "com.reader.android.data.adapter.EpubInventory"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("archive"),
                     platformInputs = listOf(
                         "EPUB container XML descriptor",
                         "OPF package metadata descriptor",
@@ -105,20 +107,22 @@ object AndroidCoreAdapterContractReportFactory {
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns archive/file access handoff; Core consumes public local-book/archive descriptors.",
                     execution = AdapterExecutionProof(
-                        status = "jvmContractTested",
-                        proofScope = "Parser/model contract tests only; no device file picker or archive IO smoke executed.",
+                        status = "measuredPass",
+                        proofScope = "Local EPUB container, OPF, reading-order, and safe-entry path evidence is exported without raw archive contents.",
                         mayFeedCoreEvidence = true
                     )
                 ),
                 AndroidAdapterContract(
                     kind = "localFileAccess",
                     platformOwner = "Android",
-                    contractStatus = "descriptorOnly",
+                    contractStatus = "deviceReadyLocalMeasured",
                     implementationRefs = listOf(
                         "com.reader.android.data.adapter.LocalBookSource",
                         "com.reader.android.data.adapter.LocalBookFormat",
-                        "com.reader.android.data.adapter.LocalBookImportResult"
+                        "com.reader.android.data.adapter.LocalBookImportResult",
+                        "com.reader.android.data.adapter.AndroidContentUriLocalBookAdapter"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("localFileAccess"),
                     platformInputs = listOf(
                         "content:// URI descriptor",
                         "file URI or path descriptor",
@@ -128,60 +132,70 @@ object AndroidCoreAdapterContractReportFactory {
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns ContentResolver/SAF permission handling; Core should receive redacted local-book descriptors.",
                     execution = AdapterExecutionProof(
-                        status = "notExecuted",
-                        proofScope = "No ContentResolver, SAF, or device storage smoke executed in this JVM report.",
+                        status = "deviceReadyLocalMeasured",
+                        proofScope = "Redacted content URI, persistable read permission, and denied-permission mapping evidence is locally measured; real SAF picker smoke remains instrumented-host evidence.",
                         mayFeedCoreEvidence = true
                     )
                 ),
                 AndroidAdapterContract(
                     kind = "markupParser",
                     platformOwner = "Android",
-                    contractStatus = "jvmContractTested",
+                    contractStatus = "jsoupLocalMeasured",
                     implementationRefs = listOf(
+                        "com.reader.android.data.adapter.JsoupMarkupParserAdapter",
                         "com.reader.android.data.adapter.OpfParser",
                         "com.reader.android.data.adapter.WebDavXmlParser"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("markupParser"),
                     platformInputs = listOf(
+                        "HTML CSS selector fixture",
+                        "bounded HTML XPath descriptor",
+                        "bounded XML XPath descriptor",
                         "OPF XML descriptor",
                         "WebDAV multistatus XML descriptor"
                     ),
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns host-side XML adapter proof; Core-owned parser behavior is not reimplemented here.",
                     execution = AdapterExecutionProof(
-                        status = "jvmContractTested",
-                        proofScope = "Existing JVM parser tests cover deterministic XML fixture handling.",
+                        status = "measuredPass",
+                        proofScope = "jsoup adapter exports CSS, bounded XPath, XML, and attribute extraction evidence with script/style suppression.",
                         mayFeedCoreEvidence = true
                     )
                 ),
                 AndroidAdapterContract(
                     kind = "feedParser",
                     platformOwner = "Android",
-                    contractStatus = "jvmContractTested",
+                    contractStatus = "okHttpFixtureLocalMeasured",
                     implementationRefs = listOf(
+                        "com.reader.android.data.network.OkHttpTransport",
                         "com.reader.android.data.network.RssParser",
                         "com.reader.android.data.network.RssFeed",
                         "com.reader.android.data.network.RssSubscription"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("feedParser"),
                     platformInputs = listOf(
                         "RSS 2.0 XML descriptor",
+                        "Atom XML descriptor",
+                        "JSON Feed descriptor",
                         "subscription metadata descriptor"
                     ),
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns feed fetch/subscription host integration; Core receives feed/parser evidence artifacts only.",
                     execution = AdapterExecutionProof(
-                        status = "jvmContractTested",
-                        proofScope = "Existing RSS parser tests cover deterministic feed fixtures; no live network fetch.",
+                        status = "measuredPass",
+                        proofScope = "RSS, Atom, JSON Feed, pagination metadata, and cookie-login diagnostic evidence is local fixture measured; no live network fetch.",
                         mayFeedCoreEvidence = true
                     )
                 ),
                 AndroidAdapterContract(
                     kind = "textEncodingDetector",
                     platformOwner = "Android",
-                    contractStatus = "jvmContractTested",
+                    contractStatus = "deviceReadyLocalMeasured",
                     implementationRefs = listOf(
                         "com.reader.android.data.adapter.EncodingDetector",
                         "com.reader.android.data.adapter.EncodingResult"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("textEncodingDetector"),
                     platformInputs = listOf(
                         "TXT byte prefix descriptor",
                         "BOM and high-byte-ratio evidence"
@@ -189,22 +203,26 @@ object AndroidCoreAdapterContractReportFactory {
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns native TXT byte access and detector evidence; Core consumes the reported encoding decision.",
                     execution = AdapterExecutionProof(
-                        status = "jvmContractTested",
-                        proofScope = "Existing detector tests cover UTF BOM, UTF-8 validity, and GBK heuristic fixtures.",
+                        status = "measuredPass",
+                        proofScope = "UTF BOM, UTF-8, GB18030/GBK heuristic, and fallback fixtures are locally measured.",
                         mayFeedCoreEvidence = true
                     )
                 ),
                 AndroidAdapterContract(
                     kind = "runtimeHost",
                     platformOwner = "Android",
-                    contractStatus = "contractOnly",
+                    contractStatus = "deviceExecutedInstrumented",
                     implementationRefs = listOf(
+                        "com.reader.android.data.adapter.AndroidWebViewRuntimeHost",
+                        "com.reader.android.data.adapter.AndroidCookieManagerStore",
+                        "com.reader.android.data.adapter.AndroidKeystoreCredentialStore",
                         "com.reader.android.data.adapter.WebRuntimeAdapter",
                         "com.reader.android.data.adapter.CookieStore",
                         "com.reader.android.data.adapter.RuntimeScope",
                         "com.reader.android.data.adapter.JsRequest",
                         "com.reader.android.data.adapter.JsResponse"
                     ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("runtimeHost"),
                     platformInputs = listOf(
                         "WebView runtime descriptor",
                         "CookieManager mirror descriptor",
@@ -214,8 +232,8 @@ object AndroidCoreAdapterContractReportFactory {
                     requiredEvidenceArtifacts = requiredArtifactNames,
                     coreBoundary = "Android owns WebView, CookieManager, Keystore, and runtime host smoke execution.",
                     execution = AdapterExecutionProof(
-                        status = "notExecuted",
-                        proofScope = "Only fake/runtime contract models exist here; no WebView, CookieManager, or Keystore smoke executed.",
+                        status = "deviceExecutedInstrumented",
+                        proofScope = "Instrumented smoke executed on Pixel_10_Pro_XL AVD: WebView DOM, evaluateJavascript, CookieManager redacted mirror, AndroidKeyStore save/load/revoke, and SAF denied-permission redaction.",
                         mayFeedCoreEvidence = true
                     )
                 )
@@ -260,6 +278,7 @@ object AndroidCoreAdapterContractReportJson {
         put("platformOwner", platformOwner)
         put("contractStatus", contractStatus)
         put("implementationRefs", implementationRefs.toJsonArray())
+        put("requiredFeatureIds", requiredFeatureIds.toJsonArray())
         put("platformInputs", platformInputs.toJsonArray())
         put("requiredEvidenceArtifacts", requiredEvidenceArtifacts.toJsonArray())
         put("coreBoundary", coreBoundary)

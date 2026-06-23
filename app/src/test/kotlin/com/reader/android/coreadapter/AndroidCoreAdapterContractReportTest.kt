@@ -49,13 +49,14 @@ class AndroidCoreAdapterContractReportTest {
                 adapter.requiredEvidenceArtifacts
             )
             assertEquals("Android", adapter.platformOwner)
+            assertEquals(AndroidCoreFeatureManifest.requiredFeatureIds.getValue(adapter.kind), adapter.requiredFeatureIds)
             assertTrue(adapter.coreBoundary.isNotBlank())
             assertTrue(adapter.execution.mayFeedCoreEvidence)
         }
     }
 
     @Test
-    fun `runtime CI evidence ids are descriptor only until Android smoke runs`() {
+    fun `runtime CI evidence ids bind device executed instrumented smoke`() {
         assertEquals(
             listOf(
                 "credential_redaction_revocation_matrix",
@@ -69,33 +70,40 @@ class AndroidCoreAdapterContractReportTest {
             report.runtimeCiEvidence.map { it.evidenceId }
         )
         report.runtimeCiEvidence.forEach { evidence ->
-            assertEquals("notExecuted", evidence.status)
-            assertTrue(evidence.claim.contains("no Android runtime smoke"))
+            assertEquals("deviceExecutedInstrumented", evidence.status)
+            assertTrue(evidence.claim.contains("Pixel_10_Pro_XL AVD"))
+            assertTrue(evidence.claim.contains("WebView DOM"))
             assertEquals("noCredentialsNoPrivateContentNoRawCookieValues", evidence.redactionPolicy)
         }
     }
 
     @Test
-    fun `local file access remains a content URI permission descriptor`() {
+    fun `local file access exports Core aligned content URI permission evidence`() {
         val localFileAccess = report.adapterContracts.single { it.kind == "localFileAccess" }
 
-        assertEquals("descriptorOnly", localFileAccess.contractStatus)
-        assertEquals("notExecuted", localFileAccess.execution.status)
+        assertEquals("deviceReadyLocalMeasured", localFileAccess.contractStatus)
+        assertEquals("deviceReadyLocalMeasured", localFileAccess.execution.status)
         assertTrue(localFileAccess.platformInputs.contains("content:// URI descriptor"))
         assertTrue(localFileAccess.platformInputs.contains("persistable read-permission requirement"))
+        assertTrue(localFileAccess.requiredFeatureIds.contains("localbook.content-uri"))
+        assertTrue(localFileAccess.requiredFeatureIds.contains("persistable-uri-permission"))
         assertTrue(localFileAccess.coreBoundary.contains("ContentResolver"))
     }
 
     @Test
-    fun `runtime host does not claim WebView CookieManager or Keystore execution`() {
+    fun `runtime host exports device ready WebView CookieManager and Keystore evidence boundary`() {
         val runtimeHost = report.adapterContracts.single { it.kind == "runtimeHost" }
 
-        assertEquals("contractOnly", runtimeHost.contractStatus)
-        assertEquals("notExecuted", runtimeHost.execution.status)
+        assertEquals("deviceExecutedInstrumented", runtimeHost.contractStatus)
+        assertEquals("deviceExecutedInstrumented", runtimeHost.execution.status)
         assertTrue(runtimeHost.platformInputs.contains("WebView runtime descriptor"))
         assertTrue(runtimeHost.platformInputs.contains("CookieManager mirror descriptor"))
         assertTrue(runtimeHost.platformInputs.contains("Keystore-backed secret descriptor"))
-        assertTrue(runtimeHost.execution.proofScope.contains("no WebView"))
+        assertTrue(runtimeHost.requiredFeatureIds.contains("webView"))
+        assertTrue(runtimeHost.requiredFeatureIds.contains("cookieJar"))
+        assertTrue(runtimeHost.requiredFeatureIds.contains("loginFlow"))
+        assertTrue(runtimeHost.execution.proofScope.contains("AndroidKeyStore"))
+        assertTrue(runtimeHost.execution.proofScope.contains("SAF denied-permission"))
     }
 
     @Test

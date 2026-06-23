@@ -13,9 +13,9 @@
 
 ## 范围（Scope）
 
-- UI 设计图（UI Design Screens）：29 张 `UI设计图.png`。
+- UI 设计图（UI Design Screens）：30 张 `UI设计图.png`。
 - 书籍封面素材（Book Cover Assets）：6 张书架封面图片。
-- 图标素材（Icon Assets）：当前 fixture 中扫描出的 54 个图标 token，加上 Shell、阅读控制、状态栏和 Compose 语义追溯补充图标，共 81 个本地 token。
+- 图标素材（Icon Assets）：当前 fixture 中扫描出的 55 个图标 token，加上 Shell、阅读控制、状态栏和 Compose 语义追溯补充图标，共 90 个本地 token。
 - 验证截图（Validation Screenshots）：60 张 `design-draft-*.png` 作为验证素材集合登记，不在预览页逐张加载。
 
 ## 使用规则（Usage Rules）

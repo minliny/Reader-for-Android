@@ -1,12 +1,12 @@
 window.ReaderAssetLibraryFixture = {
   meta: {
     title: "Reader 素材库",
-    summary: "统一登记当前 29 张 UI 设计图、6 张书籍封面和当前输入件使用的图标 token。",
+    summary: "统一登记当前 30 张 UI 设计图、6 张书籍封面和当前输入件使用的图标 token。",
     version: "2026-06-20",
-    screenCount: 29,
+    screenCount: 30,
     bookCoverCount: 6,
-    fixtureIconTokenCount: 61,
-    validationScreenshotCount: 64
+    fixtureIconTokenCount: 55,
+    validationScreenshotCount: 60
   },
   screenGroups: [
     {
@@ -42,6 +42,7 @@ window.ReaderAssetLibraryFixture = {
         { name: "自动翻页（Auto Page）", path: "../../04-阅读链路/自动翻页/UI设计图.png", shell: "ReaderShell" },
         { name: "内容搜索（Content Search）", path: "../../04-阅读链路/内容搜索/UI设计图.png", shell: "ReaderShell" },
         { name: "内容替换（Content Replacement）", path: "../../04-阅读链路/内容替换/UI设计图.png", shell: "ReaderShell" },
+        { name: "阅读入口（Reading Entry）", path: "../../04-阅读链路/阅读入口/UI设计图.png", shell: "ReaderShell" },
         { name: "沉浸阅读（Immersive Reading）", path: "../../04-阅读链路/沉浸阅读/UI设计图.png", shell: "ReaderShell" },
         { name: "换源（Source Switching）", path: "../../04-阅读链路/换源/UI设计图.png", shell: "FlowShell" }
       ]
@@ -72,7 +73,7 @@ window.ReaderAssetLibraryFixture = {
     { title: "阅读图标（Reader Icons）", items: ["directory", "tts", "appearance", "auto-page", "replace", "reader-content-search", "reader-auto-page", "reader-content-replace", "reader-module-directory", "reader-module-tts", "reader-module-appearance", "reader-module-settings", "bookmark", "book-open", "play", "pause", "stop", "volume", "sun", "night-mode", "current-location", "progress"] },
     { title: "书籍与来源图标（Book and Source Icons）", items: ["book", "source", "source-stack", "source-switch", "database", "storage", "folder", "folder-off", "file", "image", "download", "upload", "cloud"] },
     { title: "设置图标（Settings Icons）", items: ["home", "palette", "globe", "bell", "battery", "eyeOff", "bug", "shield", "permission", "trash", "gear", "columns", "grid", "badge"] },
-    { title: "状态与动作图标（Status and Action Icons）", items: ["signal", "wifi", "clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo", "clear", "offline", "sparkle", "code", "help"] }
+    { title: "状态与动作图标（Status and Action Icons）", items: ["signal", "wifi", "clock", "check", "checkmark", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo", "clear", "offline", "sparkle", "code", "help"] }
   ],
   supplementedIcons: ["back", "more", "chevron", "chevron-left", "close", "directory", "tts", "auto-page", "replace", "reader-content-search", "reader-auto-page", "reader-content-replace", "reader-module-directory", "reader-module-tts", "reader-module-appearance", "reader-module-settings", "pause", "stop", "book-open", "source-stack", "source-switch", "progress", "volume", "gear", "clear", "offline", "sparkle", "folder-off", "night-mode", "current-location", "permission", "code", "help", "signal", "wifi"],
   usageRules: [

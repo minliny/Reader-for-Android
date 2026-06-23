@@ -4,12 +4,12 @@
 
 | 中文名称（English Name） | 数量（Count） | 说明（Notes） |
 |---|---:|---|
-| UI 设计图（UI Design Screens） | 29 | 当前所有 `UI设计图.png` 已按页面组进入 `fixture.json`。 |
+| UI 设计图（UI Design Screens） | 30 | 当前所有 `UI设计图.png` 已按页面组进入 `fixture.json`。 |
 | 书籍封面素材（Book Cover Assets） | 6 | 当前书架封面图已进入素材库。 |
-| fixture 图标 token（Fixture Icon Tokens） | 61 | 从当前所有页面 `fixture.json` 扫描得出。 |
-| 补齐图标（Supplemented Icons） | 34 | 补齐 Shell、阅读模块、状态、Compose 语义追溯和缺少公共登记的图标 token。 |
-| 本地总图标 token（Total Local Icon Tokens） | 88 | 以 `icons.js` 中 `ReaderAssetIcons.icons` 为准；Figma 图标主组件已用 `lucide-static@1.21.0` 开源 SVG 补齐为 `Icon/*`。 |
-| 验证截图（Validation Screenshots） | 64 | 作为验证素材集合登记，不在预览页逐张加载。 |
+| fixture 图标 token（Fixture Icon Tokens） | 55 | 从当前所有页面 `fixture.json` 扫描得出。 |
+| 补齐图标（Supplemented Icons） | 35 | 补齐 Shell、阅读模块、状态、Compose 语义追溯和缺少公共登记的图标 token。 |
+| 本地总图标 token（Total Local Icon Tokens） | 90 | 以 `icons.js` 中 `ReaderAssetIcons.icons` 为准；Figma 图标主组件已用 `lucide-static@1.21.0` 开源 SVG 补齐为 `Icon/*`。 |
+| 验证截图（Validation Screenshots） | 60 | 作为验证素材集合登记，不在预览页逐张加载。 |
 
 ## 补齐图标（Supplemented Icons）
 
