@@ -5,7 +5,7 @@ window.ReaderAssetLibraryFixture = {
     version: "2026-06-20",
     screenCount: 29,
     bookCoverCount: 6,
-    fixtureIconTokenCount: 54,
+    fixtureIconTokenCount: 61,
     validationScreenshotCount: 64
   },
   screenGroups: [
@@ -69,12 +69,12 @@ window.ReaderAssetLibraryFixture = {
   ],
   iconGroups: [
     { title: "导航图标（Navigation Icons）", items: ["bookshelf", "discover", "rss", "settings", "back", "more", "search", "chevron", "chevron-left", "close"] },
-    { title: "阅读图标（Reader Icons）", items: ["directory", "tts", "appearance", "auto-page", "replace", "bookmark", "book-open", "play", "pause", "stop", "volume", "sun", "night-mode", "current-location", "progress"] },
-    { title: "书籍与来源图标（Book and Source Icons）", items: ["book", "source", "source-stack", "database", "storage", "folder", "folder-off", "file", "image", "download", "upload", "cloud"] },
+    { title: "阅读图标（Reader Icons）", items: ["directory", "tts", "appearance", "auto-page", "replace", "reader-content-search", "reader-auto-page", "reader-content-replace", "reader-module-directory", "reader-module-tts", "reader-module-appearance", "reader-module-settings", "bookmark", "book-open", "play", "pause", "stop", "volume", "sun", "night-mode", "current-location", "progress"] },
+    { title: "书籍与来源图标（Book and Source Icons）", items: ["book", "source", "source-stack", "source-switch", "database", "storage", "folder", "folder-off", "file", "image", "download", "upload", "cloud"] },
     { title: "设置图标（Settings Icons）", items: ["home", "palette", "globe", "bell", "battery", "eyeOff", "bug", "shield", "permission", "trash", "gear", "columns", "grid", "badge"] },
     { title: "状态与动作图标（Status and Action Icons）", items: ["signal", "wifi", "clock", "check", "warning", "info", "refresh", "sync", "sort", "people", "link", "message", "mail", "phone", "monitor", "gesture", "assist", "motion", "top", "list", "edit", "log", "add", "text", "typo", "clear", "offline", "sparkle", "code", "help"] }
   ],
-  supplementedIcons: ["back", "more", "chevron", "chevron-left", "close", "directory", "tts", "auto-page", "replace", "pause", "stop", "book-open", "source-stack", "progress", "volume", "gear", "clear", "offline", "sparkle", "folder-off", "night-mode", "current-location", "permission", "code", "help", "signal", "wifi"],
+  supplementedIcons: ["back", "more", "chevron", "chevron-left", "close", "directory", "tts", "auto-page", "replace", "reader-content-search", "reader-auto-page", "reader-content-replace", "reader-module-directory", "reader-module-tts", "reader-module-appearance", "reader-module-settings", "pause", "stop", "book-open", "source-stack", "source-switch", "progress", "volume", "gear", "clear", "offline", "sparkle", "folder-off", "night-mode", "current-location", "permission", "code", "help", "signal", "wifi"],
   usageRules: [
     "新增页面前必须先查询素材库。",
     "已有图标 token 不得新增同义名称。",

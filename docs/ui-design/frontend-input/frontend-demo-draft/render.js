@@ -57,6 +57,10 @@
     return "directory";
   }
 
+  function chapterHasMarker(chapter, marker) {
+    return chapterMarkers(chapter).includes(marker);
+  }
+
   function cover(data, coverKey) {
     return esc((data.covers || {})[coverKey] || "");
   }
@@ -107,6 +111,10 @@
     "reader-appearance": { title: "阅读外观（Reading Appearance）", shell: "ReaderShell" },
     tts: { title: "朗读（Read Aloud）", shell: "ReaderShell" },
     "reader-settings": { title: "阅读设置（Reading Settings）", shell: "ReaderShell" },
+    "reader-full-directory": { title: "目录大半屏控制窗（Expanded Directory Panel）", shell: "ReaderShell" },
+    "reader-full-tts": { title: "朗读大半屏控制窗（Expanded TTS Panel）", shell: "ReaderShell" },
+    "reader-full-appearance": { title: "界面大半屏控制窗（Expanded Appearance Panel）", shell: "ReaderShell" },
+    "reader-full-settings": { title: "阅读设置大半屏控制窗（Expanded Reading Settings Panel）", shell: "ReaderShell" },
     "auto-page": { title: "自动翻页（Auto Page）", shell: "ReaderShell" },
     "content-search": { title: "内容搜索（Content Search）", shell: "ReaderShell" },
     "content-replacement": { title: "内容替换（Content Replacement）", shell: "ReaderShell" },
@@ -512,26 +520,43 @@
     }));
   }
 
-  function bookDirectoryScreen(data) {
+  function bookDirectoryScreen(data, appState) {
+    const tocMode = appState?.readerTocMode === "bookmark" ? "bookmark" : "directory";
+    const book = data.library.book;
+    const chapters = data.library.chapters.concat([
+      { title: "第 34 章 旧地图", markers: ["已缓存"] },
+      { title: "第 35 章 夜行", markers: [] },
+      { title: "第 36 章 灯塔之后", markers: ["书签"] }
+    ]);
+    const visibleChapters = tocMode === "bookmark" ? chapters.filter((chapter) => chapterHasMarker(chapter, "书签")) : chapters;
     return shellKit().renderLibraryShell(Object.assign(phoneShellClasses("fd-library-phone"), {
       data,
       title: "书籍目录",
       ariaLabel: "书籍目录",
       topBarClass: "fd-back-bar",
       contentHtml: `
-        <section class="fd-chapter-list">
-          <h2>长夜余火 · 章节</h2>
-          ${data.library.chapters.concat([
-            { title: "第 34 章 旧地图", markers: ["已缓存"] },
-            { title: "第 35 章 夜行", markers: [] },
-            { title: "第 36 章 灯塔之后", markers: ["书签"] }
-          ]).map((chapter) => `
+        <section class="fd-chapter-list fd-directory-full-list">
+          <header class="fd-directory-full-head">
+            <span>
+              <strong>${esc(book.title)}</strong>
+              <small>${esc(book.author)} · 共 ${esc(chapters.length)} 章</small>
+            </span>
+          </header>
+          <nav class="fd-directory-toc-switch-row" aria-label="目录书签切换">
+            <button class="${tocMode === "directory" ? "is-active" : ""}" type="button" data-reader-toc-mode="directory">目录</button>
+            <button class="${tocMode === "bookmark" ? "is-active" : ""}" type="button" data-reader-toc-mode="bookmark">书签</button>
+          </nav>
+          <div class="fd-directory-full-rows">
+            ${visibleChapters.map((chapter) => `
             <article class="${chapterIsCurrent(chapter) ? "is-current" : ""}" role="button" tabindex="0" data-route="immersive-reading">
-              ${icon(chapterRowIcon(chapter), "fd-small-icon")}
               <span>${esc(chapter.title)}</span>
-              ${chapterMarkerText(chapter) ? `<em>${esc(chapterMarkerText(chapter))}</em>` : ""}
+              <span class="fd-chapter-marker-slots" aria-label="章节标识">
+                <em class="is-download-slot ${chapterHasMarker(chapter, "已缓存") ? "is-active" : ""}" title="${chapterHasMarker(chapter, "已缓存") ? "已下载" : "未下载"}">${icon(chapterHasMarker(chapter, "已缓存") ? "check" : "download", "fd-small-icon")}</em>
+                <em class="is-bookmark-slot ${chapterHasMarker(chapter, "书签") ? "is-active" : ""}" title="书签">${icon("bookmark", "fd-small-icon")}</em>
+              </span>
             </article>
-          `).join("")}
+            `).join("")}
+          </div>
         </section>`
     }));
   }
@@ -672,6 +697,24 @@
     settings: "reader-settings"
   };
 
+  const readerFullRoutes = {
+    directory: "reader-full-directory",
+    tts: "reader-full-tts",
+    appearance: "reader-full-appearance",
+    settings: "reader-full-settings"
+  };
+
+  const readerFullTypeByRoute = {
+    "reader-full-directory": "directory",
+    "reader-full-tts": "tts",
+    "reader-full-appearance": "appearance",
+    "reader-full-settings": "settings"
+  };
+
+  const readerPromotedRoutes = {
+    directory: "book-directory"
+  };
+
   const readerStateByRoute = {
     "immersive-reading": { mode: "immersive" },
     reader: { mode: "control" },
@@ -684,12 +727,25 @@
     "content-replacement": { mode: "quick", quick: "replace" }
   };
 
+  const readerQuickActionIconMap = {
+    search: "reader-content-search",
+    "auto-page": "reader-auto-page",
+    replace: "reader-content-replace"
+  };
+
   function readerRouteState(route) {
     return Object.assign({ route }, readerStateByRoute[route] || readerStateByRoute.reader);
   }
 
   function isReaderStateRoute(route) {
-    return Boolean(readerStateByRoute[route]);
+    return Boolean(readerStateByRoute[route] || readerFullTypeByRoute[route]);
+  }
+
+  function readerFullRouteForState(state) {
+    if (state?.mode === "module" && readerFullRoutes[state.module]) {
+      return readerFullRoutes[state.module];
+    }
+    return readerFullRoutes.settings;
   }
 
   function initialRouteStackFor(route) {
@@ -920,6 +976,36 @@
     };
   }
 
+  function readerSettingDropdownHtml(key, label, settings, settingDefaults, options, appState) {
+    const values = options[key] || [];
+    const current = settings[key] || settingDefaults[key] || values[0] || "";
+    if (!values.length || appState?.readerSettingsExpandedOption !== key) return "";
+    return `
+      <div class="fd-reader-setting-dropdown" data-reader-setting-dropdown="${esc(key)}" role="listbox" aria-label="${esc(label)}">
+        ${values.map((value) => `
+          <button class="${value === current ? "is-selected" : ""}" type="button" role="option" aria-selected="${value === current ? "true" : "false"}" data-reader-setting-option="${esc(key)}" data-reader-setting-value="${esc(value)}">
+            <span>${esc(value)}</span>
+            ${value === current ? icon("checkmark", "fd-small-icon") : ""}
+          </button>
+        `).join("")}
+      </div>`;
+  }
+
+  function readerTtsDropdownHtml(key, label, tts, ttsDefaults, options, appState) {
+    const values = options[key] || [];
+    const current = tts[key] || ttsDefaults[key] || values[0] || "";
+    if (!values.length || appState?.readerTtsExpandedOption !== key) return "";
+    return `
+      <div class="fd-reader-tts-dropdown" data-reader-tts-dropdown="${esc(key)}" role="listbox" aria-label="${esc(label)}">
+        ${values.map((value) => `
+          <button class="${value === current ? "is-selected" : ""}" type="button" role="option" aria-selected="${value === current ? "true" : "false"}" data-reader-tts-option="${esc(key)}" data-reader-tts-value="${esc(value)}">
+            <span>${esc(value)}</span>
+            ${value === current ? icon("checkmark", "fd-small-icon") : ""}
+          </button>
+        `).join("")}
+      </div>`;
+  }
+
   function typographyNumber(value, fractionDigits) {
     return Number(value).toFixed(fractionDigits).replace(/\.?0+$/, "");
   }
@@ -1019,7 +1105,6 @@
   function sharedReaderSurface(data, dismissRoute, appState, options) {
     const typography = appState?.readerTypography || normalizeReaderTypography(data);
     const pageState = currentReaderPage(data, appState);
-    const pageReadout = readerPageReadout(data, appState);
     const disableTurnAnimation = Boolean(options && options.disableTurnAnimation);
     const turnDirection = !disableTurnAnimation && appState?.readerTurnDirection ? ` fd-reader-page-turn-${esc(appState.readerTurnDirection)}` : "";
     const paragraphs = pageState.page.paragraphs.length > 0 ? pageState.page.paragraphs : readerTextBlocks(data);
@@ -1034,7 +1119,6 @@
         ${paragraphs.map((line) => `<p>${esc(line)}</p>`).join("")}
       </article>
       <div class="fd-reader-brightness-dim" data-reader-brightness-dim aria-hidden="true" style="${readerBrightnessStyle(data, appState)}"></div>
-      <footer class="fd-reader-footer fd-reader-page-footer" data-dev-region="FooterProgressInfo" data-reader-page-readout>${esc(pageReadout.progressLabel)}</footer>
       ${dismissRoute ? `<button class="fd-reader-dismiss-zone" type="button" data-dev-region="ControlDismissZone" data-reader-dismiss="${esc(dismissRoute)}" aria-label="隐藏阅读控制层"></button>` : ""}`;
   }
 
@@ -1042,13 +1126,42 @@
     const readout = data.reader.bottomReadout || {};
     const pageReadout = readerPageReadout(data, appState);
     const chapterState = currentReaderChapter(data, appState);
+    const statusCapsule = readerImmersiveStatusCapsule(appState);
     return `
       <section class="fd-ir-info-layer" data-dev-region="ImmersiveInfoLayer" aria-label="阅读信息层">
-        <span>${esc(data.reader.title)} · ${esc(chapterState.chapter.title || readerChapterMeta(data))}</span>
-        <span>${esc(data.reader.status.time)}</span>
-        <span>${esc(pageReadout.progress || readout.progress || "38%")}</span>
-        <span>${esc(pageReadout.pageLabel)}</span>
+        <span class="fd-ir-top-left">${esc(data.reader.title)} · ${esc(chapterState.chapter.title || readerChapterMeta(data))}</span>
+        <span class="fd-ir-top-right">${esc(data.reader.status.time)}</span>
+        <span class="fd-ir-bottom-left" data-dev-region="ImmersiveFooterProgress">${esc(pageReadout.progress || readout.progress || "38%")}</span>
+        <span class="fd-ir-bottom-right" data-dev-region="ImmersiveFooterStatus">
+          <span class="fd-ir-page-label">${esc(pageReadout.pageLabel)}</span>
+          ${statusCapsule}
+        </span>
       </section>`;
+  }
+
+  function readerImmersiveStatusCapsule(appState) {
+    const ttsSession = Boolean(appState?.readerTtsSession || appState?.readerTts?.playing);
+    const ttsPlaying = Boolean(appState?.readerTts?.playing);
+    const autoSession = Boolean(appState?.readerAutoPageSession || appState?.readerSettings?.autoPage);
+    const autoPlaying = Boolean(appState?.readerSettings?.autoPage);
+    if (!ttsSession && !autoSession) {
+      return "";
+    }
+    const label = ttsSession && autoSession
+      ? "朗读 · 自动"
+      : ttsSession
+        ? (ttsPlaying ? "朗读中" : "朗读暂停")
+        : (autoPlaying ? "自动翻页" : "自动暂停");
+    const controls = [
+      ttsSession ? `<button type="button" data-reader-tts-action="toggle" aria-label="${ttsPlaying ? "暂停朗读" : "继续朗读"}">${icon(ttsPlaying ? "pause" : "play", "fd-small-icon")}</button>` : "",
+      autoSession ? `<button type="button" data-reader-setting-toggle="autoPage" aria-label="${autoPlaying ? "暂停自动翻页" : "继续自动翻页"}">${icon(autoPlaying ? "pause" : "play", "fd-small-icon")}</button>` : ""
+    ].join("");
+    return `
+      <span class="fd-ir-status-capsule" data-reader-immersive-status>
+        ${icon(ttsSession ? "tts" : "reader-auto-page", "fd-small-icon")}
+        <b>${esc(label)}</b>
+        <span class="fd-ir-status-controls">${controls}</span>
+      </span>`;
   }
 
   function readerTapZones(data, appState) {
@@ -1085,7 +1198,7 @@
       <section class="fd-reader-top" data-dev-region="ReaderTopBar">
         <button type="button" aria-label="返回" data-reader-exit>${icon("back", "fd-icon")}</button>
         <span><strong>${esc(data.reader.title)}</strong><small>${esc(data.reader.sourceLine)}</small></span>
-        <button type="button" data-route="source-switch">${icon("source", "fd-small-icon")}换源</button>
+        <button type="button" data-route="source-switch">${icon("source-switch", "fd-small-icon")}换源</button>
         <button type="button" aria-label="更多" data-reader-more-toggle aria-expanded="${appState?.readerMoreOpen ? "true" : "false"}">${icon("more", "fd-small-icon")}</button>
       </section>
       ${readerMoreMenuHtml(appState)}`;
@@ -1155,57 +1268,63 @@
     if (type === "directory") {
       const tocMode = appState?.readerTocMode === "bookmark" ? "bookmark" : "directory";
       const currentChapterState = currentReaderChapter(data, appState);
-      const directoryItems = readerChapters(data).slice(0, 5);
-      const listHtml = tocMode === "bookmark" ? `
-            <button type="button" data-route="immersive-reading">
-              <i>${icon("bookmark", "fd-small-icon")}</i>
-              <strong>第 28 章 旧梦</strong>
-              <small>“他在雨声里停下脚步...”</small>
-              <em>昨天 23:10</em>
-            </button>
-            <button class="is-current" type="button" data-route="immersive-reading">
-              <i>${icon("bookmark", "fd-small-icon")}</i>
-              <strong>第 32 章 雨夜</strong>
-              <small>“雨，下了一整夜。”</small>
-              <em>当前位置</em>
-            </button>
-            <button type="button" data-route="immersive-reading">
-              <i>${icon("bookmark", "fd-small-icon")}</i>
-              <strong>第 32 章 雨夜</strong>
-              <small>“没有署名，只有短短四个字。”</small>
-              <em>38%</em>
-            </button>` : directoryItems.map((chapter, index) => `
-            <button class="${index === currentChapterState.index ? "is-current" : ""}" type="button" data-reader-directory-index="${index}">
+      const chapters = readerChapters(data);
+      const visibleItems = (tocMode === "bookmark" ? chapters.filter((chapter) => chapterHasMarker(chapter, "书签")) : chapters).slice(0, 5);
+      const listHtml = visibleItems.map((chapter) => {
+        const chapterIndex = Math.max(0, chapters.indexOf(chapter));
+        const cached = chapterHasMarker(chapter, "已缓存");
+        const bookmarked = chapterHasMarker(chapter, "书签");
+        return `
+            <button class="fd-reader-toc-row${chapterIndex === currentChapterState.index ? " is-current" : ""}" type="button" data-reader-directory-index="${chapterIndex}">
               <strong>${esc(chapter.title)}</strong>
-              ${chapterMarkerText(chapter) ? `<em>${esc(chapterMarkerText(chapter))}</em>` : ""}
-            </button>`).join("");
+              <span class="fd-reader-toc-marker ${cached ? "is-active" : ""}" aria-label="${cached ? "已缓存" : "未缓存"}">${icon(cached ? "storage" : "download", "fd-small-icon")}</span>
+              <span class="fd-reader-toc-marker ${bookmarked ? "is-active" : ""}" aria-label="${bookmarked ? "书签" : "未加书签"}">${icon("bookmark", "fd-small-icon")}</span>
+            </button>`;
+      }).join("");
       return `
         <section class="fd-reader-module-panel fd-reader-toc-panel" data-dev-region="ReaderModulePanel" aria-label="目录与书签">
-          <nav class="fd-reader-segment-row" aria-label="目录书签切换">
-            <button class="${tocMode === "directory" ? "is-active" : ""}" type="button" data-reader-toc-mode="directory">目录</button>
-            <button class="${tocMode === "bookmark" ? "is-active" : ""}" type="button" data-reader-toc-mode="bookmark">书签</button>
-          </nav>
-          <div class="fd-reader-module-list ${tocMode === "bookmark" ? "fd-reader-bookmark-list" : "fd-reader-directory-list"}">
+          <div class="fd-reader-toc-list">
+            <nav class="fd-reader-toc-switch-row" aria-label="目录书签切换">
+              <button class="${tocMode === "directory" ? "is-active" : ""}" type="button" data-reader-toc-mode="directory">目录</button>
+              <button class="${tocMode === "bookmark" ? "is-active" : ""}" type="button" data-reader-toc-mode="bookmark">书签</button>
+            </nav>
             ${listHtml}
           </div>
-          <button class="fd-reader-inline-entry" type="button" data-route="book-directory">${tocMode === "bookmark" ? "查看完整目录 / 书签" : "查看完整目录"}<span>${chevron()}</span></button>
         </section>`;
     }
     if (type === "tts") {
       const tts = appState.readerTts || {};
-      const ttsDefaults = readerTtsConfig(data).defaults;
+      const ttsConfig = readerTtsConfig(data);
+      const ttsDefaults = ttsConfig.defaults;
+      const ttsOptions = ttsConfig.options;
       return `
         <section class="fd-reader-module-panel fd-reader-tts-panel" data-dev-region="ReaderModulePanel" aria-label="朗读">
-          <div class="fd-reader-transport">
-            <button type="button" data-reader-tts-action="prev">上一句</button>
-            <button class="is-primary ${tts.playing ? "is-playing" : ""}" type="button" data-reader-tts-action="toggle" aria-label="${tts.playing ? "暂停朗读" : "开始朗读"}">${icon(tts.playing ? "pause" : "play", "fd-small-icon")}</button>
-            <button type="button" data-reader-tts-action="next">下一句</button>
-          </div>
-          <div class="fd-reader-option-grid">
-            <button type="button" data-reader-tts-cycle="speed"><strong>语速</strong><span>${esc(tts.speed || ttsDefaults.speed)}</span><em>${chevron()}</em></button>
-            <button type="button" data-reader-tts-cycle="voice"><strong>音色</strong><span>${esc(tts.voice || ttsDefaults.voice)}</span><em>${chevron()}</em></button>
-            <button type="button" data-reader-tts-cycle="scope"><strong>范围</strong><span>${esc(tts.scope || ttsDefaults.scope)}</span><em>${chevron()}</em></button>
-            <button type="button" data-reader-tts-cycle="timer"><strong>定时</strong><span>${esc(tts.timer || ttsDefaults.timer)}</span><em>${chevron()}</em></button>
+          <div class="fd-reader-tts-list">
+            <section class="fd-reader-tts-row fd-reader-tts-control-row" aria-label="播放控制">
+              <i>${icon("tts", "fd-small-icon")}</i>
+              <strong>播放控制</strong>
+              <span class="fd-reader-tts-controls">
+                <button type="button" data-reader-tts-action="prev" aria-label="上一句">${icon("chevron-left", "fd-small-icon")}</button>
+                <button class="is-primary ${tts.playing ? "is-playing" : ""}" type="button" data-reader-tts-action="toggle" aria-label="${tts.playing ? "暂停朗读" : "开始朗读"}">${icon(tts.playing ? "pause" : "play", "fd-small-icon")}</button>
+                <button type="button" data-reader-tts-action="next" aria-label="下一句">${icon("chevron", "fd-small-icon")}</button>
+              </span>
+            </section>
+            <div class="fd-reader-tts-option-row">
+              <button type="button" data-reader-tts-option-key="speed" aria-expanded="${appState?.readerTtsExpandedOption === "speed" ? "true" : "false"}"><i>${icon("motion", "fd-small-icon")}</i><strong>语速</strong><em>${esc(tts.speed || ttsDefaults.speed)}${chevron()}</em></button>
+              ${readerTtsDropdownHtml("speed", "语速", tts, ttsDefaults, ttsOptions, appState)}
+            </div>
+            <div class="fd-reader-tts-option-row">
+              <button type="button" data-reader-tts-option-key="voice" aria-expanded="${appState?.readerTtsExpandedOption === "voice" ? "true" : "false"}"><i>${icon("volume", "fd-small-icon")}</i><strong>音色</strong><em>${esc(tts.voice || ttsDefaults.voice)}${chevron()}</em></button>
+              ${readerTtsDropdownHtml("voice", "音色", tts, ttsDefaults, ttsOptions, appState)}
+            </div>
+            <div class="fd-reader-tts-option-row">
+              <button type="button" data-reader-tts-option-key="scope" aria-expanded="${appState?.readerTtsExpandedOption === "scope" ? "true" : "false"}"><i>${icon("current-location", "fd-small-icon")}</i><strong>范围</strong><em>${esc(tts.scope || ttsDefaults.scope)}${chevron()}</em></button>
+              ${readerTtsDropdownHtml("scope", "范围", tts, ttsDefaults, ttsOptions, appState)}
+            </div>
+            <div class="fd-reader-tts-option-row">
+              <button type="button" data-reader-tts-option-key="timer" aria-expanded="${appState?.readerTtsExpandedOption === "timer" ? "true" : "false"}"><i>${icon("clock", "fd-small-icon")}</i><strong>定时</strong><em>${esc(tts.timer || ttsDefaults.timer)}${chevron()}</em></button>
+              ${readerTtsDropdownHtml("timer", "定时", tts, ttsDefaults, ttsOptions, appState)}
+            </div>
           </div>
         </section>`;
     }
@@ -1216,56 +1335,74 @@
       const quickFonts = readerFontOptions(data).slice(0, 3);
       return `
         <section class="fd-reader-module-panel fd-reader-appearance-panel" data-dev-region="ReaderModulePanel" aria-label="阅读外观">
-          <div class="fd-reader-theme-grid" aria-label="阅读主题">
-            ${quickThemes.map((item) => `
-              <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" aria-pressed="${activeTheme.value === item.value ? "true" : "false"}">
-                <span style="--swatch:${esc(item.swatch)}"></span>
-                <strong>${esc(item.label)}</strong>
-              </button>
-            `).join("")}
-          </div>
-          <div class="fd-reader-appearance-grid">
-            <section class="fd-reader-mini-control" data-typography-row="font-size" aria-label="字号">
+          <div class="fd-reader-appearance-list">
+            <section class="fd-reader-appearance-row fd-reader-appearance-theme-row" aria-label="阅读主题">
+              <i>${icon("palette", "fd-small-icon")}</i>
+              <strong>阅读主题</strong>
+              <div class="fd-reader-theme-palette">
+                ${quickThemes.map((item) => `
+                  <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" aria-label="${esc(item.label)}" aria-pressed="${activeTheme.value === item.value ? "true" : "false"}">
+                    <span style="--swatch:${esc(item.swatch)}"></span>
+                  </button>
+                `).join("")}
+              </div>
+            </section>
+            <section class="fd-reader-appearance-row" data-typography-row="font-size" aria-label="字号">
+              <i>${icon("typo", "fd-small-icon")}</i>
               <strong>字号</strong>
-              <span>
+              <span class="fd-reader-stepper">
                 <button type="button" data-reader-typography-action="font-size-decrease">A-</button>
                 <em data-reader-typography-value="font-size">${esc(typographyNumber(typography.fontSize, 0))}</em>
                 <button type="button" data-reader-typography-action="font-size-increase">A+</button>
               </span>
             </section>
-            <section class="fd-reader-mini-control" aria-label="行距">
+            <section class="fd-reader-appearance-row" data-typography-row="line-height" aria-label="行距">
+              <i>${icon("list", "fd-small-icon")}</i>
               <strong>行距</strong>
-              <span>
-                <button type="button" data-reader-typography-action="line-height-decrease">紧凑</button>
+              <span class="fd-reader-stepper">
+                <button type="button" data-reader-typography-action="line-height-decrease">-</button>
                 <em data-reader-typography-value="line-height">${esc(typographyNumber(typography.lineHeight, 2))}</em>
-                <button type="button" data-reader-typography-action="line-height-increase">宽松</button>
+                <button type="button" data-reader-typography-action="line-height-increase">+</button>
               </span>
             </section>
+            <section class="fd-reader-appearance-row" aria-label="字体">
+              <i>${icon("text", "fd-small-icon")}</i>
+              <strong>字体</strong>
+              <div class="fd-reader-font-choice">
+                ${quickFonts.map((item) => `
+                  <button class="${typography.fontFamily === item.value ? "is-active" : ""}" type="button" data-reader-typography-set="fontFamily" data-reader-typography-value="${esc(item.value)}">${esc(item.label)}</button>
+                `).join("")}
+              </div>
+            </section>
+            <section class="fd-reader-appearance-row fd-reader-appearance-custom-row" aria-label="自定义">
+              <i>${icon("settings", "fd-small-icon")}</i>
+              <strong>自定义</strong>
+              <div class="fd-reader-custom-links">
+                <button type="button" data-route="reader-settings">背景色</button>
+                <button type="button" data-route="reader-settings">页边距</button>
+              </div>
+            </section>
           </div>
-          <div class="fd-reader-font-row fd-reader-font-row-wide" aria-label="字体">
-            ${quickFonts.map((item) => `
-              <button class="${typography.fontFamily === item.value ? "is-active" : ""}" type="button" data-reader-typography-set="fontFamily" data-reader-typography-value="${esc(item.value)}">${esc(item.label)}</button>
-            `).join("")}
-          </div>
-          <section class="fd-reader-custom-area" aria-label="自定义">
-            <div>
-              <button type="button" data-route="reader-settings"><strong>背景色</strong><span>自定义${chevron()}</span></button>
-              <button type="button" data-route="reader-settings"><strong>页边距</strong><span>默认${chevron()}</span></button>
-            </div>
-          </section>
-          <button class="fd-reader-inline-entry" type="button" data-route="reader-settings">更多界面设置<span>${chevron()}</span></button>
         </section>`;
     }
     if (type === "settings") {
       const settings = appState.readerSettings || {};
-      const settingDefaults = readerControlSettingsConfig(data).defaults;
+      const settingConfig = readerControlSettingsConfig(data);
+      const settingDefaults = settingConfig.defaults;
+      const settingOptions = settingConfig.options;
       return `
         <section class="fd-reader-module-panel fd-reader-settings-panel" data-dev-region="ReaderModulePanel" aria-label="阅读设置">
           <div class="fd-reader-settings-list">
-            <button type="button" data-reader-setting-toggle="autoPage"><i>${icon("auto-page", "fd-small-icon")}</i><strong>自动翻页</strong><span class="fd-reader-switch ${settings.autoPage ? "is-on" : ""}" aria-hidden="true"></span></button>
-            <button type="button" data-reader-setting-cycle="tapMode"><i>${icon("gesture", "fd-small-icon")}</i><strong>点击翻页方式</strong><em>${esc(settings.tapMode || settingDefaults.tapMode)}${chevron()}</em></button>
+            <button type="button" data-reader-setting-toggle="autoPage"><i>${icon("refresh", "fd-small-icon")}</i><strong>自动翻页</strong><span class="fd-reader-switch ${settings.autoPage ? "is-on" : ""}" aria-hidden="true"></span></button>
+            <div class="fd-reader-setting-row">
+              <button type="button" data-reader-setting-option-key="tapMode" aria-expanded="${appState?.readerSettingsExpandedOption === "tapMode" ? "true" : "false"}"><i>${icon("gesture", "fd-small-icon")}</i><strong>点击翻页方式</strong><em>${esc(settings.tapMode || settingDefaults.tapMode)}${chevron()}</em></button>
+              ${readerSettingDropdownHtml("tapMode", "点击翻页方式", settings, settingDefaults, settingOptions, appState)}
+            </div>
             <button type="button" data-reader-setting-toggle="volumePage"><i>${icon("volume", "fd-small-icon")}</i><strong>音量键翻页</strong><span class="fd-reader-switch ${settings.volumePage ? "is-on" : ""}" aria-hidden="true"></span></button>
-            <button type="button" data-reader-setting-cycle="pageAnimation"><i>${icon("motion", "fd-small-icon")}</i><strong>翻页动画</strong><em>${esc(settings.pageAnimation || settingDefaults.pageAnimation)}${chevron()}</em></button>
+            <div class="fd-reader-setting-row">
+              <button type="button" data-reader-setting-option-key="pageAnimation" aria-expanded="${appState?.readerSettingsExpandedOption === "pageAnimation" ? "true" : "false"}"><i>${icon("file", "fd-small-icon")}</i><strong>翻页动画</strong><em>${esc(settings.pageAnimation || settingDefaults.pageAnimation)}${chevron()}</em></button>
+              ${readerSettingDropdownHtml("pageAnimation", "翻页动画", settings, settingDefaults, settingOptions, appState)}
+            </div>
             <button type="button" data-reader-setting-toggle="landscapeLock"><i>${icon("permission", "fd-small-icon")}</i><strong>横屏锁定</strong><span class="fd-reader-switch ${settings.landscapeLock ? "is-on" : ""}" aria-hidden="true"></span></button>
             <button type="button" data-reader-setting-toggle="keepScreenOn"><i>${icon("sun", "fd-small-icon")}</i><strong>屏幕常亮</strong><span class="fd-reader-switch ${settings.keepScreenOn ? "is-on" : ""}" aria-hidden="true"></span></button>
             <button type="button" data-reader-setting-toggle="statusInfo"><i>${icon("progress", "fd-small-icon")}</i><strong>页脚进度信息</strong><span class="fd-reader-switch ${settings.statusInfo ? "is-on" : ""}" aria-hidden="true"></span></button>
@@ -1286,6 +1423,160 @@
         <small>${esc(item.label)}</small>
       </button>
     `).join("");
+  }
+
+  function readerChoiceButtons(values, current, dataAttrs) {
+    return (values || []).map((value) => `
+      <button class="${value === current ? "is-active" : ""}" type="button" ${dataAttrs(value)}>${esc(value)}</button>
+    `).join("");
+  }
+
+  function readerFullDirectoryPage(data, appState) {
+    const tocMode = appState?.readerTocMode === "bookmark" ? "bookmark" : "directory";
+    const currentChapterState = currentReaderChapter(data, appState);
+    const chapters = readerChapters(data);
+    const visibleItems = tocMode === "bookmark" ? chapters.filter((chapter) => chapterHasMarker(chapter, "书签")) : chapters;
+    return `
+      <section class="fd-reader-full-section fd-reader-full-directory" aria-label="完整目录">
+        <nav class="fd-reader-full-toc-switch-row" aria-label="目录书签切换">
+          <button class="${tocMode === "directory" ? "is-active" : ""}" type="button" data-reader-toc-mode="directory">目录</button>
+          <button class="${tocMode === "bookmark" ? "is-active" : ""}" type="button" data-reader-toc-mode="bookmark">书签</button>
+        </nav>
+        <div class="fd-reader-full-toc-list">
+          ${visibleItems.map((chapter) => {
+            const chapterIndex = Math.max(0, chapters.indexOf(chapter));
+            const cached = chapterHasMarker(chapter, "已缓存");
+            const bookmarked = chapterHasMarker(chapter, "书签");
+            return `
+              <button class="fd-reader-full-toc-row${chapterIndex === currentChapterState.index ? " is-current" : ""}" type="button" data-reader-directory-index="${chapterIndex}">
+                <strong>${esc(chapter.title)}</strong>
+                <span class="${cached ? "is-active" : ""}" aria-label="${cached ? "已缓存" : "未缓存"}">${icon(cached ? "checkmark" : "download", "fd-small-icon")}</span>
+                <span class="${bookmarked ? "is-active" : ""}" aria-label="${bookmarked ? "书签" : "未加书签"}">${icon("bookmark", "fd-small-icon")}</span>
+              </button>`;
+          }).join("")}
+        </div>
+      </section>`;
+  }
+
+  function readerFullTtsPage(data, appState) {
+    const tts = appState.readerTts || {};
+    const ttsConfig = readerTtsConfig(data);
+    const defaults = ttsConfig.defaults;
+    const options = ttsConfig.options;
+    const current = (key) => tts[key] || defaults[key] || (options[key] || [])[0] || "";
+    return `
+      <section class="fd-reader-full-section fd-reader-full-tts" aria-label="完整朗读控制">
+        <section class="fd-reader-full-playback">
+          <button type="button" data-reader-tts-action="prev" aria-label="上一句">${icon("chevron-left", "fd-small-icon")}</button>
+          <button class="is-primary ${tts.playing ? "is-playing" : ""}" type="button" data-reader-tts-action="toggle" aria-label="${tts.playing ? "暂停朗读" : "开始朗读"}">${icon(tts.playing ? "pause" : "play", "fd-medium-icon")}</button>
+          <button type="button" data-reader-tts-action="next" aria-label="下一句">${icon("chevron", "fd-small-icon")}</button>
+        </section>
+        ${["speed", "voice", "scope", "timer"].map((key) => `
+          <section class="fd-reader-full-setting-block">
+            <header><strong>${esc({ speed: "语速", voice: "音色", scope: "朗读范围", timer: "定时关闭" }[key])}</strong><em>${esc(current(key))}</em></header>
+            <div class="fd-reader-full-choice-grid">
+              ${readerChoiceButtons(options[key] || [], current(key), (value) => `data-reader-tts-option="${esc(key)}" data-reader-tts-value="${esc(value)}"`)}
+            </div>
+          </section>
+        `).join("")}
+      </section>`;
+  }
+
+  function readerFullAppearancePage(data, appState) {
+    const typography = appState?.readerTypography || normalizeReaderTypography(data);
+    const activeTheme = currentReaderTheme(data, appState);
+    return `
+      <section class="fd-reader-full-section fd-reader-full-appearance" aria-label="完整界面设置">
+        <section class="fd-reader-full-setting-block">
+          <header><strong>阅读主题</strong><em>${esc(activeTheme.label)}</em></header>
+          <div class="fd-reader-full-theme-grid">
+            ${readerThemeOptions(data).map((item) => `
+              <button class="${activeTheme.value === item.value ? "is-active" : ""}" type="button" data-reader-theme="${esc(item.value)}" aria-label="${esc(item.label)}">
+                <span style="--swatch:${esc(item.swatch)}"></span><small>${esc(item.label)}</small>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+        <section class="fd-reader-full-setting-block fd-reader-full-typography">
+          <header><strong>文字排版</strong><em>字号 / 行距 / 段距 / 字距</em></header>
+          ${typographyPanelRows(data, typography)}
+        </section>
+        <section class="fd-reader-full-setting-block">
+          <header><strong>页面空间</strong><em>完整页预留自定义入口</em></header>
+          <div class="fd-reader-full-choice-grid fd-reader-full-choice-grid-even">
+            <button type="button">上边距</button>
+            <button type="button">左右边距</button>
+            <button type="button">背景纹理</button>
+            <button type="button">段首缩进</button>
+          </div>
+        </section>
+      </section>`;
+  }
+
+  function readerFullSettingsPage(data, appState) {
+    const settings = appState.readerSettings || {};
+    const settingConfig = readerControlSettingsConfig(data);
+    const defaults = settingConfig.defaults;
+    const options = settingConfig.options;
+    const current = (key) => settings[key] || defaults[key] || (options[key] || [])[0] || "";
+    const toggles = [
+      ["autoPage", "自动翻页", "refresh"],
+      ["volumePage", "音量键翻页", "volume"],
+      ["landscapeLock", "横屏锁定", "permission"],
+      ["keepScreenOn", "屏幕常亮", "sun"],
+      ["statusInfo", "页脚进度信息", "progress"],
+      ["hapticFeedback", "触摸反馈", "gesture"],
+      ["cacheNext", "自动缓存后续章节", "download"]
+    ];
+    return `
+      <section class="fd-reader-full-section fd-reader-full-settings" aria-label="完整阅读设置">
+        ${["tapMode", "pageAnimation"].map((key) => `
+          <section class="fd-reader-full-setting-block">
+            <header><strong>${esc(key === "tapMode" ? "点击翻页方式" : "翻页动画")}</strong><em>${esc(current(key))}</em></header>
+            <div class="fd-reader-full-choice-grid">
+              ${readerChoiceButtons(options[key] || [], current(key), (value) => `data-reader-setting-option="${esc(key)}" data-reader-setting-value="${esc(value)}"`)}
+            </div>
+          </section>
+        `).join("")}
+        <section class="fd-reader-full-setting-block">
+          <header><strong>阅读行为</strong><em>开关项</em></header>
+          <div class="fd-reader-full-toggle-list">
+            ${toggles.map(([key, label, iconName]) => `
+              <button type="button" data-reader-setting-toggle="${esc(key)}">
+                <i>${icon(iconName, "fd-small-icon")}</i>
+                <strong>${esc(label)}</strong>
+                <span class="fd-reader-switch ${settings[key] ? "is-on" : ""}" aria-hidden="true"></span>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+      </section>`;
+  }
+
+  function readerFullPageBody(type, data, appState) {
+    if (type === "directory") return readerFullDirectoryPage(data, appState);
+    if (type === "tts") return readerFullTtsPage(data, appState);
+    if (type === "appearance") return readerFullAppearancePage(data, appState);
+    return readerFullSettingsPage(data, appState);
+  }
+
+  function readerFullPagePanel(data, type, appState) {
+    const module = (data.reader.modules || []).find((item) => item.type === type) || { label: "阅读设置", type: "settings", icon: "settings" };
+    const quickRoute = readerModuleRoutes[type] || "reader-settings";
+    const promotedRoute = readerPromotedRoutes[type] || "";
+    return `
+      <section class="fd-reader-full-page-panel fd-reader-full-page-${esc(type)}" data-dev-region="ReaderExpandedPanel" aria-label="${esc(module.label)}大半屏控制窗">
+        ${promotedRoute
+          ? `<button class="fd-reader-full-grabber" type="button" data-route="${esc(promotedRoute)}" aria-label="继续展开到全屏页面"></button>`
+          : `<span class="fd-reader-full-grabber" aria-hidden="true"></span>`}
+        <header class="fd-reader-full-head">
+          <span>${icon(module.icon || module.type, "fd-small-icon")}<strong>${esc(module.label)}</strong></span>
+          <button type="button" data-route="${esc(quickRoute)}" data-route-replace>收起</button>
+        </header>
+        <div class="fd-reader-full-content">
+          ${readerFullPageBody(type, data, appState)}
+        </div>
+      </section>`;
   }
 
   function readerBrightnessRail(data, appState) {
@@ -1313,21 +1604,24 @@
       <div class="fd-reader-control-main" data-dev-region="BottomControlPanel">
         <nav class="fd-reader-actions" aria-label="快捷操作">
           ${data.reader.quickActions.map((item) => `
-            <button type="button" data-route="${esc(item.type === "search" ? "content-search" : item.type === "auto-page" ? "auto-page" : "content-replacement")}" data-quick-action="${esc(item.type)}">${icon(item.type, "fd-medium-icon")}<span>${esc(item.label)}</span></button>
+            <button type="button" data-route="${esc(item.type === "search" ? "content-search" : item.type === "auto-page" ? "auto-page" : "content-replacement")}" data-quick-action="${esc(item.type)}">${icon(readerQuickActionIconMap[item.type] || item.type, "fd-medium-icon")}<span>${esc(item.label)}</span></button>
           `).join("")}
         </nav>
         <section class="fd-reader-chapter-panel" aria-label="书籍进度">
-          <div class="fd-reader-chapter-row">
-            <strong data-reader-current-chapter>${esc(chapterTitle)}</strong>
-            <span>
-              <button type="button" data-reader-chapter-action="prev" aria-disabled="${chapterState.index === 0 ? "true" : "false"}">${esc(chapter.previousLabel || "上一章")}</button>
-              <button type="button" data-reader-chapter-action="next" aria-disabled="${chapterState.index >= chapterState.count - 1 ? "true" : "false"}">${esc(chapter.nextLabel || "下一章")}</button>
+          <div class="fd-reader-chapter-row fd-reader-chapter-control-row">
+            <button class="fd-reader-chapter-step" type="button" data-reader-chapter-action="prev" aria-label="${esc(chapter.previousLabel || "上一章")}" aria-disabled="${chapterState.index === 0 ? "true" : "false"}">${icon("chevron-left", "fd-small-icon")}</button>
+            <span class="fd-reader-chapter-main">
+              <strong data-reader-current-chapter>${esc(chapterTitle)}</strong>
             </span>
+            <button class="fd-reader-chapter-step" type="button" data-reader-chapter-action="next" aria-label="${esc(chapter.nextLabel || "下一章")}" aria-disabled="${chapterState.index >= chapterState.count - 1 ? "true" : "false"}">${icon("chevron", "fd-small-icon")}</button>
           </div>
-          <button class="fd-reader-progress" type="button" style="--progress:${esc(pct(`${chapterProgress}%`))}" data-reader-chapter-progress aria-label="调整书籍进度" aria-valuemin="${esc(chapterProgressConfig.min)}" aria-valuemax="${esc(chapterProgressConfig.max)}" aria-valuenow="${esc(chapterProgress)}">
-            <i><b></b></i>
-          </button>
-          <small>${esc(readerBookProgressLabel(data, appState))} · 第 ${esc(chapterNumber)} / ${esc(totalChapterCount)} 章</small>
+          <div class="fd-reader-progress-row">
+            <small class="fd-reader-total-chapters">共 ${esc(totalChapterCount)} 章</small>
+            <button class="fd-reader-progress" type="button" style="--progress:${esc(pct(`${chapterProgress}%`))}" data-reader-chapter-progress aria-label="调整书籍进度" aria-valuemin="${esc(chapterProgressConfig.min)}" aria-valuemax="${esc(chapterProgressConfig.max)}" aria-valuenow="${esc(chapterProgress)}">
+              <i><b></b></i>
+            </button>
+            <small class="fd-reader-book-progress">${esc(readerBookProgressLabel(data, appState))}</small>
+          </div>
         </section>
       </div>`;
   }
@@ -1346,6 +1640,7 @@
     if (state.mode === "immersive") {
       return "";
     }
+    const expandedRoute = readerFullRouteForState(state);
     let bodyHtml = "";
     if (isLoading) {
       bodyHtml = readerLoadingPanel(route);
@@ -1357,9 +1652,27 @@
       bodyHtml = readerControlMain(data, appState);
     }
     return `
-      <div class="fd-reader-grabber"></div>
+      <button class="fd-reader-grabber" type="button" data-route="${esc(expandedRoute)}" data-route-replace aria-label="展开完整控制页"></button>
       ${bodyHtml}
       ${readerBrightnessRail(data, appState)}`;
+  }
+
+  function readerFullPageScreen(data, route, appState) {
+    const type = readerFullTypeByRoute[route] || "settings";
+    return shellKit().renderReaderShell({
+      frameClass: `fd-reader-frame fd-reader-flow-frame fd-reader-mode-full fd-reader-mode-full-${esc(type)}`,
+      readingSurfaceClass: "fd-reading-surface",
+      overlayClass: "fd-reader-overlay fd-reader-full-overlay",
+      bottomSheetHostClass: "fd-reader-full-host",
+      moduleNavClass: "fd-reader-module-nav fd-reader-module-nav-empty",
+      stateHostClass: "fd-reader-state-host",
+      stateHostHtml: `<div class="fd-reader-global-brightness-dim" data-reader-brightness-dim aria-hidden="true" style="${readerBrightnessStyle(data, appState)}"></div>`,
+      ariaLabel: (routes[route] || routes["reader-full-settings"]).title,
+      readingSurfaceHtml: sharedReaderSurface(data, "", appState),
+      overlayHtml: readerTopOverlay(data, appState),
+      bottomSheetHtml: readerFullPagePanel(data, type, appState),
+      moduleNavHtml: ""
+    });
   }
 
   function readerStateScreen(data, route, options, appState) {
@@ -2050,17 +2363,58 @@
     return Number.parseFloat(match[1]);
   }
 
-  function sourceCandidateRow(item, index) {
+  function adjustReaderDropdownPlacement(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const normalizedDropdownHeight = (dropdown, availableSpace) => {
+      const computed = window.getComputedStyle(dropdown);
+      const paddingTop = Number.parseFloat(computed.paddingTop) || 0;
+      const paddingBottom = Number.parseFloat(computed.paddingBottom) || 0;
+      const buttons = Array.from(dropdown.querySelectorAll("button"));
+      const firstButton = buttons[0];
+      if (!firstButton) {
+        return Math.max(40, Math.floor(availableSpace));
+      }
+      const buttonHeight = firstButton.getBoundingClientRect().height || 27;
+      const buttonGap = buttons.length > 1 ? Number.parseFloat(window.getComputedStyle(buttons[1]).marginTop) || 0 : 0;
+      const availableForRows = Math.max(buttonHeight, availableSpace - paddingTop - paddingBottom);
+      const visibleRows = Math.max(1, Math.min(buttons.length, Math.floor((availableForRows + buttonGap) / (buttonHeight + buttonGap))));
+      const height = paddingTop + paddingBottom + (visibleRows * buttonHeight) + (Math.max(0, visibleRows - 1) * buttonGap);
+      return Math.floor(Math.min(dropdown.scrollHeight || height, height, availableSpace));
+    };
+    root.querySelectorAll(".fd-reader-setting-dropdown, .fd-reader-tts-dropdown").forEach((dropdown) => {
+      dropdown.classList.remove("is-drop-up");
+      dropdown.style.removeProperty("--reader-dropdown-max-height");
+      const row = dropdown.closest(".fd-reader-setting-row, .fd-reader-tts-option-row");
+      const panel = dropdown.closest(".fd-reader-module-panel") || root;
+      if (!row || !panel) return;
+      const rowRect = row.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const spaceBelow = panelRect.bottom - rowRect.bottom;
+      const spaceAbove = rowRect.top - panelRect.top;
+      const isBottomOverflow = dropdownRect.bottom > panelRect.bottom - 6;
+      if (!isBottomOverflow) return;
+      if (spaceAbove > spaceBelow) {
+        dropdown.classList.add("is-drop-up");
+        dropdown.style.setProperty("--reader-dropdown-max-height", `${normalizedDropdownHeight(dropdown, spaceAbove - 6)}px`);
+        return;
+      }
+      dropdown.style.setProperty("--reader-dropdown-max-height", `${normalizedDropdownHeight(dropdown, spaceBelow - 6)}px`);
+    });
+  }
+
+  function sourceCandidateRow(item, index, selectedSource) {
     const isCurrent = item.state === "当前";
-    const isSelected = isCurrent;
+    const isSelected = selectedSource ? item.source === selectedSource : isCurrent;
     const canSwitch = !isCurrent && item.state !== "落后" && item.state !== "失效";
     const latestChapter = item.latestChapter || item.chapter || "最新章节";
-    const speedLabel = /\d/.test(item.speed || "") ? `延迟 ${item.speed}` : item.speed;
+    const speedLabel = /\d/.test(item.speed || "") ? item.speed : (item.speed || "未知");
     return `
-      <article class="${isCurrent ? "is-current" : ""}${isSelected ? " is-selected" : ""}${canSwitch ? " is-switchable" : " is-muted"}" data-source-index="${index}" data-source-name="${esc(item.source)}" tabindex="0" role="button" aria-label="选择 ${esc(item.source)}">
+      <article class="fd-source-candidate-row${isCurrent ? " is-current" : ""}${isSelected ? " is-selected" : ""}${canSwitch ? " is-switchable" : " is-muted"}" data-source-index="${index}" data-source-name="${esc(item.source)}" tabindex="0" role="button" aria-label="选择 ${esc(item.source)}">
         <span class="fd-source-row-main">
-          <strong><b>${esc(item.source)}</b><em>${esc(speedLabel)}</em></strong>
-          <small>最新章节：${esc(latestChapter)}</small>
+          <b>${esc(item.source)}</b>
+          <em>${esc(speedLabel)}</em>
+          <strong>${esc(latestChapter)}</strong>
         </span>
       </article>`;
   }
@@ -2074,6 +2428,7 @@
         return latencyDelta || left._sourceOrder - right._sourceOrder;
       });
     const current = candidates.find((item) => item.state === "当前") || candidates[0] || {};
+    const selectedSource = appState?.sourceSwitchSelectedSource || current.source || "";
     return shellKit().renderFlowShell({
       frameClass: "fd-flow-frame fd-source-phone-flow fd-source-reader-continuation",
       stepClass: "fd-flow-step fd-source-continuity-slot",
@@ -2096,13 +2451,14 @@
         </section>`,
       comparisonHtml: `
         <section class="fd-source-switch-window" data-source-switch-window aria-label="换源窗口">
-          <button class="fd-source-window-close" type="button" data-route="reader" data-route-replace aria-label="关闭换源窗口">${icon("close", "fd-small-icon")}</button>
-          <header>
-            <h2>换源</h2>
-            <p>${esc(data.reader.title)} · ${esc(flow.chapter || "第 32 章")} · 当前 ${esc(current.source || "优书网")}</p>
-          </header>
+          <div class="fd-source-window-info">
+            <i>${icon("source-switch", "fd-small-icon")}</i>
+            <strong>换源</strong>
+            <span>按延迟排序</span>
+            <button class="fd-source-window-close" type="button" data-route="reader" data-route-replace aria-label="关闭换源窗口">${icon("close", "fd-small-icon")}</button>
+          </div>
           <div class="fd-source-candidate-list">
-            ${candidates.map((item, index) => sourceCandidateRow(item, index)).join("")}
+            ${candidates.map((item, index) => sourceCandidateRow(item, index, selectedSource)).join("")}
           </div>
         </section>`,
       resultHtml: "",
@@ -2158,7 +2514,7 @@
       case "book-detail":
         return libraryScreen(data);
       case "book-directory":
-        return bookDirectoryScreen(data);
+        return bookDirectoryScreen(data, appState);
       case "bookshelf-empty":
         return bookshelfEmptyScreen(data);
       case "sort-filter":
@@ -2177,6 +2533,11 @@
       case "content-search":
       case "content-replacement":
         return readerStateScreen(data, route, options, appState);
+      case "reader-full-directory":
+      case "reader-full-tts":
+      case "reader-full-appearance":
+      case "reader-full-settings":
+        return readerFullPageScreen(data, route, appState);
       case "source-switch":
         return flowScreen(data, appState);
       case "source-management":
@@ -2216,7 +2577,12 @@
       readerBrightness: readerBrightnessConfig(data).defaultValue,
       readerBrightnessAuto: false,
       readerTts: Object.assign({}, readerTtsConfig(data).defaults),
+      readerTtsSession: false,
+      readerTtsExpandedOption: "",
       readerSettings: Object.assign({}, readerControlSettingsConfig(data).defaults),
+      readerAutoPageSession: false,
+      readerSettingsExpandedOption: "",
+      sourceSwitchSelectedSource: "",
       settingsOverlay: "",
       settingsExpandedOption: "",
       settingsValues: {},
@@ -2374,6 +2740,7 @@
         updateRouteInfo(route);
       }
       attachScreenInteractions(screenHost, goTo, goBack, goTab, replaceTopRoute, exitReader, appState, data, renderCurrentRoute);
+      adjustReaderDropdownPlacement(screenHost);
       if (renderedTurnDirection) {
         const readingLayer = screenHost.querySelector(".fd-ir-reading-layer");
         const clearTurnClass = () => {
@@ -2635,9 +3002,30 @@
     const applyReaderTtsAction = (action) => {
       const ttsConfig = readerTtsConfig(data);
       const tts = appState.readerTts;
-      if (action === "toggle") tts.playing = !tts.playing;
+      appState.readerTtsExpandedOption = "";
+      if (action === "toggle") {
+        appState.readerTtsSession = true;
+        tts.playing = !tts.playing;
+        if (tts.playing) {
+          replaceTopRoute("immersive-reading");
+          return;
+        }
+      }
       if (action === "prev") tts.sentenceIndex = clamp((tts.sentenceIndex || ttsConfig.defaults.sentenceIndex) - 1, ttsConfig.sentenceMin, ttsConfig.sentenceMax);
       if (action === "next") tts.sentenceIndex = clamp((tts.sentenceIndex || ttsConfig.defaults.sentenceIndex) + 1, ttsConfig.sentenceMin, ttsConfig.sentenceMax);
+      renderCurrentRoute();
+    };
+    const toggleReaderTtsOption = (key) => {
+      const options = readerTtsConfig(data).options;
+      if (!options[key]) return;
+      appState.readerTtsExpandedOption = appState.readerTtsExpandedOption === key ? "" : key;
+      renderCurrentRoute();
+    };
+    const applyReaderTtsOption = (key, value) => {
+      const options = readerTtsConfig(data).options;
+      if (!options[key] || !options[key].includes(value)) return;
+      appState.readerTts[key] = value;
+      appState.readerTtsExpandedOption = "";
       renderCurrentRoute();
     };
     const applyReaderTtsCycle = (key) => {
@@ -2653,13 +3041,28 @@
     };
     const applyReaderSettingToggle = (key) => {
       if (!Object.prototype.hasOwnProperty.call(appState.readerSettings, key)) return;
+      appState.readerSettingsExpandedOption = "";
       appState.readerSettings[key] = !appState.readerSettings[key];
+      if (key === "autoPage") {
+        appState.readerAutoPageSession = true;
+        if (appState.readerSettings[key]) {
+          replaceTopRoute("immersive-reading");
+          return;
+        }
+      }
       renderCurrentRoute();
     };
-    const applyReaderSettingCycle = (key) => {
+    const toggleReaderSettingOption = (key) => {
       const options = readerControlSettingsConfig(data).options;
       if (!options[key]) return;
-      appState.readerSettings[key] = cycleValue(appState.readerSettings[key], options[key]);
+      appState.readerSettingsExpandedOption = appState.readerSettingsExpandedOption === key ? "" : key;
+      renderCurrentRoute();
+    };
+    const applyReaderSettingOption = (key, value) => {
+      const options = readerControlSettingsConfig(data).options;
+      if (!options[key] || !options[key].includes(value)) return;
+      appState.readerSettings[key] = value;
+      appState.readerSettingsExpandedOption = "";
       renderCurrentRoute();
     };
 
@@ -2902,6 +3305,23 @@
       });
     });
 
+    screenHost.querySelectorAll("[data-source-name]").forEach((targetEl) => {
+      const selectSource = () => {
+        appState.sourceSwitchSelectedSource = targetEl.getAttribute("data-source-name") || "";
+        renderCurrentRoute();
+      };
+      targetEl.addEventListener("click", (event) => {
+        event.preventDefault();
+        selectSource();
+      });
+      targetEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectSource();
+        }
+      });
+    });
+
     screenHost.querySelectorAll("[data-route]").forEach((targetEl) => {
       if (targetEl.hasAttribute("data-book-cover")) {
         return;
@@ -3037,6 +3457,21 @@
       });
     });
 
+    screenHost.querySelectorAll("[data-reader-tts-option-key]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        toggleReaderTtsOption(button.getAttribute("data-reader-tts-option-key"));
+      });
+    });
+
+    screenHost.querySelectorAll("[data-reader-tts-option]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyReaderTtsOption(button.getAttribute("data-reader-tts-option"), button.getAttribute("data-reader-tts-value") || "");
+      });
+    });
+
     screenHost.querySelectorAll("[data-reader-theme]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.preventDefault();
@@ -3109,10 +3544,18 @@
       });
     });
 
-    screenHost.querySelectorAll("[data-reader-setting-cycle]").forEach((button) => {
+    screenHost.querySelectorAll("[data-reader-setting-option-key]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.preventDefault();
-        applyReaderSettingCycle(button.getAttribute("data-reader-setting-cycle"));
+        toggleReaderSettingOption(button.getAttribute("data-reader-setting-option-key"));
+      });
+    });
+
+    screenHost.querySelectorAll("[data-reader-setting-option]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyReaderSettingOption(button.getAttribute("data-reader-setting-option"), button.getAttribute("data-reader-setting-value") || "");
       });
     });
 

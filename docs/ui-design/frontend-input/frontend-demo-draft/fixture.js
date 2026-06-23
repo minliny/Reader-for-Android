@@ -283,10 +283,10 @@ window.READER_FRONTEND_DEMO_DRAFT_FIXTURE = {
       nextLabel: "下一章"
     },
     modules: [
-      { label: "目录", type: "directory", icon: "directory" },
-      { label: "朗读", type: "tts", icon: "tts" },
-      { label: "界面", type: "appearance", icon: "palette", active: true },
-      { label: "设置", type: "settings", icon: "gear" }
+      { label: "目录", type: "directory", icon: "reader-module-directory" },
+      { label: "朗读", type: "tts", icon: "reader-module-tts" },
+      { label: "界面", type: "appearance", icon: "reader-module-appearance", active: true },
+      { label: "设置", type: "settings", icon: "reader-module-settings" }
     ],
     brightness: {
       title: "亮度",

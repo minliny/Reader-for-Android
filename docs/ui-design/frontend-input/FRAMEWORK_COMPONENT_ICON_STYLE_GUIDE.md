@@ -128,10 +128,27 @@
 | 顶部动作 | 顶部图标按钮 | Top Icon Button | 24-28 dp | 48 dp | 默认 `neutral.icon`，active 使用当前 scheme 主色。 |
 | 主导航 | 底部导航图标 | Bottom Nav Icon | 24-26 dp | 等分导航项 | 选中仅改变图标和文字颜色，不加整列大背景。 |
 | 阅读模块 | 阅读模块图标 | Reader Module Icon | 22-26 dp | 44-52 dp | selected 时图标反色，容器加深，位置不变。 |
-| 快捷操作 | 阅读快捷图标 | Reader Quick Icon | 22-26 dp | 48 dp | 默认 Reader 蓝灰，pressed 叠黑 5-7%。 |
+| 快捷操作 | 阅读快捷图标 | Reader Quick Icon | 24 dp | 48 dp | 默认 Reader 蓝灰，pressed / selected 只改图标色和文字色，不改变背景、尺寸或位置。 |
 | 设置行 | 设置行图标 | Settings Row Icon | 22-28 dp | 48 dp | 普通项继承文本色，危险项使用 danger。 |
 | 状态反馈 | 状态反馈图标 | State Feedback Icon | 28-44 dp | 不单独点击 | good/warn/danger/info 按语义色。 |
 | 系统状态 | 系统状态图标 | System Status Icon | 14-16 dp | 不可点击 | 仅用于 QA 参考，生产端由系统管理。 |
+
+### 图标光学校准（Icon Optical Calibration）
+
+| 中文名称（Chinese Name） | English Name | 外框尺寸（Frame Size） | 图形占比（Optical Fill） | 规则（Rule） |
+| --- | --- | ---: | ---: | --- |
+| 小图标 | Small Icon | 20 dp | 15-18 dp | 用于列表行、辅助信息、章节状态、行尾标识。 |
+| 常规图标 | Regular Icon | 24 dp | 18-21 dp | 用于顶部按钮、阅读快捷操作、底部导航和常规动作。 |
+| 中号图标 | Medium Icon | 28 dp | 21-24 dp | 只用于卡片、状态块或需要更高识别度的非密集区域。 |
+| 大状态图标 | State Icon | 36-44 dp | 28-36 dp | 只用于空状态、错误状态和状态反馈，不进入工具栏。 |
+
+光学校准（optical calibration）优先级高于原始 SVG viewBox：
+
+- 圆形、放大镜、双箭头这类几何图标不得顶满外框，常规图标的图形主体应控制在外框的 75%-86%。
+- 宽图标或实心路径图标必须在 SVG viewBox 内留出额外内边距，不能只依赖 CSS `width / height`。
+- 同一工具栏内的图标必须以“视觉重量”统一，不以 SVG 源图实际边界统一。
+- 从 image2、Figma 或截图抠图并用 `potrace` 转成 SVG 后，必须重新检查光学占比；如果图形偏大，优先扩大 viewBox 留白，不改变按钮尺寸。
+- 点击 / 选中 / 反色状态不得改变图标外框尺寸、图形占比、相对位置或文字位置。
 
 ### 图标语义清单（Icon Semantic Inventory）
 
