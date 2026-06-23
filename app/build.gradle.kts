@@ -77,6 +77,9 @@ dependencies {
     // OkHttp (HTTP client for book source fetching)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // jsoup (Android-side clean-room HTML/XML selector adapter)
+    implementation("org.jsoup:jsoup:1.16.2")
+
     // Room (for structured data: bookshelf, progress, cache)
     val roomVersion = "2.7.0"
     implementation("androidx.room:room-runtime:$roomVersion")
