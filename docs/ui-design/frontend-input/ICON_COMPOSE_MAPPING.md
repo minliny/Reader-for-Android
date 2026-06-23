@@ -6,10 +6,10 @@
 
 | 项目（Item） | 数量（Count） | 说明（Notes） |
 | --- | ---: | --- |
-| 本地素材库图标 token（Local Icon Tokens） | 79 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
+| 本地素材库图标 token（Local Icon Tokens） | 81 | 来自 `docs/ui-design/frontend-input/asset-library/icons.js` 的 `ReaderAssetIcons.icons`。 |
 | Compose 语义 token 映射（Compose Semantic Token Mapping） | 55 | `ReaderIconToken` 已覆盖主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层。 |
 | Legacy 直连 Material 图标（Legacy Direct Material Icons） | 历史原型保留 | `ui/stitch/*` prototype 暂保留直接 Material Icons，不作为最终组件来源。 |
-| Figma 缺源图标（Missing Figma Source Assets） | 19 | 见 `ICON_LIBRARY_AUDIT.md`；缺源图标不得直接进入最终 Figma 主组件。 |
+| Figma 缺源图标（Missing Figma Source Assets） | 0 | `04_Icon_Library_图标素材库` 已用 `lucide-static@1.21.0` 开源 SVG 补齐 79 个 `Icon/*` 主组件；本地新增状态栏 `signal`、`wifi` 需在下次 Figma 图标库同步时补为 `Icon/*`。 |
 
 ## 使用规则（Usage Rules）
 
@@ -32,7 +32,7 @@
 
 | Material Icon | 建议 token（Suggested Token） | 状态（Status） | 说明（Notes） |
 | --- | --- | --- | --- |
-| `Add` | `add` | 可映射 | Figma 当前标为缺源；Compose 可先走语义 token。 |
+| `Add` | `add` | 可映射 | Figma 已补为 `Icon/add`；Compose 可走语义 token。 |
 | `ArrowBack` | `back` | 可映射 | 返回入口。 |
 | `ArrowDropDown` | `chevron` | 需方向规则 | 下拉箭头可用 `chevron` 旋转或补 `chevron-down`。 |
 | `AutoMode` | `auto-page` | 可映射 | 自动翻页。 |
@@ -49,7 +49,7 @@
 | `CloudOff` | `offline` | 可映射 | 离线状态。 |
 | `CloudUpload` | `upload` | 已映射 | 同步备份导出、上传和云端备份动作通过 `ReaderIconToken.Upload` 表达。 |
 | `Code` | `code` | 已映射 | 开源许可、代码与协议说明可通过 `ReaderIconToken.Code` 表达。 |
-| `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
+| `DarkMode` | `night-mode` | 已映射 | 阅读控制层夜间模式通过 `ReaderIconToken.NightMode` 表达；Figma 已补为 `Icon/night-mode`。 |
 | `Delete` | `trash` | 已映射 | 删除、移除或危险清空通过 `ReaderIconToken.Trash` 表达。 |
 | `Download` | `download` | 已映射 | 自动缓存或下载缓存通过 `ReaderIconToken.Download` 表达。 |
 | `Edit` | `edit` | 已映射 | 书源编辑和规则编辑通过 `ReaderIconToken.Edit` 表达。 |
@@ -57,7 +57,7 @@
 | `Explore` | `discover` | 可映射 | 发现。 |
 | `FileOpen` | `file` | 可映射 | 文件选择或导入。 |
 | `Folder` | `folder` | 已映射 | 默认分组或文件夹入口通过 `ReaderIconToken.Folder` 表达。 |
-| `FolderOff` | `folder-off` | 已映射 | 空文件夹或无文件状态通过 `ReaderIconToken.FolderOff` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
+| `FolderOff` | `folder-off` | 已映射 | 空文件夹或无文件状态通过 `ReaderIconToken.FolderOff` 表达；Figma 已补为 `Icon/folder-off`。 |
 | `GridView` | `grid` | 可映射 | 宫格视图。 |
 | `Groups` | `people` | 已映射 | 合并同名同作者等多人/作者语义通过 `ReaderIconToken.People` 表达。 |
 | `History` | `clock` | 已映射 | 搜索历史或历史记录通过 `ReaderIconToken.Clock` 表达。 |
@@ -69,7 +69,7 @@
 | `Lock` | `shield` | 可映射 | 权限、隐私保护。 |
 | `MenuBook` | `directory` / `book-open` | 需按上下文 | 目录用 `directory`，打开书籍用 `book-open`。 |
 | `MoreVert` | `more` | 可映射 | 更多操作。 |
-| `MyLocation` | `current-location` | 已映射 | 当前章节、定位或当前项通过 `ReaderIconToken.CurrentLocation` 表达；素材库缺源状态仍按 `ICON_LIBRARY_AUDIT.md` 回流。 |
+| `MyLocation` | `current-location` | 已映射 | 当前章节、定位或当前项通过 `ReaderIconToken.CurrentLocation` 表达；Figma 已补为 `Icon/current-location`。 |
 | `Notifications` | `bell` | 已映射 | 通知权限通过 `ReaderIconToken.Bell` 表达。 |
 | `Person` | `people` / 待移除 | 需产品确认 | 主 tab 不再使用 `我的`；作者/用户语义需另定。 |
 | `PlayArrow` | `play` | 可映射 | 播放、朗读开始。 |
@@ -93,10 +93,10 @@
 | 建议 token（Suggested Token） | 用途（Usage） | 来源（Current Trigger） |
 | --- | --- | --- |
 | `stop` | 停止自动翻页或停止朗读 | 已补入本地素材库；如后续页面需要独立停止语义，再新增 `ReaderIconToken.Stop`。 |
-| `night-mode` | 夜间模式切换 | 已补入本地素材库，并映射到 `ReaderIconToken.NightMode`；Figma 主组件仍需回流审计。 |
-| `folder-off` | 文件夹空态或不可用 | 已补入本地素材库，并映射到 `ReaderIconToken.FolderOff`；Figma 主组件仍需回流审计。 |
-| `current-location` | 当前章节定位、当前位置 | 已补入本地素材库，并映射到 `ReaderIconToken.CurrentLocation`；Figma 主组件仍需回流审计。 |
-| `chevron-left` | 左向翻页或返回以外的左向动作 | 已补入本地素材库，并映射到 `ReaderIconToken.ChevronLeft`；Figma 主组件仍需回流审计。 |
+| `night-mode` | 夜间模式切换 | 已补入本地素材库，并映射到 `ReaderIconToken.NightMode`；Figma 已补为 `Icon/night-mode`。 |
+| `folder-off` | 文件夹空态或不可用 | 已补入本地素材库，并映射到 `ReaderIconToken.FolderOff`；Figma 已补为 `Icon/folder-off`。 |
+| `current-location` | 当前章节定位、当前位置 | 已补入本地素材库，并映射到 `ReaderIconToken.CurrentLocation`；Figma 已补为 `Icon/current-location`。 |
+| `chevron-left` | 左向翻页或返回以外的左向动作 | 已补入本地素材库，并映射到 `ReaderIconToken.ChevronLeft`；Figma 已补为 `Icon/chevron-left`。 |
 
 ## 代码落点（Code Targets）
 
@@ -182,4 +182,4 @@ fun ReaderIconToken.asImageVector(): ImageVector = when (this) {
 - 主导航、阅读模块导航、设置入口必须用语义 token。
 - 没有本地 token 的 Material icon 必须先进入“需要补 token 的缺口”。
 - 生产 UI 只能在 `ReaderIcons.kt` 内映射 Material Icons；`ui/stitch/*` 仅作为历史原型例外。
-- Figma 缺源图标仍按 `ICON_LIBRARY_AUDIT.md` 处理，不因为 Compose 有 Material icon 就视为 Figma 已完成。
+- Figma 图标完成度以 `ICON_LIBRARY_AUDIT.md` 为准；当前本地语义 token 为 81 个，其中 `signal`、`wifi` 已先进入本地素材库，待下次 Figma 图标库同步。

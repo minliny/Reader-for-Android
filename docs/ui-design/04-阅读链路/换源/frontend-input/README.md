@@ -7,7 +7,7 @@
 
 ## 目标
 
-在阅读中检测和切换可用来源，覆盖横向流程：基线阅读控制层、打开换源底表、内联检测中、切换成功返回阅读页。
+在阅读中检测和切换可用来源。当前手机 demo 中，换源以正文区域内的同层弹窗呈现，打开后仍可直接操作顶部阅读栏、底部控制面板、亮度栏和四模块导航。
 
 ## 复用公共组件
 
@@ -40,7 +40,7 @@
 - `components.html`：组件拆分预览入口。
 - `../../../frontend-input/shared-shell-kit/kit.js`：统一 `FlowShell` 来源。
 - `../../../frontend-input/asset-library/icons.js`：统一语义图标来源。
-- `FlowShell StateHost`：横向流程底部状态容器，必须展示流程阶段、来源数量、筛选数量、来源切换方向和阅读位置保留结果。
+- `FlowShell StateHost`：只用于横向审计输入件；手机 demo 中不展示底部流程摘要。
 
 ## 状态覆盖
 
@@ -63,7 +63,8 @@
 - 预览页根节点必须来自 `ReaderShellKit.renderFlowShell(...)`。
 - DOM 必须包含并只使用统一语义 slot：`flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost`。
 - `stateHost` 不能是空壳，必须渲染 `FlowShell StateHost` 状态摘要。
-- 四步横向流程必须保持：基线阅读控制层、打开换源底表、内联检测中、切换成功返回阅读页。
+- 手机 demo 的换源窗口必须与阅读控制层处于同一交互平面，不得使用全屏遮罩或禁用背景来阻断顶栏、底栏和四模块导航。
+- 换源窗口关闭只关闭窗口本身，不是恢复顶栏/底栏操作的前置条件。
 - 状态矩阵必须包含 default、loading、empty、error、offline、permission 六张状态卡，且每张卡内部也必须通过 `FlowShell` 输出。
 - 图标必须来自公共素材库，不允许保留页面级内联 SVG。
 - `FrontendInputFlowShellInventoryTest` 必须通过，守住换源输入包、FlowShell renderer、manifest、验证报告、文档和 Compose preview 锚点同步。

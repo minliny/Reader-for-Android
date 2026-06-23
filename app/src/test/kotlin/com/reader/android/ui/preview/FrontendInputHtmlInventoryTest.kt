@@ -28,6 +28,9 @@ class FrontendInputHtmlInventoryTest {
             "docs/ui-design/02-主标签页/书架/frontend-input/preview 2.html",
             "docs/ui-design/04-阅读链路/阅读控制层/frontend-input/preview 2.html"
         ).sorted()
+        val expectedReviewDemos = listOf(
+            "docs/ui-design/frontend-input/bookshelf-demo/index.html"
+        ).sorted()
         val expectedStandaloneReproductions = listOf(
             "docs/ui-design/02-主标签页/书架/bookshelf-cover-mode.html",
             "docs/ui-design/02-主标签页/书架/frontend-demo/index.html",
@@ -35,8 +38,8 @@ class FrontendInputHtmlInventoryTest {
         ).sorted()
 
         assertEquals("formal UI design screen count", 30, screenDirs.size)
-        assertEquals("all local HTML files under docs/ui-design", 99, allHtml.size)
-        assertEquals("HTML files under any frontend-input directory", 96, frontendInputHtml.size)
+        assertEquals("all local HTML files under docs/ui-design", 100, allHtml.size)
+        assertEquals("HTML files under any frontend-input directory", 97, frontendInputHtml.size)
         assertEquals("formal page preview count", 30, expectedPagePreviews.size)
         assertEquals("formal state matrix count", 30, expectedStateMatrices.size)
         assertEquals("component reference count", 30, expectedComponentReferences.size)
@@ -44,7 +47,7 @@ class FrontendInputHtmlInventoryTest {
         assertEquals(
             "frontend-input HTML inventory must equal formal pages, legacy previews, and shared targets",
             (expectedPagePreviews + expectedStateMatrices + expectedComponentReferences +
-                expectedLegacyPreviewCandidates + expectedSharedTargets).sorted(),
+                expectedLegacyPreviewCandidates + expectedSharedTargets + expectedReviewDemos).sorted(),
             frontendInputHtml
         )
         assertEquals(
@@ -71,6 +74,10 @@ class FrontendInputHtmlInventoryTest {
         assertTrue(
             "manifest must not include legacy preview candidates",
             expectedLegacyPreviewCandidates.none { it in manifestTargets }
+        )
+        assertTrue(
+            "manifest must not include review demo pages",
+            expectedReviewDemos.none { it in manifestTargets }
         )
         assertTrue(
             "manifest must not include standalone historical reproductions",

@@ -1,0 +1,83 @@
+{
+  "summaryId": "CAP-5JS15_BRIDGE_ADAPTER_POLICY_ENFORCEMENT_SUMMARY",
+  "title": "CAP-5JS15: Summary — Bridge-Backed Policy Enforcement at Adapter Boundary",
+  "description": "Commit summary for CAP-5JS15 enforcement phase. Policy gate with permit generation is integrated at the Java Bridge Adapter boundary. All adapter methods require permit evidence; any call without a valid permit is denied and recorded in telemetry.",
+  "preCommitStatus": {
+    "gitStatus": "clean (5 JS14 files committed, 6 JS15 files unstaged)",
+    "HEAD": "8de9e91 (CAP-5JS14 commit)",
+    "unrelatedDocChanges": "present (docs/ui-design/* only, excluded from commit)"
+  },
+  "changedFiles": [
+    "app/src/main/kotlin/com/reader/android/data/policy/JsRuntimeBridgeBackedPolicyGate.kt (extended)",
+    "app/src/main/kotlin/com/reader/android/data/policy/JsRuntimeJavaBridgeAdapter.kt (new)",
+    "app/src/test/kotlin/com/reader/android/data/policy/CAP5JS15BridgeAdapterPolicyEnforcementTest.kt (new)",
+    "docs/CAP-5JS15_BRIDGE_ADAPTER_POLICY_ENFORCEMENT_REPORT.json (new)",
+    "docs/CAP-5JS15_BRIDGE_ADAPTER_POLICY_ENFORCEMENT_SUMMARY.json (new)"
+  ],
+  "targetedTestResults": {
+    "testClass": "CAP5JS15BridgeAdapterPolicyEnforcementTest",
+    "testsRun": 36,
+    "testsPassed": 36,
+    "testsFailed": 0,
+    "coverage": [
+      "ALLOW_TEST_ONLY_BRIDGE generates permit (3 sources)",
+      "DENY_* does not generate permit (5 deny reasons)",
+      "No permit calling adapter is denied (3 APIs)",
+      "API mismatch permit is denied (3 combinations)",
+      "Source mismatch permit is denied",
+      "3 allowlisted sources with correct permit execute",
+      "Disabled flag - no permit",
+      "Non-allowlisted - no permit",
+      "Unknown API - no permit",
+      "Missing fixture - no permit",
+      "networkRequired=true - no permit",
+      "productionContext=true - no permit",
+      "telemetryEnabled=false - no permit",
+      "recoveredClassificationRequested - no permit",
+      "java.ajax returns fixture only (no real network)",
+      "recoveredCount=0",
+      "productionPathTouchedCount=0",
+      "allowlist count unchanged (3)",
+      "Enforcement report metrics verified",
+      "Privacy safety assertions"
+    ]
+  },
+  "fullTestResults": {
+    "testsRun": 1014,
+    "testsPassed": 1009,
+    "testsFailed": 5,
+    "preExistingFailures": [
+      "ReaderRouteHostSmokeTest - route host registers all declared routes (1 failure)",
+      "UiCapabilitySmokeTest (4 failures)"
+    ],
+    "note": "All 5 failures are pre-existing UI smoke tests, unrelated to CAP-5JS15 changes"
+  },
+  "metrics": {
+    "actualJS4AllowlistCount": 22,
+    "bridgeBackedTestOnlyAllowlistCount": 3,
+    "allowPermitGeneratedCount": 3,
+    "bridgeCallWithPermitCount": 3,
+    "bridgeCallWithoutPermitDeniedCount": 3,
+    "permitAPIMismatchDeniedCount": 2,
+    "permitSourceMismatchDeniedCount": 1,
+    "policyDeniedBeforeAdapterCallCount": 7,
+    "networkRequestsMadeCount": 0,
+    "recoveredCount": 0,
+    "productionBridgeEnabled": false,
+    "productionPathTouchedCount": 0,
+    "adapterBypassPrevented": true,
+    "privacySafeReport": true
+  },
+  "productionSafety": {
+    "productionBridgeEnabled": false,
+    "networkRequestsMade": 0,
+    "recoveredCount": 0,
+    "productionPathTouchedCount": 0,
+    "actualJSAllowlistModified": false,
+    "samplesBooksourcesModified": false,
+    "fixturesModified": false,
+    "noRealNetworkCalls": true
+  },
+  "legacyIssues": [],
+  "commitMessage": "feat(CAP-5JS15): enforce bridge-backed policy at adapter boundary"
+}

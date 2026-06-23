@@ -597,15 +597,15 @@
       </div>`;
   }
 
-  function readingEntryControls(entry) {
+  function readerOpenStateControls(entry) {
     entry = entry || {};
     return `
-      <div class="rl-reading-entry-demo">
-        <section class="rl-reading-entry-context">
+      <div class="rl-reader-open-demo">
+        <section class="rl-reader-open-context">
           <strong>${esc(entry.source)}</strong>
           <small>${esc(entry.context)}</small>
         </section>
-        <div class="rl-reading-entry-actions">
+        <div class="rl-reader-open-actions">
           <button class="is-primary" type="button">
             ${icon("play")}
             <span><strong>${esc(entry.continueLabel)}</strong><small>${esc(entry.continueMeta)}</small></span>
@@ -615,12 +615,12 @@
             <span><strong>${esc(entry.startLabel)}</strong><small>${esc(entry.startMeta)}</small></span>
           </button>
         </div>
-        <section class="rl-reading-entry-loading">
+        <section class="rl-reader-open-loading">
           ${icon("clock")}
           <strong>${esc(entry.loadingTitle)}</strong>
           <i></i>
         </section>
-        <section class="rl-reading-entry-repair">
+        <section class="rl-reader-open-repair">
           ${icon("warning")}
           <span><strong>${esc(entry.errorTitle)}</strong><small>${esc(entry.retryLabel)} · ${esc(entry.repairLabel)}</small></span>
           <button type="button">${esc(entry.repairLabel)}</button>
@@ -1105,7 +1105,7 @@
             ${componentCard("SpeedSlider / StartButton / StopButton", "自动翻页速度、模式、开始和停止控制。", autoPageControls(data.autoPageControl))}
             ${componentCard("SearchInput / ResultRow / EmptySearchState / KeyboardAvoidance", "正文内搜索输入、匹配结果、无结果和键盘避让规则。", contentSearchControls(data.contentSearch))}
             ${componentCard("ReplacementRuleRow / TextField / PatternInput / SaveButton", "正文替换规则、表单、测试和保存控制。", replacementControls(data.replacementControl))}
-            ${componentCard("StartReadingButton / ContinueReadingButton / OpenLoadingState / RepairEntry", "阅读入口的开始、继续、打开中和失败修复入口。", readingEntryControls(data.readingEntry))}
+            ${componentCard("StartReadingAction / ContinueReadingAction / OpenLoadingState / ReadingRepairAction", "阅读打开状态的开始、继续、打开中和失败修复动作。", readerOpenStateControls(data.readerOpenState))}
             ${componentCard("ReadingParagraph / WeakInfoText / ProgressInfo / TapZone", "沉浸阅读正文、弱信息、进度和透明点击热区。", immersiveReadingControls(data.immersiveReading))}
             ${componentCard("SourceCandidateRow / CurrentSourceBadge / DetectStatusBadge / SwitchSourceButton", "阅读中换源候选行、当前来源、检测状态和切换操作。", sourceSwitchControls(data.sourceSwitch))}
             ${componentCard("SettingGroupCard / PresetRow", "阅读设置和通用设置页复用的分组入口、预设和高级开关。", readingSettingControls(data.readingSettingGroups, data.readingSettingPresets, data.readingAdvancedSettings))}

@@ -104,7 +104,7 @@
         <section class="asset-panel" data-slot="screenAssets">
           <header class="asset-panel-head">
             <h2>UI 设计图（UI Design Screens）</h2>
-            <p>当前所有 30 张源 UI 设计图已纳入素材库。</p>
+            <p>当前所有 29 张源 UI 设计图已纳入素材库。</p>
           </header>
           ${(data.screenGroups || []).map(screenGroup).join("")}
         </section>

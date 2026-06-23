@@ -85,7 +85,7 @@
       <main class="rskp-preview" data-shell="ComponentLibraryShell" aria-label="共享 Shell Kit 预览">
         <header class="rskp-header" data-slot="foundations">
           <h1>共享 Shell Kit（Shared Shell Kit）</h1>
-          <p>统一输出五类页面框架、固定 data-shell 与 data-slot，供 30 页前端输入件迁移。</p>
+          <p>统一输出五类页面框架、固定 data-shell 与 data-slot，供 29 页前端输入件迁移。</p>
         </header>
         <section class="rskp-grid" data-slot="appShell">
           <article><h2>MainTabShell</h2>${mainTab}</article>

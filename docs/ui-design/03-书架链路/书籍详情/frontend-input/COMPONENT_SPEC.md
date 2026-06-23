@@ -31,8 +31,7 @@ interface BookDetailBookInput {
 
 interface BookDetailChapterInput {
   title: string;
-  state: "未读" | "已读";
-  isNew: boolean;
+  markers: Array<"已缓存" | "书签" | "更新">;
 }
 ```
 
@@ -74,6 +73,7 @@ interface BookDetailChapterInput {
 - 不新增账号、社区、广告、会员或推荐流。
 - 不把简介放到章节预览上方。
 - 不把章节预览缩成 3 到 4 条固定列表。
+- 章节预览不得显示 `已读`、`未读` 等阅读状态，只能显示缓存、书签、更新等目录标记。
 - 换源底表关闭后应回到书籍详情当前滚动位置。
 - 图片缺失数必须为 0。
 - 真实 DOM 必须包含完整 `LibraryShell` slots。

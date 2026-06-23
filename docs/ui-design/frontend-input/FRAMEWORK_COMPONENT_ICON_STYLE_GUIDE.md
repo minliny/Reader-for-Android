@@ -34,7 +34,7 @@
 | --- | --- | --- | --- | --- |
 | 主标签页框架 | MainTabShell | 书架、发现、RSS、设置（Bookshelf, Discover, RSS, Settings） | 手机画布、状态栏、顶部栏、内容区、底部四栏导航、状态容器（App frame, status bar, top bar, content region, bottom navigation, state host） | 当前 Tab、页面标题、搜索入口、列表/卡片内容、状态内容（active tab, title, search entry, page content, state content） |
 | 书架链路框架 | LibraryShell | 书架空状态、书籍搜索、书籍详情、书籍目录、排序筛选、书籍操作底表、分组管理、本地书导入（library empty, book search, book detail, directory, sort/filter, action sheet, group management, local import） | 返回顶栏、内容区、底部操作区、底表宿主、弹窗宿主、状态容器（back top bar, content region, bottom action host, sheet host, dialog host, state host） | 书籍上下文、搜索控件、章节列表、分组列表、导入流程、底表内容（book context, search controls, chapter list, group list, import flow, sheet content） |
-| 阅读器框架 | ReaderShell | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读（reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, in-book search, replacement, entry, immersive reading） | 阅读正文底层、阅读覆盖层、模块导航、底表宿主、阅读状态容器（reading surface, overlay host, module navigation, bottom sheet host, reader state host） | 当前模块面板、正文内容、搜索/替换/自动翻页业务内容（module panel, reading text, search/replacement/auto-page content） |
+| 阅读器框架 | ReaderShell | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读（reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, in-book search, replacement, immersive reading） | 阅读正文底层、阅读覆盖层、模块导航、底表宿主、阅读状态容器（reading surface, overlay host, module navigation, bottom sheet host, reader state host） | 当前模块面板、正文内容、搜索/替换/自动翻页业务内容（module panel, reading text, search/replacement/auto-page content） |
 | 设置页框架 | SettingsShell | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理（general settings, bookshelf/search settings, privacy/permissions, cache, about/feedback, sync/backup, source management） | 返回顶栏、设置内容区、设置分组、提示宿主、弹窗宿主、状态容器（back top bar, settings content, setting sections, toast host, dialog host, state host） | 设置组、权限状态、缓存数据、备份记录、书源列表（setting groups, permission state, cache data, backup records, source list） |
 | 横向流程框架 | FlowShell | 换源（source switching） | 横向画布、步骤区、对照区、结果区、状态区（landscape frame, step region, comparison region, result region, state host） | 来源候选、检测状态、切换结果（source candidates, detection state, switch result） |
 
@@ -60,7 +60,7 @@
 | 控件 | 主按钮 | PrimaryActionButton | 导入、搜索、开始阅读、开始自动翻页。 |
 | 控件 | 次按钮 | SecondaryActionButton / TextActionButton | 取消、管理、换个分组等低权重动作。 |
 | 卡片与行 | 书籍封面 | BookCover | 只有书封允许使用位图，其他 UI 必须可编辑。 |
-| 卡片与行 | 书籍卡片 | BookCard | 书架封面网格、阅读入口复用。 |
+| 卡片与行 | 书籍卡片 | BookCard | 书架封面网格、详情和阅读打开动作复用。 |
 | 卡片与行 | 书籍列表行 | BookRow | 书架列表、搜索结果、书源结果复用。 |
 | 卡片与行 | 章节行 | ChapterRow / CurrentChapterRow | 完整目录、章节预览、阅读目录面板复用。 |
 | 卡片与行 | 设置分组卡 | SettingGroupCard | 设置二级页和阅读设置复用。 |
@@ -96,6 +96,7 @@
 | 右侧亮度栏 | Brightness Rail | 组件化（Componentized） | 亮度标题、太阳图标、纵向滑杆、系统按钮。 |
 | 模块导航 | Reader Module Navigation | 组件化（Componentized） | 四项固定：目录、朗读、界面、设置（TOC, TTS, Appearance, Settings）。 |
 | 快捷操作 | Quick Actions | 组件化（Componentized） | 三项固定：搜索、自动翻页、替换（Search, Auto Page, Replacement）。 |
+| 主题色块 | Theme Swatch | 非图标控件（Non-icon Control） | 色块只表达阅读背景 / 文字对比和选中态；不得在色块内放 check、moon、leaf、text 或其他图标。 |
 
 四个模块按钮交互（Four module button interaction）：
 
@@ -105,6 +106,7 @@
 - 按钮尺寸不变（button size stays fixed）。
 - 按钮间距不变（spacing stays fixed）。
 - 相对位置不变（relative position stays stable）。
+- 重复点击当前 active 模块关闭模块面板并回到默认阅读控制层（re-clicking the active module closes the panel and returns to the default reader control layer）。
 
 ## 图标体系（Icon System）
 
@@ -225,7 +227,7 @@
 | 主标签页 | 书架、发现、RSS、设置 | Bookshelf, Discover, RSS, Settings | 主标签页框架（MainTabShell） | 蓝色编辑风（BlueEditorial） |
 | 书架链路 | 书架空状态、书籍搜索、书籍详情、书籍目录、本地书导入 | Library empty, book search, book detail, directory, local import | 书架链路框架（LibraryShell） | 蓝色编辑风（BlueEditorial） |
 | 书架工具流 | 书籍操作底表、排序筛选、分组管理 | Book action sheet, sort/filter, group management | 书架链路框架（LibraryShell） | 森林工具风（ForestUtility） |
-| 阅读链路 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 | Reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, search, replacement, entry, immersive reading | 阅读器框架（ReaderShell） | 阅读器风（Reader） |
+| 阅读链路 | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读 | Reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, search, replacement, immersive reading | 阅读器框架（ReaderShell） | 阅读器风（Reader） |
 | 换源流程 | 换源 | Source switching | 横向流程框架（FlowShell） | 阅读器流程风（Reader + Flow） |
 | 设置链路 | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理 | General settings, bookshelf/search settings, privacy/permissions, cache, about/feedback, sync/backup, source management | 设置页框架（SettingsShell） | 蓝色编辑风设置变体（BlueEditorial Settings Variant） |
 
@@ -237,7 +239,7 @@
 | P1 | 稳定主标签页框架 | Stabilize MainTabShell | 四个主 Tab 使用同一底部导航和内容 slot。 |
 | P1 | 稳定设置页框架 | Stabilize SettingsShell | 七个设置页使用同一 SettingsShell。 |
 | P2 | 抽书架链路框架 | Extract LibraryShell | 书籍详情、目录、操作底表先共享 book context、SheetHost、DialogHost。 |
-| P2 | 抽阅读器框架 | Extract ReaderShell | `shared-shell-kit` 已建立 ReaderShell，旧阅读控制层、目录与书签、外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已迁移。 |
+| P2 | 抽阅读器框架 | Extract ReaderShell | `shared-shell-kit` 已建立 ReaderShell，旧阅读控制层、目录与书签、外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读 9 页已迁移。 |
 | P3 | 固化图标库 | Stabilize icon library | 所有页面引用语义图标，不保留不可复用 inline icon。 |
 | P3 | 固化横向换源 | Stabilize FlowShell | `shared-shell-kit` 已建立 FlowShell，换源页面已迁入中心化 FlowShell；不得塞进普通竖屏 ReaderShell。 |
 

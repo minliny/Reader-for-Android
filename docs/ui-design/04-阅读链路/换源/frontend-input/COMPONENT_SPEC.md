@@ -7,7 +7,8 @@
 - 默认画布：`1690 x 931`
 - Shell：`ReaderShellKit.renderFlowShell(...)`
 - Slots：`flowFrame`、`stepRegion`、`comparisonRegion`、`resultRegion`、`stateHost`
-- StateHost：必须渲染 `FlowShell StateHost`，展示流程阶段、来源数量、筛选数量、来源切换方向和阅读位置保留结果。
+- Layer Model：换源窗口是阅读控制层上的同层弹窗，不是覆盖页；顶部阅读栏、底部控制面板、亮度栏和四模块导航必须在换源打开时保持可操作。
+- StateHost：在当前手机 demo 中不展示底部流程摘要；状态摘要只保留在横向审计输入件，不进入阅读中的换源窗口。
 
 ## Fixture
 
@@ -72,6 +73,7 @@ interface SourceSwitchFixture {
 - 预览必须保持 `1690 x 931` 横向流程画布。
 - 状态矩阵必须包含 6 张状态卡。
 - 预览和状态矩阵必须由 `ReaderShellKit` 输出统一 `FlowShell`，不能再复制独立横向 frame。
-- `stateHost` 必须有真实内容，不能只保留空 slot。
+- 手机 demo 的换源窗口不得使用全屏遮罩、暗色聚焦层或 `pointer-events: none` 禁用阅读控制层。
+- 换源窗口打开后，用户必须能直接点击顶部阅读栏、底部控制面板和四模块导航；不需要先关闭换源窗口。
 - 页面图标必须来自 `asset-library/icons.js`，不能保留页面级内联 SVG。
 - 切换成功必须返回阅读页并保留阅读位置。

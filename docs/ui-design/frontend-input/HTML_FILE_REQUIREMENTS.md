@@ -22,7 +22,7 @@
 | 前端 Demo 设计稿（Frontend Demo Draft Page） | 1 | 是（Yes） | `frontend-input/frontend-demo-draft/index.html` 是统一 shell 拼装的开发参考稿。 |
 | 历史临时预览页（Legacy Preview Candidate） | 2 | 否（No） | `preview 2.html` 是历史临时文件，不进入 manifest，不作为真实前端输入件。 |
 | 历史独立复刻页（Legacy Standalone Reproduction Page） | 3 | 否（No） | 早期独立 HTML 复刻页，仅作历史参考，不进入 manifest。 |
-| 全部本地 HTML（All Local HTML） | 99 | 混合（Mixed） | 96 个 `frontend-input` 范围 HTML（90 个正式页面 HTML + 2 个历史临时预览页 + 4 个公共库/示例 HTML）+ 3 个历史独立复刻页。 |
+| 全部本地 HTML（All Local HTML） | 97 | 混合（Mixed） | 94 个 `frontend-input` 范围 HTML（87 个正式页面 HTML + 2 个历史临时预览页 + 4 个公共库/示例 HTML + 1 个人工审视 demo）+ 3 个历史独立复刻页。 |
 
 ## 页面组分布（Page Group Distribution）
 
@@ -161,14 +161,14 @@
 5. 同一页面不得出现多个互相竞争的正式预览页；`preview 2.html` 这类临时文件不得作为输入件。
 6. 共享 shell 已存在时，HTML 必须先加载共享 kit，再加载 fixture 和 renderer。
 7. 页面文档必须说明使用哪个页面框架（Page Shell）和哪些组件类别。
-8. manifest 正式目标集合必须保持 64 个目标：30 个页面预览、30 个状态矩阵和 4 个公共库/示例目标；不得加入 `preview 2.html` 或 `components.html`。
+8. manifest 正式目标集合必须保持 62 个目标：29 个页面预览、29 个状态矩阵和 4 个公共库/示例目标；不得加入 `preview 2.html` 或 `components.html`。
 
 ## 验证要求（Validation Requirements）
 
 - 全量渲染验证（Full Render Validation）：运行 `validate-frontend-inputs.js`，覆盖 manifest 中的 preview、state matrix、组件库、共享 Shell Kit、素材库和前端 demo 设计稿。
-- 组件参考烟测（Component Reference Smoke Test）：`validate-frontend-inputs.js` 批量打开 30 个 `components.html`，确认它们是独立 HTML 文档、无 console error、无 failed request、无缺失图片。
+- 组件参考烟测（Component Reference Smoke Test）：`validate-frontend-inputs.js` 批量打开 29 个 `components.html`，确认它们是独立 HTML 文档、无 console error、无 failed request、无缺失图片。
 - 文档一致性检查（Documentation Consistency Check）：检查 README、COMPONENT_SPEC、路线图和架构文档是否使用一致的 `中文名称（English Name）`。
 - 例外清单检查（Exception List Check）：确认 `preview 2.html` 不在 manifest 中，也没有被文档标记为正式输入件。
-- 本地 HTML 库存检查（Local HTML Inventory Check）：运行 `FrontendInputHtmlInventoryTest`，确认 99 个本地 HTML、96 个 `frontend-input` 范围 HTML、30 个预览页、30 个状态矩阵、30 个组件参考页、2 个 `preview 2.html` 和 3 个历史独立复刻页的角色分类一致。
+- 本地 HTML 库存检查（Local HTML Inventory Check）：运行 `FrontendInputHtmlInventoryTest`，确认 97 个本地 HTML、94 个 `frontend-input` 范围 HTML、29 个预览页、29 个状态矩阵、29 个组件参考页、2 个 `preview 2.html`、4 个公共库/示例页、1 个人工审视 demo 和 3 个历史独立复刻页的角色分类一致。
 - Manifest 目标集合检查（Manifest Target Set Check）：运行 `FrontendInputComposeCoverageTest`，确认 manifest 只包含正式页面预览、状态矩阵和公共库/示例目标，并且每个 target 的 `shellName/pageRole/slots` 与正式 shell taxonomy 完全一致。
-- 验证报告同步检查（Validation Report Sync Check）：运行 `FrontendInputComposeCoverageTest`，确认 `frontend-input-design-draft-validation.json` 已通过、无失败数组，并且报告中的 64 个正式目标和 30 个组件参考页与当前 manifest/UI 设计图目录一致。
+- 验证报告同步检查（Validation Report Sync Check）：运行 `FrontendInputComposeCoverageTest`，确认 `frontend-input-design-draft-validation.json` 已通过、无失败数组，并且报告中的 62 个正式目标和 29 个组件参考页与当前 manifest/UI 设计图目录一致。

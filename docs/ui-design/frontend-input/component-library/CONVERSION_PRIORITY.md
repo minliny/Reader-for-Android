@@ -1,6 +1,6 @@
 # UI 设计图转前端设计稿优先级
 
-当前共有 30 张 `UI设计图.png`，其中 30 页已完成 `frontend-input/` 输入件并进入总 `manifest.json`：
+当前共有 29 张 `UI设计图.png`，其中 29 页已完成 `frontend-input/` 输入件并进入总 `manifest.json`：
 
 - `02-主标签页/书架`
 - `02-主标签页/发现`
@@ -22,7 +22,6 @@
 - `04-阅读链路/自动翻页`
 - `04-阅读链路/内容搜索`
 - `04-阅读链路/内容替换`
-- `04-阅读链路/阅读入口`
 - `04-阅读链路/沉浸阅读`
 - `04-阅读链路/换源`
 - `05-设置链路/App通用设置`
@@ -69,10 +68,9 @@
 18. `04-阅读链路/自动翻页`：已完成。提供 `SpeedSlider`、`StartButton`、`StopButton`，复用 `RunningCapsule`、`Switch`、`SettingRow`，并覆盖 default、running、paused、error 四种状态。
 19. `04-阅读链路/内容搜索`：已完成。提供 `SearchInput`、`ResultRow`、`EmptySearchState`、`KeyboardAvoidance`，并覆盖 default、loading、empty、error、offline 五种状态。
 20. `04-阅读链路/内容替换`：已完成。提供 `TextField`、`ReplacementRuleRow`、`PatternInput`、`SaveButton`，复用 `SearchInput`、`SettingRow`、`Switch`、`PreviewCard`、`BottomActionBar`，并覆盖 default、edit、empty、loading、error 五种状态。
-21. `04-阅读链路/阅读入口`：已完成。提供 `StartReadingButton`、`ContinueReadingButton`、`OpenLoadingState`、`RepairEntry`，复用 `BookCard`、`BookDetailHeader`、`SearchResultItem`、`PrimaryActionButton`、`ErrorGuidance`，并覆盖 default、loading、error、offline 四种状态。
-22. `04-阅读链路/沉浸阅读`：已完成。提供 `ReadingParagraph`、`WeakInfoText`、`ProgressInfo`、`TapZone`，复用阅读外观主题、阅读设置屏幕/翻页配置和阅读控制层交互规则，并覆盖 default、loading、error、offline 四种状态。
-23. `04-阅读链路/换源`：已完成。提供 `SourceCandidateRow`、`CurrentSourceBadge`、`DetectStatusBadge`、`SwitchSourceButton`，复用 `SourceStatusBar`、`SearchField`、`FilterChip`、`LoadingState`、`ErrorState`，并覆盖 default、loading、empty、error、offline、permission 六种状态。
-24. `05-设置链路/App通用设置`：已完成。提供 `SelectRow`、`OptionSheet`、`SettingsToast`，复用 `SettingGroupCard`、`SettingRow`、`Switch`、`ConfirmDialog`、`LoadingState`、`ErrorState`，并覆盖 default、option_sheet、loading、error、permission 五种状态。
+21. `04-阅读链路/沉浸阅读`：已完成。提供 `ReadingParagraph`、`WeakInfoText`、`ProgressInfo`、`TapZone`、`OpenLoadingState`、`ReadingRepairAction`，复用阅读外观主题、阅读设置屏幕/翻页配置和阅读控制层交互规则，并覆盖 default、loading、error、offline 四种状态。
+22. `04-阅读链路/换源`：已完成。提供 `SourceCandidateRow`、`CurrentSourceBadge`、`DetectStatusBadge`、`SwitchSourceButton`，复用 `SourceStatusBar`、`SearchField`、`FilterChip`、`LoadingState`、`ErrorState`，并覆盖 default、loading、empty、error、offline、permission 六种状态。
+23. `05-设置链路/App通用设置`：已完成。提供 `SelectRow`、`OptionSheet`、`SettingsToast`，复用 `SettingGroupCard`、`SettingRow`、`Switch`、`ConfirmDialog`、`LoadingState`、`ErrorState`，并覆盖 default、option_sheet、loading、error、permission 五种状态。
 
 ## P1：主导航闭环与搜索入口
 
@@ -84,13 +82,13 @@
 
 ## P3：阅读链路面板体系
 
-已完成。阅读链路已经覆盖控制层四按钮、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读和换源。`换源` 的横向画布补齐了来源检测、失效说明、来源切换和返回阅读页的闭环，`书源管理` 已复用候选源行和检测状态语义。
+已完成。阅读链路已经覆盖控制层四按钮、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读和换源；打开、失败、离线状态并入沉浸阅读的 ReaderStateHost。`换源` 的横向画布补齐了来源检测、失效说明、来源切换和返回阅读页的闭环，`书源管理` 已复用候选源行和检测状态语义。
 
 ## P4：设置链路批量补齐
 
 已完成。设置链路已经覆盖通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份和书源管理；危险操作、权限说明、缓存占用、备份记录、书源编辑与错误日志均已沉淀到公共组件库。
 
-25. `05-设置链路/书架与搜索设置`：已完成。
+24. `05-设置链路/书架与搜索设置`：已完成。
     - 目的：把书架展示、搜索范围、结果排序和搜索历史规则接入设置体系。
     - 复用：`SettingGroupCard`、`SegmentControl`、`Switch`、`ConfirmDialog`、P2 书架筛选组件。
     - 新增：`SelectRow` 的设置页变体、`DangerActionRow`。

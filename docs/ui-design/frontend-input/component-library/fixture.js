@@ -527,7 +527,7 @@ window.READER_COMPONENT_LIBRARY_FIXTURE = {
       saveLabel: "保存"
     }
   },
-  readingEntry: {
+  readerOpenState: {
     source: "从书架继续阅读",
     context: "长篇追读 · 保留滚动位置和筛选条件",
     continueLabel: "继续阅读",

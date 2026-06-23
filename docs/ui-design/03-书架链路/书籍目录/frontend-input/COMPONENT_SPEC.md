@@ -26,14 +26,13 @@ interface BookDirectorySummaryInput {
 
 interface BookDirectoryCurrentChapterInput {
   title: string;
-  status: "当前阅读";
+  label: "当前阅读";
   progress: number;
 }
 
 interface ChapterRowInput {
   title: string;
-  status: "未读" | "已读";
-  isNew: boolean;
+  markers: Array<"已缓存" | "书签" | "更新">;
 }
 ```
 
@@ -64,5 +63,6 @@ interface ChapterRowInput {
 - 不在本页生成换源入口。
 - 不在章节列表上方生成筛选 chip 行。
 - 当前阅读章节不使用独立左侧图标。
+- 普通章节行不得显示 `已读`、`未读`、`当前` 等阅读状态，只能显示缓存、书签、更新等目录标记。
 - `ChapterRow` 必须可被阅读链路 `目录与书签` 复用。
 - 真实 DOM 必须包含完整 `LibraryShell` slots。

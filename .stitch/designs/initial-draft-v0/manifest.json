@@ -1,0 +1,176 @@
+{
+  "manifestVersion": 2,
+  "packageName": "Stitch Initial Draft v0",
+  "projectId": "9736408155228191581",
+  "projectIdStatus": "CONFIRMED_CURRENT_SOURCE_PROJECT",
+  "historicalProjectIds": [
+    {
+      "projectId": "14245818599411324705",
+      "status": "NOT_FOUND",
+      "note": "Historical repository record only; not used by this package"
+    }
+  ],
+  "designSystem": "assets/f36ba8a7f5ff4426af38c126670526ed",
+  "expectedScreenCount": 13,
+  "presentFileCount": 13,
+  "generatedAt": "2026-06-12T16:19:22+08:00",
+  "packageStatus": "CORRECTION_P0_STILL_BLOCKED",
+  "screens": [
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "a2b252a266144be19cd1b202d0f9c4e3",
+      "screenName": "书架",
+      "theme": "LIGHT",
+      "sourceFile": "bookshelf.png",
+      "sha256": "7dedc7bfd495412b859f4a06b4da0815a2c7f33f18c6b4815c116d96094c18ae",
+      "exportedAt": "2026-06-12T14:24:49+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/a2b252a266144be19cd1b202d0f9c4e3; screenshot resource projects/9736408155228191581/files/420ee9536c1c4b99baf56986dc4c6f1e; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "e31438e72ad1411dbfe15b2f80dc8db4",
+      "screenName": "书籍详情",
+      "theme": "LIGHT",
+      "sourceFile": "book-detail.png",
+      "sha256": "38d98ce1ffc22a44ae345ea8264b5196bef13c09cd1806e75e1603893b9909eb",
+      "exportedAt": "2026-06-12T14:24:49+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/e31438e72ad1411dbfe15b2f80dc8db4; screenshot resource projects/9736408155228191581/files/73264aeabeca4d8692013137df852acc; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "3a45904c1939456e8997b172216b4f30",
+      "screenName": "阅读沉浸页",
+      "theme": "LIGHT",
+      "sourceFile": "reader-light.png",
+      "sha256": "7b25143d5f3a0ed3330153262d284211d83328b3594ca7a430cf23d92b4b1664",
+      "exportedAt": "2026-06-12T16:11:55+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/3a45904c1939456e8997b172216b4f30; screenshot resource projects/9736408155228191581/files/ab4f525218764dc99e64d761b6d0a33c; fixed 390x884 viewport and bottom safe area; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P1_PASS_PENDING_TARGETED_REVIEW"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "68860c69b4b1496a8b1e7183ad755ddc",
+      "screenName": "搜索弹层",
+      "theme": "LIGHT",
+      "sourceFile": "reader-search-overlay.png",
+      "sha256": "81727718c2ea6dc31a3116ae7cdf475deaad8ae542a2ba38510abfa166c7a91c",
+      "exportedAt": "2026-06-12T16:09:41+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/68860c69b4b1496a8b1e7183ad755ddc; screenshot resource projects/9736408155228191581/files/c78aa950e13548f6959c62721b7461e8; device frame removed and shared overlay shell applied; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P1_PASS_PENDING_TARGETED_REVIEW"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "c7904f020bd0413ba6445a26865d5fed",
+      "screenName": "自动翻页弹层",
+      "theme": "LIGHT",
+      "sourceFile": "reader-auto-page-overlay.png",
+      "sha256": "97ff097bf7b472eb2b9f3915618e6d9d5932a7e789bb95b77b162e7d08767e2a",
+      "exportedAt": "2026-06-12T16:09:41+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/c7904f020bd0413ba6445a26865d5fed; screenshot resource projects/9736408155228191581/files/6628513c160940b3bdaebc493fdd5541; shared overlay shell and control language applied; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P1_PASS_PENDING_TARGETED_REVIEW"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "0faf5641d4f1434a8010fc98c85a31f9",
+      "screenName": "目录/书签弹层",
+      "theme": "LIGHT",
+      "sourceFile": "reader-toc-bookmark-overlay.png",
+      "sha256": "237635be21c48fe4af68f9d47328c74d39cf3b46062529c6944ab1c198759ec3",
+      "exportedAt": "2026-06-12T16:11:55+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/0faf5641d4f1434a8010fc98c85a31f9; screenshot resource projects/9736408155228191581/files/a60cc18b69fe4790b95314be2e59c81f; shared overlay shell, search/menu/progress summary and current-reading state applied; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P1_PASS_PENDING_TARGETED_REVIEW"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "7d361bb7d9454516ad8fee6c4ce93ee2",
+      "screenName": "书源管理",
+      "theme": "LIGHT",
+      "sourceFile": "source-management.png",
+      "sha256": "cfe64bbce2570db0580d7f5ad27dcceb6c586f6a886960a70f40213c007af915",
+      "exportedAt": "2026-06-12T14:36:39+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/7d361bb7d9454516ad8fee6c4ce93ee2; screenshot resource projects/9736408155228191581/files/b6121b321b3648d58a32c9384e754682; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "59326435f2a24c308033cfd75b11c1c1",
+      "screenName": "设置",
+      "theme": "LIGHT",
+      "sourceFile": "settings.png",
+      "sha256": "84ee63cb948802e12f897c11b80433619d09d3c7afc63273c67e2f541d081421",
+      "exportedAt": "2026-06-12T14:24:49+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/59326435f2a24c308033cfd75b11c1c1; screenshot resource projects/9736408155228191581/files/d653b74f69324dd3b3ddc69d9a7436e7; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "b64b1b3bc3804fec8a6247a947625d1d",
+      "screenName": "发现",
+      "theme": "LIGHT",
+      "sourceFile": "discovery.png",
+      "sha256": "3a3f2cc9531bbdbd50e9e35e456f8832c03e63912ff1952988d589ae8dd7b66b",
+      "exportedAt": "2026-06-12T14:24:49+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/b64b1b3bc3804fec8a6247a947625d1d; screenshot resource projects/9736408155228191581/files/84e2c3480b4a475997b2327fe4820b87; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "66eadd62c01a433ebf993c0f22f5d55d",
+      "screenName": "RSS",
+      "theme": "LIGHT",
+      "sourceFile": "rss.png",
+      "sha256": "559b441d32e163e5fcbb0b4fe7486f952459196a9449e7e8864aa1bbd515794b",
+      "exportedAt": "2026-06-12T14:30:30+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/66eadd62c01a433ebf993c0f22f5d55d; screenshot resource projects/9736408155228191581/files/22396f9182aa438098a5bdfea67ceaa2; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "6a976181229246d4a627763255b9dd1e",
+      "screenName": "49/50 派生状态",
+      "theme": "LIGHT",
+      "sourceFile": "derived-states.png",
+      "sha256": "cf8430288ec03e05d2637d0636899789ef077e3e8d2dab8ff09b1c7cc30062cc",
+      "exportedAt": "2026-06-12T16:10:45+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/6a976181229246d4a627763255b9dd1e; screenshot resource projects/9736408155228191581/files/f70840f9ccc8447bb5daebfb3881cf1a; Chinese loading/empty/error template with DERIVED_NOT_FINAL retained; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P0_PASS_PENDING_TARGETED_REVIEW"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "0876ce1490344fec8896a4d5ff074961",
+      "screenName": "DARK 初稿",
+      "theme": "DARK_LEGACY_COOL",
+      "sourceFile": "reader-dark-initial.png",
+      "sha256": "9e64ef80b9829256fc43af06955761582c5709ad9b94e2deb0fea2899e11e3d3",
+      "exportedAt": "2026-06-12T14:36:39+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch API screen projects/9736408155228191581/screens/0876ce1490344fec8896a4d5ff074961; screenshot resource projects/9736408155228191581/files/d0b1b730036146daabefb7a1894d6674; downloaded from screenshot.downloadUrl",
+      "auditStatus": "READY_FOR_VISUAL_AUDIT"
+    },
+    {
+      "projectId": "9736408155228191581",
+      "screenId": "dd9ee5a988a944098434f0eb81780798",
+      "screenName": "DARK token 修订稿",
+      "theme": "DARK_TOKEN_WARM",
+      "sourceFile": "reader-dark-token-v0.png",
+      "sha256": "8df3d0f2ab5e1994e38607cf2ece4213c75fcb7dc3787efba694257bd8334cc2",
+      "exportedAt": "2026-06-12T16:17:42+08:00",
+      "stitchUrl": null,
+      "sourceNote": "Stitch correction screen projects/9736408155228191581/screens/dd9ee5a988a944098434f0eb81780798; screenshot resource projects/9736408155228191581/files/97d16f371a8441cd86d1f342639cb7f5; fixed 390x884 viewport, exact source paragraphs and isolated footer; exported screenshot still differs from DARK initial in visible density/title alignment; downloaded from screenshot.downloadUrl",
+      "auditStatus": "CORRECTION_P0_STILL_BLOCKED"
+    }
+  ]
+}

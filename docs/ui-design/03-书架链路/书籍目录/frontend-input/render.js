@@ -56,17 +56,22 @@
       <button class="dr-current-row" type="button" aria-label="当前阅读章节">
         <span>
           <strong>${esc(current.title)}</strong>
-          <small>${esc(current.status)}</small>
+          <small>${esc(current.label || "当前阅读")}</small>
         </span>
         <em>${esc(current.progress)}%</em>
       </button>`;
   }
 
+  function chapterMarkers(chapter) {
+    return Array.isArray(chapter.markers) ? chapter.markers.filter(Boolean) : [];
+  }
+
   function chapterRow(chapter) {
+    const markers = chapterMarkers(chapter);
     return `
       <button class="dr-chapter-row" type="button">
-        <span>${esc(chapter.title)}${chapter.isNew ? '<em>新</em>' : ""}</span>
-        <strong>${esc(chapter.status)}</strong>
+        <span>${esc(chapter.title)}</span>
+        ${markers.length ? `<strong>${markers.map((marker) => `<em>${esc(marker)}</em>`).join("")}</strong>` : ""}
       </button>`;
   }
 

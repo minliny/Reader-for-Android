@@ -1,12 +1,14 @@
+@import "../tokens.css";
+
 :root {
-  --asset-bg: #f7f3ed;
-  --asset-panel: #fffaf4;
+  --asset-bg: var(--reader-ds-color-paper);
+  --asset-panel: var(--reader-ds-color-paper-bright);
   --asset-panel-strong: #ffffff;
-  --asset-ink: #17130f;
-  --asset-muted: #756f69;
-  --asset-line: rgba(88, 73, 56, .16);
-  --asset-primary: #2379a4;
-  --asset-accent: #d96f14;
+  --asset-ink: var(--reader-ds-color-ink);
+  --asset-muted: var(--reader-ds-color-muted);
+  --asset-line: var(--reader-ds-color-border);
+  --asset-primary: var(--reader-ds-color-primary);
+  --asset-accent: var(--reader-ds-color-accent);
   --asset-good: #277a48;
   --asset-danger: #b43d32;
   color: var(--asset-ink);

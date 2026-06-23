@@ -7,6 +7,7 @@
 - 事件名（Event Name）：以 `contracts.d.ts` 和页面 `COMPONENT_SPEC.md` 为准。
 - 回调名（Callback Name）：使用 `on` + 事件名首字母大写，例如 `queryChange` -> `onQueryChange`。
 - 参数（Parameters）：保留 `contracts.d.ts` 中 Event payload 的语义，不把 payload 压成无参点击。
+- 阅读模块事件（Reader Module Event）：`moduleChange(moduleType)` 同时承担打开模块、切换模块和重复点击当前模块关闭面板的入口；实现层必须结合当前 active 模块判断是进入、切换还是回到默认阅读控制层。
 - 边界（Boundary）：本表不要求当前阶段接入真实仓库、网络或持久化；真实业务数据和副作用仍按 `FRONTEND_MAPPING_GUIDE.md` 后续阶段处理。
 - 禁用（Do Not）：不要用一个泛化 `onClick`、`onAction` 或页面内匿名逻辑替代下列明确回调。
 
@@ -27,7 +28,6 @@
 | 分组管理（Group Management）<br>`GroupManagement` | `back`, `addGroupOpen`, `groupRenameOpen`, `groupDeleteOpen`, `groupReorder`, `dialogCancel`, `dialogSave`, `deleteConfirm`, `retry` | `onBack`, `onAddGroupOpen`, `onGroupRenameOpen`, `onGroupDeleteOpen`, `onGroupReorder`, `onDialogCancel`, `onDialogSave`, `onDeleteConfirm`, `onRetry` |
 | 本地书导入（Local Import）<br>`LocalImport` | `back`, `openSystemFilePicker`, `pickerCancelled`, `importProgress`, `resultRowOpen`, `chooseAgain`, `done`, `backToBookshelf` | `onBack`, `onOpenSystemFilePicker`, `onPickerCancelled`, `onImportProgress`, `onResultRowOpen`, `onChooseAgain`, `onDone`, `onBackToBookshelf` |
 | 阅读控制层（Reader Control Layer）<br>`ReaderControl` | `back`, `sourceChange`, `more`, `quickAction`, `chapterChange`, `progressChange`, `moduleChange`, `brightnessChange` | `onBack`, `onSourceChange`, `onMore`, `onQuickAction`, `onChapterChange`, `onProgressChange`, `onModuleChange`, `onBrightnessChange` |
-| 阅读入口（Reading Entry）<br>`ReadingEntry` | `backToSource`, `continueReading`, `startReading`, `openLoading`, `retryOpen`, `switchSource`, `continueCached` | `onBackToSource`, `onContinueReading`, `onStartReading`, `onOpenLoading`, `onRetryOpen`, `onSwitchSource`, `onContinueCached` |
 | 沉浸阅读（Immersive Reading）<br>`ImmersiveReading` | `tapPrevious`, `tapCenter`, `tapNext`, `retry`, `continueCached`, `backToSource` | `onTapPrevious`, `onTapCenter`, `onTapNext`, `onRetry`, `onContinueCached`, `onBackToSource` |
 | 目录与书签（TOC and Bookmarks）<br>`ReadingTocBookmark` | `back`, `sourceChange`, `moreOpen`, `tabChange`, `searchChange`, `openFullDirectory`, `openChapter`, `openBookmark`, `moreAction`, `moduleChange`, `brightnessChange`, `retry` | `onBack`, `onSourceChange`, `onMoreOpen`, `onTabChange`, `onSearchChange`, `onOpenFullDirectory`, `onOpenChapter`, `onOpenBookmark`, `onMoreAction`, `onModuleChange`, `onBrightnessChange`, `onRetry` |
 | 阅读外观（Reading Appearance）<br>`ReadingAppearance` | `back`, `sourceChange`, `fontSizeDecrease`, `fontSizeIncrease`, `lineSpacingChange`, `themeChange`, `fontChange`, `animationChange`, `editThemeOpen`, `resetAppearance`, `saveTheme`, `moduleChange`, `brightnessChange`, `retry` | `onBack`, `onSourceChange`, `onFontSizeDecrease`, `onFontSizeIncrease`, `onLineSpacingChange`, `onThemeChange`, `onFontChange`, `onAnimationChange`, `onEditThemeOpen`, `onResetAppearance`, `onSaveTheme`, `onModuleChange`, `onBrightnessChange`, `onRetry` |

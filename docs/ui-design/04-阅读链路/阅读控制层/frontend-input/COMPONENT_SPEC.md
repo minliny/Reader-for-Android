@@ -26,7 +26,7 @@
 
 ## Events
 
-- `back`：返回阅读入口。
+- `back`：返回沉浸阅读或来源页。
 - `sourceChange`：换源。
 - `more`：更多菜单。
 - `quickAction(type)`：快捷操作点击。

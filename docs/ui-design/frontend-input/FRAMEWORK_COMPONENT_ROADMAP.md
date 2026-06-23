@@ -2,7 +2,7 @@
 
 本文按统一格式 `中文名称（English Name）` 梳理当前已完成内容和后续规划。后续文档、组件规格、审计结论和实现说明都应沿用这个命名格式。
 
-完整框架、共享 kit、页面归属和组件化清单见 `FRAMEWORK_COMPONENT_CATALOG.md`。真实 Android Compose 接入顺序见 `FRONTEND_MAPPING_GUIDE.md`，主导航和图标专项清单见 `MAIN_NAV_RECONCILIATION.md`、`ICON_COMPOSE_MAPPING.md`。
+完整框架、共享 kit、页面归属和组件化清单见 `FRAMEWORK_COMPONENT_CATALOG.md`。当前项目规划需求见 `FRONTEND_PLANNING_REQUIREMENTS.md`，开工前规划需求模板见 `FRONTEND_PLANNING_REQUIREMENTS_TEMPLATE.md`，完整应用前端设计稿模板见 `FRONTEND_DESIGN_SPEC_TEMPLATE.md`，当前 29 页完成度审计见 `FRONTEND_DESIGN_COMPLETION_AUDIT.md`。页面结构和 UI 设计稿的 shell/slot 梳理见 `PAGE_STRUCTURE_MAP.md`，页面间关系和跨 shell 交互流向见 `PAGE_RELATIONSHIP_MAP.md`。真实 Android Compose 接入顺序见 `FRONTEND_MAPPING_GUIDE.md`，主导航和图标专项清单见 `MAIN_NAV_RECONCILIATION.md`、`ICON_COMPOSE_MAPPING.md`。
 
 ## 总原则（Overall Rule）
 
@@ -15,19 +15,20 @@
 
 | 中文名称（English Name） | 当前状态（Current Status） | 证据与说明（Evidence and Notes） |
 |---|---|---|
-| 前端输入件交付格式（Frontend Input Delivery Format） | 已完成（Completed） | 30 个页面都有输入包、fixture、renderer、preview、state matrix、README、组件规格和 manifest 目标。 |
+| 前端输入件交付格式（Frontend Input Delivery Format） | 已完成（Completed） | 29 个页面都有输入包、fixture、renderer、preview、state matrix、README、组件规格和 manifest 目标。 |
 | 框架元数据契约（Shell Metadata Contract） | 已完成（Completed） | `contracts.d.ts`、`manifest.json` 和 `validate-frontend-inputs.js` 已覆盖 `shellName`、`pageRole`、`slots`、`stateModel`；`FrontendInputComposeCoverageTest` 守住正式 shell taxonomy 和目标数量，`ReaderSharedComponentsStructureTest` 守住五个 runtime shell 到 Compose 骨架、slot 和 preview 的锚点。 |
 | 设置页框架（SettingsShell） | 已完成（Completed） | 7 个设置二级页已通过 `SettingsPageKit` 输出统一设置页结构和真实 DOM slots。 |
 | 主标签页框架（MainTabShell） | 已完成第一版（First Version Completed） | 书架、发现、RSS、设置 4 个主标签页已通过 `MainTabPageKit` 输出统一主标签结构；Compose 侧已补四个主标签页状态矩阵。 |
 | 书架链路框架（LibraryShell） | 已完成（Completed） | 8 个书架链路页面已通过 `LibraryPageKit` 输出统一 `StackFrame / BackTopBar / ContentRegion / BottomActionHost / SheetHost / DialogHost / StateHost`。 |
 | 主导航交互规则（Main Navigation Interaction Rule） | 已完成并已校验（Completed and Validated） | 四个按钮固定为书架、发现、RSS、设置；选中态只改变背景、图标颜色和文字颜色，不改变位置。 |
-| 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理并守卫（Documented and Guarded） | 99 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层，并由 `FrontendInputHtmlInventoryTest` 守住库存分类和 manifest 排除规则。 |
+| 本地 HTML 文件要求（Local HTML File Requirements） | 已梳理并守卫（Documented and Guarded） | 96 个本地 HTML 已按预览页、状态矩阵页、组件拆分页、组件库预览页、共享 Shell Kit 预览页、素材库预览页和历史临时预览分层，并由 `FrontendInputHtmlInventoryTest` 守住库存分类和 manifest 排除规则。 |
 | 框架与组件总目录（Framework and Component Catalog） | 已梳理（Documented） | `FRAMEWORK_COMPONENT_CATALOG.md` 已按 Shell、共享 kit、页面归属、组件类别和固定交互规则整理。 |
 | 公共组件库（Component Library） | 已覆盖并守卫当前输入件（Covered and Guarded for Current Inputs） | 当前公共库已经覆盖本轮已转化页面需要的框架组件和高复用组件；49 个组件卡、6 个 section、fixture 图标 token、manifest 和验证报告由 `FrontendInputComponentLibraryInventoryTest` 守住，核心语义组件及五个 runtime shell 的 Compose 实现锚点由 `ReaderSharedComponentsStructureTest` 守住。 |
-| 公共素材库（Asset Library） | 已完成第一版并守卫（First Version Completed and Guarded） | `asset-library` 已登记 30 张 UI 设计图、6 张封面素材和 79 个统一图标 token，并由 `FrontendInputAssetLibraryInventoryTest` 守住 fixture、图标注册表、manifest 和验证报告同步。 |
-| 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读 10 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
+| 公共素材库（Asset Library） | 已完成第一版并守卫（First Version Completed and Guarded） | `asset-library` 已登记 29 张 UI 设计图、6 张封面素材和 79 个统一图标 token，并由 `FrontendInputAssetLibraryInventoryTest` 守住 fixture、图标注册表、manifest 和验证报告同步。 |
+| 设计 Token 契约（Design Token Contract） | 已完成首版并守卫（First Version Completed and Guarded） | `design-tokens.json` 定义 70 个 token，`tokens.css` 负责 HTML 变量落地，覆盖颜色、基础间距、frame、安全区、shell 尺寸、z-index、文本范围、字号、圆角、阴影和 focus；`ReaderDesignTokenContractTest` 追溯 Compose theme 源文件，`validate-frontend-inputs.js` 校验运行时关键 CSS 变量。 |
+| 阅读器框架（ReaderShell） | 已完成（Completed） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读 9 页已接入 `ReaderShellKit`，并通过 DOM slot 校验。 |
 | 横向流程框架（FlowShell） | 已完成并守卫（Completed and Guarded） | 换源页面已通过 `ReaderShellKit.renderFlowShell(...)` 输出 `FlowFrame / StepRegion / ComparisonRegion / ResultRegion / StateHost`，并通过 DOM slot 校验；`FlowShell StateHost` 已固化为非空状态摘要，由 `FrontendInputFlowShellInventoryTest` 守住输入包、manifest、验证报告、文档和 Compose preview 锚点同步。 |
-| Compose 覆盖守卫（Compose Coverage Guard） | 已建立（Established） | `FrontendInputComposeCoverageTest` 已覆盖 30 张 UI 设计图、30 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态；`ReaderSharedComponentsStructureTest` 已覆盖 runtime shell taxonomy 到 Compose 骨架/slot/preview 锚点。 |
+| Compose 覆盖守卫（Compose Coverage Guard） | 已建立并扩展（Established and Extended） | `FrontendInputComposeCoverageTest` 已覆盖 29 张 UI 设计图、29 个输入包、spec 状态声明、manifest preview/state-matrix 目标、shell taxonomy、验证报告同步、Compose 源码落点和 preview 状态；`ReaderSharedComponentsStructureTest` 已覆盖 runtime shell taxonomy 到 Compose 骨架/slot/preview 锚点；`ReaderShellComposeUiTest` 已作为首个 androidTest UI test 编译通过。 |
 
 ## 页面框架（Page Shells）
 
@@ -37,7 +38,7 @@
 | 主标签页框架（MainTabShell） | 书架、发现、RSS、设置（Bookshelf, Discover, RSS, Settings） | 手机画布、状态栏、顶部栏、内容区、底部四栏导航、状态容器（App frame, status bar, top bar, content region, bottom navigation, state host） | 已完成（Completed） |
 | 设置页框架（SettingsShell） | App 通用设置、书架与搜索设置、隐私与权限、缓存管理、关于与反馈、同步与备份、书源管理（General settings, bookshelf/search settings, privacy/permissions, cache, about/feedback, sync/backup, source management） | 返回顶栏、设置内容区、设置分组、提示宿主、弹窗宿主、状态容器（Back top bar, settings content, setting sections, toast host, dialog host, state host） | 已完成（Completed） |
 | 书架链路框架（LibraryShell） | 书架空状态、书籍搜索、书籍详情、书籍目录、排序筛选、书籍操作底表、分组管理、本地书导入（Library empty, book search, book detail, directory, sort/filter, action sheet, group management, local import） | 返回顶栏、内容区、底部操作区、底表宿主、弹窗宿主、状态容器（Back top bar, content region, bottom action host, sheet host, dialog host, state host） | 已完成（Completed） |
-| 阅读器框架（ReaderShell） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读（Reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, in-book search, replacement, entry, immersive reading） | 阅读正文底层、阅读覆盖层、模块导航、底表宿主、阅读状态容器（Reading surface, overlay host, module navigation, bottom sheet host, reader state host） | 已完成（Completed） |
+| 阅读器框架（ReaderShell） | 阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读（Reader controls, TOC/bookmarks, appearance, TTS, settings, auto page, in-book search, replacement, immersive reading） | 阅读正文底层、阅读覆盖层、模块导航、底表宿主、阅读状态容器（Reading surface, overlay host, module navigation, bottom sheet host, reader state host） | 已完成（Completed） |
 | 横向流程框架（FlowShell） | 换源（Source switching） | 横向画布、步骤区、对照区、结果区、状态区（Landscape frame, step region, comparison region, result region, state host） | 已完成（Completed） |
 
 ## 基础组件（Primitive Components）
@@ -108,8 +109,9 @@
 |---|---|---|
 | 设置分组卡（SettingGroupCard） | 已沉淀（Available） | 设置首页和设置二级页复用。 |
 | 设置行（SettingRow） | 已沉淀（Available） | SettingsPageKit 核心组件。 |
-| 选择行（SelectRow） | 已沉淀（Available） | 进入选项底表，不在行内展开完整选项。 |
-| 选项底表（OptionSheet） | 已沉淀（Available） | 通用设置和书架搜索设置已使用。 |
+| 选择行（SelectRow） | 已沉淀（Available） | 默认只展示当前值；短选项点击后打开锚定当前行的选项下拉浮层。 |
+| 选项下拉浮层（OptionDropdown） | 已沉淀（Available） | App 主题、语言、启动页等短选项使用；以列表展示全部选项并标识当前项；选项字号与设置行当前值一致；可覆盖下一行部分内容，但不改变列表结构，也不覆盖屏幕底部。 |
+| 选项底表（OptionSheet） | 已沉淀（Available） | 仅用于长列表、复杂说明或需要独立确认的选择。 |
 | 危险操作行（DangerActionRow） | 已沉淀（Available） | 必须接确认弹窗。 |
 | 权限行（PermissionRow） | 已沉淀（Available） | 权限状态和系统设置入口。 |
 | 状态徽标（StatusBadge） | 已沉淀（Available） | good、warn、danger、info 语义。 |
@@ -125,7 +127,7 @@
 
 阅读控制层（Reader Control Layer）必须归入阅读器框架（ReaderShell），不是书架链路框架（LibraryShell），也不是主标签页框架（MainTabShell）。
 
-当前状态（Current Status）：阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、阅读入口、沉浸阅读已完成 ReaderShell kit 统一。
+当前状态（Current Status）：阅读控制层、目录与书签、阅读外观、朗读、阅读设置、自动翻页、内容搜索、内容替换、沉浸阅读已完成 ReaderShell kit 统一。
 
 必须框架化（Must Be Shellized）：
 
@@ -156,6 +158,14 @@
 - 按钮尺寸不变（Fixed button size）
 - 按钮间距不变（Fixed spacing）
 - 相对位置不变（Stable relative position）
+- 重复点击当前选中模块，退出模块面板并回到默认阅读控制层（Tap active module again to close the module panel and return to default reader controls）
+
+当前 demo 模块面板规则（Current Demo Module Panel Rules）：
+
+- 目录面板（TOC Panel）：目录行只显示章节名，不显示章节摘要、时间或右侧状态。
+- 朗读面板（TTS Panel）：不展示示例正文；开始/暂停按钮中间只显示图标。
+- 界面面板（Appearance Panel）：主题色块是无图标纯色块；参数区按字号、行距、段距、字距两列展示。
+- 设置面板（Reader Settings Panel）：开关和值项在 ReaderShell 内即时切换，不进入 SettingsShell。
 
 ## 不应组件化（Should Not Be Componentized）
 
@@ -172,7 +182,7 @@
 1. 真实前端映射（Frontend Mapping）：按 `FRONTEND_MAPPING_GUIDE.md` 把已归一的 MainTabShell、LibraryShell、ReaderShell、FlowShell、SettingsShell 映射到实际 Android Compose 组件结构；公共组件库核心语义和五个 runtime shell 已由 `ReaderSharedComponentsStructureTest` 追溯到 Compose 实现锚点。
 2. 主导航差异收敛（Main Navigation Reconciliation）：Android 代码中的主入口已收敛到 `书架 / 发现 / RSS / 设置`；后续变更不得恢复 `书源 / 我的` 作为主 tab。
 3. 图标映射收敛（Icon Mapping Reconciliation）：主导航、书架、发现、RSS、设置二级页、书源链路、共享状态组件和阅读控制层已接入 `ReaderIconToken`；生产 UI 直连 Material Icons 已由 `ReaderIconImportBoundaryTest` 守卫，后续重点是同步素材库缺源状态。
-4. 状态矩阵落地（State Matrix Implementation）：30 张 UI 设计图和 30 个正式输入包已建立第一批 Compose preview/state matrix 输入，并由 `FrontendInputComposeCoverageTest` 守卫输入包、spec、manifest、Compose source 和 preview 覆盖；后续继续把这些状态接入真实导航、真实业务数据和可交互 UI test。
+4. 状态矩阵落地（State Matrix Implementation）：29 张 UI 设计图和 29 个正式输入包已建立第一批 Compose preview/state matrix 输入，并由 `FrontendInputComposeCoverageTest` 守卫输入包、spec、manifest、Compose source 和 preview 覆盖；后续继续把这些状态接入真实导航、真实业务数据和可交互 UI test。
 
 ## 本地 HTML 要求（Local HTML Requirements）
 

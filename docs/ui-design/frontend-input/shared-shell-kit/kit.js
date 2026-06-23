@@ -19,7 +19,7 @@
     if (window.ReaderAssetIcons && window.ReaderAssetIcons.renderIcon) {
       return window.ReaderAssetIcons.renderIcon(name, cls);
     }
-    return `<span class="${esc(cls)}" data-icon-fallback="${esc(name)}"></span>`;
+    return `<span class="${esc(cls)}" data-icon-missing="${esc(name)}" aria-hidden="true"></span>`;
   }
 
   function statusBar(data, config) {
@@ -28,17 +28,18 @@
       <header class="${classList("rsk-status-bar", config.statusBarClass)}" data-slot="statusBar" aria-label="系统状态栏">
         <span>${esc(status.time || "10:30")}</span>
         <span class="${classList("rsk-system-icons", config.systemIconsClass)}" aria-hidden="true">
-          <span class="${classList("rsk-signal", config.signalClass)}"></span>
-          <span class="${classList("rsk-wifi", config.wifiClass)}"></span>
-          <span class="${classList("rsk-battery", config.batteryClass)}"></span>
+          ${icon("signal", classList("rsk-system-icon", config.signalClass))}
+          ${icon("wifi", classList("rsk-system-icon", config.wifiClass))}
+          ${icon("battery", classList("rsk-system-icon", config.batteryClass))}
           ${status.battery ? `<span>${esc(status.battery)}</span>` : ""}
         </span>
       </header>`;
   }
 
   function topActionButtons(actions, config) {
+    const actionLabels = Object.assign({ search: "搜索", more: "更多", refresh: "刷新" }, config.actionLabels || {});
     return (actions || ["search", "more"]).map((name) => `
-      <button class="${classList("rsk-icon-button", config.iconButtonClass)}" type="button" aria-label="${esc(name)}">
+      <button class="${classList("rsk-icon-button", config.iconButtonClass)}" type="button" data-top-action="${esc(name)}" aria-label="${esc(name)}" title="${esc(actionLabels[name] || name)}">
         ${icon(name, classList("rsk-icon", config.iconClass))}
       </button>`).join("");
   }
@@ -56,7 +57,7 @@
   function backTopBar(config) {
     const trailing = config.trailingHtml !== undefined
       ? config.trailingHtml
-      : config.trailingIcon === null
+      : config.trailingIcon === undefined || config.trailingIcon === null
         ? "<span></span>"
         : `<button type="button" aria-label="${esc(config.trailingLabel || "更多")}">${icon(config.trailingIcon || "more", classList("rsk-icon", config.iconClass))}</button>`;
 

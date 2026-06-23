@@ -2730,14 +2730,14 @@ button:focus-visible {
   text-align: center;
 }
 
-.rl-reading-entry-demo {
+.rl-reader-open-demo {
   display: grid;
   gap: 12px;
 }
 
-.rl-reading-entry-context,
-.rl-reading-entry-loading,
-.rl-reading-entry-repair {
+.rl-reader-open-context,
+.rl-reader-open-loading,
+.rl-reader-open-repair {
   display: grid;
   gap: 6px;
   padding: 14px;
@@ -2746,30 +2746,30 @@ button:focus-visible {
   background: rgba(255, 252, 248, 0.66);
 }
 
-.rl-reading-entry-context strong,
-.rl-reading-entry-actions strong,
-.rl-reading-entry-loading strong,
-.rl-reading-entry-repair strong {
+.rl-reader-open-context strong,
+.rl-reader-open-actions strong,
+.rl-reader-open-loading strong,
+.rl-reader-open-repair strong {
   color: var(--rl-ink);
   font-size: 15px;
   line-height: 1.2;
 }
 
-.rl-reading-entry-context small,
-.rl-reading-entry-actions small,
-.rl-reading-entry-repair small {
+.rl-reader-open-context small,
+.rl-reader-open-actions small,
+.rl-reader-open-repair small {
   color: var(--rl-muted);
   font-size: 12px;
   line-height: 1.35;
 }
 
-.rl-reading-entry-actions {
+.rl-reader-open-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-.rl-reading-entry-actions button {
+.rl-reader-open-actions button {
   min-width: 0;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
@@ -2783,46 +2783,46 @@ button:focus-visible {
   text-align: left;
 }
 
-.rl-reading-entry-actions button.is-primary {
+.rl-reader-open-actions button.is-primary {
   border-color: rgba(35, 121, 164, 0.26);
   background: rgba(235, 248, 253, 0.86);
 }
 
-.rl-reading-entry-actions .rl-icon {
+.rl-reader-open-actions .rl-icon {
   width: 28px;
   height: 28px;
   color: var(--rl-primary);
 }
 
-.rl-reading-entry-loading {
+.rl-reader-open-loading {
   grid-template-columns: 30px 1fr;
   align-items: center;
 }
 
-.rl-reading-entry-loading .rl-icon,
-.rl-reading-entry-repair .rl-icon {
+.rl-reader-open-loading .rl-icon,
+.rl-reader-open-repair .rl-icon {
   width: 28px;
   height: 28px;
   color: var(--rl-primary);
 }
 
-.rl-reading-entry-loading i {
+.rl-reader-open-loading i {
   grid-column: 1 / -1;
   height: 10px;
   border-radius: 999px;
   background: linear-gradient(90deg, #eadfd2 0%, #fbf7f1 48%, #eadfd2 100%);
 }
 
-.rl-reading-entry-repair {
+.rl-reader-open-repair {
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
 }
 
-.rl-reading-entry-repair .rl-icon {
+.rl-reader-open-repair .rl-icon {
   color: #a84435;
 }
 
-.rl-reading-entry-repair button {
+.rl-reader-open-repair button {
   min-height: 34px;
   border-radius: 999px;
   padding: 0 12px;

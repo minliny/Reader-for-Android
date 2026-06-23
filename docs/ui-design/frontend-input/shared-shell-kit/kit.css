@@ -49,25 +49,20 @@
   align-items: center;
 }
 
-.rsk-signal {
-  background: currentColor;
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-}
-
-.rsk-wifi {
-  background: currentColor;
-  clip-path: polygon(50% 100%, 0 18%, 17% 0, 83% 0, 100% 18%);
-}
-
+.rsk-system-icon,
+.rsk-signal,
+.rsk-wifi,
 .rsk-battery {
-  position: relative;
-  background: currentColor;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.rsk-battery::before {
-  content: "";
-  position: absolute;
-  background: currentColor;
+.rsk-signal {
+  fill: currentColor;
+  stroke: none;
 }
 
 .rsk-app-top-bar,

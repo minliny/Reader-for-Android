@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -138,6 +139,7 @@ fun ReaderMainTabBar(
                 modifier = Modifier
                     .width(64.dp)
                     .height(44.dp)
+                    .testTag("MainTab-${tab.label}")
                     .clickable(
                         role = Role.Tab,
                         onClick = { onTabSelected(index) }

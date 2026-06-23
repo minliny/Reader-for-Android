@@ -36,7 +36,6 @@
 | `04-阅读链路/自动翻页` | `ReaderShell` | `AutoPageInput` | `rsk-reader-frame ap-page-frame` | 已使用 `ReaderShellKit` | 已迁入 `ReadingSurface + ReaderOverlayHost + BottomSheetHost`，运行态进入统一 state model。 |
 | `04-阅读链路/内容搜索` | `ReaderShell` | `ContentSearchInput` | `rsk-reader-frame cs-page-frame` | 已使用 `ReaderShellKit` | 已迁入 `ReaderOverlayHost + BottomSheetHost`，保留键盘安全区内容。 |
 | `04-阅读链路/内容替换` | `ReaderShell` | `ContentReplacementInput` | `rsk-reader-frame cr-page-frame` | 已使用 `ReaderShellKit` | 已迁入 `ReaderOverlayHost + BottomSheetHost`，表单保存状态统一。 |
-| `04-阅读链路/阅读入口` | `ReaderShell` | `ReadingEntryInput` | `rsk-reader-frame re-page-frame` | 已使用 `ReaderShellKit` | 已迁入 `ReaderStateHost`，保留书籍和进度上下文。 |
 | `04-阅读链路/沉浸阅读` | `ReaderShell` | `ImmersiveReadingInput` | `rsk-reader-frame ir-page-frame` | 已使用 `ReaderShellKit` | 已迁入 `ReadingSurface + ReaderStateHost`，不出现主底部导航。 |
 | `04-阅读链路/换源` | `FlowShell` | `SourceSwitchInput` | `rsk-flow-frame sw-flow-frame` | 已使用 `ReaderShellKit.renderFlowShell(...)` | 保留横屏验证，后续真实前端映射。 |
 | `05-设置链路/App通用设置` | `SettingsShell` | `GeneralSettingsInput` | `sk-page-frame gs-page-frame` | 已使用 `SettingsPageKit` | 已通过 SettingsShell DOM slot 校验。 |
@@ -101,8 +100,8 @@
 状态：已完成。
 
 - `阅读控制层`、`目录与书签`、`阅读外观`、`朗读`、`阅读设置` 已接入 `ReaderShellKit.renderReaderShell(...)`。
-- `自动翻页`、`内容搜索`、`内容替换`、`阅读入口`、`沉浸阅读` 已接入 `ReaderShellKit.renderReaderShell(...)`。
-- 10 个阅读页面的 preview 和 state matrix 已通过真实 DOM slots 校验。
+- `自动翻页`、`内容搜索`、`内容替换`、`沉浸阅读` 已接入 `ReaderShellKit.renderReaderShell(...)`。
+- 9 个阅读页面的 preview 和 state matrix 已通过真实 DOM slots 校验。
 - `换源` 已接入 `ReaderShellKit.renderFlowShell(...)`，preview 和 state matrix 已通过真实 DOM slots 校验。
 
 完成后收益：阅读中所有面板和覆盖层有统一状态、导航和进度上下文。

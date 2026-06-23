@@ -53,6 +53,10 @@
       </section>`;
   }
 
+  function chapterMarkers(chapter) {
+    return Array.isArray(chapter.markers) ? chapter.markers.filter(Boolean) : [];
+  }
+
   function chapterPreview(data, state) {
     if (state === "loading") {
       return `
@@ -85,8 +89,8 @@
         <div class="bd-chapter-list" aria-label="章节预览长列表">
           ${(data.chapters || []).map((chapter) => `
             <button class="bd-chapter-row" type="button">
-              <span>${esc(chapter.title)} ${chapter.isNew ? '<em>新</em>' : ""}</span>
-              <strong>${esc(chapter.state)}</strong>
+              <span>${esc(chapter.title)}</span>
+              ${chapterMarkers(chapter).length ? `<strong>${chapterMarkers(chapter).map((marker) => `<em>${esc(marker)}</em>`).join("")}</strong>` : ""}
             </button>`).join("")}
         </div>
         <p class="bd-chapter-footer">${esc(data.chapterFooter)}</p>

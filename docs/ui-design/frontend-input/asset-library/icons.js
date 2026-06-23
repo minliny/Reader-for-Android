@@ -3,6 +3,10 @@
     return svg.replace('class="asset-icon"', `class="${String(className || "asset-icon").replace(/"/g, "")}"`);
   }
 
+  function withIconName(svg, name) {
+    return svg.replace("<svg ", `<svg data-icon-name="${String(name || "").replace(/"/g, "")}" `);
+  }
+
   const icons = {
     add: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M24 9v30"></path><path d="M9 24h30"></path></svg>',
     appearance: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M8 35 18 12h2l10 23"></path><path d="M12 27h14"></path><path d="M31 35V20"></path><path d="M31 20c7 0 9 3 9 7v8"></path></svg>',
@@ -36,7 +40,7 @@
     file: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M14 7h14l8 8v26H14V7Z"></path><path d="M28 7v9h8"></path></svg>',
     folder: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M7 16h14l4 5h16v19H7V16Z"></path><path d="M7 21h34"></path></svg>',
     "folder-off": '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M7 16h14l4 5h16v19H7V16Z"></path><path d="M7 21h34"></path><path d="M8 8 40 40"></path></svg>',
-    gear: '<svg class="asset-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="7"></circle><path d="M24 5v6M24 37v6M7.5 14.5l5.2 3M35.3 30.5l5.2 3M7.5 33.5l5.2-3M35.3 17.5l5.2-3M5 24h6M37 24h6"></path></svg>',
+    gear: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M21 5h6l1.3 5.2c1.4.4 2.7.9 4 1.6l4.6-2.8 4.2 4.2-2.8 4.6c.7 1.2 1.3 2.6 1.6 4L45 23v6l-5.1 1.2c-.4 1.4-.9 2.8-1.6 4l2.8 4.6-4.2 4.2-4.6-2.8c-1.2.7-2.6 1.3-4 1.6L27 47h-6l-1.3-5.2c-1.4-.4-2.7-.9-4-1.6L11.1 43l-4.2-4.2 2.8-4.6c-.7-1.2-1.3-2.6-1.6-4L3 29v-6l5.1-1.2c.4-1.4.9-2.8 1.6-4l-2.8-4.6L11.1 9l4.6 2.8c1.2-.7 2.6-1.3 4-1.6L21 5Z"></path><circle cx="24" cy="26" r="7"></circle></svg>',
     gesture: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M19 25V12a4 4 0 0 1 8 0v13"></path><path d="M27 22a4 4 0 0 1 8 0v8"></path><path d="M19 22a4 4 0 0 0-8 0v5c0 9 5 15 14 15h4c6 0 10-4 10-10v-6"></path></svg>',
     globe: '<svg class="asset-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="17"></circle><path d="M7 24h34"></path><path d="M24 7c5 5 7 11 7 17s-2 12-7 17"></path><path d="M24 7c-5 5-7 11-7 17s2 12 7 17"></path></svg>',
     grid: '<svg class="asset-icon" viewBox="0 0 48 48"><rect x="9" y="9" width="11" height="11"></rect><rect x="28" y="9" width="11" height="11"></rect><rect x="9" y="28" width="11" height="11"></rect><rect x="28" y="28" width="11" height="11"></rect></svg>',
@@ -65,8 +69,9 @@
     replace: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M33 8h7v7"></path><path d="M8 22v-4a10 10 0 0 1 10-10h20"></path><path d="M15 40H8v-7"></path><path d="M40 26v4a10 10 0 0 1-10 10H10"></path></svg>',
     rss: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M10 30a8 8 0 0 1 8 8"></path><path d="M10 20a18 18 0 0 1 18 18"></path><path d="M10 10a28 28 0 0 1 28 28"></path><circle cx="13" cy="35" r="2" fill="currentColor" stroke="none"></circle></svg>',
     search: '<svg class="asset-icon" viewBox="0 0 48 48"><circle cx="21" cy="21" r="13"></circle><path d="M31 31 42 42"></path></svg>',
-    settings: '<svg class="asset-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="7"></circle><path d="M24 5v6M24 37v6M7.5 14.5l5.2 3M35.3 30.5l5.2 3M7.5 33.5l5.2-3M35.3 17.5l5.2-3M5 24h6M37 24h6"></path></svg>',
+    settings: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M21 5h6l1.3 5.2c1.4.4 2.7.9 4 1.6l4.6-2.8 4.2 4.2-2.8 4.6c.7 1.2 1.3 2.6 1.6 4L45 23v6l-5.1 1.2c-.4 1.4-.9 2.8-1.6 4l2.8 4.6-4.2 4.2-4.6-2.8c-1.2.7-2.6 1.3-4 1.6L27 47h-6l-1.3-5.2c-1.4-.4-2.7-.9-4-1.6L11.1 43l-4.2-4.2 2.8-4.6c-.7-1.2-1.3-2.6-1.6-4L3 29v-6l5.1-1.2c.4-1.4.9-2.8 1.6-4l-2.8-4.6L11.1 9l4.6 2.8c1.2-.7 2.6-1.3 4-1.6L21 5Z"></path><circle cx="24" cy="26" r="7"></circle></svg>',
     shield: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M24 6 39 12v12c0 10-6 16-15 19C15 40 9 34 9 24V12l15-6Z"></path><path d="m18 24 5 5 9-12"></path></svg>',
+    signal: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M8 38h32V10L8 38Z" fill="currentColor" stroke="none"></path></svg>',
     sort: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M8 13h22"></path><path d="M8 24h16"></path><path d="M8 35h10"></path><path d="M34 12v22"></path><path d="m27 28 7 7 7-7"></path></svg>',
     source: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M11 16h22l-6-6"></path><path d="M37 32H15l6 6"></path><path d="M33 10l6 6-6 6"></path><path d="M15 38l-6-6 6-6"></path></svg>',
     "source-stack": '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M10 15h28v20H10V15Z"></path><path d="M14 11h20"></path><path d="M14 39h20"></path><path d="M18 24h12"></path></svg>',
@@ -82,14 +87,16 @@
     typo: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M13 34 22 12h2l9 22"></path><path d="M17 27h12"></path><path d="M35 14v20"></path></svg>',
     upload: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M17 37h19a8 8 0 0 0 0-16 13 13 0 0 0-25 4 6 6 0 0 0 6 12Z"></path><path d="M24 33V18M18 24l6-6 6 6"></path></svg>',
     volume: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M9 20h8l11-9v26l-11-9H9v-8Z"></path><path d="M34 18a9 9 0 0 1 0 12"></path><path d="M39 12a17 17 0 0 1 0 24"></path></svg>',
-    warning: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M24 7 43 40H5L24 7Z"></path><path d="M24 18v11"></path><path d="M24 35h.01"></path></svg>'
+    warning: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M24 7 43 40H5L24 7Z"></path><path d="M24 18v11"></path><path d="M24 35h.01"></path></svg>',
+    wifi: '<svg class="asset-icon" viewBox="0 0 48 48"><path d="M8 18c10-8 22-8 32 0"></path><path d="M15 27c6-5 12-5 18 0"></path><path d="M21 36c2-2 4-2 6 0"></path><circle cx="24" cy="39" r="2" fill="currentColor" stroke="none"></circle></svg>'
   };
 
   window.ReaderAssetIcons = {
     icons,
     names: Object.keys(icons).sort(),
     renderIcon(name, className) {
-      return withClass(icons[name] || icons.warning, className);
+      const resolvedName = icons[name] ? name : "warning";
+      return withIconName(withClass(icons[resolvedName], className), resolvedName);
     },
     has(name) {
       return Boolean(icons[name]);

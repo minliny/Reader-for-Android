@@ -21,22 +21,22 @@
 ## 新增公共组件
 
 - `SelectRow`
-- `OptionSheet`
+- `OptionDropdown`
 - `SettingsToast`
 
 ## 文件
 
 - `fixture.js` / `fixture.json`：通用设置默认数据。
 - `render.js`：`window.GeneralSettingsInput` 渲染器。
-- `components.css`：默认页、底表、toast、确认弹窗和状态矩阵样式。
+- `components.css`：默认页、选项下拉浮层、toast、确认弹窗和状态矩阵样式。
 - `preview.html`：833 x 1888 默认设计稿。
-- `state-matrix.html`：default、option_sheet、loading、error、permission 状态矩阵。
+- `state-matrix.html`：default、option_dropdown、loading、error、permission 状态矩阵。
 - `components.html`：组件拆分预览入口。
 
 ## 状态覆盖
 
 - `default`：展示当前设置值和保存成功 toast。
-- `option_sheet`：点击语言行后打开可选项底表。
+- `option_dropdown`：点击选择行后在当前行上方或下方浮层展示其他可选项，不改变列表结构。
 - `loading`：读取设置值时保留页面结构。
 - `error`：恢复默认确认和失败 toast。
 - `permission`：崩溃日志权限说明。
