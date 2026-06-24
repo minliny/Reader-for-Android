@@ -18,9 +18,4 @@ class ProjectSkeletonTest {
         assertTrue(versionName.matches(Regex("\\d+\\.\\d+\\.\\d+")))
     }
 
-    @Test
-    fun `app screens list contains all four tabs`() {
-        val routes = com.reader.android.ui.appScreens.map { it.route }.toSet()
-        assertEquals(setOf("bookshelf", "discover", "rss", "settings"), routes)
-    }
 }

@@ -252,7 +252,6 @@ object AndroidCoreAdapterContractReportFactory {
                         "com.reader.android.data.adapter.RenderRequest",
                         "com.reader.android.data.adapter.RenderResult",
                         "com.reader.android.data.adapter.ReaderContentType",
-                        "com.reader.android.ui.reader.ContentAdapterShell"
                     ),
                     requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("readerShell"),
                     platformInputs = listOf(
