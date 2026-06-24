@@ -20,7 +20,8 @@ object AndroidCoreAdapterContractIds {
         "markupParser",
         "feedParser",
         "textEncodingDetector",
-        "runtimeHost"
+        "runtimeHost",
+        "readerShell"
     )
 
     val RUNTIME_CI_EVIDENCE_IDS = listOf(
@@ -214,8 +215,12 @@ object AndroidCoreAdapterContractReportFactory {
                     contractStatus = "deviceExecutedInstrumented",
                     implementationRefs = listOf(
                         "com.reader.android.data.adapter.AndroidWebViewRuntimeHost",
+                        "com.reader.android.data.adapter.AndroidWebRuntimeAdapter",
                         "com.reader.android.data.adapter.AndroidCookieManagerStore",
                         "com.reader.android.data.adapter.AndroidKeystoreCredentialStore",
+                        "com.reader.android.data.adapter.WebDavCredentialStore",
+                        "com.reader.android.data.network.OkHttpAdapter",
+                        "com.reader.android.data.network.ScopedOkHttpCookieJar",
                         "com.reader.android.data.adapter.WebRuntimeAdapter",
                         "com.reader.android.data.adapter.CookieStore",
                         "com.reader.android.data.adapter.RuntimeScope",
@@ -234,6 +239,33 @@ object AndroidCoreAdapterContractReportFactory {
                     execution = AdapterExecutionProof(
                         status = "deviceExecutedInstrumented",
                         proofScope = "Instrumented smoke executed on Pixel_10_Pro_XL AVD: WebView DOM, evaluateJavascript, CookieManager redacted mirror, AndroidKeyStore save/load/revoke, and SAF denied-permission redaction.",
+                        mayFeedCoreEvidence = true
+                    )
+                ),
+                AndroidAdapterContract(
+                    kind = "readerShell",
+                    platformOwner = "Android",
+                    contractStatus = "measuredPass",
+                    implementationRefs = listOf(
+                        "com.reader.android.data.adapter.ReaderShellHost",
+                        "com.reader.android.data.adapter.ComposeReaderShellHost",
+                        "com.reader.android.data.adapter.RenderRequest",
+                        "com.reader.android.data.adapter.RenderResult",
+                        "com.reader.android.data.adapter.ReaderContentType",
+                        "com.reader.android.ui.reader.ContentAdapterShell"
+                    ),
+                    requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("readerShell"),
+                    platformInputs = listOf(
+                        "TXT pagination descriptor",
+                        "HTML sanitization descriptor",
+                        "CSP-locked render descriptor",
+                        "EPUB-CFI future slot descriptor"
+                    ),
+                    requiredEvidenceArtifacts = requiredArtifactNames,
+                    coreBoundary = "Android owns the clean-room reader-shell host (text pagination + jsoup HTML sanitization + CSP, JS off by default). No Readium dependency; EPUB-CFI is a future opt-in behind the same contract.",
+                    execution = AdapterExecutionProof(
+                        status = "measuredPass",
+                        proofScope = "TXT pagination, HTML script/iframe stripping, CSP default-src 'none' with script-src 'none', JS-disabled default, and CFI-future-slot null are locally measured against fixtures; no live network.",
                         mayFeedCoreEvidence = true
                     )
                 )

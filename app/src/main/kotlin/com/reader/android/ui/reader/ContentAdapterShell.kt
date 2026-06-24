@@ -1,5 +1,9 @@
 package com.reader.android.ui.reader
 
+import com.reader.android.data.adapter.ComposeReaderShellHost
+import com.reader.android.data.adapter.ReaderContentType
+import com.reader.android.data.adapter.ReaderShellHost
+import com.reader.android.data.adapter.RenderRequest
 import com.reader.android.data.bridge.CoreBridge
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.bridge.ReaderError
@@ -11,11 +15,14 @@ import com.reader.android.data.model.BookSource
  * Fake/real boundary for Reader content loading.
  *
  * Mode.FAKE (default): returns fixture content.
- * Mode.REAL: calls [CoreBridge.getContent] through public facade.
+ * Mode.REAL: calls [CoreBridge.getContent] through the public facade, then
+ *   routes the cleaned content through [readerShellHost] (clean-room
+ *   pagination + HTML sanitization, no Readium) before mapping to the UI model.
  */
 object ContentAdapterShell {
 
     private val bridge: CoreBridge by lazy { FakeCoreBridge() }
+    private val readerShellHost: ReaderShellHost = ComposeReaderShellHost()
 
     enum class Mode { FAKE, REAL }
 
@@ -55,8 +62,19 @@ object ContentAdapterShell {
             val page = bridge.getContent(request.chapterUrl, source)
             if (page.content.isBlank()) return ContentResult.Error(ContentFacadeErrorMapper.emptyContent())
 
+            // Route through the clean-room reader-shell host: paginate TXT and
+            // sanitize HTML (CSP-locked, JS off) before handing to the UI.
+            val rendered = readerShellHost.render(
+                RenderRequest(
+                    content = page.content,
+                    contentType = detectContentType(page.content),
+                    title = page.title
+                )
+            )
+            val shellText = rendered.paginatedText.joinToString("\n\n")
+
             val content = ContentFacadeResultMapper.applyChapterContext(
-                ContentFacadeResultMapper.mapContent(page),
+                ContentFacadeResultMapper.mapContent(page).copy(text = shellText),
                 request
             )
             val chapter = ContentFacadeResultMapper.mapChapter(page, request)
@@ -71,9 +89,13 @@ object ContentAdapterShell {
         }
     }
 
+    private fun detectContentType(content: String): ReaderContentType =
+        if (content.contains(Regex("<(p|div|span|article|section)\\b"))) ReaderContentType.HTML
+        else ReaderContentType.TXT
+
     // ── Integration level ──
 
-    val integrationLevel: String get() = "NEEDS_ADAPTER"
+    val integrationLevel: String get() = "READY_HOST_SHELL"
     val isFakeMode: Boolean get() = mode == Mode.FAKE
 
     fun enableRealMode() { mode = Mode.REAL }

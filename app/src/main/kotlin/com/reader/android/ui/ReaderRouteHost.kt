@@ -19,8 +19,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.reader.android.BuildConfig
+import com.reader.android.ui.bookshelf.BookshelfActionSheetDesignScreen
 import com.reader.android.ui.bookshelf.BookshelfAdapterShell
+import com.reader.android.ui.bookshelf.BookshelfEmptyDesignScreen
+import com.reader.android.ui.bookshelf.BookshelfGroupManagementScreen
+import com.reader.android.ui.bookshelf.BookshelfLocalImportScreen
 import com.reader.android.ui.bookshelf.BookshelfScreen
+import com.reader.android.ui.bookshelf.BookshelfSortFilterScreen
 import com.reader.android.ui.booksource.BookSourceScreen
 import com.reader.android.ui.booksource.SourceDetailData
 import com.reader.android.ui.booksource.SourceDetailScreen
@@ -39,15 +44,29 @@ import com.reader.android.ui.discover.RssHomeScreen
 import com.reader.android.ui.discover.RssListScreen
 import com.reader.android.ui.discover.RssSubscriptionManagementScreen
 import com.reader.android.ui.prototype.ReaderPrototypeGallery
+import com.reader.android.ui.reader.AutoPageScreen
+import com.reader.android.ui.reader.ContentReplacementScreen
+import com.reader.android.ui.reader.ContentSearchScreen
 import com.reader.android.ui.reader.ReaderScreen
+import com.reader.android.ui.reader.ReadingAloudScreen
+import com.reader.android.ui.reader.ReadingAppearanceScreen
+import com.reader.android.ui.reader.ReadingSettingsScreen
+import com.reader.android.ui.reader.ReadingTocBookmarkScreen
 import com.reader.android.ui.reader.source.SourceSwitchFlowScreen
 import com.reader.android.ui.search.SearchScreen
+import com.reader.android.ui.settings.AboutFeedbackScreen
 import com.reader.android.ui.settings.BackupSettingsScreen
+import com.reader.android.ui.settings.BookshelfSearchSettingsScreen
+import com.reader.android.ui.settings.CacheManagementScreen
+import com.reader.android.ui.settings.GeneralSettingsScreen
 import com.reader.android.ui.settings.MineScreen
+import com.reader.android.ui.settings.PrivacyPermissionsScreen
 import com.reader.android.ui.settings.ProgressSyncStatusScreen
 import com.reader.android.ui.settings.RemoteWebDavBooksScreen
 import com.reader.android.ui.settings.SettingsRootScreen
 import com.reader.android.ui.settings.SettingsScreen
+import com.reader.android.ui.settings.SourceManagementDesignScreen
+import com.reader.android.ui.settings.SyncBackupScreen
 import com.reader.android.ui.settings.WebDavConfigScreen
 import com.reader.android.ui.toc.TOCScreen
 import java.net.URLDecoder
@@ -85,12 +104,35 @@ object ReaderRoutes {
 
     // Mine subscreens
     const val GLOBAL_SETTINGS = "global_settings"
+    const val GENERAL_SETTINGS = "general_settings"
+    const val BOOKSHELF_SEARCH_SETTINGS = "bookshelf_search_settings"
+    const val PRIVACY_PERMISSIONS = "privacy_permissions"
+    const val CACHE_MANAGEMENT = "cache_management"
+    const val ABOUT_FEEDBACK = "about_feedback"
+    const val SYNC_BACKUP = "sync_backup"
+    const val SOURCE_MANAGEMENT_DESIGN = "source_management_design"
     const val WEBDAV_CONFIG = "webdav_config"
     const val BACKUP_SETTINGS = "backup_settings"
     const val PROGRESS_SYNC = "progress_sync"
     const val REMOTE_WEBDAV_BOOKS = "remote_webdav_books"
     const val ABOUT = "about"
     const val PROTOTYPE_GALLERY = "prototype_gallery"
+
+    // Bookshelf subscreens
+    const val BOOKSHELF_EMPTY = "bookshelf_empty"
+    const val BOOKSHELF_GROUP_MANAGEMENT = "bookshelf_group_management"
+    const val BOOKSHELF_LOCAL_IMPORT = "bookshelf_local_import"
+    const val BOOKSHELF_SORT_FILTER = "bookshelf_sort_filter"
+    const val BOOKSHELF_ACTION_SHEET = "bookshelf_action_sheet"
+
+    // Reader expanded module screens
+    const val READER_TOC_BOOKMARK = "reader_toc_bookmark"
+    const val READER_APPEARANCE = "reader_appearance"
+    const val READER_ALOUD = "reader_aloud"
+    const val READER_SETTINGS = "reader_settings"
+    const val READER_AUTO_PAGE = "reader_auto_page"
+    const val READER_CONTENT_SEARCH = "reader_content_search"
+    const val READER_CONTENT_REPLACEMENT = "reader_content_replacement"
 
     // State screens
     const val STATE_ERROR = "state/error/{message}"
@@ -237,6 +279,13 @@ fun ReaderRouteHost(
                     onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
                     onRssManagementClick = { navController.navigateAndTrack(ReaderRoutes.RSS_SUBSCRIPTION, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
+                    onGeneralSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GENERAL_SETTINGS, backStack) },
+                    onBookshelfSearchSettingsClick = { navController.navigateAndTrack(ReaderRoutes.BOOKSHELF_SEARCH_SETTINGS, backStack) },
+                    onReadingPreferenceClick = { navController.navigateAndTrack(ReaderRoutes.READER_SETTINGS, backStack) },
+                    onCacheManagementClick = { navController.navigateAndTrack(ReaderRoutes.CACHE_MANAGEMENT, backStack) },
+                    onPrivacyPermissionsClick = { navController.navigateAndTrack(ReaderRoutes.PRIVACY_PERMISSIONS, backStack) },
+                    onAboutFeedbackClick = { navController.navigateAndTrack(ReaderRoutes.ABOUT_FEEDBACK, backStack) },
+                    onSyncBackupClick = { navController.navigateAndTrack(ReaderRoutes.SYNC_BACKUP, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
                     onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },
                     onProgressSyncClick = { navController.navigateAndTrack(ReaderRoutes.PROGRESS_SYNC, backStack) },
@@ -255,6 +304,13 @@ fun ReaderRouteHost(
                     onSourceManagementClick = { navController.navigateAndTrack(ReaderRoutes.SOURCES, backStack) },
                     onRssManagementClick = { navController.navigateAndTrack(ReaderRoutes.RSS_SUBSCRIPTION, backStack) },
                     onGlobalSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GLOBAL_SETTINGS, backStack) },
+                    onGeneralSettingsClick = { navController.navigateAndTrack(ReaderRoutes.GENERAL_SETTINGS, backStack) },
+                    onBookshelfSearchSettingsClick = { navController.navigateAndTrack(ReaderRoutes.BOOKSHELF_SEARCH_SETTINGS, backStack) },
+                    onReadingPreferenceClick = { navController.navigateAndTrack(ReaderRoutes.READER_SETTINGS, backStack) },
+                    onCacheManagementClick = { navController.navigateAndTrack(ReaderRoutes.CACHE_MANAGEMENT, backStack) },
+                    onPrivacyPermissionsClick = { navController.navigateAndTrack(ReaderRoutes.PRIVACY_PERMISSIONS, backStack) },
+                    onAboutFeedbackClick = { navController.navigateAndTrack(ReaderRoutes.ABOUT_FEEDBACK, backStack) },
+                    onSyncBackupClick = { navController.navigateAndTrack(ReaderRoutes.SYNC_BACKUP, backStack) },
                     onWebDavClick = { navController.navigateAndTrack(ReaderRoutes.WEBDAV_CONFIG, backStack) },
                     onBackupClick = { navController.navigateAndTrack(ReaderRoutes.BACKUP_SETTINGS, backStack) },
                     onProgressSyncClick = { navController.navigateAndTrack(ReaderRoutes.PROGRESS_SYNC, backStack) },
@@ -333,6 +389,84 @@ fun ReaderRouteHost(
                 )
             }
 
+            // Bookshelf subscreens
+            composable(ReaderRoutes.BOOKSHELF_EMPTY) {
+                BookshelfEmptyDesignScreen(
+                    onSearch = { navController.navigateAndTrack(ReaderRoutes.SEARCH, backStack) },
+                    onMore = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.BOOKSHELF_GROUP_MANAGEMENT) {
+                BookshelfGroupManagementScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.BOOKSHELF_LOCAL_IMPORT) {
+                BookshelfLocalImportScreen(
+                    onBack = { navController.popBackStack() },
+                    onBackToBookshelf = {
+                        navController.popBackStack(ReaderRoutes.BOOKSHELF, inclusive = false)
+                    }
+                )
+            }
+            composable(ReaderRoutes.BOOKSHELF_SORT_FILTER) {
+                BookshelfSortFilterScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onApply = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.BOOKSHELF_ACTION_SHEET) {
+                BookshelfActionSheetDesignScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            // Reader expanded module screens
+            composable(ReaderRoutes.READER_TOC_BOOKMARK) {
+                ReadingTocBookmarkScreen(
+                    onBack = { navController.popBackStack() },
+                    onSourceChange = {
+                        navController.navigateAndTrack(ReaderRoutes.SOURCE_SWITCH, backStack)
+                    }
+                )
+            }
+            composable(ReaderRoutes.READER_APPEARANCE) {
+                ReadingAppearanceScreen(
+                    onBack = { navController.popBackStack() },
+                    onSourceChange = {
+                        navController.navigateAndTrack(ReaderRoutes.SOURCE_SWITCH, backStack)
+                    }
+                )
+            }
+            composable(ReaderRoutes.READER_ALOUD) {
+                ReadingAloudScreen(
+                    onBack = { navController.popBackStack() },
+                    onSourceChange = {
+                        navController.navigateAndTrack(ReaderRoutes.SOURCE_SWITCH, backStack)
+                    }
+                )
+            }
+            composable(ReaderRoutes.READER_SETTINGS) {
+                ReadingSettingsScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.READER_AUTO_PAGE) {
+                AutoPageScreen(
+                    onClose = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.READER_CONTENT_SEARCH) {
+                ContentSearchScreen(
+                    onClose = { navController.popBackStack() }
+                )
+            }
+            composable(ReaderRoutes.READER_CONTENT_REPLACEMENT) {
+                ContentReplacementScreen(
+                    onClose = { navController.popBackStack() }
+                )
+            }
+
             composable(
                 route = ReaderRoutes.SOURCE_DETAIL,
                 arguments = listOf(navArgument("sourceId") { type = NavType.StringType })
@@ -389,6 +523,30 @@ fun ReaderRouteHost(
             composable(ReaderRoutes.REMOTE_WEBDAV_BOOKS) {
                 RemoteWebDavBooksScreen(onBack = { navController.popBackStack() })
             }
+
+            // Settings subscreens (design screens wired into navigation)
+            composable(ReaderRoutes.GENERAL_SETTINGS) {
+                GeneralSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.BOOKSHELF_SEARCH_SETTINGS) {
+                BookshelfSearchSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.PRIVACY_PERMISSIONS) {
+                PrivacyPermissionsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.CACHE_MANAGEMENT) {
+                CacheManagementScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.ABOUT_FEEDBACK) {
+                AboutFeedbackScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.SYNC_BACKUP) {
+                SyncBackupScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ReaderRoutes.SOURCE_MANAGEMENT_DESIGN) {
+                SourceManagementDesignScreen(onBack = { navController.popBackStack() })
+            }
+
             composable(ReaderRoutes.ABOUT) {
                 ReaderEmptyState(
                     title = "关于 Reader",

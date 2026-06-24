@@ -11,6 +11,7 @@ import com.reader.android.ui.state.ReaderUiState
 enum class ReaderIntegrationLevel {
     READY_EXISTING_FLOW,
     READY_FAKE_TO_STATE,
+    READY_HOST_SHELL,
     NEEDS_ADAPTER,
     BLOCKED_BY_CORE_GAP,
     BLOCKED_BY_DESIGN_DECISION
@@ -100,7 +101,7 @@ object BookDetailAdapter : ReaderScreenAdapter {
 object ReaderContentAdapter : ReaderScreenAdapter {
     override val contract = ReaderAdapterContract(
         ReaderScreenKey.READER,
-        ReaderIntegrationLevel.NEEDS_ADAPTER,
+        ReaderIntegrationLevel.READY_HOST_SHELL,
         "ReaderContentAdapter",
         "readerChapter",
         allowRealDataIntegration = false

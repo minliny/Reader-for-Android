@@ -1,10 +1,41 @@
 package com.reader.android.data.network
 
+import com.reader.android.data.adapter.JsoupMarkupParserAdapter
 import com.reader.android.data.model.BookInfo
+import com.reader.android.data.model.BookSourceRule
 
-class BookInfoParser {
+class BookInfoParser(
+    private val markup: JsoupMarkupParserAdapter = JsoupMarkupParserAdapter()
+) {
 
-    fun parseBookInfoResponse(html: String, sourceName: String): BookInfo? {
+    fun parseBookInfoResponse(html: String, sourceName: String): BookInfo? =
+        parseBookInfoResponse(html, sourceName, rule = null)
+
+    /**
+     * When [rule] is present, evaluate it against the whole document through the
+     * jsoup rule engine (no list selector for bookInfo). Falls back to regex.
+     */
+    fun parseBookInfoResponse(html: String, sourceName: String, rule: BookSourceRule?): BookInfo? {
+        if (rule != null && rule.fields.isNotEmpty()) {
+            val rows = markup.evaluateRule(html, rule)
+            val row = rows.firstOrNull() ?: return null
+            val name = row["name"]?.takeIf { it.isNotBlank() } ?: return null
+            return BookInfo(
+                name = name,
+                author = row["author"]?.ifBlank { null } ?: "未知",
+                intro = row["intro"]?.ifBlank { null },
+                kind = row["kind"]?.ifBlank { null },
+                coverUrl = row["coverUrl"]?.ifBlank { null },
+                tocUrl = row["tocUrl"]?.ifBlank { null },
+                wordCount = row["wordCount"]?.ifBlank { null },
+                latestChapter = row["latestChapter"]?.ifBlank { null },
+                origin = sourceName
+            )
+        }
+        return parseWithRegex(html, sourceName)
+    }
+
+    private fun parseWithRegex(html: String, sourceName: String): BookInfo? {
         val name = extract(html, Regex("""<h1[^>]*>\s*([^<]{2,40})\s*</h1>"""))
             ?: extract(html, Regex("""<meta\s+property="og:title"\s+content="([^"]+)""""))
             ?: return null

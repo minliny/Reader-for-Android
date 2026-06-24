@@ -1,11 +1,51 @@
 package com.reader.android.data.network
 
+import com.reader.android.data.adapter.JsoupMarkupParserAdapter
+import com.reader.android.data.model.BookSourceRule
 import com.reader.android.data.model.SearchResultItem
 import java.util.regex.Pattern
 
-class SearchParser {
+class SearchParser(
+    private val markup: JsoupMarkupParserAdapter = JsoupMarkupParserAdapter()
+) {
 
-    fun parseSearchResponse(html: String, sourceName: String): List<SearchResultItem> {
+    fun parseSearchResponse(html: String, sourceName: String): List<SearchResultItem> =
+        parseSearchResponse(html, sourceName, rule = null)
+
+    /**
+     * When [rule] is present, evaluate it through the jsoup rule engine. Each
+     * row field map is mapped to a [SearchResultItem] by field name
+     * (name, author, detailUrl, coverUrl, kind, wordCount, latestChapter, intro).
+     * Falls back to the regex path otherwise.
+     */
+    fun parseSearchResponse(
+        html: String,
+        sourceName: String,
+        rule: BookSourceRule?
+    ): List<SearchResultItem> {
+        if (rule != null && rule.fields.isNotEmpty()) {
+            val rows = markup.evaluateRule(html, rule)
+            if (rows.isNotEmpty()) {
+                return rows.mapNotNull { row ->
+                    val name = row["name"]?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    SearchResultItem(
+                        name = name,
+                        author = row["author"]?.ifBlank { null } ?: "未知",
+                        coverUrl = row["coverUrl"]?.ifBlank { null },
+                        detailUrl = row["detailUrl"]?.ifBlank { null },
+                        kind = row["kind"]?.ifBlank { null },
+                        wordCount = row["wordCount"]?.ifBlank { null },
+                        latestChapter = row["latestChapter"]?.ifBlank { null },
+                        intro = row["intro"]?.ifBlank { null },
+                        sourceName = sourceName
+                    )
+                }
+            }
+        }
+        return parseWithRegex(html, sourceName)
+    }
+
+    private fun parseWithRegex(html: String, sourceName: String): List<SearchResultItem> {
         val results = mutableListOf<SearchResultItem>()
 
         // Attempt to find book list items in common Chinese novel site formats

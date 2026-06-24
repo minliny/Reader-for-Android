@@ -25,7 +25,8 @@ class ReaderScreenAdapterContractTest {
 
         assertEquals(2, counts[ReaderIntegrationLevel.READY_EXISTING_FLOW])
         assertEquals(1, counts[ReaderIntegrationLevel.READY_FAKE_TO_STATE])
-        assertEquals(10, counts[ReaderIntegrationLevel.NEEDS_ADAPTER])
+        assertEquals(1, counts[ReaderIntegrationLevel.READY_HOST_SHELL])
+        assertEquals(9, counts[ReaderIntegrationLevel.NEEDS_ADAPTER])
         assertEquals(1, counts[ReaderIntegrationLevel.BLOCKED_BY_DESIGN_DECISION])
         assertEquals(null, counts[ReaderIntegrationLevel.BLOCKED_BY_CORE_GAP])
     }

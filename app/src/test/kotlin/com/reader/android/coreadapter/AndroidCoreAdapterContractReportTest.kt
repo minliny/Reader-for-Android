@@ -32,7 +32,8 @@ class AndroidCoreAdapterContractReportTest {
                 "markupParser",
                 "feedParser",
                 "textEncodingDetector",
-                "runtimeHost"
+                "runtimeHost",
+                "readerShell"
             ),
             report.adapterContracts.map { it.kind }
         )
@@ -116,7 +117,7 @@ class AndroidCoreAdapterContractReportTest {
             "reader-core.android.adapter.contract-runner",
             obj.getString("runnerIdentifier")
         )
-        assertEquals(6, obj.getJSONArray("adapterContracts").length())
+        assertEquals(7, obj.getJSONArray("adapterContracts").length())
         assertEquals(7, obj.getJSONArray("runtimeCiEvidence").length())
         assertTrue(obj.getJSONObject("cleanRoom").getBoolean("maintained"))
         assertFalse(obj.getJSONObject("cleanRoom").getBoolean("externalGplCodeCopied"))

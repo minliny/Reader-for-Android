@@ -10,6 +10,7 @@ import com.reader.android.data.model.TOCItem
 import com.reader.android.data.network.BookInfoParser
 import com.reader.android.data.network.ContentParser
 import com.reader.android.data.network.HttpTransport
+import com.reader.android.data.network.PostRequestBody
 import com.reader.android.data.network.RequestHeaders
 import com.reader.android.data.network.SearchParser
 import com.reader.android.data.network.TOCParser
@@ -32,7 +33,8 @@ class RealCoreBridge(
     private val searchParser: SearchParser = SearchParser(),
     private val bookInfoParser: BookInfoParser = BookInfoParser(),
     private val tocParser: TOCParser = TOCParser(),
-    private val contentParser: ContentParser = ContentParser()
+    private val contentParser: ContentParser = ContentParser(),
+    private val cookieStore: com.reader.android.data.adapter.CookieStore? = null
 ) : CoreBridge {
 
     init {
@@ -58,10 +60,14 @@ class RealCoreBridge(
             )
 
         val url = searchUrl.replace("key", URLEncoder.encode(query.keyword, "UTF-8"))
-        val headers = buildHeaders(source)
+        val headers = withCookies(buildHeaders(source), url)
 
         return runCatching {
-            val response = transport.get(url, headers)
+            val response = if (source.searchMethod?.equals("POST", ignoreCase = true) == true) {
+                transport.post(url, headers, searchBody(query.keyword, source))
+            } else {
+                transport.get(url, headers)
+            }
             if (response.code != 200) {
                 throw ReaderException(
                     error = ReaderError(
@@ -72,7 +78,7 @@ class RealCoreBridge(
                     )
                 )
             }
-            val results = searchParser.parseSearchResponse(response.body, source.sourceName)
+            val results = searchParser.parseSearchResponse(response.body, source.sourceName, source.ruleSearch)
             // Normalize all relative URLs in parser output to absolute
             results.map { it.copy(detailUrl = normalizeUrl(it.detailUrl, source.sourceUrl)) }
         }.getOrElse { e ->
@@ -116,7 +122,7 @@ class RealCoreBridge(
                     )
                 )
             }
-            val raw = bookInfoParser.parseBookInfoResponse(response.body, source.sourceName)
+            val raw = bookInfoParser.parseBookInfoResponse(response.body, source.sourceName, source.ruleBookInfo)
                 ?: throw ReaderException(
                     error = ReaderError(
                         code = ReaderErrorCode.PARSE,
@@ -166,7 +172,7 @@ class RealCoreBridge(
                     )
                 )
             }
-            val toc = tocParser.parseTOCResponse(response.body)
+            val toc = tocParser.parseTOCResponse(response.body, source.ruleToc)
             toc.map { normalizeTocUrls(it, source.sourceUrl) }
         }.getOrElse { e ->
             if (e is ReaderException) throw e
@@ -208,7 +214,7 @@ class RealCoreBridge(
                     )
                 )
             }
-            val raw = contentParser.parseContentResponse(response.body)
+            val raw = contentParser.parseContentResponse(response.body, source.ruleContent)
                 ?: throw ReaderException(
                     error = ReaderError(
                         code = ReaderErrorCode.PARSE,
@@ -245,6 +251,27 @@ class RealCoreBridge(
             }
         }
         return headers
+    }
+
+    /**
+     * Attach cookies for [url] from the wired [cookieStore] (when present) as a
+     * `Cookie` header. This keeps OkHttp transport in sync with the WebView
+     * CookieManager mirror during a source run.
+     */
+    private suspend fun withCookies(headers: Map<String, String>, url: String): Map<String, String> {
+        val store = cookieStore ?: return headers
+        val scope = store.get(url)
+        if (scope.cookies.isEmpty()) return headers
+        val existing = headers["Cookie"]
+        val cookieHeader = scope.getCookieString()
+        val merged = if (existing.isNullOrBlank()) cookieHeader else "$existing; $cookieHeader"
+        return headers + ("Cookie" to merged)
+    }
+
+    /** Build the POST body for a search request from the keyword + source charset. */
+    private fun searchBody(keyword: String, source: BookSource): PostRequestBody {
+        val charset = source.searchCharset?.ifBlank { null } ?: "UTF-8"
+        return PostRequestBody.formUrlEncoded(mapOf("key" to keyword, "charset" to charset))
     }
 
     /**

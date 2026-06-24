@@ -30,11 +30,23 @@ val appScreens = listOf(
 object AppRouteGroups {
     val bookshelf = setOf(
         ReaderRoutes.BOOKSHELF,
+        ReaderRoutes.BOOKSHELF_EMPTY,
+        ReaderRoutes.BOOKSHELF_GROUP_MANAGEMENT,
+        ReaderRoutes.BOOKSHELF_LOCAL_IMPORT,
+        ReaderRoutes.BOOKSHELF_SORT_FILTER,
+        ReaderRoutes.BOOKSHELF_ACTION_SHEET,
         Routes.SEARCH,
         Routes.DETAIL,
         Routes.TOC,
         Routes.READER_CONTENT,
-        ReaderRoutes.SOURCE_SWITCH
+        ReaderRoutes.SOURCE_SWITCH,
+        ReaderRoutes.READER_TOC_BOOKMARK,
+        ReaderRoutes.READER_APPEARANCE,
+        ReaderRoutes.READER_ALOUD,
+        ReaderRoutes.READER_SETTINGS,
+        ReaderRoutes.READER_AUTO_PAGE,
+        ReaderRoutes.READER_CONTENT_SEARCH,
+        ReaderRoutes.READER_CONTENT_REPLACEMENT
     )
 
     val discover = setOf(
@@ -52,13 +64,20 @@ object AppRouteGroups {
         ReaderRoutes.SOURCES,
         ReaderRoutes.SOURCE_DETAIL,
         ReaderRoutes.SOURCE_EDIT,
-        ReaderRoutes.SOURCE_IMPORT
+        ReaderRoutes.SOURCE_IMPORT,
+        ReaderRoutes.SOURCE_MANAGEMENT_DESIGN
     )
 
     val settings = setOf(
         ReaderRoutes.SETTINGS,
         ReaderRoutes.MINE,
         ReaderRoutes.GLOBAL_SETTINGS,
+        ReaderRoutes.GENERAL_SETTINGS,
+        ReaderRoutes.BOOKSHELF_SEARCH_SETTINGS,
+        ReaderRoutes.PRIVACY_PERMISSIONS,
+        ReaderRoutes.CACHE_MANAGEMENT,
+        ReaderRoutes.ABOUT_FEEDBACK,
+        ReaderRoutes.SYNC_BACKUP,
         ReaderRoutes.WEBDAV_CONFIG,
         ReaderRoutes.BACKUP_SETTINGS,
         ReaderRoutes.PROGRESS_SYNC,

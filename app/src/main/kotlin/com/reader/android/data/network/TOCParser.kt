@@ -1,10 +1,35 @@
 package com.reader.android.data.network
 
+import com.reader.android.data.adapter.JsoupMarkupParserAdapter
+import com.reader.android.data.model.BookSourceRule
 import com.reader.android.data.model.TOCItem
 
-class TOCParser {
+class TOCParser(
+    private val markup: JsoupMarkupParserAdapter = JsoupMarkupParserAdapter()
+) {
 
-    fun parseTOCResponse(html: String): List<TOCItem> {
+    fun parseTOCResponse(html: String): List<TOCItem> =
+        parseTOCResponse(html, rule = null)
+
+    /**
+     * When [rule] is present (with a list selector), evaluate each row to a
+     * [TOCItem] using the `title` and `url` fields. Falls back to regex.
+     */
+    fun parseTOCResponse(html: String, rule: BookSourceRule?): List<TOCItem> {
+        if (rule != null && rule.listSelector != null && rule.fields.isNotEmpty()) {
+            val rows = markup.evaluateRule(html, rule)
+            if (rows.isNotEmpty()) {
+                return rows.mapNotNull { row ->
+                    val title = row["title"]?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val url = row["url"]?.ifBlank { "" } ?: ""
+                    TOCItem(title = title, url = url)
+                }
+            }
+        }
+        return parseWithRegex(html)
+    }
+
+    private fun parseWithRegex(html: String): List<TOCItem> {
         // Match chapter links: <a href="url">title</a> or <a href="url" title="title">display</a>
         val chapterRegex = Regex(
             """<a[^>]*href="([^"]*)"[^>]*>\s*([^<]{1,60})\s*</a>""",

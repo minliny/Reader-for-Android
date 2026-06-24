@@ -64,11 +64,13 @@ class AndroidContentUriLocalBookAdapter(
 }
 
 class AndroidCookieManagerStore(
-    private val cookieManager: CookieManager = CookieManager.getInstance()
+    private val cookieManager: () -> CookieManager = { CookieManager.getInstance() }
 ) : CookieStore {
 
+    private fun cm(): CookieManager = cookieManager()
+
     override suspend fun get(sourceUrl: String): CookieScope {
-        val header = cookieManager.getCookie(sourceUrl).orEmpty()
+        val header = cm().getCookie(sourceUrl).orEmpty()
         val records = header.split(";")
             .mapNotNull { raw ->
                 val parts = raw.trim().split("=", limit = 2)
@@ -87,25 +89,25 @@ class AndroidCookieManagerStore(
 
     override suspend fun save(sourceUrl: String, cookies: List<CookieRecord>) {
         cookies.forEach { cookie ->
-            cookieManager.setCookie(sourceUrl, cookie.toHeaderValue())
+            cm().setCookie(sourceUrl, cookie.toHeaderValue())
         }
-        cookieManager.flush()
+        cm().flush()
     }
 
     override suspend fun clear(sourceUrl: String) {
         get(sourceUrl).cookies.forEach { cookie ->
-            cookieManager.setCookie(sourceUrl, "${cookie.name}=; Max-Age=0; Path=${cookie.path}")
+            cm().setCookie(sourceUrl, "${cookie.name}=; Max-Age=0; Path=${cookie.path}")
         }
-        cookieManager.flush()
+        cm().flush()
     }
 
     override suspend fun clearAll() {
-        cookieManager.removeAllCookies(null)
-        cookieManager.flush()
+        cm().removeAllCookies(null)
+        cm().flush()
     }
 
     fun redactedMirrorEvidence(sourceUrl: String): String {
-        val cookieCount = cookieManager.getCookie(sourceUrl).orEmpty()
+        val cookieCount = cm().getCookie(sourceUrl).orEmpty()
             .split(";")
             .count { it.contains("=") }
         return "cookie_mirror source:${sourceUrl.redactedUrl()} count:$cookieCount values:REDACTED"
@@ -132,10 +134,10 @@ data class AndroidEncryptedCredentialRecord(
 
 class AndroidKeystoreCredentialStore(
     private val namespace: String = "reader_android_runtime"
-) {
+) : WebDavCredentialStore.CredentialKeystore {
     private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
-    fun save(identifier: String, secret: String): AndroidEncryptedCredentialRecord {
+    override fun save(identifier: String, secret: String): AndroidEncryptedCredentialRecord {
         val alias = aliasFor(identifier)
         val key = getOrCreateKey(alias)
         val cipher = Cipher.getInstance(AES_GCM)
@@ -150,7 +152,7 @@ class AndroidKeystoreCredentialStore(
         )
     }
 
-    fun load(record: AndroidEncryptedCredentialRecord): String {
+    override fun load(record: AndroidEncryptedCredentialRecord): String {
         val key = keyStore.getKey(record.keyAlias, null) as SecretKey
         val cipher = Cipher.getInstance(AES_GCM)
         val iv = Base64.decode(record.ivBase64, Base64.NO_WRAP)
@@ -159,7 +161,7 @@ class AndroidKeystoreCredentialStore(
         return bytes.toString(Charsets.UTF_8)
     }
 
-    fun revoke(record: AndroidEncryptedCredentialRecord): Boolean {
+    override fun revoke(record: AndroidEncryptedCredentialRecord): Boolean {
         if (keyStore.containsAlias(record.keyAlias)) {
             keyStore.deleteEntry(record.keyAlias)
         }

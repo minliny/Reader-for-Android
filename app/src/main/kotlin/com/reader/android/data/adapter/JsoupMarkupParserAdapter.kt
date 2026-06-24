@@ -1,7 +1,11 @@
 package com.reader.android.data.adapter
 
+import com.reader.android.data.model.BookSourceRule
+import com.reader.android.data.model.RuleExtraction
+import com.reader.android.data.model.RuleField
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 
 data class MarkupExtractionResult(
@@ -50,6 +54,39 @@ class JsoupMarkupParserAdapter {
         val document = Jsoup.parse(html)
         document.select("script,style").remove()
         return document.text().trim()
+    }
+
+    /**
+     * Select repeated row elements by [listSelector] and return their text.
+     * Used by list stages (search results, TOC chapters) when a [BookSourceRule]
+     * carries a `listSelector`.
+     */
+    fun selectHtmlTextList(html: String, listSelector: String): List<Element> {
+        return Jsoup.parse(html).select(listSelector).toList()
+    }
+
+    /**
+     * Evaluate a [BookSourceRule] against [html]. Returns one field map per row
+     * when the rule has a [BookSourceRule.listSelector] (search/TOC), or a single
+     * field map evaluated against the whole document otherwise (bookInfo/content).
+     * Empty results are returned for selectors that fail to parse — the caller
+     * (parser) falls back to the regex path.
+     */
+    fun evaluateRule(html: String, rule: BookSourceRule): List<Map<String, String>> {
+        val document = Jsoup.parse(html)
+        val rows: List<Element> = rule.listSelector
+            ?.let { document.select(it).toList() }
+            ?: listOf(document)
+        return rows.map { row -> rule.fields.associate { field -> field.name to extractField(row, field) } }
+    }
+
+    private fun extractField(scope: Element, field: RuleField): String {
+        val elements = scope.select(field.selector)
+        return when (field.extraction) {
+            RuleExtraction.ATTRIBUTE -> elements.firstOrNull()?.attr(field.attribute ?: "href")?.trim().orEmpty()
+            RuleExtraction.HTML -> elements.firstOrNull()?.html()?.trim().orEmpty()
+            RuleExtraction.TEXT -> elements.joinToString("\n") { it.text().trim() }.trim()
+        }
     }
 
     private fun result(values: List<String>, selector: String, mode: String): MarkupExtractionResult =

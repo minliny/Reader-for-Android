@@ -151,6 +151,13 @@ fun SettingsRootScreen(
     onSourceManagementClick: () -> Unit = {},
     onRssManagementClick: () -> Unit = {},
     onGlobalSettingsClick: () -> Unit = {},
+    onGeneralSettingsClick: () -> Unit = {},
+    onBookshelfSearchSettingsClick: () -> Unit = {},
+    onReadingPreferenceClick: () -> Unit = {},
+    onCacheManagementClick: () -> Unit = {},
+    onPrivacyPermissionsClick: () -> Unit = {},
+    onAboutFeedbackClick: () -> Unit = {},
+    onSyncBackupClick: () -> Unit = {},
     onWebDavClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     onProgressSyncClick: () -> Unit = {},
@@ -194,6 +201,13 @@ fun SettingsRootScreen(
                                 onSourceManagementClick = onSourceManagementClick,
                                 onRssManagementClick = onRssManagementClick,
                                 onGlobalSettingsClick = onGlobalSettingsClick,
+                                onGeneralSettingsClick = onGeneralSettingsClick,
+                                onBookshelfSearchSettingsClick = onBookshelfSearchSettingsClick,
+                                onReadingPreferenceClick = onReadingPreferenceClick,
+                                onCacheManagementClick = onCacheManagementClick,
+                                onPrivacyPermissionsClick = onPrivacyPermissionsClick,
+                                onAboutFeedbackClick = onAboutFeedbackClick,
+                                onSyncBackupClick = onSyncBackupClick,
                                 onWebDavClick = onWebDavClick,
                                 onBackupClick = onBackupClick,
                                 onProgressSyncClick = onProgressSyncClick,
@@ -223,6 +237,13 @@ fun SettingsRootScreen(
                                             onSourceManagementClick = onSourceManagementClick,
                                             onRssManagementClick = onRssManagementClick,
                                             onGlobalSettingsClick = onGlobalSettingsClick,
+                                            onGeneralSettingsClick = onGeneralSettingsClick,
+                                            onBookshelfSearchSettingsClick = onBookshelfSearchSettingsClick,
+                                            onReadingPreferenceClick = onReadingPreferenceClick,
+                                            onCacheManagementClick = onCacheManagementClick,
+                                            onPrivacyPermissionsClick = onPrivacyPermissionsClick,
+                                            onAboutFeedbackClick = onAboutFeedbackClick,
+                                            onSyncBackupClick = onSyncBackupClick,
                                             onWebDavClick = onWebDavClick,
                                             onBackupClick = onBackupClick,
                                             onProgressSyncClick = onProgressSyncClick,
@@ -388,6 +409,13 @@ private fun dispatchSettingsTarget(
     onSourceManagementClick: () -> Unit,
     onRssManagementClick: () -> Unit,
     onGlobalSettingsClick: () -> Unit,
+    onGeneralSettingsClick: () -> Unit,
+    onBookshelfSearchSettingsClick: () -> Unit,
+    onReadingPreferenceClick: () -> Unit,
+    onCacheManagementClick: () -> Unit,
+    onPrivacyPermissionsClick: () -> Unit,
+    onAboutFeedbackClick: () -> Unit,
+    onSyncBackupClick: () -> Unit,
     onWebDavClick: () -> Unit,
     onBackupClick: () -> Unit,
     onProgressSyncClick: () -> Unit,
@@ -398,14 +426,14 @@ private fun dispatchSettingsTarget(
     when (target) {
         SettingsTarget.SourceManagement -> onSourceManagementClick()
         SettingsTarget.RssManagement -> onRssManagementClick()
-        SettingsTarget.ReadingPreference,
-        SettingsTarget.General,
-        SettingsTarget.BookshelfSearch,
-        SettingsTarget.CacheManagement -> onGlobalSettingsClick()
+        SettingsTarget.General -> onGeneralSettingsClick()
+        SettingsTarget.ReadingPreference -> onReadingPreferenceClick()
+        SettingsTarget.BookshelfSearch -> onBookshelfSearchSettingsClick()
+        SettingsTarget.CacheManagement -> onCacheManagementClick()
         SettingsTarget.SourceSubscription -> onSourceManagementClick()
-        SettingsTarget.SyncBackup -> onBackupClick()
-        SettingsTarget.PrivacyPermissions,
-        SettingsTarget.AboutFeedback -> onAboutClick()
+        SettingsTarget.SyncBackup -> onSyncBackupClick()
+        SettingsTarget.PrivacyPermissions -> onPrivacyPermissionsClick()
+        SettingsTarget.AboutFeedback -> onAboutFeedbackClick()
         SettingsTarget.PrototypeGallery -> onPrototypeGalleryClick?.invoke()
     }
 }
@@ -415,6 +443,13 @@ fun MineScreen(
     onSourceManagementClick: () -> Unit = {},
     onRssManagementClick: () -> Unit = {},
     onGlobalSettingsClick: () -> Unit = {},
+    onGeneralSettingsClick: () -> Unit = {},
+    onBookshelfSearchSettingsClick: () -> Unit = {},
+    onReadingPreferenceClick: () -> Unit = {},
+    onCacheManagementClick: () -> Unit = {},
+    onPrivacyPermissionsClick: () -> Unit = {},
+    onAboutFeedbackClick: () -> Unit = {},
+    onSyncBackupClick: () -> Unit = {},
     onWebDavClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     onProgressSyncClick: () -> Unit = {},
@@ -426,6 +461,13 @@ fun MineScreen(
         onSourceManagementClick = onSourceManagementClick,
         onRssManagementClick = onRssManagementClick,
         onGlobalSettingsClick = onGlobalSettingsClick,
+        onGeneralSettingsClick = onGeneralSettingsClick,
+        onBookshelfSearchSettingsClick = onBookshelfSearchSettingsClick,
+        onReadingPreferenceClick = onReadingPreferenceClick,
+        onCacheManagementClick = onCacheManagementClick,
+        onPrivacyPermissionsClick = onPrivacyPermissionsClick,
+        onAboutFeedbackClick = onAboutFeedbackClick,
+        onSyncBackupClick = onSyncBackupClick,
         onWebDavClick = onWebDavClick,
         onBackupClick = onBackupClick,
         onProgressSyncClick = onProgressSyncClick,

@@ -3,6 +3,9 @@ package com.reader.android.coreadapter
 import com.reader.android.data.adapter.EncodingDetector
 import com.reader.android.data.adapter.EpubContainerParser
 import com.reader.android.data.adapter.JsoupMarkupParserAdapter
+import com.reader.android.data.adapter.ComposeReaderShellHost
+import com.reader.android.data.adapter.ReaderContentType
+import com.reader.android.data.adapter.RenderRequest
 import com.reader.android.data.adapter.OpfParser
 import com.reader.android.data.network.RssParser
 import org.json.JSONArray
@@ -16,7 +19,8 @@ object AndroidCoreFeatureManifest {
         "markupParser" to listOf("html.css", "html.xpath", "xml.xpath", "attribute-extraction"),
         "feedParser" to listOf("rss", "atom", "json-feed", "feed-pagination-metadata", "cookie-login-diagnostic"),
         "textEncodingDetector" to listOf("txt.bom", "txt.utf8", "txt.gb18030", "txt.fallback"),
-        "runtimeHost" to listOf("webView", "javascript", "cookieJar", "sessionPersistence", "loginFlow", "snapshotWrite")
+        "runtimeHost" to listOf("webView", "javascript", "cookieJar", "sessionPersistence", "loginFlow", "snapshotWrite"),
+        "readerShell" to listOf("text-paginate", "html-sanitize", "csp-lock", "js-disabled-default", "cfi-future-slot")
     )
 }
 
@@ -137,6 +141,7 @@ object AndroidLegadoParityEvidenceRunner {
         cases += feedParserCases()
         cases += textEncodingDetectorCases()
         cases += runtimeHostCases()
+        cases += readerShellCases()
 
         return AndroidLegadoParityEvidenceBundle(
             sampleId = "android_core_legado_parity_001",
@@ -258,6 +263,28 @@ object AndroidLegadoParityEvidenceRunner {
             evidence("runtimeHost", "sessionPersistence", "android_platform_runtime_ci", !runtime.rawSessionTokenExported && runtime.deviceExecutorUsed, "Session persistence boundary remains redacted after device cookie smoke", AndroidEvidenceStatus.DeviceExecutedInstrumented),
             evidence("runtimeHost", "loginFlow", "android_platform_runtime_ci", runtime.runtimeEvidenceIds.contains("session_cookie_login_platform_runner") && runtime.deviceExecutorUsed, "Login/session smoke evidence ID is supplied after device runtime smoke", AndroidEvidenceStatus.DeviceExecutedInstrumented),
             evidence("runtimeHost", "snapshotWrite", "android_platform_runtime_ci", runtime.runtimeEvidenceIds.contains("runtime_rollback_audit") && runtime.deviceExecutorUsed, "Runtime rollback/snapshot evidence ID is supplied after device runtime smoke", AndroidEvidenceStatus.DeviceExecutedInstrumented)
+        )
+    }
+
+    private fun readerShellCases(): List<AndroidPlatformEvidenceCase> {
+        val host = ComposeReaderShellHost()
+        val txt = kotlinx.coroutines.runBlocking {
+            host.render(RenderRequest(content = (1..200).joinToString("\n") { "段落$it 正文。" }, contentType = ReaderContentType.TXT))
+        }
+        val html = kotlinx.coroutines.runBlocking {
+            host.render(
+                RenderRequest(
+                    content = "<article><p>第一段<script>bad()</script></p><iframe src='https://evil/x'></iframe></article>",
+                    contentType = ReaderContentType.HTML
+                )
+            )
+        }
+        return listOf(
+            evidence("readerShell", "text-paginate", "android_reader_shell_platform_execution", txt.paginatedText.size > 1, "TXT content paginated into bounded pages without Readium"),
+            evidence("readerShell", "html-sanitize", "android_reader_shell_platform_execution", !html.sanitizedHtml!!.contains("script") && !html.sanitizedHtml.contains("iframe"), "HTML sanitized: scripts and iframes stripped via jsoup Safelist"),
+            evidence("readerShell", "csp-lock", "android_reader_shell_platform_execution", html.csp.contains("default-src 'none'"), "CSP locks remote resources to none"),
+            evidence("readerShell", "js-disabled-default", "android_reader_shell_platform_execution", !html.jsEnabled && html.csp.contains("script-src 'none'"), "JavaScript disabled by default with script-src none"),
+            evidence("readerShell", "cfi-future-slot", "android_reader_shell_platform_execution", html.cfi == null, "EPUB-CFI slot left null for future Readium opt-in behind the same contract")
         )
     }
 

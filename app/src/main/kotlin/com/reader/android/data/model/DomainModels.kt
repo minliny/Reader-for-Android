@@ -22,6 +22,38 @@ data class BookInfo(
 
 // ── Source ──
 
+/**
+ * One selector expression for a [BookSourceRule]. Legado-style shape:
+ * `name@css||attr` (CSS selector, optional `||attr` to read an attribute),
+ * `name@xpath` (bounded XPath mapped to a CSS selector by the adapter),
+ * or `name@text` / `name@html` for explicit extraction modes.
+ *
+ * This is a clean-room rule grammar — no Legado source is referenced. The
+ * field list is the minimal set the four parsers consume; it is additive on
+ * [BookSource] and defaults to null so existing fixtures/sources keep working.
+ */
+data class RuleField(
+    val name: String,
+    val selector: String,
+    val extraction: RuleExtraction = RuleExtraction.TEXT,
+    val attribute: String? = null
+)
+
+enum class RuleExtraction { TEXT, HTML, ATTRIBUTE }
+
+/**
+ * A parsed selector rule for one fetch stage (search / bookInfo / toc / content).
+ * [listSelector] selects the repeated rows for list stages (search results, TOC
+ * chapters); [fields] are evaluated relative to each row (or the whole document
+ * for bookInfo / content). Null fields fall back to the regex path in the parser.
+ */
+data class BookSourceRule(
+    val listSelector: String? = null,
+    val fields: List<RuleField> = emptyList()
+) {
+    fun field(name: String): RuleField? = fields.firstOrNull { it.name == name }
+}
+
 data class BookSource(
     val sourceUrl: String,
     val sourceName: String,
@@ -40,6 +72,11 @@ data class BookSource(
     // Content rule
     val contentUrl: String? = null,
     val contentCharset: String? = null,
+    // Selector rules (clean-room Legado-style grammar; null = use regex fallback)
+    val ruleSearch: BookSourceRule? = null,
+    val ruleBookInfo: BookSourceRule? = null,
+    val ruleToc: BookSourceRule? = null,
+    val ruleContent: BookSourceRule? = null,
     // Meta
     val header: String? = null,
     val loginUrl: String? = null
