@@ -1,5 +1,6 @@
 package com.reader.android.coreadapter
 
+import com.reader.android.data.nativebridge.ReaderNativeRuntimeBridge
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -25,6 +26,9 @@ object AndroidCoreAdapterContractIds {
     )
 
     val RUNTIME_CI_EVIDENCE_IDS = listOf(
+        ReaderNativeRuntimeBridge.NDK_PACKAGING_EVIDENCE_ID,
+        ReaderNativeRuntimeBridge.SYSTEM_LOAD_LIBRARY_EVIDENCE_ID,
+        ReaderNativeRuntimeBridge.HOST_BUS_LOOP_EVIDENCE_ID,
         "credential_redaction_revocation_matrix",
         "product_gated_js_bridge_release_runner",
         "runtime_rollback_audit",
@@ -68,9 +72,9 @@ data class AndroidAdapterContract(
 
 data class RuntimeCiEvidenceDescriptor(
     val evidenceId: String,
-    val status: String = "deviceExecutedInstrumented",
+    val status: String,
     val redactionPolicy: String = "noCredentialsNoPrivateContentNoRawCookieValues",
-    val claim: String = "Android runtime seam executed on Pixel_10_Pro_XL AVD: WebView DOM, CookieManager mirror, Keystore revoke, and SAF denied-permission redaction smoke passed."
+    val claim: String
 )
 
 data class AndroidCoreAdapterContractReport(
@@ -225,20 +229,26 @@ object AndroidCoreAdapterContractReportFactory {
                         "com.reader.android.data.adapter.CookieStore",
                         "com.reader.android.data.adapter.RuntimeScope",
                         "com.reader.android.data.adapter.JsRequest",
-                        "com.reader.android.data.adapter.JsResponse"
+                        "com.reader.android.data.adapter.JsResponse",
+                        "com.reader.android.data.nativebridge.ReaderNativeRuntimeBridge",
+                        "com.reader.android.data.nativebridge.ReaderNativeRuntimeJni",
+                        "app/src/main/cpp/reader_native_runtime_evidence.cpp"
                     ),
                     requiredFeatureIds = AndroidCoreFeatureManifest.requiredFeatureIds.getValue("runtimeHost"),
                     platformInputs = listOf(
                         "WebView runtime descriptor",
                         "CookieManager mirror descriptor",
                         "Keystore-backed secret descriptor",
-                        "per-source runtime isolation descriptor"
+                        "per-source runtime isolation descriptor",
+                        "NDK shared-object packaging descriptor",
+                        "System.loadLibrary(\"reader_native_runtime_evidence\") descriptor",
+                        "JNI host bus loop probe descriptor"
                     ),
                     requiredEvidenceArtifacts = requiredArtifactNames,
-                    coreBoundary = "Android owns WebView, CookieManager, Keystore, and runtime host smoke execution.",
+                    coreBoundary = "Android owns WebView, CookieManager, Keystore, NDK/JNI loading, and host bus loop smoke execution; no Reader-Core protocol mutation is allowed from this repo.",
                     execution = AdapterExecutionProof(
-                        status = "deviceExecutedInstrumented",
-                        proofScope = "Instrumented smoke executed on Pixel_10_Pro_XL AVD: WebView DOM, evaluateJavascript, CookieManager redacted mirror, AndroidKeyStore save/load/revoke, and SAF denied-permission redaction.",
+                        status = "deviceInstrumentedPlusNativeReady",
+                        proofScope = "Existing instrumented runtime smoke covers WebView DOM, evaluateJavascript, CookieManager redacted mirror, AndroidKeyStore save/load/revoke, and SAF denied-permission redaction. Native evidence adds CMake-built libreader_native_runtime_evidence.so, explicit System.loadLibrary, and AndroidNativeRuntimeInstrumentedSmokeTest for JNI host bus loop execution; JVM unit smoke is explicitly not device evidence.",
                         mayFeedCoreEvidence = true
                     )
                 ),
@@ -269,11 +279,63 @@ object AndroidCoreAdapterContractReportFactory {
                     )
                 )
             ),
-            runtimeCiEvidence = AndroidCoreAdapterContractIds.RUNTIME_CI_EVIDENCE_IDS.map {
-                RuntimeCiEvidenceDescriptor(evidenceId = it)
-            }
+            runtimeCiEvidence = runtimeCiEvidenceDescriptors()
         )
     }
+
+    private fun runtimeCiEvidenceDescriptors(): List<RuntimeCiEvidenceDescriptor> =
+        listOf(
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = ReaderNativeRuntimeBridge.NDK_PACKAGING_EVIDENCE_ID,
+                status = "apkNativePackagingMeasured",
+                claim = "AGP externalNativeBuild.cmake builds libreader_native_runtime_evidence.so for arm64-v8a and x86_64 and packages it into the app APK native library directory."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = ReaderNativeRuntimeBridge.SYSTEM_LOAD_LIBRARY_EVIDENCE_ID,
+                status = "deviceExecutedInstrumented",
+                claim = "ReaderNativeRuntimeBridge.loadLibraryForApp calls System.loadLibrary(\"reader_native_runtime_evidence\"); this passed on Pixel_10_Pro_XL AVD, while JVM UnsatisfiedLinkError is recorded as JVM_HOST_NOT_DEVICE and is not device completion."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = ReaderNativeRuntimeBridge.HOST_BUS_LOOP_EVIDENCE_ID,
+                status = "deviceExecutedInstrumented",
+                claim = "AndroidNativeRuntimeInstrumentedSmokeTest passed on Pixel_10_Pro_XL AVD and proved JNI host bus loop dispatch through the loaded shared object."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "credential_redaction_revocation_matrix",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: AndroidKeyStore save/load/revoke smoke passed with no credential export."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "product_gated_js_bridge_release_runner",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: product-gated JavaScript bridge policy remained enforced."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "runtime_rollback_audit",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: rollback/snapshot boundary smoke passed with redacted output."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "secure_storage_platform_audit",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: secure storage platform audit passed with no raw secret export."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "session_cookie_login_platform_runner",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: session cookie login runner passed with redacted cookie values."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "webview_cookie_mirror_audit",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: CookieManager mirror exported counts only."
+            ),
+            RuntimeCiEvidenceDescriptor(
+                evidenceId = "webview_dom_platform_smoke_runner",
+                status = "deviceExecutedInstrumented",
+                claim = "Android runtime seam executed on Pixel_10_Pro_XL AVD: WebView DOM and evaluateJavascript smoke passed."
+            )
+        )
 }
 
 object AndroidCoreAdapterContractReportJson {

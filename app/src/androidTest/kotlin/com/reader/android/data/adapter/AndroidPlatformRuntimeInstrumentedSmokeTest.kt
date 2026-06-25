@@ -68,7 +68,7 @@ class AndroidPlatformRuntimeInstrumentedSmokeTest {
         cookieManager.setCookie(sourceUrl, "sid=synthetic-cookie; Path=/; HttpOnly")
         cookieManager.flush()
 
-        val evidence = AndroidCookieManagerStore(cookieManager).redactedMirrorEvidence(sourceUrl)
+        val evidence = AndroidCookieManagerStore { cookieManager }.redactedMirrorEvidence(sourceUrl)
 
         assertTrue(evidence.contains("count:1"))
         assertTrue(evidence.contains("values:REDACTED"))

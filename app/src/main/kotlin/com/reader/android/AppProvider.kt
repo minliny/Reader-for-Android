@@ -12,6 +12,10 @@ import com.reader.android.data.adapter.WebRuntimeAdapter
 import com.reader.android.data.bridge.CoreBridge
 import com.reader.android.data.bridge.FakeCoreBridge
 import com.reader.android.data.bridge.RealCoreBridge
+import com.reader.android.data.nativebridge.NativeHostBusLoopEvidence
+import com.reader.android.data.nativebridge.NativeRuntimeLoadEvidence
+import com.reader.android.data.nativebridge.NativeRuntimePackagingEvidence
+import com.reader.android.data.nativebridge.ReaderNativeRuntimeBridge
 import com.reader.android.data.network.OkHttpTransport
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
@@ -114,6 +118,18 @@ object AppProvider {
     fun initForWebRuntimeAdapter(adapter: WebRuntimeAdapter) {
         _webRuntimeAdapter = adapter
     }
+
+    /** Android app-side NDK/JNI packaging descriptor. Does not load the library. */
+    val nativeRuntimePackagingEvidence: NativeRuntimePackagingEvidence
+        get() = ReaderNativeRuntimeBridge.packagingEvidence()
+
+    /** Explicit app-side native load seam; JVM unit tests are not device evidence. */
+    fun loadNativeRuntimeForApp(): NativeRuntimeLoadEvidence =
+        ReaderNativeRuntimeBridge.loadLibraryForApp()
+
+    /** Executes the native JNI host bus loop probe when the shared object is loaded. */
+    fun runNativeRuntimeHostBusLoopProbe(commands: List<String>): NativeHostBusLoopEvidence =
+        ReaderNativeRuntimeBridge.runHostBusLoopProbe(commands)
 
     /** Keystore-backed WebDAV credential persistence. */
     val webDavCredentialStore: WebDavCredentialStore

@@ -29,6 +29,12 @@ class AndroidLegadoParityEvidenceRunnerTest {
         assertEquals("DEVICE_EXECUTED_INSTRUMENTED", runtime.executionMode)
         assertTrue(runtime.deviceExecutorReady)
         assertTrue(runtime.deviceExecutorUsed)
+        assertEquals("libreader_native_runtime_evidence.so", runtime.nativeLibraryName)
+        assertEquals("android_ndk_shared_library_packaging", runtime.nativePackagingEvidenceId)
+        assertEquals("android_system_load_library_runner", runtime.systemLoadLibraryEvidenceId)
+        assertEquals("android_jni_host_bus_loop_probe", runtime.jniHostBusLoopEvidenceId)
+        assertTrue(runtime.nativeHostBusLoopDeviceExecuted)
+        assertFalse(runtime.jvmSmokeCountsAsDeviceEvidence)
         assertFalse(runtime.externalNetworkUsed)
         assertEquals(AndroidCoreAdapterContractIds.RUNTIME_CI_EVIDENCE_IDS, runtime.runtimeEvidenceIds)
     }

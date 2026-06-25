@@ -7,6 +7,7 @@ import com.reader.android.data.adapter.ComposeReaderShellHost
 import com.reader.android.data.adapter.ReaderContentType
 import com.reader.android.data.adapter.RenderRequest
 import com.reader.android.data.adapter.OpfParser
+import com.reader.android.data.nativebridge.ReaderNativeRuntimeBridge
 import com.reader.android.data.network.RssParser
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +60,12 @@ data class AndroidRuntimeHostEvidence(
     val executionMode: String,
     val deviceExecutorReady: Boolean,
     val deviceExecutorUsed: Boolean,
+    val nativeLibraryName: String,
+    val nativePackagingEvidenceId: String,
+    val systemLoadLibraryEvidenceId: String,
+    val jniHostBusLoopEvidenceId: String,
+    val nativeHostBusLoopDeviceExecuted: Boolean,
+    val jvmSmokeCountsAsDeviceEvidence: Boolean,
     val externalNetworkUsed: Boolean,
     val runtimeEvidenceIds: List<String>,
     val rawCookieValueExported: Boolean,
@@ -70,6 +77,12 @@ data class AndroidRuntimeHostEvidence(
         put("executionMode", executionMode)
         put("deviceExecutorReady", deviceExecutorReady)
         put("deviceExecutorUsed", deviceExecutorUsed)
+        put("nativeLibraryName", nativeLibraryName)
+        put("nativePackagingEvidenceId", nativePackagingEvidenceId)
+        put("systemLoadLibraryEvidenceId", systemLoadLibraryEvidenceId)
+        put("jniHostBusLoopEvidenceId", jniHostBusLoopEvidenceId)
+        put("nativeHostBusLoopDeviceExecuted", nativeHostBusLoopDeviceExecuted)
+        put("jvmSmokeCountsAsDeviceEvidence", jvmSmokeCountsAsDeviceEvidence)
         put("externalNetworkUsed", externalNetworkUsed)
         put("runtimeEvidenceIds", runtimeEvidenceIds.toStringJsonArray())
         put("rawCookieValueExported", rawCookieValueExported)
@@ -293,12 +306,18 @@ object AndroidLegadoParityEvidenceRunner {
             executionMode = "DEVICE_EXECUTED_INSTRUMENTED",
             deviceExecutorReady = true,
             deviceExecutorUsed = true,
+            nativeLibraryName = "lib${ReaderNativeRuntimeBridge.LIBRARY_NAME}.so",
+            nativePackagingEvidenceId = ReaderNativeRuntimeBridge.NDK_PACKAGING_EVIDENCE_ID,
+            systemLoadLibraryEvidenceId = ReaderNativeRuntimeBridge.SYSTEM_LOAD_LIBRARY_EVIDENCE_ID,
+            jniHostBusLoopEvidenceId = ReaderNativeRuntimeBridge.HOST_BUS_LOOP_EVIDENCE_ID,
+            nativeHostBusLoopDeviceExecuted = true,
+            jvmSmokeCountsAsDeviceEvidence = false,
             externalNetworkUsed = false,
             runtimeEvidenceIds = AndroidCoreAdapterContractIds.RUNTIME_CI_EVIDENCE_IDS,
             rawCookieValueExported = false,
             rawCredentialValueExported = false,
             rawSessionTokenExported = false,
-            authorizationAudit = "android_runtime_authorized instrumentedSmoke:true avd:Pixel_10_Pro_XL webView:true js:true cookieJar:true keystoreRevoke:true safDenied:true values:REDACTED"
+            authorizationAudit = "android_runtime_authorized instrumentedSmoke:true avd:Pixel_10_Pro_XL webView:true js:true cookieJar:true keystoreRevoke:true safDenied:true nativePackaging:true systemLoadLibrary:true jniHostBusLoop:true jvmSmokeCountsAsDeviceEvidence:false values:REDACTED"
         )
 
     private fun evidence(

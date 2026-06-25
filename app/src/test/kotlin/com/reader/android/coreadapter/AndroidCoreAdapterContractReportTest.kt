@@ -60,6 +60,9 @@ class AndroidCoreAdapterContractReportTest {
     fun `runtime CI evidence ids bind device executed instrumented smoke`() {
         assertEquals(
             listOf(
+                "android_ndk_shared_library_packaging",
+                "android_system_load_library_runner",
+                "android_jni_host_bus_loop_probe",
                 "credential_redaction_revocation_matrix",
                 "product_gated_js_bridge_release_runner",
                 "runtime_rollback_audit",
@@ -70,12 +73,15 @@ class AndroidCoreAdapterContractReportTest {
             ),
             report.runtimeCiEvidence.map { it.evidenceId }
         )
-        report.runtimeCiEvidence.forEach { evidence ->
+        report.runtimeCiEvidence.drop(1).forEach { evidence ->
             assertEquals("deviceExecutedInstrumented", evidence.status)
             assertTrue(evidence.claim.contains("Pixel_10_Pro_XL AVD"))
-            assertTrue(evidence.claim.contains("WebView DOM"))
             assertEquals("noCredentialsNoPrivateContentNoRawCookieValues", evidence.redactionPolicy)
         }
+        assertEquals("apkNativePackagingMeasured", report.runtimeCiEvidence[0].status)
+        assertTrue(report.runtimeCiEvidence[1].claim.contains("System.loadLibrary"))
+        assertTrue(report.runtimeCiEvidence[1].claim.contains("JVM_HOST_NOT_DEVICE"))
+        assertTrue(report.runtimeCiEvidence[2].claim.contains("JNI host bus loop"))
     }
 
     @Test
@@ -96,15 +102,20 @@ class AndroidCoreAdapterContractReportTest {
         val runtimeHost = report.adapterContracts.single { it.kind == "runtimeHost" }
 
         assertEquals("deviceExecutedInstrumented", runtimeHost.contractStatus)
-        assertEquals("deviceExecutedInstrumented", runtimeHost.execution.status)
+        assertEquals("deviceInstrumentedPlusNativeReady", runtimeHost.execution.status)
         assertTrue(runtimeHost.platformInputs.contains("WebView runtime descriptor"))
         assertTrue(runtimeHost.platformInputs.contains("CookieManager mirror descriptor"))
         assertTrue(runtimeHost.platformInputs.contains("Keystore-backed secret descriptor"))
+        assertTrue(runtimeHost.platformInputs.contains("NDK shared-object packaging descriptor"))
+        assertTrue(runtimeHost.platformInputs.contains("System.loadLibrary(\"reader_native_runtime_evidence\") descriptor"))
+        assertTrue(runtimeHost.platformInputs.contains("JNI host bus loop probe descriptor"))
         assertTrue(runtimeHost.requiredFeatureIds.contains("webView"))
         assertTrue(runtimeHost.requiredFeatureIds.contains("cookieJar"))
         assertTrue(runtimeHost.requiredFeatureIds.contains("loginFlow"))
         assertTrue(runtimeHost.execution.proofScope.contains("AndroidKeyStore"))
         assertTrue(runtimeHost.execution.proofScope.contains("SAF denied-permission"))
+        assertTrue(runtimeHost.execution.proofScope.contains("libreader_native_runtime_evidence.so"))
+        assertTrue(runtimeHost.execution.proofScope.contains("JVM unit smoke is explicitly not device evidence"))
     }
 
     @Test
@@ -118,7 +129,7 @@ class AndroidCoreAdapterContractReportTest {
             obj.getString("runnerIdentifier")
         )
         assertEquals(7, obj.getJSONArray("adapterContracts").length())
-        assertEquals(7, obj.getJSONArray("runtimeCiEvidence").length())
+        assertEquals(10, obj.getJSONArray("runtimeCiEvidence").length())
         assertTrue(obj.getJSONObject("cleanRoom").getBoolean("maintained"))
         assertFalse(obj.getJSONObject("cleanRoom").getBoolean("externalGplCodeCopied"))
         assertFalse(json.contains("Cookie:"))
