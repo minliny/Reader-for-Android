@@ -17,7 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    onBookClick: (String) -> Unit,
+    onBookClick: (com.reader.api.SearchBook) -> Unit,
     vm: SearchViewModel = viewModel()
 ) {
     val query by vm.query.collectAsState()
@@ -50,7 +50,7 @@ fun SearchScreen(
                         ListItem(
                             headlineContent = { Text(book.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text(book.author, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            modifier = Modifier.clickable { onBookClick(book.bookUrl) }
+                            modifier = Modifier.clickable { onBookClick(book) }
                         )
                         HorizontalDivider()
                     }
