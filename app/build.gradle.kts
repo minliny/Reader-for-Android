@@ -76,6 +76,9 @@ dependencies {
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
 
+    // Kotlin Coroutines (for BookApi/SourceApi suspend facades + withContext)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
     // DataStore Preferences (for theme, reading settings)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
