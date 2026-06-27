@@ -3,16 +3,12 @@ package com.reader.ui.bookshelf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reader.api.Book
-import com.reader.api.ReaderCoreClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 class BookshelfViewModel : ViewModel() {
-    private val client = ReaderCoreClient.get()
-
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -21,33 +17,12 @@ class BookshelfViewModel : ViewModel() {
     fun loadBooks() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            try {
-                // 尝试通过 Core 拉本地书架列表
-                // 注意:bookshelf.list 可能不被 Core 支持,异常时回退到 Empty
-                val result = client.sendAndAwait("bookshelf.list", JSONObject(), 10_000)
-                val books = parseBooks(result)
-                _uiState.value = if (books.isEmpty()) UiState.Empty
-                                 else UiState.Success(books)
-            } catch (e: Exception) {
-                // bookshelf.list 不支持或 Core 未就绪 → 空书架
-                // 引导用户去搜索或导入书源
-                _uiState.value = UiState.Empty
-            }
-        }
-    }
-
-    private fun parseBooks(data: JSONObject): List<Book> {
-        val arr = data.optJSONArray("books") ?: return emptyList()
-        return (0 until arr.length()).map { i ->
-            val b = arr.getJSONObject(i)
-            Book(
-                bookUrl = b.optString("bookUrl"),
-                name = b.optString("name"),
-                author = b.optString("author"),
-                coverUrl = b.optString("coverUrl"),
-                intro = b.optString("intro"),
-                origin = b.optString("origin")
-            )
+            // Core 协议 v1 未暴露 bookshelf.list / bookshelf.get 命令
+            // (rb-bookshelf-protocol-gap)。reader-storage 内部有 BookshelfStore
+            // (list_shelf/query_shelf/get_book),但未通过 JSON protocol 暴露;
+            // Android 侧也暂无本地书架 Room 表。协议补齐 bookshelf.list 或本地
+            // 书架持久化落地前,书架保持空,引导用户去搜索或导入书源。
+            _uiState.value = UiState.Empty
         }
     }
 }
