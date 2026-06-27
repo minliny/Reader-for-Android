@@ -9,10 +9,6 @@ import com.reader.android.data.adapter.FakeCookieStore
 import com.reader.android.data.adapter.FakeWebRuntimeAdapter
 import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.android.data.adapter.WebRuntimeAdapter
-import com.reader.android.data.bridge.CoreBridge
-import com.reader.android.data.bridge.FakeCoreBridge
-import com.reader.android.data.bridge.RealCoreBridge
-import com.reader.android.data.network.OkHttpTransport
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
@@ -34,34 +30,11 @@ object AppProvider {
     // ── Runtime state ──
     private var db: AppDatabase? = null
     private var _bookSourceRepo: BookSourceRepository? = null
-    private var _coreBridge: CoreBridge? = null
     private var _cookieStore: CookieStore? = null
     private var _webRuntimeAdapter: WebRuntimeAdapter? = null
     private var _webDavCredentialStore: WebDavCredentialStore? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
-
-    // ── Core Bridge ──
-
-    /**
-     * Provides [CoreBridge] based on network state.
-     * - Network disabled: returns [FakeCoreBridge] (deterministic, no I/O)
-     * - Network enabled: returns [RealCoreBridge] with OkHttp transport wired to
-     *   the shared [cookieStore], so OkHttp and the WebView mirror the same cookies.
-     *
-     * Tests can inject a custom bridge via [initForBridge].
-     */
-    val coreBridge: CoreBridge
-        get() = _coreBridge ?: if (_networkAllowed) {
-            RealCoreBridge(OkHttpTransport.withCookieStore(cookieStore), cookieStore = cookieStore)
-        } else {
-            FakeCoreBridge()
-        }
-
-    /** Inject a custom bridge for tests. Overrides network-state default. */
-    fun initForBridge(bridge: CoreBridge) {
-        _coreBridge = bridge
-    }
 
     // ── Network gate ──
 
@@ -170,7 +143,6 @@ object AppProvider {
         db?.close()
         db = null
         _bookSourceRepo = null
-        _coreBridge = null
         _cookieStore = null
         _webRuntimeAdapter = null
         _webDavCredentialStore = null

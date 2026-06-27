@@ -13,6 +13,7 @@ build/
 
 # Android
 local.properties
+**/.cxx/
 
 # Test artifacts
 **/test-results/
