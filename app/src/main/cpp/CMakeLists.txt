@@ -1,15 +1,30 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project(reader_native_runtime_evidence LANGUAGES CXX)
+project(reader_core_jni LANGUAGES CXX)
 
-add_library(
-    reader_native_runtime_evidence
-    SHARED
-    reader_native_runtime_evidence.cpp
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_library(reader_core_static STATIC IMPORTED GLOBAL)
+set_target_properties(reader_core_static PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/../../../libs/${ANDROID_ABI}/libreader_core.a
 )
 
-target_compile_features(reader_native_runtime_evidence PRIVATE cxx_std_17)
+add_library(reader_core_jni SHARED
+    reader_jni.cpp
+)
 
-find_library(log_lib log)
+target_include_directories(reader_core_jni PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
 
-target_link_libraries(reader_native_runtime_evidence PRIVATE ${log_lib})
+find_library(log-lib log)
+
+target_link_libraries(reader_core_jni
+    reader_core_static
+    ${log-lib}
+    android
+    dl
+    m
+)

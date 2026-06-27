@@ -21,6 +21,12 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DANDROID_STL=c++_static"
+            }
+        }
     }
 
     buildTypes {
@@ -56,6 +62,12 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = false
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("src/main/libs")
         }
     }
 }
