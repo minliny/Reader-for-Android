@@ -19,7 +19,7 @@ class BookApi(private val client: ReaderCoreClient) {
     suspend fun search(sourceId: String, key: String, page: Int = 1): List<SearchBook> {
         val params = JSONObject().apply {
             put("sourceId", sourceId)
-            put("query", key)
+            put("keyword", key)
             put("page", page)
         }
         val result = client.sendAndAwait("book.search", params)
@@ -29,9 +29,10 @@ class BookApi(private val client: ReaderCoreClient) {
     suspend fun detail(sourceId: String, book: Book): Book {
         val params = JSONObject().apply {
             put("sourceId", sourceId)
+            put("bookUrl", book.bookUrl)
             put("book", JSONObject().apply {
-                put("bookUrl", book.bookUrl)
-                put("name", book.name)
+                put("bookId", book.bookUrl)
+                put("title", book.name)
                 put("author", book.author)
             })
         }
@@ -39,10 +40,13 @@ class BookApi(private val client: ReaderCoreClient) {
         return parseBookDetail(result)
     }
 
-    suspend fun toc(sourceId: String, book: Book): List<Chapter> {
+    suspend fun toc(sourceId: String, book: Book, tocUrl: String = book.tocUrl): List<Chapter> {
         val params = JSONObject().apply {
             put("sourceId", sourceId)
             put("bookId", book.bookUrl)
+            if (tocUrl.isNotEmpty()) {
+                put("tocUrl", tocUrl)
+            }
         }
         val result = client.sendAndAwait("book.toc", params)
         return parseTocResult(result)
@@ -65,8 +69,8 @@ class BookApi(private val client: ReaderCoreClient) {
             return (0 until arr.length()).map { i ->
                 val b = arr.getJSONObject(i)
                 SearchBook(
-                    bookUrl = b.optString("bookUrl"),
-                    name = b.optString("name"),
+                    bookUrl = b.optString("bookId"),
+                    name = b.optString("title"),
                     author = b.optString("author"),
                     coverUrl = b.optString("coverUrl"),
                     intro = b.optString("intro"),
@@ -80,21 +84,21 @@ class BookApi(private val client: ReaderCoreClient) {
         internal fun parseBookDetail(data: JSONObject): Book {
             val b = data.optJSONObject("book") ?: data
             return Book(
-                bookUrl = b.optString("bookUrl"),
+                bookUrl = b.optString("bookId"),
                 tocUrl = b.optString("tocUrl"),
-                name = b.optString("name"),
+                name = b.optString("title"),
                 author = b.optString("author"),
                 coverUrl = b.optString("coverUrl"),
                 intro = b.optString("intro"),
                 kind = b.optString("kind"),
                 wordCount = b.optString("wordCount"),
-                latestChapterTitle = b.optString("latestChapterTitle"),
+                latestChapterTitle = b.optString("lastChapter"),
                 origin = b.optString("origin")
             )
         }
 
         internal fun parseTocResult(data: JSONObject): List<Chapter> {
-            val arr = data.optJSONArray("chapters") ?: return emptyList()
+            val arr = data.optJSONArray("toc") ?: return emptyList()
             return (0 until arr.length()).map { i ->
                 val c = arr.getJSONObject(i)
                 Chapter(

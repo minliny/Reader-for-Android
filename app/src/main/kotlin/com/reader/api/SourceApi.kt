@@ -10,8 +10,12 @@ import org.json.JSONObject
 class SourceApi(private val client: ReaderCoreClient) {
 
     suspend fun importBookSource(bookSourceJson: String): ImportResult {
+        val bookSource = JSONObject(bookSourceJson)
         val params = JSONObject().apply {
-            put("bookSource", JSONObject(bookSourceJson))
+            put("sourceId", bookSource.optString("bookSourceUrl"))
+            put("name", bookSource.optString("bookSourceName"))
+            put("baseUrl", bookSource.optString("bookSourceUrl"))
+            put("bookSource", bookSource)
         }
         return try {
             val result = client.sendAndAwait(

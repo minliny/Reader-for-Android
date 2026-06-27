@@ -3,6 +3,7 @@ package com.reader.api
 import com.reader.core.ReaderCoreRuntime
 import com.reader.host.HostRuntime
 import com.reader.host.HttpExecuteHandler
+import com.reader.host.HttpFetch
 import com.reader.host.OkHttpHostTransport
 import com.reader.host.ReaderCoreHostTransport
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +87,26 @@ class ReaderCoreClient private constructor(
 
         fun get(): ReaderCoreClient = INSTANCE
             ?: error("ReaderCoreClient not initialized. Call init() first.")
+
+        /**
+         * Test-only entry point: injects a custom [HttpFetch] so instrumented
+         * tests can route Core's `http.execute` requests through MockWebServer
+         * instead of the real network. Mirrors [init] but swaps the host-side
+         * HTTP transport. Production code must keep using [init].
+         */
+        @JvmStatic
+        fun initForTest(httpFetch: HttpFetch, configJson: String = "{}"): ReaderCoreClient {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: run {
+                    val runtime = ReaderCoreRuntime(configJson)
+                    val transport = ReaderCoreHostTransport(runtime)
+                    val hostRuntime = HostRuntime.over(transport)
+                        .register(HttpExecuteHandler.CAPABILITY, HttpExecuteHandler(httpFetch))
+                        .start()
+                    ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
+                }
+            }
+        }
 
         @Synchronized
         fun resetForTest() {

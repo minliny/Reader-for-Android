@@ -20,7 +20,7 @@ class BookApiJsonParseTest {
     @Test
     fun `parseSearchResult extracts books from Core JSON`() {
         val json = JSONObject(
-            """{"books":[{"bookUrl":"http://ex.com/1","name":"Test Book",""" +
+            """{"books":[{"bookId":"http://ex.com/1","title":"Test Book",""" +
                 """"author":"Author","coverUrl":"http://ex.com/cover.jpg",""" +
                 """"intro":"Intro","lastChapter":"Ch10","kind":"Novel",""" +
                 """"origin":"TestSource"}]}"""
@@ -30,6 +30,7 @@ class BookApiJsonParseTest {
         val b = books[0]
         assertEquals("http://ex.com/1", b.bookUrl)
         assertEquals("Test Book", b.name)
+        // Core returns bookId/title; Android data class maps to bookUrl/name
         assertEquals("Author", b.author)
         assertEquals("http://ex.com/cover.jpg", b.coverUrl)
         assertEquals("Intro", b.intro)
@@ -48,9 +49,9 @@ class BookApiJsonParseTest {
     @Test
     fun `parseBookDetail extracts book from nested object`() {
         val json = JSONObject(
-            """{"book":{"bookUrl":"http://ex.com/1","name":"Title",""" +
+            """{"book":{"bookId":"http://ex.com/1","title":"Title",""" +
                 """"author":"A","coverUrl":"c","intro":"i","kind":"k",""" +
-                """"wordCount":"1000","latestChapterTitle":"L","origin":"O"}}"""
+                """"lastChapter":"L"}}"""
         )
         val book = BookApi.parseBookDetail(json)
         assertEquals("http://ex.com/1", book.bookUrl)
@@ -59,15 +60,14 @@ class BookApiJsonParseTest {
         assertEquals("c", book.coverUrl)
         assertEquals("i", book.intro)
         assertEquals("k", book.kind)
-        assertEquals("1000", book.wordCount)
+        // Core Book struct has no wordCount/latestChapterTitle/origin fields
         assertEquals("L", book.latestChapterTitle)
-        assertEquals("O", book.origin)
     }
 
     @Test
     fun `parseBookDetail unwraps flat object when book field absent`() {
         val json = JSONObject(
-            """{"bookUrl":"http://ex.com/2","name":"Flat","author":"B"}"""
+            """{"bookId":"http://ex.com/2","title":"Flat","author":"B"}"""
         )
         val book = BookApi.parseBookDetail(json)
         assertEquals("http://ex.com/2", book.bookUrl)
@@ -78,7 +78,7 @@ class BookApiJsonParseTest {
     @Test
     fun `parseTocResult extracts chapters from Core JSON`() {
         val json = JSONObject(
-            """{"chapters":[{"title":"Ch1","url":"http://ex.com/ch1","index":0},""" +
+            """{"toc":[{"title":"Ch1","url":"http://ex.com/ch1","index":0},""" +
                 """{"title":"Ch2","url":"http://ex.com/ch2","index":1}]}"""
         )
         val chapters = BookApi.parseTocResult(json)
@@ -94,7 +94,7 @@ class BookApiJsonParseTest {
     @Test
     fun `parseTocResult defaults index to array position when missing`() {
         val json = JSONObject(
-            """{"chapters":[{"title":"Ch1","url":"http://ex.com/ch1"}]}"""
+            """{"toc":[{"title":"Ch1","url":"http://ex.com/ch1"}]}"""
         )
         val chapters = BookApi.parseTocResult(json)
         assertEquals(1, chapters.size)

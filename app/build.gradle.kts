@@ -120,5 +120,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    // MockWebServer for serving real Legado fixture responses offline (Task 12).
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
 }
