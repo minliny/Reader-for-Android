@@ -1,0 +1,830 @@
+package com.reader.ui.shell
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.reader.android.R
+import com.reader.ui.bookshelf.BookBatchManagementScreen
+import com.reader.ui.bookshelf.BookshelfScreen
+import com.reader.ui.bookshelf.BookshelfSearchSettingsScreen
+import com.reader.ui.bookshelf.GroupManagementScreen
+import com.reader.ui.bookshelf.LocalImportScreen
+import com.reader.ui.demo.DemoRouteRegistry
+import com.reader.ui.demo.DemoRouteScreen
+import com.reader.ui.discover.DiscoverScreen
+import com.reader.ui.motion.AppMotionTokens
+import com.reader.ui.motion.ReaderMotionTokens
+import com.reader.ui.motion.ReducedMotionResolver
+import com.reader.ui.motion.effectiveDuration
+import com.reader.ui.reading.ImmersiveReadingScreen
+import com.reader.ui.rss.RssReadRecordScreen
+import com.reader.ui.rss.RssArticleHubScreen
+import com.reader.ui.rss.RssDetailScreen
+import com.reader.ui.rss.RssOriginalScreen
+import com.reader.ui.rss.RssRefreshingScreen
+import com.reader.ui.rss.RssRuleSubscriptionApplyScreen
+import com.reader.ui.rss.RssRuleSubscriptionDetailScreen
+import com.reader.ui.rss.RssRuleSubscriptionEditScreen
+import com.reader.ui.rss.RssRuleSubscriptionScreen
+import com.reader.ui.rss.RssRuleSubscriptionTestScreen
+import com.reader.ui.rss.RssScreen
+import com.reader.ui.rss.RssSearchScreen
+import com.reader.ui.rss.RssSourceActionsScreen
+import com.reader.ui.rss.RssSourceBatchScreen
+import com.reader.ui.rss.RssSourceConfirmScreen
+import com.reader.ui.rss.RssSourceDebugScreen
+import com.reader.ui.rss.RssSourceEditScreen
+import com.reader.ui.rss.RssSourceExportDetailScreen
+import com.reader.ui.rss.RssSourceExportScreen
+import com.reader.ui.rss.RssSourceImportDetailScreen
+import com.reader.ui.rss.RssSourceImportResultScreen
+import com.reader.ui.rss.RssSourceImportScreen
+import com.reader.ui.rss.RssSourceGroupEditScreen
+import com.reader.ui.rss.RssSourceGroupsScreen
+import com.reader.ui.rss.RssSourceLoginCookieScreen
+import com.reader.ui.rss.RssSourceLoginScreen
+import com.reader.ui.rss.RssSourceLoginWebScreen
+import com.reader.ui.rss.RssSourceVarsScreen
+import com.reader.ui.rss.RssSubscriptionManagementScreen
+import com.reader.ui.source.ImportBookSourceScreen
+import com.reader.ui.search.SearchScreen
+import com.reader.ui.settings.AboutFeedbackScreen
+import com.reader.ui.settings.SettingsScreen
+import com.reader.ui.settings.SettingsGeneralScreen
+import com.reader.ui.settings.SourceManagementScreen
+import com.reader.ui.settings.SyncBackupScreen
+import com.reader.ui.settings.WebDavConfigScreen
+import com.reader.ui.theme.ReaderTextStyles
+import com.reader.ui.theme.readerExtraColors
+
+/**
+ * Native Compose App Shell. Hosts the four main tabs (`书架 / 发现 / RSS / 设置`) above a
+ * floating rounded-pill [FloatingPillTabBar] and renders the current route via
+ * [AnimatedContent] driven by the single [AppShellViewModel] state.
+ *
+ * Contract alignment (FRONTEND_DEVELOPMENT_SLICE_MATRIX.md Slice 1):
+ * - Main tabs are exactly [MainTab.ORDER]; search / reader / source-management are NOT tabs.
+ * - Tab switch mutates [ReaderUiState.activeTab] only — never a route push.
+ * - Bottom bar geometry (count / size / hit area) is stable across switches.
+ * - Content area fades 80–120ms (`app.tab.switch`); no horizontal slide, no overshoot.
+ * - Reduced motion collapses all transitions to instant (MOTION_EFFECTS.md §8).
+ *
+ * Layout (mirrors `frontend-demo/styles/01-shell-layout.css`):
+ * - TabShell: full-screen content with the floating pill bar bottom-aligned; the bar floats
+ *   14dp above the system nav inset with 14dp side margins (handled inside [FloatingPillTabBar]).
+ * - ImmersiveReading: full-screen text surface, NO control layer, NO tab bar.
+ */
+@Composable
+fun AppShell(
+    reducedMotionResolver: ReducedMotionResolver? = null,
+    vm: AppShellViewModel = viewModel(
+        factory = appShellViewModelFactory(reducedMotionResolver)
+    )
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val reducedMotion = state.reducedMotion
+    fun popBackTo(route: ReaderRoute, fallbackPops: Int = 1) {
+        val targetIndex = state.backStack.indexOfLast { it == route }
+        val popCount = if (targetIndex >= 0) {
+            (state.backStack.lastIndex - targetIndex).coerceAtLeast(0)
+        } else {
+            fallbackPops
+        }.coerceAtLeast(1)
+        repeat(popCount) {
+            vm.dispatch(ReaderUiIntent.PopRoute)
+        }
+    }
+    fun navigateTo(route: ReaderRoute) {
+        when (route) {
+            is ReaderRoute.TabShell -> vm.dispatch(ReaderUiIntent.SelectTab(route.tab))
+            else -> vm.dispatch(ReaderUiIntent.PushRoute(route))
+        }
+    }
+    fun navigateToRouteId(routeId: String) {
+        navigateTo(DemoRouteRegistry.routeFor(routeId))
+    }
+
+    // System back maps to app.route.pop when there is a pushed route to pop.
+    BackHandler(enabled = state.backStack.isNotEmpty()) {
+        vm.dispatch(ReaderUiIntent.PopRoute)
+    }
+
+    when (val route = state.currentRoute) {
+        is ReaderRoute.ImmersiveReading -> {
+            // `immersive-reading`: full-screen text surface, NO control layer, NO tab bar.
+            AnimatedContent(
+                targetState = route.context,
+                transitionSpec = {
+                    readerEntryTransition(reducedMotion)
+                },
+                label = "reader.entry"
+            ) { targetContext ->
+                ImmersiveReadingScreen(targetContext)
+            }
+        }
+
+        is ReaderRoute.Search -> {
+            SearchScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBookClick = { book ->
+                    vm.dispatch(
+                        ReaderUiIntent.EnterReaderFromAction(
+                            sourceId = book.origin.ifEmpty { book.bookUrl },
+                            bookUrl = book.bookUrl,
+                            bookName = book.name
+                        )
+                    )
+                }
+            )
+        }
+
+        ReaderRoute.ImportSource -> {
+            ImportBookSourceScreen(onDone = { vm.dispatch(ReaderUiIntent.PopRoute) })
+        }
+
+        ReaderRoute.BookBatchManagement -> {
+            BookBatchManagementScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onMoveGroup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) }
+            )
+        }
+
+        ReaderRoute.GroupManagement -> {
+            GroupManagementScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onDone = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.LocalImport -> {
+            LocalImportScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onDone = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.BookshelfSearchSettings -> {
+            BookshelfSearchSettingsScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.SettingsGeneral -> {
+            SettingsGeneralScreen(
+                reducedMotion = state.reducedMotion,
+                onReducedMotionChange = { vm.dispatch(ReaderUiIntent.SetReducedMotion(it)) },
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.AboutFeedback -> {
+            AboutFeedbackScreen(onBack = { vm.dispatch(ReaderUiIntent.PopRoute) })
+        }
+
+        ReaderRoute.SyncBackup -> {
+            SyncBackupScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onWebDavConfig = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.WebDavConfig)) }
+            )
+        }
+
+        ReaderRoute.WebDavConfig -> {
+            WebDavConfigScreen(onBack = { vm.dispatch(ReaderUiIntent.PopRoute) })
+        }
+
+        ReaderRoute.SourceManagement -> {
+            SourceManagementScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onImportSource = { navigateToRouteId("source-import-options") }
+            )
+        }
+
+        ReaderRoute.RssSearch -> {
+            RssSearchScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) },
+                onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) }
+            )
+        }
+
+        ReaderRoute.RssAll -> {
+            RssArticleHubScreen(
+                title = "全部条目",
+                activeMode = "全部",
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
+                onOpenSourceList = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenAll = {},
+                onOpenStarred = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssStarred)) },
+                onOpenRuleSubscription = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscription)) },
+                onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
+                onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
+            )
+        }
+
+        ReaderRoute.RssStarred -> {
+            RssArticleHubScreen(
+                title = "收藏",
+                activeMode = "收藏",
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
+                onOpenSourceList = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenAll = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssAll)) },
+                onOpenStarred = {},
+                onOpenRuleSubscription = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscription)) },
+                onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
+                onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
+            )
+        }
+
+        ReaderRoute.RssRefreshing -> {
+            RssRefreshingScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
+                onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
+            )
+        }
+
+        ReaderRoute.RssSubscriptionManagement -> {
+            RssSubscriptionManagementScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onCreateSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
+                onImportSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImport)) },
+                onRuleSubscription = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscription)) },
+                onManageGroups = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceGroups)) },
+                onSourceActions = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceActions)) },
+                onBatch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceBatch)) },
+                onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExport)) }
+            )
+        }
+
+        ReaderRoute.RssDetail -> {
+            RssDetailScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBackToList = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenOriginal = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssOriginal)) },
+                onManageSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
+            )
+        }
+
+        ReaderRoute.RssOriginal -> {
+            RssOriginalScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBackToDetail = { popBackTo(ReaderRoute.RssDetail) },
+                onOpenBrowser = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssOriginalBrowser)) }
+            )
+        }
+
+        ReaderRoute.RssOriginalBrowser -> {
+            RssSourceConfirmScreen(
+                title = "系统浏览器",
+                iconRes = R.drawable.reader_ic_globe,
+                heading = "已准备打开原文链接",
+                copy = "实际应用中这里会调用系统浏览器打开 github.com/minliny/Reader-UI/releases/latest，同时保留当前 RSS 阅读上下文。",
+                cancelLabel = "返回原文页",
+                confirmLabel = "回到正文",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssDetail, fallbackPops = 2) }
+            )
+        }
+
+        ReaderRoute.RssSourceEdit -> {
+            RssSourceEditScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
+                onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.RssSourceImport -> {
+            RssSourceImportScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImportDetail)) },
+                onImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImportResult)) }
+            )
+        }
+
+        ReaderRoute.RssSourceImportDetail -> {
+            RssSourceImportDetailScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onJoinImport = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.RssSourceImportResult -> {
+            RssSourceImportResultScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onContinueImport = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onDone = {
+                    vm.dispatch(ReaderUiIntent.PopRoute)
+                    vm.dispatch(ReaderUiIntent.PopRoute)
+                }
+            )
+        }
+
+        ReaderRoute.RssRuleSubscription -> {
+            RssRuleSubscriptionScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionDetail)) },
+                onCreate = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionEdit)) }
+            )
+        }
+
+        ReaderRoute.RssRuleSubscriptionDetail -> {
+            RssRuleSubscriptionDetailScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionEdit)) },
+                onApply = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionApply)) }
+            )
+        }
+
+        ReaderRoute.RssRuleSubscriptionEdit -> {
+            RssRuleSubscriptionEditScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onTest = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionTest)) },
+                onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.RssRuleSubscriptionTest -> {
+            RssRuleSubscriptionTestScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onViewResult = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionDetail)) }
+            )
+        }
+
+        ReaderRoute.RssRuleSubscriptionApply -> {
+            RssRuleSubscriptionApplyScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImport)) }
+            )
+        }
+
+        ReaderRoute.RssSourceGroups -> {
+            RssSourceGroupsScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onEditGroup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceGroupEdit)) },
+                onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.RssSourceGroupEdit -> {
+            RssSourceGroupEditScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
+        }
+
+        ReaderRoute.RssSourceActions -> {
+            RssSourceActionsScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onRefresh = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRefreshing)) },
+                onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
+                onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
+                onReadRecord = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssReadRecord)) },
+                onVars = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceVars)) },
+                onLogin = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLogin)) },
+                onPin = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourcePin)) },
+                onDisable = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDisable)) },
+                onManageAll = { popBackTo(ReaderRoute.RssSubscriptionManagement) }
+            )
+        }
+
+        ReaderRoute.RssSourceBatch -> {
+            RssSourceBatchScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExport)) },
+                onDisable = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceBatchDisable)) },
+                onDone = { popBackTo(ReaderRoute.RssSubscriptionManagement) }
+            )
+        }
+
+        ReaderRoute.RssSourceExport -> {
+            RssSourceExportScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onPreview = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportDetail)) },
+                onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportResult)) }
+            )
+        }
+
+        ReaderRoute.RssSourceExportDetail -> {
+            RssSourceExportDetailScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportResult)) }
+            )
+        }
+
+        ReaderRoute.RssSourceExportResult -> {
+            RssSourceConfirmScreen(
+                title = "导出完成",
+                iconRes = R.drawable.reader_ic_check,
+                heading = "已生成导出文件",
+                copy = "reader-rss-sources-20260626.json 已生成，包含已选订阅源、分组、启用状态和规则配置。",
+                detail = "登录 Cookie 和账号凭据没有写入导出文件。",
+                cancelLabel = "返回导出",
+                confirmLabel = "完成",
+                onCancel = { popBackTo(ReaderRoute.RssSourceExport) },
+                onConfirm = { popBackTo(ReaderRoute.RssSubscriptionManagement, fallbackPops = 2) }
+            )
+        }
+
+        ReaderRoute.RssSourceBatchDisable -> {
+            RssSourceConfirmScreen(
+                title = "批量禁用",
+                iconRes = R.drawable.reader_ic_offline,
+                heading = "禁用已选 2 个订阅源？",
+                copy = "禁用后这些订阅源不会参与自动刷新、未读提醒和首页统计，已缓存条目和阅读记录会保留。",
+                cancelLabel = "取消",
+                confirmLabel = "确认禁用",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssSubscriptionManagement, fallbackPops = 2) }
+            )
+        }
+
+        ReaderRoute.RssSourceDebug -> {
+            RssSourceDebugScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onEdit = {
+                    if (state.backStack.dropLast(1).lastOrNull() == ReaderRoute.RssSourceEdit) {
+                        vm.dispatch(ReaderUiIntent.PopRoute)
+                    } else {
+                        vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit))
+                    }
+                },
+                onDone = {
+                    if (state.backStack.dropLast(1).lastOrNull() == ReaderRoute.RssSourceActions) {
+                        vm.dispatch(ReaderUiIntent.PopRoute)
+                    } else {
+                        vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceActions))
+                    }
+                }
+            )
+        }
+
+        ReaderRoute.RssSourceVars -> {
+            RssSourceVarsScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
+                onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
+                onDone = { popBackTo(ReaderRoute.RssSourceActions) }
+            )
+        }
+
+        ReaderRoute.RssSourceLogin -> {
+            RssSourceLoginScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onWebLogin = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginWeb)) },
+                onCookie = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginCookie)) },
+                onTest = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
+                onClear = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginClear)) },
+                onDone = { popBackTo(ReaderRoute.RssSourceActions) }
+            )
+        }
+
+        ReaderRoute.RssSourceLoginWeb -> {
+            RssSourceLoginWebScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onDone = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginCookie)) }
+            )
+        }
+
+        ReaderRoute.RssSourceLoginCookie -> {
+            RssSourceLoginCookieScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onSave = { popBackTo(ReaderRoute.RssSourceActions) }
+            )
+        }
+
+        ReaderRoute.RssSourceLoginClear -> {
+            RssSourceConfirmScreen(
+                title = "清除登录",
+                iconRes = R.drawable.reader_ic_trash,
+                heading = "清除当前源登录信息？",
+                copy = "清除后该 RSS 源下次刷新会重新进入登录流程，不影响其他订阅源和已缓存文章。",
+                cancelLabel = "取消",
+                confirmLabel = "确认清除",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssSourceActions) }
+            )
+        }
+
+        ReaderRoute.RssSourcePin -> {
+            RssSourceConfirmScreen(
+                title = "置顶订阅源",
+                iconRes = R.drawable.reader_ic_top,
+                heading = "置顶 GitHub Releases？",
+                copy = "置顶后该订阅源会显示在源列表和快捷入口最前面，不影响刷新规则和分组。",
+                detail = "适合高频阅读的发布源、公告源或需要优先查看的订阅源。",
+                cancelLabel = "取消",
+                confirmLabel = "确认置顶",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssSourceActions) }
+            )
+        }
+
+        ReaderRoute.RssSourceDisable -> {
+            RssSourceConfirmScreen(
+                title = "禁用订阅源",
+                iconRes = R.drawable.reader_ic_offline,
+                heading = "禁用已选订阅源？",
+                copy = "禁用后不会参与自动刷新、未读提醒和 RSS 首页统计，已缓存条目和阅读记录会保留。",
+                detail = "可以在订阅管理页重新启用。",
+                cancelLabel = "取消",
+                confirmLabel = "确认禁用",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssSubscriptionManagement, fallbackPops = 2) }
+            )
+        }
+
+        ReaderRoute.RssReadRecord -> {
+            RssReadRecordScreen(
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBackToList = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.RSS)) },
+                onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
+                onClear = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRecordClear)) }
+            )
+        }
+
+        ReaderRoute.RssRecordClear -> {
+            RssSourceConfirmScreen(
+                title = "清空阅读记录",
+                iconRes = R.drawable.reader_ic_trash,
+                heading = "清空 RSS 阅读记录？",
+                copy = "只会清除 RSS 阅读历史，不会删除收藏、订阅源、未读状态或正文缓存。",
+                cancelLabel = "取消",
+                confirmLabel = "确认清空",
+                onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onConfirm = { popBackTo(ReaderRoute.RssReadRecord) }
+            )
+        }
+
+        is ReaderRoute.Demo -> {
+            DemoRouteScreen(
+                routeId = route.id,
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onNavigate = { navigateToRouteId(it) }
+            )
+        }
+
+        is ReaderRoute.TabShell -> {
+            Box(Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = state.activeTab,
+                    transitionSpec = { tabSwitchTransition(reducedMotion) },
+                    label = "app.tab.switch",
+                    modifier = Modifier.fillMaxSize()
+                ) { tab ->
+                    TabContent(tab, vm, state.reducedMotion)
+                }
+                FloatingPillTabBar(
+                    activeTab = state.activeTab,
+                    onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabContent(tab: MainTab, vm: AppShellViewModel, reducedMotion: Boolean) {
+    when (tab) {
+        MainTab.BOOKSHELF -> BookshelfScreen(
+            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+            onOpenBookFromCover = { book ->
+                vm.dispatch(
+                    ReaderUiIntent.EnterReaderFromCover(
+                        sourceId = book.origin.ifEmpty { book.bookUrl },
+                        bookUrl = book.bookUrl,
+                        bookName = book.name
+                    )
+                )
+            },
+            onOpenBookFromAction = { book ->
+                vm.dispatch(
+                    ReaderUiIntent.EnterReaderFromAction(
+                        sourceId = book.origin.ifEmpty { book.bookUrl },
+                        bookUrl = book.bookUrl,
+                        bookName = book.name
+                    )
+                )
+            },
+            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
+            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+            onDiscover = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.DISCOVER)) }
+        )
+        MainTab.DISCOVER -> DiscoverScreen(
+            onOpenBook = { sourceId, bookUrl, bookName ->
+                vm.dispatch(
+                    ReaderUiIntent.EnterReaderFromAction(
+                        sourceId = sourceId,
+                        bookUrl = bookUrl,
+                        bookName = bookName
+                    )
+                )
+            },
+            onOpenDiscoverControl = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Demo("discover-control"))) }
+        )
+        MainTab.RSS -> RssScreen(
+            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
+            onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) },
+            onOpenAll = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssAll)) },
+            onOpenStarred = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssStarred)) },
+            onOpenRuleSubscription = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscription)) },
+            onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) }
+        )
+        MainTab.SETTINGS -> SettingsScreen(
+            reducedMotion = reducedMotion,
+            onReducedMotionChange = { vm.dispatch(ReaderUiIntent.SetReducedMotion(it)) },
+            onGeneralSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.SettingsGeneral)) },
+            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+            onSourceManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.SourceManagement)) },
+            onSyncBackup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.SyncBackup)) },
+            onAboutFeedback = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.AboutFeedback)) }
+        )
+    }
+}
+
+private fun appShellViewModelFactory(
+    reducedMotionResolver: ReducedMotionResolver?
+) = viewModelFactory {
+    initializer { AppShellViewModel(reducedMotionResolver) }
+}
+
+@Composable
+private fun PushedPlaceholderRouteScreen(title: String, body: String, onBack: () -> Unit) {
+    val ink = MaterialTheme.colorScheme.onBackground
+    val muted = readerExtraColors().muted
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 58.dp)
+                .padding(top = 6.dp, start = 20.dp, end = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.reader_ic_chevron_left),
+                    contentDescription = "返回",
+                    tint = ink,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                text = title,
+                style = ReaderTextStyles.backBarTitle,
+                color = ink,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
+            Spacer(Modifier.size(44.dp))
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = body,
+                style = ReaderTextStyles.emptyBody,
+                color = muted,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Demo-matched placeholder for tabs whose real screen lands in a later slice.
+ *
+ * Layout mirrors `.fd-top-bar` (58dp, 29sp serif title, status-bar inset) and centers a
+ * single body line in the content area. Typography uses [ReaderTextStyles.appBarTitle] /
+ * [ReaderTextStyles.emptyBody] so the placeholder reads as part of the demo design language
+ * rather than a generic Material3 stub.
+ */
+@Composable
+private fun PlaceholderTabScreen(title: String, body: String) {
+    val ink = MaterialTheme.colorScheme.onBackground
+    val muted = readerExtraColors().muted
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp, start = 20.dp, end = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = title, style = ReaderTextStyles.appBarTitle, color = ink)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = title,
+                    style = ReaderTextStyles.emptyHeading,
+                    color = ink,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = body,
+                    style = ReaderTextStyles.emptyBody,
+                    color = muted,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/** `app.tab.switch` content fade: 80–120ms, no slide, no overshoot. Instant under reduced motion. */
+private fun tabSwitchTransition(reducedMotion: Boolean) =
+    if (reducedMotion) {
+        EnterTransition.None togetherWith ExitTransition.None
+    } else {
+        fadeIn(
+            animationSpec = tween(
+                durationMillis = effectiveDuration(AppMotionTokens.DurationTabSelect, false)
+                    .inWholeMilliseconds.toInt()
+                    .coerceIn(80, 120)
+            )
+        ) togetherWith fadeOut(
+            animationSpec = tween(durationMillis = AppMotionTokens.DurationTabPress.inWholeMilliseconds.toInt())
+        )
+    }
+
+/**
+ * `reader.entry.coverToImmersive` / `reader.entry.actionToImmersive`: 240ms fade + 12px rise.
+ * Under reduced motion: instant entry (MOTION_EFFECTS.md §6 acceptance).
+ */
+private fun readerEntryTransition(reducedMotion: Boolean) =
+    if (reducedMotion) {
+        EnterTransition.None togetherWith ExitTransition.None
+    } else {
+        fadeIn(
+            animationSpec = tween(
+                durationMillis = ReaderMotionTokens.DurationReaderEntry.inWholeMilliseconds.toInt()
+            )
+        ) togetherWith fadeOut(
+            animationSpec = tween(durationMillis = ReaderMotionTokens.DurationBase.inWholeMilliseconds.toInt())
+        )
+    }

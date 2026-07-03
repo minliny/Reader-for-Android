@@ -22,6 +22,11 @@ class SearchViewModel : ViewModel() {
 
     fun updateQuery(q: String) { _query.value = q }
 
+    fun reset() {
+        _query.value = ""
+        _uiState.value = SearchUiState.Idle
+    }
+
     fun search() {
         val q = _query.value.trim()
         if (q.isEmpty()) return
@@ -30,7 +35,7 @@ class SearchViewModel : ViewModel() {
             try {
                 val sources = getSourceIds()
                 if (sources.isEmpty()) {
-                    _uiState.value = SearchUiState.Error("请先导入书源(右上角 +)")
+                    _uiState.value = SearchUiState.Idle
                     return@launch
                 }
                 val results = mutableListOf<SearchBook>()
