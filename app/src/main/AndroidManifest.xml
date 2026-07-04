@@ -20,5 +20,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.reader.ui.evidence.EvidenceActivity"
+            android:label="Evidence Runner"
+            android:exported="false" />
     </application>
 </manifest>
