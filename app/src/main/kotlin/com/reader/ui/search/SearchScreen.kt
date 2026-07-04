@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.api.SearchBook
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -59,66 +60,72 @@ fun SearchScreen(
 ) {
     val query by vm.query.collectAsStateWithLifecycle()
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        SearchTopBar(
-            title = "书籍搜索",
-            onBack = onBack
-        )
-        val isAfter = state is SearchUiState.Success
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            SearchInputBox(
-                query = query,
-                onQueryChange = vm::updateQuery,
-                onSearch = vm::search
+    val isAfter = state is SearchUiState.Success
+    LibraryShellFrame(
+        backTopBar = {
+            SearchTopBar(
+                title = "书籍搜索",
+                onBack = onBack
             )
-            if (isAfter) {
-                Spacer(Modifier.height(10.dp))
-                SearchScopeRow()
-            }
-            Spacer(Modifier.height(16.dp))
-            Box(modifier = Modifier.weight(1f)) {
-                when (val screenState = state) {
-                    is SearchUiState.Success -> SearchResultsList(
-                        results = screenState.results,
-                        onBookClick = onBookClick,
-                        modifier = Modifier.fillMaxSize()
-                    )
+        },
+        contentRegion = {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                SearchInputBox(
+                    query = query,
+                    onQueryChange = vm::updateQuery,
+                    onSearch = vm::search
+                )
+                if (isAfter) {
+                    Spacer(Modifier.height(10.dp))
+                    SearchScopeRow()
+                }
+                Spacer(Modifier.height(16.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    when (val screenState = state) {
+                        is SearchUiState.Success -> SearchResultsList(
+                            results = screenState.results,
+                            onBookClick = onBookClick,
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-                    else -> SearchHomeState(
-                        onHistoryClick = { keyword ->
-                            vm.updateQuery(keyword)
+                        else -> SearchHomeState(
+                            history = history,
+                            onHistoryClick = { keyword ->
+                                vm.updateQuery(keyword)
+                            },
+                            onClearHistory = vm::clearHistory
+                        )
+                    }
+                }
+            }
+        },
+        bottomActionHost = {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                SearchBottomActions(
+                    after = isAfter,
+                    onPrimary = {
+                        if (isAfter) {
+                            vm.reset()
+                        } else {
+                            vm.search()
                         }
-                    )
-                }
+                    },
+                    onSecondary = {
+                        if (!isAfter) {
+                            vm.updateQuery("")
+                        }
+                    }
+                )
+                Spacer(Modifier.height(18.dp))
             }
-            SearchBottomActions(
-                after = isAfter,
-                onPrimary = {
-                    if (isAfter) {
-                        vm.reset()
-                    } else {
-                        vm.search()
-                    }
-                },
-                onSecondary = {
-                    if (!isAfter) {
-                        vm.updateQuery("")
-                    }
-                }
-            )
-            Spacer(Modifier.height(18.dp))
         }
-    }
+    )
 }
 
 @Composable
@@ -143,7 +150,7 @@ private fun SearchBottomActions(after: Boolean, onPrimary: () -> Unit, onSeconda
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         SearchBottomButton(
@@ -258,21 +265,26 @@ private fun SearchInputBox(
 }
 
 @Composable
-private fun SearchHomeState(onHistoryClick: (String) -> Unit) {
+private fun SearchHomeState(
+    history: List<String>,
+    onHistoryClick: (String) -> Unit,
+    onClearHistory: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SearchHistoryHeader()
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                "长夜余火" to "书名 · 网络",
-                "三体" to "书名 · 全部",
-                "爱潜水的乌贼" to "作者 · 网络",
-                "本地导入" to "关键词 · 本地"
-            ).forEach { (keyword, meta) ->
-                SearchHistoryRow(
-                    title = keyword,
-                    meta = meta,
-                    onClick = { onHistoryClick(keyword) }
-                )
+        SearchHistoryHeader(onClear = onClearHistory)
+        if (history.isEmpty()) {
+            // P2: empty-history state — no rows to render. The demo contract renders
+            // history rows from real user searches; with no history, the section is empty.
+            Spacer(Modifier.height(0.dp))
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                history.forEach { keyword ->
+                    SearchHistoryRow(
+                        title = keyword,
+                        meta = "书名 · 全部",
+                        onClick = { onHistoryClick(keyword) }
+                    )
+                }
             }
         }
     }
@@ -288,7 +300,7 @@ private fun SearchSectionTitle(title: String) {
 }
 
 @Composable
-private fun SearchHistoryHeader() {
+private fun SearchHistoryHeader(onClear: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -308,7 +320,8 @@ private fun SearchHistoryHeader() {
                 fontWeight = FontWeight(800)
             ),
             color = MaterialTheme.colorScheme.primary,
-            maxLines = 1
+            maxLines = 1,
+            modifier = Modifier.clickable(onClick = onClear)
         )
     }
 }
@@ -415,7 +428,7 @@ private fun SearchBottomButton(
     val extra = readerExtraColors()
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = 42.dp)
+            .defaultMinSize(minHeight = 46.dp)
             .background(if (primary) colors.primary else colors.surface.copy(alpha = 0.86f), ReaderShapes.pill)
             .border(1.dp, if (primary) colors.primary else extra.hairline, ReaderShapes.pill)
             .clickable(onClick = onClick)
@@ -620,7 +633,7 @@ private fun SearchPrimaryAction(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .width(64.dp)
-            .defaultMinSize(minHeight = 34.dp)
+            .defaultMinSize(minHeight = 28.dp)
             .background(colors.primary, ReaderShapes.pill)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 9.dp),

@@ -2,6 +2,7 @@ package com.reader.ui.demo
 
 import com.reader.ui.shell.MainTab
 import com.reader.ui.shell.ReaderRoute
+import com.reader.ui.shell.RouteIds
 
 data class DemoRoutePage(
     val id: String,
@@ -99,6 +100,86 @@ object DemoRouteRegistry {
 
     val routeIds: Set<String> = pages.map { it.id }.toSet()
 
+    val bookStateRouteIds: Set<String> = setOf(
+        "book-detail",
+        "book-directory",
+        "bookshelf-empty",
+        "sort-filter"
+    )
+
+    val rssStateRouteIds: Set<String> = setOf(
+        "rss-source-feed",
+        "rss-source-category-releases",
+        "rss-source-category-issues",
+        "rss-source-category-discussions",
+        "rss-favorite-groups",
+        "rss-favorite-group-edit",
+        "rss-favorite-clear",
+        "rss-empty",
+        "rss-error"
+    )
+
+    val restoreStateRouteIds: Set<String> = setOf(
+        "restore-confirm",
+        "restore-progress",
+        "restore-conflict",
+        "restore-result"
+    )
+
+    val discoverStateRouteIds: Set<String> = setOf(
+        "discover-control",
+        "discover-sort",
+        "discover-entry-ranking",
+        "discover-entry-bestseller",
+        "discover-entry-category",
+        "discover-entry-finished",
+        "discover-entry-latest",
+        "discover-entry-new",
+        "discover-entry-booklist",
+        "discover-filter-keyword",
+        "discover-filter-male",
+        "discover-filter-female",
+        "discover-sort-popularity",
+        "discover-sort-update",
+        "discover-sort-collection",
+        "discover-sort-finished",
+        "discover-sort-words",
+        "discover-no-results",
+        "discover-loading",
+        "discover-refreshing",
+        "discover-infinite-loading",
+        "discover-page-two",
+        "discover-cache-confirm",
+        "discover-cache-toast",
+        "discover-login-return",
+        "discover-switching-source",
+        "discover-switched-source",
+        "discover-entry-error",
+        "discover-empty",
+        "discover-error",
+        "discover-source-login",
+        "discover-rule-test",
+        "discover-source-bulk"
+    )
+
+    val sourceStateRouteIds: Set<String> = setOf(
+        "source-import-options",
+        "source-batch",
+        "source-groups",
+        "source-detail",
+        "source-detect",
+        "source-rule-edit",
+        "source-debug",
+        "source-debug-search-result",
+        "source-debug-detail-result",
+        "source-debug-catalog-result",
+        "source-debug-content-log",
+        "source-edit-debug",
+        "source-logs",
+        "source-code-view",
+        "source-delete-confirm"
+    )
+
     fun page(routeId: String): DemoRoutePage? = pages.firstOrNull { it.id == routeId }
 
     fun routeFor(routeId: String): ReaderRoute = when (routeId) {
@@ -106,6 +187,72 @@ object DemoRouteRegistry {
         MainTab.DISCOVER.routeId -> ReaderRoute.TabShell(MainTab.DISCOVER)
         MainTab.RSS.routeId -> ReaderRoute.TabShell(MainTab.RSS)
         MainTab.SETTINGS.routeId -> ReaderRoute.TabShell(MainTab.SETTINGS)
+        RouteIds.READER_CONTROL,
+        RouteIds.READER_TOC_BOOKMARKS,
+        RouteIds.READER_APPEARANCE,
+        RouteIds.READER_TTS,
+        RouteIds.READER_AUTO_PAGE,
+        RouteIds.READER_CONTENT_SEARCH,
+        RouteIds.READER_CONTENT_REPLACEMENT,
+        RouteIds.READER_SETTINGS,
+        RouteIds.READER_FULL_DIRECTORY,
+        RouteIds.READER_FULL_TTS,
+        RouteIds.READER_FULL_APPEARANCE,
+        RouteIds.READER_FULL_SETTINGS,
+        RouteIds.READER_BOOK_CACHE,
+        RouteIds.READER_DEBUG_INFO -> ReaderRoute.ReaderControl(routeId)
+        RouteIds.SOURCE_SWITCH -> ReaderRoute.SourceSwitchFlow()
+        RouteIds.BOOK_SEARCH -> ReaderRoute.Search
+        RouteIds.SOURCE_IMPORT_PREVIEW -> ReaderRoute.ImportSource
+        RouteIds.BOOK_BATCH_MANAGEMENT -> ReaderRoute.BookBatchManagement
+        RouteIds.GROUP_MANAGEMENT -> ReaderRoute.GroupManagement
+        RouteIds.LOCAL_IMPORT -> ReaderRoute.LocalImport
+        RouteIds.BOOKSHELF_SEARCH_SETTINGS -> ReaderRoute.BookshelfSearchSettings
+        RouteIds.SETTINGS_GENERAL -> ReaderRoute.SettingsGeneral
+        RouteIds.ABOUT_FEEDBACK -> ReaderRoute.AboutFeedback
+        RouteIds.SYNC_BACKUP -> ReaderRoute.SyncBackup
+        RouteIds.WEBDAV_CONFIG -> ReaderRoute.WebDavConfig
+        RouteIds.SOURCE_MANAGEMENT -> ReaderRoute.SourceManagement
+        RouteIds.RSS_SEARCH -> ReaderRoute.RssSearch
+        RouteIds.RSS_ALL -> ReaderRoute.RssAll
+        RouteIds.RSS_STARRED -> ReaderRoute.RssStarred
+        RouteIds.RSS_REFRESHING -> ReaderRoute.RssRefreshing
+        RouteIds.RSS_SUBSCRIPTION_MANAGEMENT -> ReaderRoute.RssSubscriptionManagement
+        RouteIds.RSS_DETAIL -> ReaderRoute.RssDetail
+        RouteIds.RSS_ORIGINAL -> ReaderRoute.RssOriginal
+        RouteIds.RSS_ORIGINAL_BROWSER -> ReaderRoute.RssOriginalBrowser
+        RouteIds.RSS_SOURCE_EDIT -> ReaderRoute.RssSourceEdit
+        RouteIds.RSS_SOURCE_IMPORT -> ReaderRoute.RssSourceImport
+        RouteIds.RSS_SOURCE_IMPORT_DETAIL -> ReaderRoute.RssSourceImportDetail
+        RouteIds.RSS_SOURCE_IMPORT_RESULT -> ReaderRoute.RssSourceImportResult
+        RouteIds.RSS_RULE_SUBSCRIPTION -> ReaderRoute.RssRuleSubscription
+        RouteIds.RSS_RULE_SUBSCRIPTION_DETAIL -> ReaderRoute.RssRuleSubscriptionDetail
+        RouteIds.RSS_RULE_SUBSCRIPTION_EDIT -> ReaderRoute.RssRuleSubscriptionEdit
+        RouteIds.RSS_RULE_SUBSCRIPTION_TEST -> ReaderRoute.RssRuleSubscriptionTest
+        RouteIds.RSS_RULE_SUBSCRIPTION_APPLY -> ReaderRoute.RssRuleSubscriptionApply
+        RouteIds.RSS_SOURCE_GROUPS -> ReaderRoute.RssSourceGroups
+        RouteIds.RSS_SOURCE_GROUP_EDIT -> ReaderRoute.RssSourceGroupEdit
+        RouteIds.RSS_SOURCE_ACTIONS -> ReaderRoute.RssSourceActions
+        RouteIds.RSS_SOURCE_BATCH -> ReaderRoute.RssSourceBatch
+        RouteIds.RSS_SOURCE_EXPORT -> ReaderRoute.RssSourceExport
+        RouteIds.RSS_SOURCE_EXPORT_DETAIL -> ReaderRoute.RssSourceExportDetail
+        RouteIds.RSS_SOURCE_EXPORT_RESULT -> ReaderRoute.RssSourceExportResult
+        RouteIds.RSS_SOURCE_BATCH_DISABLE -> ReaderRoute.RssSourceBatchDisable
+        RouteIds.RSS_SOURCE_DEBUG -> ReaderRoute.RssSourceDebug
+        RouteIds.RSS_SOURCE_VARS -> ReaderRoute.RssSourceVars
+        RouteIds.RSS_SOURCE_LOGIN -> ReaderRoute.RssSourceLogin
+        RouteIds.RSS_SOURCE_LOGIN_WEB -> ReaderRoute.RssSourceLoginWeb
+        RouteIds.RSS_SOURCE_LOGIN_COOKIE -> ReaderRoute.RssSourceLoginCookie
+        RouteIds.RSS_SOURCE_LOGIN_CLEAR -> ReaderRoute.RssSourceLoginClear
+        RouteIds.RSS_SOURCE_PIN -> ReaderRoute.RssSourcePin
+        RouteIds.RSS_SOURCE_DISABLE -> ReaderRoute.RssSourceDisable
+        RouteIds.RSS_READ_RECORD -> ReaderRoute.RssReadRecord
+        RouteIds.RSS_RECORD_CLEAR -> ReaderRoute.RssRecordClear
+        in bookStateRouteIds -> ReaderRoute.BookState(routeId)
+        in rssStateRouteIds -> ReaderRoute.RssState(routeId)
+        in restoreStateRouteIds -> ReaderRoute.RestoreState(routeId)
+        in discoverStateRouteIds -> ReaderRoute.DiscoverState(routeId)
+        in sourceStateRouteIds -> ReaderRoute.SourceState(routeId)
         else -> ReaderRoute.Demo(routeId)
     }
 }

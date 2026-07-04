@@ -2,9 +2,12 @@ package com.reader.ui.bookshelf
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -33,8 +37,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,30 +49,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.api.Book
+import com.reader.ui.demo.demoCoverDrawableRes
+import com.reader.ui.theme.ReaderElevations
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import coil.compose.AsyncImage
 
 /**
- * Bookshelf screen — `bookshelf` main tab.
+ * Bookshelf screen body — `bookshelf` main tab `contentRegion`.
+ *
+ * The top bar is rendered via [BookshelfTabTopBar] in the MainTabShell `appTopBar` slot, and
+ * the more/focus overlays via [BookshelfTabStateHost] in the `stateHost` slot. This composable
+ * fills only the `contentRegion` slot.
  *
  * Structural source: `frontend-demo/render-runtime.js` `mainTabBookshelf` /
  * `bookshelfEmptyScreen`, with dimensions from `styles/00-foundation.css` and
- * `styles/01-shell-layout.css`. This file mirrors the demo's component hierarchy rather than
- * copying DOM/CSS:
- *
- * MainTabShell -> `.fd-top-bar` -> `.fd-phone-content` -> `.fd-continue-card` ->
- * `.fd-bookshelf-shelf-section` -> `.fd-section-head` + `.fd-bookshelf-filter-popover` +
- * `.fd-book-grid` / `.fd-bookshelf-empty-state`; `.fd-bookshelf-more-layer` is a state-host
- * overlay.
+ * `styles/01-shell-layout.css`.
  */
 @Composable
 fun BookshelfScreen(
     onSearch: () -> Unit,
     onOpenBookFromCover: (Book) -> Unit,
     onOpenBookFromAction: (Book) -> Unit,
-    onBookBatchManagement: () -> Unit,
-    onGroupManagement: () -> Unit,
     onLocalImport: () -> Unit,
     onBookshelfSettings: () -> Unit,
     onDiscover: () -> Unit,
@@ -76,79 +81,66 @@ fun BookshelfScreen(
     val continueReading by vm.continueReading.collectAsStateWithLifecycle()
     val chrome by vm.chromeState.collectAsStateWithLifecycle()
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            BookshelfTopBar(
-                onSearch = onSearch,
-                onMore = { vm.setMoreMenuOpen(true) }
-            )
+    when (val s = state) {
+        is UiState.Loading -> Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) { CircularProgressIndicator() }
 
-            when (val s = state) {
-                is UiState.Loading -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator() }
-
-                is UiState.Error -> Box(
-                    Modifier.fillMaxSize().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(s.message, color = MaterialTheme.colorScheme.error)
-                }
-
-                is UiState.Empty -> BookshelfContent(
-                    continueReading = null,
-                    books = emptyList(),
-                    isEmpty = true,
-                    chrome = chrome,
-                    onOpenBookFromCover = onOpenBookFromCover,
-                    onOpenBookFromAction = onOpenBookFromAction,
-                    onCoverView = { vm.setViewMode(BookshelfViewMode.COVER) },
-                    onListView = { vm.setViewMode(BookshelfViewMode.LIST) },
-                    onToggleFilter = { vm.toggleFilter() },
-                    onFilterGroup = { vm.setFilterGroup(it) },
-                    onFilterSort = { vm.setFilterSort(it) },
-                    onFilterValue = { vm.setFilterValue(it) },
-                    onSearch = onSearch,
-                    onLocalImport = onLocalImport,
-                    onBookshelfSettings = onBookshelfSettings,
-                    onDiscover = onDiscover
-                )
-
-                is UiState.Success -> BookshelfContent(
-                    continueReading = continueReading,
-                    books = s.books,
-                    isEmpty = false,
-                    chrome = chrome,
-                    onOpenBookFromCover = onOpenBookFromCover,
-                    onOpenBookFromAction = onOpenBookFromAction,
-                    onCoverView = { vm.setViewMode(BookshelfViewMode.COVER) },
-                    onListView = { vm.setViewMode(BookshelfViewMode.LIST) },
-                    onToggleFilter = { vm.toggleFilter() },
-                    onFilterGroup = { vm.setFilterGroup(it) },
-                    onFilterSort = { vm.setFilterSort(it) },
-                    onFilterValue = { vm.setFilterValue(it) },
-                    onSearch = onSearch,
-                    onLocalImport = onLocalImport,
-                    onBookshelfSettings = onBookshelfSettings,
-                    onDiscover = onDiscover
-                )
-            }
+        is UiState.Error -> Box(
+            Modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(s.message, color = MaterialTheme.colorScheme.error)
         }
 
-        if (chrome.isMoreMenuOpen) {
-            BookshelfMoreLayer(
-                onDismiss = { vm.setMoreMenuOpen(false) },
-                onBookBatchManagement = onBookBatchManagement,
-                onGroupManagement = onGroupManagement,
-                onLocalImport = onLocalImport
-            )
-        }
+        is UiState.Empty -> BookshelfContent(
+            continueReading = null,
+            books = emptyList(),
+            isEmpty = true,
+            chrome = chrome,
+            onOpenBookFromCover = onOpenBookFromCover,
+            onOpenBookFromAction = onOpenBookFromAction,
+            onFocusBook = { vm.setFocusedBook(it) },
+            onCoverView = { vm.setViewMode(BookshelfViewMode.COVER) },
+            onListView = { vm.setViewMode(BookshelfViewMode.LIST) },
+            onToggleFilter = { vm.toggleFilter() },
+            onFilterGroup = { vm.setFilterGroup(it) },
+            onFilterSort = { vm.setFilterSort(it) },
+            onFilterValue = { vm.setFilterValue(it) },
+            onSearch = onSearch,
+            onLocalImport = onLocalImport,
+            onBookshelfSettings = onBookshelfSettings,
+            onDiscover = onDiscover
+        )
+
+        is UiState.Success -> BookshelfContent(
+            continueReading = continueReading,
+            books = s.books,
+            isEmpty = false,
+            chrome = chrome,
+            onOpenBookFromCover = onOpenBookFromCover,
+            onOpenBookFromAction = onOpenBookFromAction,
+            onFocusBook = { vm.setFocusedBook(it) },
+            onCoverView = { vm.setViewMode(BookshelfViewMode.COVER) },
+            onListView = { vm.setViewMode(BookshelfViewMode.LIST) },
+            onToggleFilter = { vm.toggleFilter() },
+            onFilterGroup = { vm.setFilterGroup(it) },
+            onFilterSort = { vm.setFilterSort(it) },
+            onFilterValue = { vm.setFilterValue(it) },
+            onSearch = onSearch,
+            onLocalImport = onLocalImport,
+            onBookshelfSettings = onBookshelfSettings,
+            onDiscover = onDiscover
+        )
     }
 }
 
 @Composable
-private fun BookshelfTopBar(onSearch: () -> Unit, onMore: () -> Unit) {
+fun BookshelfTabTopBar(
+    onSearch: () -> Unit,
+    vm: BookshelfViewModel = viewModel()
+) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = Modifier
@@ -166,7 +158,7 @@ private fun BookshelfTopBar(onSearch: () -> Unit, onMore: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TopIconButton(
                 iconRes = R.drawable.reader_ic_search,
                 contentDescription = "搜索",
@@ -175,9 +167,47 @@ private fun BookshelfTopBar(onSearch: () -> Unit, onMore: () -> Unit) {
             TopIconButton(
                 iconRes = R.drawable.reader_ic_more,
                 contentDescription = "更多",
-                onClick = onMore
+                onClick = { vm.setMoreMenuOpen(true) }
             )
         }
+    }
+}
+
+@Composable
+fun BookshelfTabStateHost(
+    onBookBatchManagement: () -> Unit,
+    onGroupManagement: () -> Unit,
+    onLocalImport: () -> Unit,
+    onBookDetail: (Book) -> Unit,
+    vm: BookshelfViewModel = viewModel()
+) {
+    val chrome by vm.chromeState.collectAsStateWithLifecycle()
+    if (chrome.isMoreMenuOpen) {
+        BookshelfMoreLayer(
+            onDismiss = { vm.setMoreMenuOpen(false) },
+            onBookBatchManagement = onBookBatchManagement,
+            onGroupManagement = onGroupManagement,
+            onLocalImport = onLocalImport
+        )
+    }
+    chrome.focusedBook?.let { book ->
+        BookFocusLayer(
+            book = book,
+            onDismiss = { vm.setFocusedBook(null) },
+            onBookBatchManagement = {
+                vm.setFocusedBook(null)
+                onBookBatchManagement()
+            },
+            onGroupManagement = {
+                vm.setFocusedBook(null)
+                onGroupManagement()
+            },
+            onBookDetail = {
+                vm.setFocusedBook(null)
+                onBookDetail(book)
+            },
+            onDelete = { vm.setFocusedBook(null) }
+        )
     }
 }
 
@@ -191,6 +221,7 @@ private fun TopIconButton(
     Box(
         modifier = Modifier
             .size(44.dp)
+            .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -211,6 +242,7 @@ private fun BookshelfContent(
     chrome: BookshelfChromeState,
     onOpenBookFromCover: (Book) -> Unit,
     onOpenBookFromAction: (Book) -> Unit,
+    onFocusBook: (Book) -> Unit,
     onCoverView: () -> Unit,
     onListView: () -> Unit,
     onToggleFilter: () -> Unit,
@@ -237,6 +269,7 @@ private fun BookshelfContent(
                 ContinueReadingCard(
                     book = continueReading,
                     onCoverClick = { onOpenBookFromCover(continueReading) },
+                    onCoverFocus = { onFocusBook(continueReading) },
                     onContinue = { onOpenBookFromAction(continueReading) }
                 )
             }
@@ -247,6 +280,7 @@ private fun BookshelfContent(
                 isEmpty = isEmpty,
                 chrome = chrome,
                 onOpenBookFromCover = onOpenBookFromCover,
+                onFocusBook = onFocusBook,
                 onCoverView = onCoverView,
                 onListView = onListView,
                 onToggleFilter = onToggleFilter,
@@ -268,6 +302,7 @@ private fun BookshelfShelfSection(
     isEmpty: Boolean,
     chrome: BookshelfChromeState,
     onOpenBookFromCover: (Book) -> Unit,
+    onFocusBook: (Book) -> Unit,
     onCoverView: () -> Unit,
     onListView: () -> Unit,
     onToggleFilter: () -> Unit,
@@ -304,7 +339,8 @@ private fun BookshelfShelfSection(
                 BookGrid(
                     books = books,
                     viewMode = chrome.viewMode,
-                    onOpenBookFromCover = onOpenBookFromCover
+                    onOpenBookFromCover = onOpenBookFromCover,
+                    onFocusBook = onFocusBook
                 )
             }
         }
@@ -397,6 +433,7 @@ private fun SectionIconButton(
     Box(
         modifier = Modifier
             .size(34.dp)
+            .clip(CircleShape)
             .then(clickModifier),
         contentAlignment = Alignment.Center
     ) {
@@ -413,7 +450,8 @@ private fun SectionIconButton(
 private fun BookGrid(
     books: List<Book>,
     viewMode: BookshelfViewMode,
-    onOpenBookFromCover: (Book) -> Unit
+    onOpenBookFromCover: (Book) -> Unit,
+    onFocusBook: (Book) -> Unit
 ) {
     when (viewMode) {
         BookshelfViewMode.COVER -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -424,6 +462,7 @@ private fun BookGrid(
                             book = book,
                             viewMode = viewMode,
                             onClick = { onOpenBookFromCover(book) },
+                            onFocus = { onFocusBook(book) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -439,7 +478,8 @@ private fun BookGrid(
                 BookCard(
                     book = book,
                     viewMode = viewMode,
-                    onClick = { onOpenBookFromCover(book) }
+                    onClick = { onOpenBookFromCover(book) },
+                    onFocus = { onFocusBook(book) }
                 )
             }
         }
@@ -451,38 +491,33 @@ private fun BookCard(
     book: Book,
     viewMode: BookshelfViewMode,
     onClick: () -> Unit,
+    onFocus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     when (viewMode) {
-        BookshelfViewMode.COVER -> CoverBookCard(book = book, onClick = onClick, modifier = modifier)
-        BookshelfViewMode.LIST -> ListBookCard(book = book, onClick = onClick, modifier = modifier)
+        BookshelfViewMode.COVER -> CoverBookCard(book = book, onClick = onClick, onFocus = onFocus, modifier = modifier)
+        BookshelfViewMode.LIST -> ListBookCard(book = book, onClick = onClick, onFocus = onFocus, modifier = modifier)
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CoverBookCard(book: Book, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CoverBookCard(book: Book, onClick: () -> Unit, onFocus: () -> Unit, modifier: Modifier = Modifier) {
     val extra = readerExtraColors()
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onFocus),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
+        BookCoverFrame(
+            book = book,
+            shape = ReaderShapes.md,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(4f / 5f)
-                .shadow(elevation = 4.dp, shape = ReaderShapes.md, clip = false)
-                .background(color = extra.surfaceSoft, shape = ReaderShapes.md)
-                .border(width = 1.dp, color = extra.hairline, shape = ReaderShapes.md),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = book.name.take(1),
-                style = ReaderTextStyles.appBarTitle,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
+                .aspectRatio(2f / 3f)
+                .shadow(elevation = ReaderElevations.softShadow, shape = ReaderShapes.md, clip = false)
+        )
         Text(
             text = book.name,
             style = ReaderTextStyles.bookTitle,
@@ -500,31 +535,25 @@ private fun CoverBookCard(book: Book, onClick: () -> Unit, modifier: Modifier = 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ListBookCard(book: Book, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ListBookCard(book: Book, onClick: () -> Unit, onFocus: () -> Unit, modifier: Modifier = Modifier) {
     val extra = readerExtraColors()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 66.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onFocus),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Box(
+        BookCoverFrame(
+            book = book,
+            shape = ReaderShapes.sm,
             modifier = Modifier
-                .size(width = 48.dp, height = 60.dp)
-                .shadow(elevation = 3.dp, shape = ReaderShapes.sm, clip = false)
-                .background(color = extra.surfaceSoft, shape = ReaderShapes.sm)
-                .border(width = 1.dp, color = extra.hairline, shape = ReaderShapes.sm),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = book.name.take(1),
-                style = ReaderTextStyles.continueLabel,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
+                .size(width = 48.dp, height = 72.dp)
+                .shadow(elevation = 6.dp, shape = ReaderShapes.sm, clip = false)
+        )
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -548,9 +577,50 @@ private fun ListBookCard(book: Book, onClick: () -> Unit, modifier: Modifier = M
 }
 
 @Composable
+private fun BookCoverFrame(
+    book: Book,
+    shape: androidx.compose.ui.graphics.Shape,
+    modifier: Modifier = Modifier
+) {
+    // demo .fd-book-cover-frame: background var(--fd-surface) [0.9 alpha], border 0, overflow hidden.
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(color = MaterialTheme.colorScheme.surface, shape = shape),
+        contentAlignment = Alignment.Center
+    ) {
+        val coverRes = demoCoverDrawableRes(book.coverUrl)
+        if (coverRes != null) {
+            Image(
+                painter = painterResource(id = coverRes),
+                contentDescription = "${book.name}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (book.coverUrl.isNotBlank()) {
+            AsyncImage(
+                model = book.coverUrl,
+                contentDescription = "${book.name}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.reader_cover_long_night),
+                contentDescription = "${book.name}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun ContinueReadingCard(
     book: Book,
     onCoverClick: () -> Unit,
+    onCoverFocus: () -> Unit,
     onContinue: () -> Unit
 ) {
     val extra = readerExtraColors()
@@ -558,7 +628,7 @@ private fun ContinueReadingCard(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 100.dp)
-            .shadow(elevation = 2.dp, shape = ReaderShapes.md, clip = false),
+            .shadow(elevation = ReaderElevations.softShadow, shape = ReaderShapes.md, clip = false),
         shape = ReaderShapes.md,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, extra.hairline)
@@ -568,20 +638,14 @@ private fun ContinueReadingCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
+            BookCoverFrame(
+                book = book,
+                shape = ReaderShapes.sm,
                 modifier = Modifier
-                    .size(width = 62.dp, height = 78.dp)
-                    .background(color = extra.surfaceSoft, shape = ReaderShapes.sm)
-                    .border(width = 1.dp, color = extra.hairline, shape = ReaderShapes.sm)
-                    .clickable(onClick = onCoverClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = book.name.take(1),
-                    style = ReaderTextStyles.continueTitle,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+                    .width(62.dp)
+                    .aspectRatio(2f / 3f)
+                    .combinedClickable(onClick = onCoverClick, onLongClick = onCoverFocus)
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -606,9 +670,10 @@ private fun ContinueReadingCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            // Demo .fd-continue-card grid col 3 = 82px.
             Box(
                 modifier = Modifier
-                    .defaultMinSize(minWidth = 74.dp, minHeight = 40.dp)
+                    .defaultMinSize(minWidth = 82.dp, minHeight = 40.dp)
                     .background(color = MaterialTheme.colorScheme.primary, shape = ReaderShapes.pill)
                     .clickable(onClick = onContinue)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -902,6 +967,116 @@ private fun EmptyHintButton(
             modifier = Modifier.size(14.dp)
         )
         Text(text = text, style = ReaderTextStyles.tabLabel, color = extra.controlInk, maxLines = 1)
+    }
+}
+
+@Composable
+private fun BookFocusLayer(
+    book: Book,
+    onDismiss: () -> Unit,
+    onBookBatchManagement: () -> Unit,
+    onGroupManagement: () -> Unit,
+    onBookDetail: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val extra = readerExtraColors()
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x572B251F))
+                .clickable(onClick = onDismiss)
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 18.dp, end = 18.dp, bottom = 104.dp)
+                .fillMaxWidth()
+                .shadow(elevation = 22.dp, shape = ReaderShapes.lg, clip = false)
+                .background(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f), shape = ReaderShapes.lg)
+                .border(width = 1.dp, color = extra.hairline, shape = ReaderShapes.lg)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BookCoverFrame(
+                    book = book,
+                    shape = ReaderShapes.xs,
+                    modifier = Modifier
+                        .width(42.dp)
+                        .aspectRatio(2f / 3f)
+                        .shadow(elevation = 8.dp, shape = ReaderShapes.xs, clip = false)
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = book.name.ifBlank { "长夜余火" },
+                        style = ReaderTextStyles.bookTitle,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${book.author.ifBlank { "未知作者" }} · ${book.latestChapterTitle.ifBlank { "第 32 章 雨夜" }}",
+                        style = ReaderTextStyles.tabLabel,
+                        color = extra.muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                FocusActionButton(R.drawable.reader_ic_check, "多选", onBookBatchManagement, Modifier.weight(1f))
+                FocusActionButton(R.drawable.reader_ic_people, "分支", onGroupManagement, Modifier.weight(1f))
+                FocusActionButton(R.drawable.reader_ic_info, "书籍详情", onBookDetail, Modifier.weight(1f))
+                FocusActionButton(R.drawable.reader_ic_trash, "删除", onDelete, Modifier.weight(1f), danger = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FocusActionButton(
+    @DrawableRes iconRes: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false
+) {
+    val extra = readerExtraColors()
+    val content = if (danger) extra.danger else extra.controlInk
+    Column(
+        modifier = modifier
+            .defaultMinSize(minHeight = 54.dp)
+            .background(
+                color = if (danger) extra.danger.copy(alpha = 0.1f) else extra.metaBackground.copy(alpha = 0.86f),
+                shape = ReaderShapes.md
+            )
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = label,
+            tint = content,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = ReaderTextStyles.tabLabel,
+            color = content,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

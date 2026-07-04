@@ -3,18 +3,23 @@ package com.reader.android
 import android.content.Context
 import androidx.room.Room
 import com.reader.android.data.adapter.AndroidCookieManagerStore
+import com.reader.android.data.adapter.AndroidPermissionRuntimeAdapter
 import com.reader.android.data.adapter.AndroidWebRuntimeAdapter
 import com.reader.android.data.adapter.CookieStore
 import com.reader.android.data.adapter.FakeCookieStore
 import com.reader.android.data.adapter.FakeWebRuntimeAdapter
+import com.reader.android.data.adapter.PermissionRuntimeAdapter
 import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.android.data.adapter.WebRuntimeAdapter
+import com.reader.android.data.network.RoomSubscriptionRepository
+import com.reader.android.data.network.SubscriptionRepository
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.data.storage.AppDatabase
 import com.reader.android.data.storage.BookmarkDao
 import com.reader.android.data.storage.CachedChapterDao
+import com.reader.android.data.storage.RssSubscriptionDao
 import com.reader.android.data.storage.ReadingProgressDao
 
 /**
@@ -33,6 +38,8 @@ object AppProvider {
     private var _cookieStore: CookieStore? = null
     private var _webRuntimeAdapter: WebRuntimeAdapter? = null
     private var _webDavCredentialStore: WebDavCredentialStore? = null
+    private var _permissionRuntimeAdapter: PermissionRuntimeAdapter? = null
+    private var _subscriptionRepo: SubscriptionRepository? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
 
@@ -92,6 +99,22 @@ object AppProvider {
     val webDavCredentialStore: WebDavCredentialStore
         get() = _webDavCredentialStore ?: WebDavCredentialStore().also { _webDavCredentialStore = it }
 
+    /**
+     * P3: Unified permission runtime adapter. On-device this is
+     * [AndroidPermissionRuntimeAdapter] (wired in [init]); tests inject a fake
+     * via [initForPermissionRuntimeAdapter]. The UI layer reads permission
+     * state through this adapter so `SettingsGeneralScreen` can render real
+     * permission badges and the reducer can record `PermissionGranted` /
+     * `PermissionDenied` outcomes.
+     */
+    val permissionRuntimeAdapter: PermissionRuntimeAdapter
+        get() = _permissionRuntimeAdapter
+            ?: com.reader.android.data.adapter.FakePermissionRuntimeAdapter()
+
+    fun initForPermissionRuntimeAdapter(adapter: PermissionRuntimeAdapter) {
+        _permissionRuntimeAdapter = adapter
+    }
+
     // ── Database ──
 
     val readingProgressDao: ReadingProgressDao
@@ -102,6 +125,25 @@ object AppProvider {
 
     val bookmarkDao: BookmarkDao
         get() = requireDb().bookmarkDao()
+
+    val rssSubscriptionDao: RssSubscriptionDao
+        get() = requireDb().rssSubscriptionDao()
+
+    /**
+     * P4: RSS subscription repository. On-device this is
+     * [RoomSubscriptionRepository] (wired in [init]); tests inject a fake
+     * via [initForSubscriptionRepository]. The repository persists
+     * subscription metadata only — article content is DomainState owned
+     * by Core (`rss.list` / `rss.item.read`, currently a Core blocker).
+     */
+    val subscriptionRepository: SubscriptionRepository
+        get() = _subscriptionRepo ?: RoomSubscriptionRepository(rssSubscriptionDao).also {
+            _subscriptionRepo = it
+        }
+
+    fun initForSubscriptionRepository(repo: SubscriptionRepository) {
+        _subscriptionRepo = repo
+    }
 
     // ── Repository ──
 
@@ -122,6 +164,10 @@ object AppProvider {
         // On-device: wire the real CookieManager-backed cookie store so OkHttp
         // and the WebView share one cookie source. Tests use FakeCookieStore.
         _cookieStore = AndroidCookieManagerStore()
+        // P3: wire the real Android permission adapter so the UI can read
+        // notification / file-access / battery-optimization state. Tests
+        // inject a fake via initForPermissionRuntimeAdapter.
+        _permissionRuntimeAdapter = AndroidPermissionRuntimeAdapter(context.applicationContext)
         initialized = true
         return this
     }
@@ -146,6 +192,8 @@ object AppProvider {
         _cookieStore = null
         _webRuntimeAdapter = null
         _webDavCredentialStore = null
+        _permissionRuntimeAdapter = null
+        _subscriptionRepo = null
         _networkAllowed = false
         initialized = false
     }

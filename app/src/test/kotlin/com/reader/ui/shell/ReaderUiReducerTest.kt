@@ -38,6 +38,7 @@ class ReaderUiReducerTest {
 
         assertFalse(mainTabRoutes.contains(RouteIds.BOOK_SEARCH))
         assertFalse(mainTabRoutes.contains(RouteIds.IMMERSIVE_READING))
+        assertFalse(mainTabRoutes.contains(RouteIds.READER_CONTROL))
         assertFalse(mainTabRoutes.contains(RouteIds.SOURCE_IMPORT_PREVIEW))
         assertFalse(mainTabRoutes.contains(RouteIds.BOOK_BATCH_MANAGEMENT))
         assertFalse(mainTabRoutes.contains(RouteIds.GROUP_MANAGEMENT))
@@ -84,6 +85,7 @@ class ReaderUiReducerTest {
         assertEquals("book-search", ReaderRoute.Search.routeId)
         assertEquals("source-import-preview", ReaderRoute.ImportSource.routeId)
         assertEquals("immersive-reading", RouteIds.IMMERSIVE_READING)
+        assertEquals("reader", ReaderRoute.ReaderControl().routeId)
         assertEquals("book-batch-management", ReaderRoute.BookBatchManagement.routeId)
         assertEquals("group-management", ReaderRoute.GroupManagement.routeId)
         assertEquals("local-import", ReaderRoute.LocalImport.routeId)
@@ -246,6 +248,7 @@ class ReaderUiReducerTest {
         assertEquals("book-search", ReaderRoute.Search.routeId)
         assertEquals("source-import-preview", ReaderRoute.ImportSource.routeId)
         assertEquals("immersive-reading", RouteIds.IMMERSIVE_READING)
+        assertEquals("reader", ReaderRoute.ReaderControl().routeId)
         assertEquals("book-batch-management", ReaderRoute.BookBatchManagement.routeId)
         assertEquals("group-management", ReaderRoute.GroupManagement.routeId)
         assertEquals("local-import", ReaderRoute.LocalImport.routeId)
@@ -358,6 +361,35 @@ class ReaderUiReducerTest {
         // ReaderContext must be cleared — we've left the reader entirely.
         assertNull(afterBack.readerContext)
         assertNull(afterBack.activeSession)
+    }
+
+    @Test
+    fun `reader control layer is explicit push over immersive-reading`() {
+        val immersive = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover(
+                sourceId = "fixture://",
+                bookUrl = "fixture://book/demo",
+                bookName = "示例书籍",
+                requestId = "req-cover"
+            )
+        )
+        val ctx = immersive.readerContext!!
+        val withControl = ReaderUiReducer.reduce(
+            immersive,
+            ReaderUiIntent.PushRoute(ReaderRoute.ReaderControl(context = ctx), requestId = "req-control")
+        )
+
+        assertFalse("control layer is not immersive final state", withControl.isImmersiveReading)
+        assertEquals(RouteIds.READER_CONTROL, withControl.currentRoute.routeId)
+        assertEquals(2, withControl.backStack.size)
+        assertTrue(withControl.backStack[0] is ReaderRoute.ImmersiveReading)
+        assertTrue(withControl.backStack[1] is ReaderRoute.ReaderControl)
+        assertEquals(ctx, withControl.readerContext)
+
+        val afterBack = ReaderUiReducer.reduce(withControl, ReaderUiIntent.PopRoute)
+        assertTrue(afterBack.isImmersiveReading)
+        assertEquals(ctx, afterBack.readerContext)
     }
 
     @Test
@@ -519,5 +551,1028 @@ class ReaderUiReducerTest {
             assertNotNull("backStack must be present (possibly empty)", state.backStack)
             assertNotNull("overlayState must be present", state.overlayState)
         }
+    }
+
+    // ── P5: Reader session (autoPage / TTS mutual exclusion) ─────────────────────
+
+    @Test
+    fun `StartAutoPageSession sets activeSession to AUTO_PAGE playing`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        val session = next.activeSession
+        assertNotNull(session)
+        assertEquals(SessionType.AUTO_PAGE, session!!.type)
+        assertTrue("auto-page must start playing", session.playing)
+    }
+
+    @Test
+    fun `StartTtsSession sets activeSession to TTS playing`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession
+        )
+        val session = next.activeSession
+        assertNotNull(session)
+        assertEquals(SessionType.TTS, session!!.type)
+        assertTrue("TTS must start playing", session.playing)
+    }
+
+    @Test
+    fun `activeSession is mutually exclusive - starting TTS replaces AUTO_PAGE`() {
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        assertEquals(SessionType.AUTO_PAGE, withAutoPage.activeSession!!.type)
+
+        val withTts = ReaderUiReducer.reduce(withAutoPage, ReaderUiIntent.StartTtsSession)
+        assertEquals(
+            "TTS must replace autoPage — only one session at a time",
+            SessionType.TTS,
+            withTts.activeSession!!.type
+        )
+    }
+
+    @Test
+    fun `activeSession is mutually exclusive - starting AUTO_PAGE replaces TTS`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession
+        )
+        assertEquals(SessionType.TTS, withTts.activeSession!!.type)
+
+        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession)
+        assertEquals(
+            "autoPage must replace TTS — only one session at a time",
+            SessionType.AUTO_PAGE,
+            withAutoPage.activeSession!!.type
+        )
+    }
+
+    @Test
+    fun `StopSession clears activeSession`() {
+        val withSession = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        assertNotNull(withSession.activeSession)
+
+        val stopped = ReaderUiReducer.reduce(withSession, ReaderUiIntent.StopSession)
+        assertNull("StopSession must clear activeSession", stopped.activeSession)
+    }
+
+    @Test
+    fun `ToggleSessionPlaying flips playing flag without changing type`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession
+        )
+        assertTrue(withTts.activeSession!!.playing)
+
+        val paused = ReaderUiReducer.reduce(withTts, ReaderUiIntent.ToggleSessionPlaying)
+        assertEquals(SessionType.TTS, paused.activeSession!!.type)
+        assertFalse("ToggleSessionPlaying must pause a playing session", paused.activeSession!!.playing)
+
+        val resumed = ReaderUiReducer.reduce(paused, ReaderUiIntent.ToggleSessionPlaying)
+        assertTrue("ToggleSessionPlaying must resume a paused session", resumed.activeSession!!.playing)
+    }
+
+    @Test
+    fun `UpdateCountdown only affects AUTO_PAGE session`() {
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        val updated = ReaderUiReducer.reduce(
+            withAutoPage,
+            ReaderUiIntent.UpdateCountdown(seconds = 30)
+        )
+        assertEquals(30, updated.activeSession!!.countdownSeconds)
+    }
+
+    @Test
+    fun `UpdateTtsProgress only affects TTS session`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession
+        )
+        val updated = ReaderUiReducer.reduce(
+            withTts,
+            ReaderUiIntent.UpdateTtsProgress(sentenceIndex = 5, chapterIndex = 2)
+        )
+        assertEquals(5, updated.activeSession!!.ttsSentenceIndex)
+        assertEquals(2, updated.activeSession!!.ttsChapterIndex)
+    }
+
+    // ── P5: Overlay (keyboard / sheet / dialog) ──────────────────────────────────
+
+    @Test
+    fun `OpenKeyboard sets overlayState to Keyboard`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenKeyboard(inputId = "search-input")
+        )
+        assertTrue(next.overlayState is OverlayState.Keyboard)
+        assertEquals("search-input", (next.overlayState as OverlayState.Keyboard).inputId)
+    }
+
+    @Test
+    fun `CloseKeyboard clears keyboard overlay only`() {
+        val withKeyboard = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenKeyboard(inputId = "search-input")
+        )
+        val closed = ReaderUiReducer.reduce(withKeyboard, ReaderUiIntent.CloseKeyboard)
+        assertEquals(OverlayState.None, closed.overlayState)
+    }
+
+    @Test
+    fun `CloseKeyboard does not clear Sheet overlay`() {
+        val withSheet = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter-1"))
+        )
+        val closed = ReaderUiReducer.reduce(withSheet, ReaderUiIntent.CloseKeyboard)
+        assertEquals(
+            "CloseKeyboard must not close a Sheet",
+            withSheet.overlayState,
+            closed.overlayState
+        )
+    }
+
+    @Test
+    fun `OpenSheet replaces existing overlay`() {
+        val withKeyboard = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenKeyboard(inputId = "input")
+        )
+        val withSheet = ReaderUiReducer.reduce(
+            withKeyboard,
+            ReaderUiIntent.OpenSheet(SheetContent.ReaderSetting("directory"))
+        )
+        assertTrue(withSheet.overlayState is OverlayState.Sheet)
+    }
+
+    @Test
+    fun `CloseSheet clears sheet overlay only`() {
+        val withSheet = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter"))
+        )
+        val closed = ReaderUiReducer.reduce(withSheet, ReaderUiIntent.CloseSheet)
+        assertEquals(OverlayState.None, closed.overlayState)
+    }
+
+    @Test
+    fun `OpenDialog and CloseDialog work as a pair`() {
+        val withDialog = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        assertTrue(withDialog.overlayState is OverlayState.Dialog)
+        val closed = ReaderUiReducer.reduce(withDialog, ReaderUiIntent.CloseDialog)
+        assertEquals(OverlayState.None, closed.overlayState)
+    }
+
+    // ── P5: Reader control layer phase (ENTERING / LEAVING / SETTLED) ─────────────
+
+    @Test
+    fun `ShowReaderControl sets visible=true phase=ENTERING`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ShowReaderControl
+        )
+        assertTrue(next.readerControl.visible)
+        assertEquals(MotionPhase.ENTERING, next.readerControl.phase)
+    }
+
+    @Test
+    fun `HideReaderControl sets phase=LEAVING but keeps visible true until SETTLED`() {
+        val shown = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ShowReaderControl
+        )
+        val hidden = ReaderUiReducer.reduce(shown, ReaderUiIntent.HideReaderControl)
+        assertEquals(
+            "LEAVING phase must keep visible=true so the leave animation can play",
+            true,
+            hidden.readerControl.visible
+        )
+        assertEquals(MotionPhase.LEAVING, hidden.readerControl.phase)
+    }
+
+    @Test
+    fun `UpdateMotionPhase to SETTLED after LEAVING collapses visible to false`() {
+        val shown = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ShowReaderControl
+        )
+        val hidden = ReaderUiReducer.reduce(shown, ReaderUiIntent.HideReaderControl)
+        val settled = ReaderUiReducer.reduce(
+            hidden,
+            ReaderUiIntent.UpdateMotionPhase(MotionPhase.SETTLED)
+        )
+        assertFalse(
+            "After LEAVING -> SETTLED the control layer must be hidden",
+            settled.readerControl.visible
+        )
+        assertEquals(MotionPhase.SETTLED, settled.readerControl.phase)
+    }
+
+    @Test
+    fun `UpdateMotionPhase to SETTLED without prior LEAVING keeps visible state`() {
+        val shown = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ShowReaderControl
+        )
+        val settled = ReaderUiReducer.reduce(
+            shown,
+            ReaderUiIntent.UpdateMotionPhase(MotionPhase.SETTLED)
+        )
+        assertTrue(
+            "SETTLED without LEAVING must not hide a visible control layer",
+            settled.readerControl.visible
+        )
+    }
+
+    @Test
+    fun `SwitchReaderModule updates activeModule without touching visible or phase`() {
+        val shown = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ShowReaderControl
+        )
+        val switched = ReaderUiReducer.reduce(
+            shown,
+            ReaderUiIntent.SwitchReaderModule(module = "tts")
+        )
+        assertEquals("tts", switched.readerControl.activeModule)
+        assertTrue(switched.readerControl.visible)
+    }
+
+    // ── P5: Text selection ───────────────────────────────────────────────────────
+
+    @Test
+    fun `StartSelection activates selection with toolbar hidden`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartSelection(startOffset = 0, endOffset = 10)
+        )
+        assertTrue(next.textSelection.active)
+        assertEquals(0, next.textSelection.startOffset)
+        assertEquals(10, next.textSelection.endOffset)
+        assertFalse(next.textSelection.toolbarVisible)
+    }
+
+    @Test
+    fun `UpdateSelectionRange updates offsets without touching toolbar`() {
+        val started = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartSelection(startOffset = 0, endOffset = 5)
+        )
+        val updated = ReaderUiReducer.reduce(
+            started,
+            ReaderUiIntent.UpdateSelectionRange(startOffset = 2, endOffset = 12)
+        )
+        assertEquals(2, updated.textSelection.startOffset)
+        assertEquals(12, updated.textSelection.endOffset)
+    }
+
+    @Test
+    fun `ShowSelectionToolbar then HideSelectionToolbar toggle visibility`() {
+        val started = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartSelection(0, 10)
+        )
+        val withToolbar = ReaderUiReducer.reduce(started, ReaderUiIntent.ShowSelectionToolbar)
+        assertTrue(withToolbar.textSelection.toolbarVisible)
+
+        val hidden = ReaderUiReducer.reduce(withToolbar, ReaderUiIntent.HideSelectionToolbar)
+        assertFalse(hidden.textSelection.toolbarVisible)
+    }
+
+    @Test
+    fun `EndSelection resets text selection to default`() {
+        val started = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartSelection(0, 10)
+        )
+        val ended = ReaderUiReducer.reduce(started, ReaderUiIntent.EndSelection)
+        assertFalse(ended.textSelection.active)
+        assertFalse(ended.textSelection.toolbarVisible)
+    }
+
+    // ── P5: More menu ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `OpenMoreMenu and CloseMoreMenu toggle more menu state`() {
+        val opened = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenMoreMenu(triggerId = "bookshelf-more")
+        )
+        assertTrue(opened.moreMenu.open)
+        assertEquals("bookshelf-more", opened.moreMenu.triggerId)
+
+        val closed = ReaderUiReducer.reduce(opened, ReaderUiIntent.CloseMoreMenu)
+        assertFalse(closed.moreMenu.open)
+        assertNull(closed.moreMenu.triggerId)
+    }
+
+    // ── P5: Viewport orientation (prepare / reshape / settle) ────────────────────
+
+    @Test
+    fun `ViewportPrepare sets orientationPhase to PREPARING and emits motion interrupt`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ViewportPrepare
+        )
+        assertEquals(OrientationPhase.PREPARING, next.viewport.orientationPhase)
+        assertNotNull(next.motionInterrupt)
+    }
+
+    @Test
+    fun `ViewportReshape sets orientationPhase to RESHAPING`() {
+        val prepared = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ViewportPrepare
+        )
+        val reshaped = ReaderUiReducer.reduce(prepared, ReaderUiIntent.ViewportReshape)
+        assertEquals(OrientationPhase.RESHAPING, reshaped.viewport.orientationPhase)
+    }
+
+    @Test
+    fun `ViewportSettle returns orientationPhase to STABLE`() {
+        val reshaped = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ViewportReshape
+        )
+        val settled = ReaderUiReducer.reduce(reshaped, ReaderUiIntent.ViewportSettle)
+        assertEquals(OrientationPhase.STABLE, settled.viewport.orientationPhase)
+    }
+
+    @Test
+    fun `UpdateViewport records viewportClass widthDp heightDp`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.UpdateViewport(
+                viewportClass = ViewportClass.COMPACT_LANDSCAPE,
+                widthDp = 800,
+                heightDp = 360
+            )
+        )
+        assertEquals(ViewportClass.COMPACT_LANDSCAPE, next.viewport.viewportClass)
+        assertEquals(800, next.viewport.widthDp)
+        assertEquals(360, next.viewport.heightDp)
+    }
+
+    // ── P5: AsyncResult guard (latest intent wins / stale discard) ───────────────
+
+    @Test
+    fun `StartAsyncRequest sets PENDING and emits COMPLETE_THEN_REPLACE interrupt`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-async-1"
+            )
+        )
+        assertEquals(AsyncResultStateValue.PENDING, next.asyncResult.state)
+        assertEquals("req-async-1", next.asyncResult.requestId)
+        assertNotNull(next.motionInterrupt)
+        assertEquals(
+            InterruptKind.COMPLETE_THEN_REPLACE,
+            next.motionInterrupt!!.kind
+        )
+    }
+
+    @Test
+    fun `CompleteAsyncRequest with matching requestId writes value and COMPLETED`() {
+        val pending = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-async-1"
+            )
+        )
+        val completed = ReaderUiReducer.reduce(
+            pending,
+            ReaderUiIntent.CompleteAsyncRequest(
+                requestId = "req-async-1",
+                value = "chapter-content",
+                currentRoute = RouteIds.IMMERSIVE_READING
+            )
+        )
+        assertEquals(AsyncResultStateValue.COMPLETED, completed.asyncResult.state)
+        assertEquals("chapter-content", completed.asyncResult.value)
+    }
+
+    @Test
+    fun `CompleteAsyncRequest with stale requestId marks DISCARDED not COMPLETED`() {
+        val first = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-1"
+            )
+        )
+        // Second request supersedes the first
+        val second = ReaderUiReducer.reduce(
+            first,
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-2"
+            )
+        )
+        // Late completion of the first (stale) request
+        val lateComplete = ReaderUiReducer.reduce(
+            second,
+            ReaderUiIntent.CompleteAsyncRequest(
+                requestId = "req-1",
+                value = "stale-content",
+                currentRoute = RouteIds.IMMERSIVE_READING
+            )
+        )
+        assertEquals(
+            "stale result must be DISCARDED, not COMPLETED",
+            AsyncResultStateValue.DISCARDED,
+            lateComplete.asyncResult.state
+        )
+    }
+
+    @Test
+    fun `CancelAsyncRequest with matching requestId sets CANCELLED`() {
+        val pending = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-1"
+            )
+        )
+        val cancelled = ReaderUiReducer.reduce(
+            pending,
+            ReaderUiIntent.CancelAsyncRequest(requestId = "req-1")
+        )
+        assertEquals(AsyncResultStateValue.CANCELLED, cancelled.asyncResult.state)
+    }
+
+    @Test
+    fun `CancelAsyncRequest with non-matching requestId is a no-op`() {
+        val pending = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAsyncRequest(
+                fromRoute = "bookshelf",
+                toRoute = RouteIds.IMMERSIVE_READING,
+                requestId = "req-1"
+            )
+        )
+        val cancelled = ReaderUiReducer.reduce(
+            pending,
+            ReaderUiIntent.CancelAsyncRequest(requestId = "req-other")
+        )
+        assertEquals(
+            "cancel for a non-current requestId must not change state",
+            AsyncResultStateValue.PENDING,
+            cancelled.asyncResult.state
+        )
+    }
+
+    // ── P5: ReaderContext updates (S4) ───────────────────────────────────────────
+
+    @Test
+    fun `UpdateReaderChapter mutates chapterIndex on existing context`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderChapter(chapterIndex = 5)
+        )
+        assertEquals(5, updated.readerContext!!.chapterIndex)
+    }
+
+    @Test
+    fun `UpdateReaderPage mutates page and progress`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderPage(page = 3, progress = 0.42f)
+        )
+        assertEquals(3, updated.readerContext!!.page)
+        assertEquals(0.42f, updated.readerContext!!.progress, 0.001f)
+    }
+
+    @Test
+    fun `UpdateReaderTheme mutates themeId`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderTheme(themeId = "warm-night")
+        )
+        assertEquals("warm-night", updated.readerContext!!.themeId)
+    }
+
+    @Test
+    fun `UpdateReaderBrightness mutates brightness and auto`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderBrightness(brightness = 0.8f, auto = false)
+        )
+        assertEquals(0.8f, updated.readerContext!!.brightness, 0.001f)
+        assertFalse(updated.readerContext!!.brightnessAuto)
+    }
+
+    @Test
+    fun `UpdateReaderTypography mutates fontSize lineSpacing pageMargin`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderTypography(
+                fontSize = 20f,
+                lineSpacing = 1.7f,
+                pageMargin = 24f
+            )
+        )
+        assertEquals(20f, updated.readerContext!!.fontSize, 0.001f)
+        assertEquals(1.7f, updated.readerContext!!.lineSpacing, 0.001f)
+        assertEquals(24f, updated.readerContext!!.pageMargin, 0.001f)
+    }
+
+    @Test
+    fun `TurnPageNext increments page and TurnPagePrev decrements with floor at 0`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val next = ReaderUiReducer.reduce(withReader, ReaderUiIntent.TurnPageNext)
+        assertEquals(1, next.readerContext!!.page)
+
+        val prev = ReaderUiReducer.reduce(next, ReaderUiIntent.TurnPagePrev)
+        assertEquals(0, prev.readerContext!!.page)
+
+        val floored = ReaderUiReducer.reduce(prev, ReaderUiIntent.TurnPagePrev)
+        assertEquals(
+            "page must not go below 0",
+            0,
+            floored.readerContext!!.page
+        )
+    }
+
+    @Test
+    fun `JumpChapter resets page and progress to 0`() {
+        val withReader = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
+        )
+        val paged = ReaderUiReducer.reduce(
+            withReader,
+            ReaderUiIntent.UpdateReaderPage(page = 5, progress = 0.5f)
+        )
+        val jumped = ReaderUiReducer.reduce(
+            paged,
+            ReaderUiIntent.JumpChapter(chapterIndex = 3)
+        )
+        assertEquals(3, jumped.readerContext!!.chapterIndex)
+        assertEquals(0, jumped.readerContext!!.page)
+        assertEquals(0f, jumped.readerContext!!.progress, 0.001f)
+    }
+
+    // ── P5: ReplaceRoute (app.route.replace) ─────────────────────────────────────
+
+    @Test
+    fun `ReplaceRoute swaps currentRoute and emits motion interrupt cancel`() {
+        val withSearch = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.Search)
+        )
+        val replaced = ReaderUiReducer.reduce(
+            withSearch,
+            ReaderUiIntent.ReplaceRoute(ReaderRoute.ImportSource, requestId = "req-replace")
+        )
+        assertEquals(ReaderRoute.ImportSource, replaced.currentRoute)
+        assertNotNull(replaced.motionInterrupt)
+        assertEquals(InterruptKind.CANCEL, replaced.motionInterrupt!!.kind)
+        assertEquals("req-replace", replaced.motionInterrupt!!.requestId)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `ReplaceRoute rejects TabShell`() {
+        ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.ReplaceRoute(ReaderRoute.TabShell(MainTab.DISCOVER))
+        )
+    }
+
+    // ── P5: UpdateDockOffset ─────────────────────────────────────────────────────
+
+    @Test
+    fun `UpdateDockOffset records offset per viewportClass`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.UpdateDockOffset(
+                viewportClass = ViewportClass.TABLET_EXPANDED,
+                offset = 64f
+            )
+        )
+        assertEquals(64f, next.readerControl.dockOffset[ViewportClass.TABLET_EXPANDED]!!)
+    }
+
+    // ── P5: MotionInterrupt intent ───────────────────────────────────────────────
+
+    @Test
+    fun `MotionInterrupt intent records interrupt with kind and requestId`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.MotionInterrupt(
+                kind = InterruptKind.REDIRECT,
+                reason = "user-switched-target"
+            )
+        )
+        assertNotNull(next.motionInterrupt)
+        assertEquals(InterruptKind.REDIRECT, next.motionInterrupt!!.kind)
+    }
+
+    // ── P5: tab switch clears session / overlay / control (interrupt rule) ──────
+
+    @Test
+    fun `tab switch clears activeSession and overlayState (interrupt rule)`() {
+        val withSession = ReaderUiReducer.reduce(
+            ReaderUiState(activeTab = MainTab.BOOKSHELF),
+            ReaderUiIntent.StartTtsSession
+        )
+        val withOverlay = ReaderUiReducer.reduce(
+            withSession,
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter"))
+        )
+        assertNotNull(withOverlay.activeSession)
+        assertTrue(withOverlay.overlayState !is OverlayState.None)
+
+        val afterTabSwitch = ReaderUiReducer.reduce(
+            withOverlay,
+            ReaderUiIntent.SelectTab(MainTab.SETTINGS)
+        )
+        assertNull("tab switch must clear activeSession", afterTabSwitch.activeSession)
+        assertEquals(
+            "tab switch must clear overlayState",
+            OverlayState.None,
+            afterTabSwitch.overlayState
+        )
+    }
+
+    @Test
+    fun `popRoute clears overlayState`() {
+        val withSearch = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.Search)
+        )
+        val withOverlay = ReaderUiReducer.reduce(
+            withSearch,
+            ReaderUiIntent.OpenKeyboard(inputId = "search")
+        )
+        val popped = ReaderUiReducer.reduce(withOverlay, ReaderUiIntent.PopRoute)
+        assertEquals(
+            "PopRoute must clear overlayState",
+            OverlayState.None,
+            popped.overlayState
+        )
+    }
+
+    // ── P3: Source Import e2e state machine ─────────────────────────────────────
+
+    @Test
+    fun `ParseSourceImport transitions Idle to Parsing`() {
+        val initial = ReaderUiState(sourceImport = SourceImportState.Idle)
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.ParseSourceImport(json = "[{}]")
+        )
+        assertEquals(SourceImportState.Parsing, next.sourceImport)
+    }
+
+    @Test
+    fun `CompleteSourceImportParse transitions Parsing to Preview`() {
+        val entries = listOf(
+            SourceImportPreviewEntry("起点", "qidian.com", "测试", SourceImportTone.GOOD),
+            SourceImportPreviewEntry("旧源", "old.com", "自定义", SourceImportTone.WARN)
+        )
+        val parsing = ReaderUiState(sourceImport = SourceImportState.Parsing)
+        val next = ReaderUiReducer.reduce(
+            parsing,
+            ReaderUiIntent.CompleteSourceImportParse(entries)
+        )
+        assertEquals(SourceImportState.Preview::class, next.sourceImport::class)
+        val preview = next.sourceImport as SourceImportState.Preview
+        assertEquals(2, preview.entries.size)
+        assertEquals("起点", preview.entries.first().name)
+    }
+
+    @Test
+    fun `ConfirmSourceImport transitions Preview to Importing`() {
+        val preview = ReaderUiState(
+            sourceImport = SourceImportState.Preview(entries = emptyList())
+        )
+        val next = ReaderUiReducer.reduce(
+            preview,
+            ReaderUiIntent.ConfirmSourceImport(conflictMode = "跳过重复")
+        )
+        assertEquals(SourceImportState.Importing, next.sourceImport)
+    }
+
+    @Test
+    fun `ConfirmSourceImport from non-Preview state is no-op`() {
+        val idle = ReaderUiState(sourceImport = SourceImportState.Idle)
+        val next = ReaderUiReducer.reduce(
+            idle,
+            ReaderUiIntent.ConfirmSourceImport()
+        )
+        assertEquals(SourceImportState.Idle, next.sourceImport)
+    }
+
+    @Test
+    fun `CompleteSourceImport transitions Importing to Done`() {
+        val importing = ReaderUiState(sourceImport = SourceImportState.Importing)
+        val next = ReaderUiReducer.reduce(
+            importing,
+            ReaderUiIntent.CompleteSourceImport(imported = 5, skipped = 2, failed = 1)
+        )
+        assertEquals(SourceImportState.Done::class, next.sourceImport::class)
+        val done = next.sourceImport as SourceImportState.Done
+        assertEquals(5, done.imported)
+        assertEquals(2, done.skipped)
+        assertEquals(1, done.failed)
+    }
+
+    @Test
+    fun `FailSourceImport transitions to Error with message`() {
+        val importing = ReaderUiState(sourceImport = SourceImportState.Importing)
+        val next = ReaderUiReducer.reduce(
+            importing,
+            ReaderUiIntent.FailSourceImport(message = "network error")
+        )
+        assertEquals(SourceImportState.Error::class, next.sourceImport::class)
+        assertEquals("network error", (next.sourceImport as SourceImportState.Error).message)
+    }
+
+    @Test
+    fun `DismissSourceImportResult resets to Idle`() {
+        val done = ReaderUiState(
+            sourceImport = SourceImportState.Done(imported = 3, skipped = 0, failed = 0)
+        )
+        val next = ReaderUiReducer.reduce(done, ReaderUiIntent.DismissSourceImportResult)
+        assertEquals(SourceImportState.Idle, next.sourceImport)
+    }
+
+    @Test
+    fun `source-import e2e full happy path Idle to Done`() {
+        var state = ReaderUiState(sourceImport = SourceImportState.Idle)
+        state = ReaderUiReducer.reduce(
+            state, ReaderUiIntent.ParseSourceImport(json = "[{...}]")
+        )
+        assertEquals(SourceImportState.Parsing, state.sourceImport)
+        state = ReaderUiReducer.reduce(
+            state,
+            ReaderUiIntent.CompleteSourceImportParse(
+                listOf(SourceImportPreviewEntry("A", "a.com", "G", SourceImportTone.GOOD))
+            )
+        )
+        assertTrue(state.sourceImport is SourceImportState.Preview)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.ConfirmSourceImport())
+        assertEquals(SourceImportState.Importing, state.sourceImport)
+        state = ReaderUiReducer.reduce(
+            state,
+            ReaderUiIntent.CompleteSourceImport(imported = 1, skipped = 0, failed = 0)
+        )
+        assertTrue(state.sourceImport is SourceImportState.Done)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.DismissSourceImportResult)
+        assertEquals(SourceImportState.Idle, state.sourceImport)
+    }
+
+    // ── P3: WebDAV config state ─────────────────────────────────────────────────
+
+    @Test
+    fun `UpdateWebDavServer sets serverUrl`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.UpdateWebDavServer("https://dav.example.com/reader/")
+        )
+        assertEquals(
+            "https://dav.example.com/reader/",
+            next.webDavConfig.serverUrl
+        )
+    }
+
+    @Test
+    fun `UpdateWebDavCredentials sets username and password`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.UpdateWebDavCredentials("user", "pass")
+        )
+        assertEquals("user", next.webDavConfig.username)
+        assertEquals("pass", next.webDavConfig.password)
+    }
+
+    @Test
+    fun `TestWebDavConnection sets testStatus to Testing`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.TestWebDavConnection
+        )
+        assertEquals(WebDavTestStatus.Testing, next.webDavConfig.testStatus)
+    }
+
+    @Test
+    fun `WebDavTestResult success sets Success with latency`() {
+        val testing = ReaderUiState(
+            webDavConfig = WebDavConfigState(testStatus = WebDavTestStatus.Testing)
+        )
+        val next = ReaderUiReducer.reduce(
+            testing,
+            ReaderUiIntent.WebDavTestResult(success = true, message = "OK", latencyMs = 120L)
+        )
+        assertEquals(WebDavTestStatus.Success::class, next.webDavConfig.testStatus::class)
+        assertEquals(120L, (next.webDavConfig.testStatus as WebDavTestStatus.Success).latencyMs)
+    }
+
+    @Test
+    fun `WebDavTestResult failure sets Error with message`() {
+        val testing = ReaderUiState(
+            webDavConfig = WebDavConfigState(testStatus = WebDavTestStatus.Testing)
+        )
+        val next = ReaderUiReducer.reduce(
+            testing,
+            ReaderUiIntent.WebDavTestResult(success = false, message = "timeout")
+        )
+        assertEquals(WebDavTestStatus.Error::class, next.webDavConfig.testStatus::class)
+        assertEquals("timeout", (next.webDavConfig.testStatus as WebDavTestStatus.Error).message)
+    }
+
+    @Test
+    fun `SaveWebDavConfig sets saveStatus to Saving`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.SaveWebDavConfig
+        )
+        assertEquals(WebDavSaveStatus.Saving, next.webDavConfig.saveStatus)
+    }
+
+    @Test
+    fun `WebDavSaveResult success sets Saved and savedIdentifier`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.WebDavSaveResult(
+                success = true,
+                savedIdentifier = "webdav-primary",
+                message = ""
+            )
+        )
+        assertEquals(WebDavSaveStatus.Saved, next.webDavConfig.saveStatus)
+        assertEquals("webdav-primary", next.webDavConfig.savedIdentifier)
+    }
+
+    @Test
+    fun `RevokeWebDavConfig resets entire WebDavConfigState`() {
+        val configured = ReaderUiState(
+            webDavConfig = WebDavConfigState(
+                serverUrl = "https://dav.example.com",
+                username = "user",
+                password = "pass",
+                savedIdentifier = "webdav-primary"
+            )
+        )
+        val next = ReaderUiReducer.reduce(configured, ReaderUiIntent.RevokeWebDavConfig)
+        assertEquals(WebDavConfigState(), next.webDavConfig)
+        assertEquals(null, next.webDavConfig.savedIdentifier)
+    }
+
+    // ── P3: Permission state ────────────────────────────────────────────────────
+
+    @Test
+    fun `PermissionGranted updates the matching kind to GRANTED`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PermissionGranted(PermissionKind.NOTIFICATIONS)
+        )
+        assertEquals(PermissionStatus.GRANTED, next.permissions.notifications)
+        // Other permissions stay UNKNOWN.
+        assertEquals(PermissionStatus.UNKNOWN, next.permissions.fileAccess)
+        assertEquals(PermissionStatus.UNKNOWN, next.permissions.batteryOptimization)
+    }
+
+    @Test
+    fun `PermissionDenied updates the matching kind to DENIED`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PermissionDenied(PermissionKind.FILE_ACCESS)
+        )
+        assertEquals(PermissionStatus.DENIED, next.permissions.fileAccess)
+    }
+
+    @Test
+    fun `PermissionGranted for battery optimization only updates that kind`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PermissionGranted(PermissionKind.BATTERY_OPTIMIZATION)
+        )
+        assertEquals(PermissionStatus.GRANTED, next.permissions.batteryOptimization)
+        assertEquals(PermissionStatus.UNKNOWN, next.permissions.notifications)
+    }
+
+    @Test
+    fun `RequestPermission is a side-effect intent - reducer does not change state`() {
+        val initial = ReaderUiState()
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.RequestPermission(PermissionKind.NOTIFICATIONS)
+        )
+        assertEquals(initial, next)
+    }
+
+    @Test
+    fun `OpenSystemPermissionSettings is a side-effect intent - reducer does not change state`() {
+        val initial = ReaderUiState()
+        val next = ReaderUiReducer.reduce(initial, ReaderUiIntent.OpenSystemPermissionSettings)
+        assertEquals(initial, next)
+    }
+
+    // ── P4: RSS list state ──────────────────────────────────────────────────────
+
+    @Test
+    fun `LoadRssList transitions Idle to Loading`() {
+        val initial = ReaderUiState(rssList = RssListState.Idle)
+        val next = ReaderUiReducer.reduce(initial, ReaderUiIntent.LoadRssList)
+        assertEquals(RssListState.Loading, next.rssList)
+    }
+
+    @Test
+    fun `RssListLoaded transitions Loading to Success with source count`() {
+        val loading = ReaderUiState(rssList = RssListState.Loading)
+        val next = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.RssListLoaded(sourceCount = 7)
+        )
+        assertEquals(RssListState.Success::class, next.rssList::class)
+        assertEquals(7, (next.rssList as RssListState.Success).sourceCount)
+    }
+
+    @Test
+    fun `RssListEmpty transitions Loading to Empty`() {
+        val loading = ReaderUiState(rssList = RssListState.Loading)
+        val next = ReaderUiReducer.reduce(loading, ReaderUiIntent.RssListEmpty)
+        assertEquals(RssListState.Empty, next.rssList)
+    }
+
+    @Test
+    fun `RssListLoadFailed transitions to Error with message`() {
+        val loading = ReaderUiState(rssList = RssListState.Loading)
+        val next = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.RssListLoadFailed(message = "rss.list not implemented in Core")
+        )
+        assertEquals(RssListState.Error::class, next.rssList::class)
+        assertEquals(
+            "rss.list not implemented in Core",
+            (next.rssList as RssListState.Error).message
+        )
+    }
+
+    @Test
+    fun `DismissRssListResult resets to Idle`() {
+        val error = ReaderUiState(
+            rssList = RssListState.Error(message = "boom", retryable = true)
+        )
+        val next = ReaderUiReducer.reduce(error, ReaderUiIntent.DismissRssListResult)
+        assertEquals(RssListState.Idle, next.rssList)
+    }
+
+    @Test
+    fun `rss list state machine full cycle Idle Loading Success Idle`() {
+        var state = ReaderUiState(rssList = RssListState.Idle)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.LoadRssList)
+        assertEquals(RssListState.Loading, state.rssList)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.RssListLoaded(sourceCount = 3))
+        assertTrue(state.rssList is RssListState.Success)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.DismissRssListResult)
+        assertEquals(RssListState.Idle, state.rssList)
     }
 }

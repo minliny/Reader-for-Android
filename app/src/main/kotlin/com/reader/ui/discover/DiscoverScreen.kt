@@ -1,5 +1,6 @@
 package com.reader.ui.discover
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -42,35 +50,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.demo.demoCoverDrawableRes
+import com.reader.ui.demo.demoCoverUrlForTitle
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import coil.compose.AsyncImage
+
+class DiscoverTabState {
+    var activeEntry by mutableStateOf("排行榜")
+    var activeFilter by mutableStateOf("男频")
+    var activeSort by mutableStateOf("人气")
+    var controlExpanded by mutableStateOf(false)
+    var filterOpen by mutableStateOf(false)
+    var refreshTick by mutableStateOf(0)
+}
 
 @Composable
 fun DiscoverScreen(
+    state: DiscoverTabState,
     onOpenBook: (sourceId: String, bookUrl: String, bookName: String) -> Unit,
     onOpenDiscoverControl: () -> Unit = {}
 ) {
-    var activeEntry by remember { mutableStateOf("排行榜") }
-    var activeFilter by remember { mutableStateOf("男频") }
-    var activeSort by remember { mutableStateOf("人气") }
-    var controlExpanded by remember { mutableStateOf(false) }
-    var filterOpen by remember { mutableStateOf(false) }
-    val books = remember(activeEntry, activeFilter, activeSort) { discoverDemoBooks(activeEntry) }
+    with(state) {
+        val books = remember(activeEntry, activeFilter, activeSort, refreshTick) {
+            discoverDemoBooks(activeEntry)
+        }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        DiscoverTopBar()
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(bottom = 118.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             item {
                 DiscoverSourceBar(
@@ -134,10 +147,11 @@ fun DiscoverScreen(
 }
 
 @Composable
-private fun DiscoverTopBar() {
+fun DiscoverTabTopBar(state: DiscoverTabState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
             .defaultMinSize(minHeight = 58.dp)
             .padding(top = 6.dp, start = 20.dp, end = 20.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -147,8 +161,23 @@ private fun DiscoverTopBar() {
             style = ReaderTextStyles.appBarTitle,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .clickable(onClick = { state.refreshTick++ }),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.reader_ic_refresh),
+                contentDescription = "刷新",
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 
@@ -250,7 +279,12 @@ private fun DiscoverFilterControl(
             )
             Text(
                 text = "筛选",
-                style = discoverTitleStyle(),
+                style = TextStyle(
+                    fontFamily = FontFamily.Default,
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = FontWeight(900)
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f)
             )
@@ -294,7 +328,7 @@ private fun DiscoverListHeader(title: String) {
             fontFamily = FontFamily.Default,
             fontSize = 15.sp,
             lineHeight = 19.sp,
-            fontWeight = FontWeight(900)
+            fontWeight = FontWeight(700)
         ),
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.padding(horizontal = 2.dp)
@@ -347,10 +381,11 @@ private fun DiscoverControlPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f), ReaderShapes.md)
-            .border(1.dp, extra.hairline, ReaderShapes.md)
+            .offset(y = (-8).dp)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f), RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
+            .border(1.dp, extra.hairline.copy(alpha = 0.34f), RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         DiscoverControlSection(title = "当前书源") {
             val sources = listOf(
@@ -359,8 +394,23 @@ private fun DiscoverControlPanel(
                 Triple("轻小说文库", "需登录", false),
                 Triple("本地聚合源", "维护中", false)
             )
-            sources.forEach { (name, meta, active) ->
-                DiscoverSourceOption(name = name, meta = meta, active = active)
+            // grid-template-columns: repeat(2, minmax(0,1fr)) per demo .fd-discover-source-options
+            sources.chunked(2).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    row.forEach { (name, meta, active) ->
+                        DiscoverSourceOption(
+                            name = name,
+                            meta = meta,
+                            active = active,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    // pad single-item rows to keep grid alignment
+                    if (row.size == 1) { Spacer(Modifier.weight(1f)) }
+                }
             }
         }
         DiscoverControlSection(title = "发现入口") {
@@ -443,7 +493,12 @@ private fun DiscoverControlSection(title: String, content: @Composable ColumnSco
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = title,
-            style = discoverTitleStyle().copy(fontWeight = FontWeight(900)),
+            style = TextStyle(
+                fontFamily = FontFamily.Default,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight(900)
+            ),
             color = MaterialTheme.colorScheme.onBackground
         )
         Column(verticalArrangement = Arrangement.spacedBy(7.dp), content = content)
@@ -451,28 +506,42 @@ private fun DiscoverControlSection(title: String, content: @Composable ColumnSco
 }
 
 @Composable
-private fun DiscoverSourceOption(name: String, meta: String, active: Boolean) {
+private fun DiscoverSourceOption(
+    name: String,
+    meta: String,
+    active: Boolean,
+    modifier: Modifier = Modifier
+) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp)
-            .background(if (active) colors.primary.copy(alpha = 0.10f) else extra.metaBackground, ReaderShapes.md)
-            .border(1.dp, if (active) colors.primary.copy(alpha = 0.30f) else extra.hairline, ReaderShapes.md)
+        modifier = modifier
+            .defaultMinSize(minHeight = 52.dp)
+            .background(if (active) colors.primary.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.52f), ReaderShapes.md)
+            .border(1.dp, if (active) colors.primary.copy(alpha = 0.38f) else extra.hairline.copy(alpha = 0.28f), ReaderShapes.md)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
             text = name,
-            style = discoverTitleStyle(),
-            color = if (active) colors.primary else colors.onBackground,
+            style = TextStyle(
+                fontFamily = FontFamily.Default,
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                fontWeight = FontWeight(700)
+            ),
+            color = colors.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = meta,
-            style = discoverMetaStyle(),
+            style = TextStyle(
+                fontFamily = FontFamily.Default,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                fontWeight = FontWeight(700)
+            ),
             color = extra.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -486,26 +555,39 @@ private fun DiscoverPrimaryAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MaterialTheme.colorScheme
     Row(
         modifier = modifier
-            .defaultMinSize(minHeight = 34.dp)
-            .background(MaterialTheme.colorScheme.primary, ReaderShapes.md)
+            .defaultMinSize(minWidth = 64.dp, minHeight = 34.dp)
+            .shadow(elevation = 2.dp, shape = ReaderShapes.sm, clip = false)
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(Color(0xFF436F88), Color(0xFF315F78))
+                ),
+                shape = ReaderShapes.sm
+            )
+            .border(1.dp, Color(0x6F2D5D76), ReaderShapes.sm)
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painter = painterResource(id = R.drawable.reader_ic_check),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = colors.onPrimary,
             modifier = Modifier.size(14.dp)
         )
         Spacer(Modifier.width(4.dp))
         Text(
             text = text,
-            style = discoverMetaStyle().copy(fontWeight = FontWeight(900)),
-            color = MaterialTheme.colorScheme.onPrimary,
+            style = TextStyle(
+                fontFamily = FontFamily.Default,
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight(900)
+            ),
+            color = colors.onPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -522,10 +604,9 @@ private fun DiscoverActionButton(
     val extra = readerExtraColors()
     Row(
         modifier = modifier
-            .defaultMinSize(minHeight = 38.dp)
-            .background(extra.metaBackground, ReaderShapes.md)
-            .border(1.dp, extra.hairline, ReaderShapes.md)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .defaultMinSize(minHeight = 32.dp)
+            .background(Color(0xDDEEE8DF), ReaderShapes.pill)
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -538,8 +619,13 @@ private fun DiscoverActionButton(
         Spacer(Modifier.width(5.dp))
         Text(
             text = text,
-            style = discoverMetaStyle().copy(fontWeight = FontWeight(850)),
-            color = colors.onBackground,
+            style = TextStyle(
+                fontFamily = FontFamily.Default,
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight(800)
+            ),
+            color = extra.controlInk,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -548,43 +634,49 @@ private fun DiscoverActionButton(
 
 @Composable
 private fun DiscoverBookList(books: List<DiscoverBook>, onOpenBook: (DiscoverBook) -> Unit) {
-    val extra = readerExtraColors()
+    // Demo .fd-discover-book-list: plain section, no bg/border. Rows separated by border-top.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f), ReaderShapes.md)
-            .border(1.dp, extra.hairline, ReaderShapes.md)
-            .padding(horizontal = 12.dp)
     ) {
         books.forEachIndexed { index, book ->
-            DiscoverBookRow(book = book, onClick = { onOpenBook(book) })
-            if (index != books.lastIndex) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(extra.hairline.copy(alpha = 0.58f))
-                )
-            }
+            DiscoverBookRow(
+                book = book,
+                showTopDivider = index > 0,
+                onClick = { onOpenBook(book) }
+            )
         }
     }
 }
 
 @Composable
-private fun DiscoverBookRow(book: DiscoverBook, onClick: () -> Unit) {
+private fun DiscoverBookRow(book: DiscoverBook, showTopDivider: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
+    val rowBorderColor = Color(0xFFB4A697).copy(alpha = 0.24f)
+    val introColor = Color(0xFF5C554D)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 108.dp)
+            .then(
+                if (showTopDivider) Modifier.drawBehind {
+                    drawLine(
+                        color = rowBorderColor,
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                } else Modifier
+            )
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
         verticalAlignment = Alignment.Top
     ) {
         Box {
-            DiscoverCoverTile(book.title)
+            DiscoverCoverTile(book)
+            // .fd-discover-shelf-dot: absolute 12x12, border 2px surface, circle
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -603,7 +695,7 @@ private fun DiscoverBookRow(book: DiscoverBook, onClick: () -> Unit) {
                     fontFamily = FontFamily.Default,
                     fontSize = 15.sp,
                     lineHeight = 19.sp,
-                    fontWeight = FontWeight(850)
+                    fontWeight = FontWeight(700)
                 ),
                 color = colors.onBackground,
                 maxLines = 1,
@@ -618,8 +710,8 @@ private fun DiscoverBookRow(book: DiscoverBook, onClick: () -> Unit) {
             )
             Text(
                 text = book.latest,
-                style = discoverMetaStyle().copy(fontWeight = FontWeight(800)),
-                color = colors.primary,
+                style = discoverMetaStyle().copy(fontWeight = FontWeight(700)),
+                color = extra.primaryDark,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -631,7 +723,7 @@ private fun DiscoverBookRow(book: DiscoverBook, onClick: () -> Unit) {
                     lineHeight = 17.sp,
                     fontWeight = FontWeight(500)
                 ),
-                color = extra.infoLayer,
+                color = introColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -640,22 +732,38 @@ private fun DiscoverBookRow(book: DiscoverBook, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DiscoverCoverTile(title: String) {
-    val colors = MaterialTheme.colorScheme
+private fun DiscoverCoverTile(book: DiscoverBook) {
     val extra = readerExtraColors()
+    val coverRes = demoCoverDrawableRes(book.coverUrl)
+    // Demo .fd-discover-book-row img: 52x74, radius xs, box-shadow 0 6 14 rgba(80,67,52,0.12).
     Box(
         modifier = Modifier
             .size(width = 52.dp, height = 74.dp)
-            .background(extra.metaBackground, ReaderShapes.xs)
-            .border(1.dp, extra.hairline, ReaderShapes.xs),
+            .shadow(elevation = 6.dp, shape = ReaderShapes.xs, clip = false)
+            .clip(ReaderShapes.xs)
+            .background(extra.metaBackground, ReaderShapes.xs),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = title.firstOrNull()?.toString() ?: "书",
-            style = ReaderTextStyles.bookTitle.copy(fontSize = 18.sp, lineHeight = 22.sp),
-            color = colors.primary,
-            maxLines = 1
-        )
+        when {
+            coverRes != null -> Image(
+                painter = painterResource(id = coverRes),
+                contentDescription = "${book.title}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            book.coverUrl.isNotBlank() -> AsyncImage(
+                model = book.coverUrl,
+                contentDescription = "${book.title}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            else -> Image(
+                painter = painterResource(id = R.drawable.reader_cover_long_night),
+                contentDescription = "${book.title}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -697,11 +805,10 @@ private fun DiscoverFilterButton(
     val extra = readerExtraColors()
     Row(
         modifier = modifier
-            .defaultMinSize(minHeight = 34.dp)
-            .background(if (active) colors.primary.copy(alpha = 0.12f) else colors.surface.copy(alpha = 0.90f), ReaderShapes.md)
-            .border(1.dp, if (active) colors.primary.copy(alpha = 0.30f) else extra.hairline, ReaderShapes.md)
+            .defaultMinSize(minHeight = 32.dp)
+            .background(if (active) colors.primary.copy(alpha = 0.12f) else Color(0xDDEEE8DF), ReaderShapes.pill)
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -717,11 +824,11 @@ private fun DiscoverFilterButton(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 11.sp,
-                lineHeight = 13.sp,
-                fontWeight = FontWeight(850)
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight(800)
             ),
-            color = if (active) colors.primary else colors.onBackground,
+            color = if (active) colors.primary else extra.controlInk,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -753,7 +860,8 @@ private data class DiscoverBook(
     val latest: String,
     val intro: String,
     val inShelf: Boolean,
-    val bookUrl: String
+    val bookUrl: String,
+    val coverUrl: String = demoCoverUrlForTitle(title)
 )
 
 private val discoverEntries = listOf("排行榜", "畅销", "分类", "完本", "最新", "新书", "书单")
@@ -768,13 +876,6 @@ private fun discoverDemoBooks(entry: String): List<DiscoverBook> {
     )
     return if (entry == "最新") base.reversed() else base
 }
-
-private fun discoverTitleStyle() = TextStyle(
-    fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
-    lineHeight = 16.sp,
-    fontWeight = FontWeight(800)
-)
 
 private fun discoverMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,

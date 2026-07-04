@@ -111,6 +111,9 @@ dependencies {
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // WindowManager (for foldable / viewport class detection - ViewportClassAdapter)
+    implementation("androidx.window:window:1.3.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

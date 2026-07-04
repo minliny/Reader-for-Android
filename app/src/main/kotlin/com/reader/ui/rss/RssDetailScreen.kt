@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -53,19 +54,16 @@ fun RssDetailScreen(
     var isRead by remember { mutableStateOf(true) }
     var starred by remember { mutableStateOf(true) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
+    LibraryShellFrame(
+        backTopBar = {
             RssDetailTopBar(
                 starred = starred,
                 onBack = onBack,
                 onToggleStar = { starred = !starred },
                 onOpenOriginal = onOpenOriginal
             )
+        },
+        contentRegion = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
@@ -93,13 +91,14 @@ fun RssDetailScreen(
                     RssOriginalLinkCard(onOpenOriginal = onOpenOriginal)
                 }
             }
+        },
+        bottomActionHost = {
+            RssReaderBottomActions(
+                onBackToList = onBackToList,
+                onOpenOriginal = onOpenOriginal
+            )
         }
-        RssReaderBottomActions(
-            onBackToList = onBackToList,
-            onOpenOriginal = onOpenOriginal,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
+    )
 }
 
 @Composable

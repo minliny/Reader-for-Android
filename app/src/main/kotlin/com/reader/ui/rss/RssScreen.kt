@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -43,12 +45,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
 
+class RssTabState {
+    var activeMode by mutableStateOf("源列表")
+    var activeFilter by mutableStateOf("全部")
+    var refreshing by mutableStateOf(false)
+    val sources = rssDemoSources()
+    val articles = rssDemoArticles()
+}
+
 @Composable
 fun RssScreen(
+    state: RssTabState,
     onSearch: () -> Unit,
     onManageSources: () -> Unit,
     onOpenAll: () -> Unit,
@@ -56,37 +68,21 @@ fun RssScreen(
     onOpenRuleSubscription: () -> Unit,
     onOpenArticle: () -> Unit
 ) {
-    var activeMode by remember { mutableStateOf("源列表") }
-    var activeFilter by remember { mutableStateOf("全部") }
-    var refreshing by remember { mutableStateOf(false) }
-    val sources = remember { rssDemoSources() }
-    val articles = remember { rssDemoArticles() }
-    val filteredSources = sources.filter { source ->
-        when (activeFilter) {
-            "全部" -> true
-            "需登录" -> source.login
-            "暂停" -> !source.enabled
-            else -> source.group == activeFilter
+    with(state) {
+        val filteredSources = sources.filter { source ->
+            when (activeFilter) {
+                "全部" -> true
+                "需登录" -> source.login
+                "暂停" -> !source.enabled
+                else -> source.group == activeFilter
+            }
         }
-    }
-    val visibleArticles = when (activeMode) {
-        "全部" -> articles
-        "收藏" -> articles.filter { it.starred }
-        else -> articles.filter { it.unread }
-    }
+        val visibleArticles = when (activeMode) {
+            "全部" -> articles
+            "收藏" -> articles.filter { it.starred }
+            else -> articles.filter { it.unread }
+        }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        RssTopBar(
-            enabledCount = sources.count { it.enabled },
-            refreshing = refreshing,
-            onRefresh = { refreshing = !refreshing },
-            onManageSources = onManageSources
-        )
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,6 +103,14 @@ fun RssScreen(
                             else -> activeMode = mode
                         }
                     }
+                )
+            }
+            item {
+                RssSummaryCard(
+                    enabledCount = sources.count { it.enabled },
+                    unreadCount = sources.sumOf { it.unread },
+                    lastRefresh = "10:18",
+                    onRefresh = { refreshing = true }
                 )
             }
             if (refreshing) {
@@ -176,46 +180,43 @@ fun RssArticleHubScreen(
         articles
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        RssLibraryTopBar(title = title, onBack = onBack)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item { RssSearchEntry(onClick = onSearch) }
-            item {
-                RssModeRow(
-                    modes = listOf("源列表", "全部", "收藏", "规则订阅"),
-                    activeMode = activeMode,
-                    onMode = { mode ->
-                        when (mode) {
-                            "源列表" -> onOpenSourceList()
-                            "全部" -> if (activeMode != "全部") onOpenAll()
-                            "收藏" -> if (activeMode != "收藏") onOpenStarred()
-                            "规则订阅" -> onOpenRuleSubscription()
+    LibraryShellFrame(
+        backTopBar = { RssLibraryTopBar(title = title, onBack = onBack) },
+        contentRegion = {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item { RssSearchEntry(onClick = onSearch) }
+                item {
+                    RssModeRow(
+                        modes = listOf("源列表", "全部", "收藏", "规则订阅"),
+                        activeMode = activeMode,
+                        onMode = { mode ->
+                            when (mode) {
+                                "源列表" -> onOpenSourceList()
+                                "全部" -> if (activeMode != "全部") onOpenAll()
+                                "收藏" -> if (activeMode != "收藏") onOpenStarred()
+                                "规则订阅" -> onOpenRuleSubscription()
+                            }
                         }
-                    }
-                )
-            }
-            item { RssSourceStrip(sources = sources) }
-            item {
-                RssArticleSection(
-                    title = title,
-                    articles = visibleArticles,
-                    actionLabel = "管理源",
-                    actionIcon = R.drawable.reader_ic_source_stack,
-                    onAction = onManageSources,
-                    onOpenArticle = onOpenArticle
-                )
+                    )
+                }
+                item { RssSourceStrip(sources = sources) }
+                item {
+                    RssArticleSection(
+                        title = title,
+                        articles = visibleArticles,
+                        actionLabel = "管理源",
+                        actionIcon = R.drawable.reader_ic_source_stack,
+                        onAction = onManageSources,
+                        onOpenArticle = onOpenArticle
+                    )
+                }
             }
         }
-    }
+    )
 }
 
 @Composable
@@ -255,40 +256,38 @@ private fun RssLibraryTopBar(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun RssTopBar(
-    enabledCount: Int,
-    refreshing: Boolean,
-    onRefresh: () -> Unit,
+fun RssTabTopBar(
+    state: RssTabState,
     onManageSources: () -> Unit
 ) {
+    // Demo .fd-top-bar: min-height 58, padding 6px 20px 0, color --fd-ink, space-between.
+    // Trailing .fd-top-actions: gap 10px, each .fd-icon-button 44x44 circle, icon 24x24.
+    val ink = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
             .defaultMinSize(minHeight = 58.dp)
             .padding(top = 6.dp, start = 20.dp, end = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "RSS",
             style = ReaderTextStyles.appBarTitle,
-            color = readerExtraColors().primaryDark,
-            maxLines = 1
+            color = ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RssRefreshPill(
-                text = "$enabledCount 个启用源",
-                meta = if (refreshing) "· 10:18 更新" else "· 10:18 更新",
-                onClick = onRefresh
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RssTopIconButton(
+                iconRes = R.drawable.reader_ic_refresh,
+                contentDescription = "刷新",
+                onClick = { state.refreshing = !state.refreshing }
             )
-            Spacer(Modifier.width(6.dp))
-            RssTopActionPill(
-                label = "管理",
+            RssTopIconButton(
                 iconRes = R.drawable.reader_ic_nav_list,
+                contentDescription = "管理",
                 onClick = onManageSources
             )
         }
@@ -296,70 +295,32 @@ private fun RssTopBar(
 }
 
 @Composable
-private fun RssRefreshPill(text: String, meta: String, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val extra = readerExtraColors()
-    Row(
+private fun RssTopIconButton(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val ink = MaterialTheme.colorScheme.onBackground
+    Box(
         modifier = Modifier
-            .defaultMinSize(minHeight = 34.dp)
-            .background(colors.surface.copy(alpha = 0.86f), ReaderShapes.pill)
-            .border(1.dp, extra.hairline, ReaderShapes.pill)
-            .clickable(onClick = onClick)
-            .padding(start = 10.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(9.dp)
-                .background(colors.primary, ReaderShapes.pill)
-                .border(4.dp, colors.primary.copy(alpha = 0.12f), ReaderShapes.pill)
-        )
-        Text(
-            text = text,
-            style = rssButtonStyle(),
-            color = extra.primaryDark,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = meta,
-            style = rssButtonStyle(),
-            color = extra.primaryDark,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
         Icon(
-            painter = painterResource(id = R.drawable.reader_ic_refresh),
-            contentDescription = null,
-            tint = extra.primaryDark,
-            modifier = Modifier.size(18.dp)
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription,
+            tint = ink,
+            modifier = Modifier.size(24.dp)
         )
     }
 }
 
 @Composable
-private fun RssTopActionPill(label: String, @DrawableRes iconRes: Int, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val extra = readerExtraColors()
-    Row(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 64.dp, minHeight = 34.dp)
-            .background(colors.surface.copy(alpha = 0.86f), ReaderShapes.lg)
-            .border(1.dp, extra.hairline, ReaderShapes.lg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = null,
-            tint = extra.primaryDark,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(text = label, style = rssButtonStyle(), color = extra.primaryDark, maxLines = 1)
-    }
+private fun RssRefreshPillRemoved() {
+    // Removed: RssRefreshPill / RssTopActionPill were non-conformant custom pills.
+    // RssTabTopBar now uses RssTopIconButton (44x44 circle, 24 icon, fd-ink) per .fd-icon-button.
 }
 
 @Composable
@@ -430,6 +391,97 @@ private fun RssRefreshLine() {
             style = rssMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(800)),
             color = extra.muted
         )
+    }
+}
+
+@Composable
+private fun RssSummaryCard(
+    enabledCount: Int,
+    unreadCount: Int,
+    lastRefresh: String,
+    onRefresh: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val extra = readerExtraColors()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 62.dp)
+            .background(colors.surface.copy(alpha = 0.92f), ReaderShapes.md)
+            .border(1.dp, extra.hairline, ReaderShapes.md)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // 34px icon circle per demo .fd-rss-summary-card > span
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(colors.primary.copy(alpha = 0.14f), ReaderShapes.circle),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.reader_ic_rss),
+                contentDescription = null,
+                tint = extra.primaryDark,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        // title + meta
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "订阅中心",
+                style = TextStyle(
+                    fontFamily = FontFamily.Default,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight(700)
+                ),
+                color = colors.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "$enabledCount 个启用源 · $unreadCount 条未读 · 最近刷新 $lastRefresh",
+                style = TextStyle(
+                    fontFamily = FontFamily.Default,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight(400)
+                ),
+                color = extra.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        // action button: primary pill per demo .fd-rss-summary-card button
+        Row(
+            modifier = Modifier
+                .defaultMinSize(minHeight = 30.dp)
+                .background(colors.primary, ReaderShapes.pill)
+                .clickable(onClick = onRefresh)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.reader_ic_refresh),
+                contentDescription = null,
+                tint = extra.onPrimary,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = "刷新",
+                style = TextStyle(
+                    fontFamily = FontFamily.Default,
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = FontWeight(850)
+                ),
+                color = extra.onPrimary,
+                maxLines = 1
+            )
+        }
     }
 }
 
@@ -506,16 +558,17 @@ private fun RssSourceList(sources: List<RssSource>) {
 private fun RssSourceRow(source: RssSource) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
+    // Demo .fd-rss-source-list article: grid 30/1fr/auto/30, gap 8, min-height 58, padding 8 10.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 62.dp)
+            .defaultMinSize(minHeight = 58.dp)
             .alpha(if (source.enabled) 1f else 0.62f)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RssIconCircle(if (source.enabled) R.drawable.reader_ic_rss else R.drawable.reader_ic_offline, 32.dp)
+        RssIconCircle(if (source.enabled) R.drawable.reader_ic_rss else R.drawable.reader_ic_offline, 30.dp)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = source.name,
@@ -582,7 +635,7 @@ private fun RssSourceStripItem(source: RssSource, active: Boolean) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = source.name,
-                style = rssMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(850)),
+                style = rssMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(700)),
                 color = colors.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -796,7 +849,7 @@ private fun RssChip(text: String, active: Boolean, onClick: () -> Unit) {
         Text(
             text = text,
             style = rssButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
-            color = if (active) colors.onPrimary else extra.navInactive,
+            color = if (active) colors.onPrimary else Color(0xFF564D44),
             maxLines = 1
         )
     }
@@ -823,30 +876,33 @@ private fun RssIconCircle(@DrawableRes iconRes: Int, size: androidx.compose.ui.u
 
 @Composable
 private fun RssStatusBadge(label: String, tone: RssTone) {
+    // Demo .fd-rss-badge: 24x18 pill, no border, padding 0, font-size 0 (text hidden),
+    // 7px <i> dot provides visible color via currentColor.
+    // .is-good: bg rgba(54,121,91,0.12), color #2f6b52.
+    // .is-warn: bg rgba(180,110,35,0.14), color #8b5829.
+    // .is-muted: bg rgba(127,118,108,0.12), color --fd-muted.
     val extra = readerExtraColors()
-    val color = when (tone) {
-        RssTone.Good -> extra.forest
-        RssTone.Warn -> extra.accent
-        RssTone.Muted -> extra.muted
+    val (bgColor, dotColor) = when (tone) {
+        RssTone.Good -> Color(0xFF36795B).copy(alpha = 0.12f) to Color(0xFF2F6B52)
+        RssTone.Warn -> Color(0xFFB46E23).copy(alpha = 0.14f) to Color(0xFF8B5829)
+        RssTone.Muted -> Color(0xFF7F766C).copy(alpha = 0.12f) to extra.muted
     }
     Box(
         modifier = Modifier
-            .defaultMinSize(minHeight = 22.dp)
-            .background(color.copy(alpha = 0.13f), ReaderShapes.pill)
-            .border(1.dp, color.copy(alpha = 0.26f), ReaderShapes.pill)
-            .padding(horizontal = 7.dp, vertical = 5.dp),
+            .defaultMinSize(minWidth = 24.dp, minHeight = 18.dp)
+            .background(bgColor, ReaderShapes.pill),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            style = rssMetaStyle().copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight(850)),
-            color = color,
-            maxLines = 1
+        // 7px dot per demo .fd-rss-badge i
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(dotColor, ReaderShapes.circle)
         )
     }
 }
 
-private data class RssSource(
+data class RssSource(
     val name: String,
     val group: String,
     val unread: Int,
@@ -860,7 +916,7 @@ private data class RssSource(
     val login: Boolean
 )
 
-private data class RssArticle(
+data class RssArticle(
     val title: String,
     val source: String,
     val time: String,
@@ -876,7 +932,7 @@ private data class RssRuleSubscription(
     val update: String
 )
 
-private enum class RssTone { Good, Warn, Muted }
+enum class RssTone { Good, Warn, Muted }
 
 private fun rssDemoSources() = listOf(
     RssSource("GitHub Releases", "开源项目", 6, "10:18", "正常", RssTone.Good, true, 3, "列表", "默认 RSS", false),
@@ -903,14 +959,14 @@ private fun rssSectionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = 15.sp,
     lineHeight = 18.sp,
-    fontWeight = FontWeight(900)
+    fontWeight = FontWeight(700)
 )
 
 private fun rssTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = 13.sp,
     lineHeight = 16.sp,
-    fontWeight = FontWeight(850)
+    fontWeight = FontWeight(700)
 )
 
 private fun rssMetaStyle() = TextStyle(
@@ -924,5 +980,5 @@ private fun rssButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = 12.sp,
     lineHeight = 14.sp,
-    fontWeight = FontWeight(900)
+    fontWeight = FontWeight(850)
 )

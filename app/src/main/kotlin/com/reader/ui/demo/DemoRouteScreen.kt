@@ -180,13 +180,15 @@ private fun DemoTopBar(title: String) {
 
 @Composable
 private fun DemoBackBar(title: String, onBack: () -> Unit) {
+    // Mirrors demo `fd-back-bar` grid: 44px 1fr 44px (kit.js backTopBar helper).
+    // Padding 6px 20px 0 per 00-foundation.css `.fd-top-bar, .fd-back-bar`.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 58.dp)
-            .padding(top = 6.dp, start = 8.dp, end = 20.dp),
+            .padding(top = 6.dp, start = 20.dp, end = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
             modifier = Modifier
@@ -204,6 +206,9 @@ private fun DemoBackBar(title: String, onBack: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        // Trailing slot placeholder — demo `backTopBar` outputs `<span></span>` when trailingIcon
+        // is null (kit.js line 64), preserving the 44px 1fr 44px grid. Spacer mirrors that here.
+        Spacer(Modifier.size(44.dp))
     }
 }
 

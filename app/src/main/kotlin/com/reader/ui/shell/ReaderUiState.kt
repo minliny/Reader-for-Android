@@ -50,13 +50,39 @@ data class ReaderContext(
     val entry: ReaderEntry,
     val chapterIndex: Int = 0,
     /** requestId of the entry intent that created this context — used by async-result guard. */
-    val entryRequestId: String
+    val entryRequestId: String,
+    // 阅读进度与排版状态（S4）：跨旋转/折叠/控制层显隐/会话启停保留，仅在全新 reader entry 时重置
+    /** 当前页序号。 */
+    val page: Int = 0,
+    /** 当前章节阅读进度 0f..1f。 */
+    val progress: Float = 0f,
+    /** 主题 id：paper/warm/green/blue/paper-night/warm-night/green-night/blue-night。 */
+    val themeId: String = "paper",
+    /** 屏幕亮度 0f..1f。 */
+    val brightness: Float = 0.5f,
+    /** 是否自动亮度。 */
+    val brightnessAuto: Boolean = true,
+    /** 正文字号 sp。 */
+    val fontSize: Float = 18f,
+    /** 行距倍数。 */
+    val lineSpacing: Float = 1.55f,
+    /** 页边距 dp。 */
+    val pageMargin: Float = 16f
 )
 
 /** Single running session. autoPage and tts are mutually exclusive (one activeSession). */
-data class ActiveSession(val type: SessionType, val playing: Boolean)
+data class ActiveSession(
+    val type: SessionType,
+    val playing: Boolean,
+    /** 自动翻页倒计时秒数（AUTO_PAGE 专用）。 */
+    val countdownSeconds: Int = 0,
+    /** TTS 当前句序（TTS 专用）。 */
+    val ttsSentenceIndex: Int = 0,
+    /** TTS 当前章节序号（TTS 专用）。 */
+    val ttsChapterIndex: Int = 0
+)
 
-enum class SessionType { AUTO_PAGE, TTS }
+enum class SessionType { AUTO_PAGE, TTS, NONE }
 
 /**
  * Overlay state. Slice 4 will populate keyboard/sheet/dialog; Slice 1/2 only needs `None`
@@ -64,6 +90,32 @@ enum class SessionType { AUTO_PAGE, TTS }
  */
 sealed class OverlayState {
     object None : OverlayState()
+    /** 软键盘浮层（输入框聚焦时）。 */
+    data class Keyboard(val inputId: String) : OverlayState()
+    /** 底部/侧边 Sheet 浮层。 */
+    data class Sheet(val content: SheetContent) : OverlayState()
+    /** 居中 Dialog 浮层。 */
+    data class Dialog(val content: DialogContent) : OverlayState()
+}
+
+/** Sheet 浮层内容契约（S2）。 */
+sealed class SheetContent {
+    /** 阅读器设置面板（module: directory/tts/appearance/settings）。 */
+    data class ReaderSetting(val module: String) : SheetContent()
+    /** 书架筛选面板。 */
+    data class BookshelfFilter(val filterId: String) : SheetContent()
+}
+
+/** Dialog 浮层内容契约（S2）。 */
+sealed class DialogContent {
+    /** 通用确认弹窗。 */
+    data class Confirm(
+        val title: String,
+        val message: String,
+        val onConfirm: () -> Unit
+    ) : DialogContent()
+    /** 书源切换确认弹窗。 */
+    data class SourceSwitch(val sourceId: String) : DialogContent()
 }
 
 /** Interrupt kind, mirroring `motion.interrupt.cancel / redirect / completeThenReplace`. */
@@ -85,13 +137,22 @@ data class MotionInterrupt(
 )
 
 /**
+ * 动效阶段（M2）—— UI 侧三态。reducer 据此驱动 ENTERING/LEAVING/SETTLED，
+ * 避免多个 Animatable 在打断时各自收尾。
+ *
+ * 注意：与 `com.reader.ui.motion.MotionPhase`（RUNNING/INTERRUPTED/SETTLED，
+ * 描述 MotionController transaction 阶段）是不同枚举，分属不同包，互不冲突。
+ */
+enum class MotionPhase { ENTERING, LEAVING, SETTLED }
+
+/**
  * Routes the reducer owns. Tab roots are NOT pushable — switching tabs only mutates
  * [ReaderUiState.activeTab] and never grows [ReaderUiState.backStack]
  * (FRONTEND_DEVELOPMENT_SLICE_MATRIX.md Slice 1: "不把 tab switch 写成 route push").
  *
- * `immersive-reading` is the final-state route for reader entry; `reader` (the control
- * layer) is deferred to Slice 3 and intentionally absent here so Slice 2 cannot
- * accidentally end on the control layer.
+ * `immersive-reading` is the final-state route for reader entry. `reader` and its reader
+ * module routes are explicit pushed routes opened from immersive tap zones; they never
+ * auto-open on entry.
  */
 sealed class ReaderRoute {
     /** Main tab shell is the back-stack root; never pushed/popped. */
@@ -106,6 +167,24 @@ sealed class ReaderRoute {
      */
     data class ImmersiveReading(val context: ReaderContext) : ReaderRoute() {
         val routeId: String get() = RouteIds.IMMERSIVE_READING
+    }
+
+    /** `reader` control layer and reader module routes opened over the same reading surface. */
+    data class ReaderControl(
+        val id: String = RouteIds.READER_CONTROL,
+        val context: ReaderContext? = null
+    ) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
+    /**
+     * `source-switch` is a FlowShell route, not a ReaderShell module panel. It keeps the
+     * reader context so the flow can render above the previous reading/control layer.
+     */
+    data class SourceSwitchFlow(
+        val context: ReaderContext? = null
+    ) : ReaderRoute() {
+        val routeId: String get() = RouteIds.SOURCE_SWITCH
     }
 
     /** Pushed from Bookshelf top bar — not a main tab (Slice 1). */
@@ -338,6 +417,31 @@ sealed class ReaderRoute {
         const val routeId: String = RouteIds.RSS_RECORD_CLEAR
     }
 
+    /** Bookshelf/book demo states that collapse into the bookshelf/book native flow. */
+    data class BookState(val id: String) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
+    /** RSS demo states that collapse into the RSS native flow. */
+    data class RssState(val id: String) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
+    /** Restore demo states that collapse into one restore native flow. */
+    data class RestoreState(val id: String) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
+    /** Discover demo states that collapse into the Discover native state model. */
+    data class DiscoverState(val id: String) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
+    /** Source management/debug demo states that collapse into source native flows. */
+    data class SourceState(val id: String) : ReaderRoute() {
+        val routeId: String get() = id
+    }
+
     /** Native fallback for demo-authored routes that do not yet have bespoke Compose screens. */
     data class Demo(val id: String) : ReaderRoute() {
         val routeId: String get() = id
@@ -347,6 +451,21 @@ sealed class ReaderRoute {
 /** Canonical route ids (match `frontend-demo/route-contract.js` for the Slice 1/2 subset). */
 object RouteIds {
     const val IMMERSIVE_READING = "immersive-reading"
+    const val READER_CONTROL = "reader"
+    const val READER_TOC_BOOKMARKS = "toc-bookmarks"
+    const val READER_APPEARANCE = "reader-appearance"
+    const val READER_TTS = "tts"
+    const val READER_AUTO_PAGE = "auto-page"
+    const val READER_CONTENT_SEARCH = "content-search"
+    const val READER_CONTENT_REPLACEMENT = "content-replacement"
+    const val READER_SETTINGS = "reader-settings"
+    const val READER_FULL_DIRECTORY = "reader-full-directory"
+    const val READER_FULL_TTS = "reader-full-tts"
+    const val READER_FULL_APPEARANCE = "reader-full-appearance"
+    const val READER_FULL_SETTINGS = "reader-full-settings"
+    const val READER_BOOK_CACHE = "reader-book-cache"
+    const val READER_DEBUG_INFO = "reader-debug-info"
+    const val SOURCE_SWITCH = "source-switch"
     const val BOOK_SEARCH = "book-search"
     const val SOURCE_IMPORT_PREVIEW = "source-import-preview"
     const val BOOK_BATCH_MANAGEMENT = "book-batch-management"
@@ -399,6 +518,8 @@ val ReaderRoute.routeId: String
     get() = when (this) {
         is ReaderRoute.TabShell -> tab.routeId
         is ReaderRoute.ImmersiveReading -> RouteIds.IMMERSIVE_READING
+        is ReaderRoute.ReaderControl -> routeId
+        is ReaderRoute.SourceSwitchFlow -> routeId
         ReaderRoute.Search -> ReaderRoute.Search.routeId
         ReaderRoute.ImportSource -> ReaderRoute.ImportSource.routeId
         ReaderRoute.BookBatchManagement -> ReaderRoute.BookBatchManagement.routeId
@@ -445,8 +566,204 @@ val ReaderRoute.routeId: String
         ReaderRoute.RssSourceDisable -> ReaderRoute.RssSourceDisable.routeId
         ReaderRoute.RssReadRecord -> ReaderRoute.RssReadRecord.routeId
         ReaderRoute.RssRecordClear -> ReaderRoute.RssRecordClear.routeId
+        is ReaderRoute.BookState -> routeId
+        is ReaderRoute.RssState -> routeId
+        is ReaderRoute.RestoreState -> routeId
+        is ReaderRoute.DiscoverState -> routeId
+        is ReaderRoute.SourceState -> routeId
         is ReaderRoute.Demo -> routeId
     }
+
+/**
+ * 文本选择状态（S6）。记录当前阅读器内文本选区的起止 offset 与工具栏可见性。
+ */
+data class TextSelectionState(
+    val active: Boolean = false,
+    val startOffset: Int = 0,
+    val endOffset: Int = 0,
+    val toolbarVisible: Boolean = false
+)
+
+/**
+ * 视口类别（M6）。驱动宽屏 dock offset、控制层布局、reader 分栏策略。
+ */
+enum class ViewportClass { PORTRAIT, COMPACT_LANDSCAPE, TABLET_EXPANDED, EXPANDED_WIDTH, HALF_OPENED }
+
+/**
+ * 旋转/折叠阶段（M6）。与 [MotionIds.VIEWPORT_ORIENTATION_PREPARE/RESHAPE/SETTLE] 对应。
+ */
+enum class OrientationPhase { STABLE, PREPARING, RESHAPING, SETTLING }
+
+/**
+ * 阅读器控制层状态（S5）。visible/phase 驱动 ENTERING/LEAVING 动效，
+ * activeModule 标记当前激活的 reader module（directory/tts/appearance/settings），
+ * dockOffset 按 [ViewportClass] 保存宽屏 dock 偏移。
+ */
+data class ReaderControlState(
+    val visible: Boolean = false,
+    val phase: MotionPhase = MotionPhase.SETTLED,
+    /** directory/tts/appearance/settings。 */
+    val activeModule: String = "directory",
+    /** 宽屏 dock offset 按 viewport class 保存（S5 dock drag release）。 */
+    val dockOffset: Map<ViewportClass, Float> = emptyMap()
+)
+
+/**
+ * 异步结果守卫状态值（M5）。IDLE/PENDING/COMPLETED/CANCELLED/DISCARDED/SUPERSEDED。
+ */
+enum class AsyncResultStateValue { IDLE, PENDING, COMPLETED, CANCELLED, DISCARDED, SUPERSEDED }
+
+/**
+ * 异步结果守卫状态（M5）。跟踪 reader entry / chapter load 等异步请求，
+ * 使 stale 结果可被 discard/supersede（MOTION_CONTRACT.md §async result guard）。
+ */
+data class AsyncResultState(
+    val requestId: String? = null,
+    val state: AsyncResultStateValue = AsyncResultStateValue.IDLE,
+    val value: Any? = null
+)
+
+/**
+ * 视口状态（M6）。记录当前 viewportClass、旋转阶段、宽高、折叠特征。
+ * foldFeature 用 Any? 以避免直接依赖 androidx.window FoldingFeature。
+ */
+data class ViewportState(
+    val viewportClass: ViewportClass = ViewportClass.PORTRAIT,
+    val orientationPhase: OrientationPhase = OrientationPhase.STABLE,
+    val widthDp: Int = 0,
+    val heightDp: Int = 0,
+    /** FoldingFeature，为避免直接依赖 androidx.window 用 Any?。 */
+    val foldFeature: Any? = null
+)
+
+/**
+ * 更多菜单状态（S8）。书架/阅读器顶部 more 菜单的开关与触发源。
+ */
+data class MoreMenuState(
+    val open: Boolean = false,
+    val triggerId: String? = null
+)
+
+// ── P3: Source Import / WebDAV / Permission state slices ─────────────────────
+
+/**
+ * P3: 书源导入 e2e 状态机。
+ *
+ * 契约要求：source-import 空/解析/成功/错误 四态可在 final state 解释。
+ * 状态流转：Idle → Parsing → Preview → Importing → Done | Error
+ */
+sealed class SourceImportState {
+    /** 初始空态：用户尚未粘贴 JSON。 */
+    object Idle : SourceImportState()
+    /** 解析中：JSON 正在解析为预览条目。 */
+    object Parsing : SourceImportState()
+    /** 解析完成：展示预览条目（新增/重复/异常），等待用户确认导入。 */
+    data class Preview(
+        val entries: List<SourceImportPreviewEntry>,
+        val conflictMode: String = "跳过重复"
+    ) : SourceImportState()
+    /** 导入中：Core 正在写入书源。 */
+    object Importing : SourceImportState()
+    /** 导入完成：展示汇总（成功数 / 跳过数 / 失败数）。 */
+    data class Done(val imported: Int, val skipped: Int, val failed: Int) : SourceImportState()
+    /** 错误：解析失败或 Core 返回错误。 */
+    data class Error(val message: String, val retryable: Boolean = true) : SourceImportState()
+}
+
+/** P3: 书源导入预览条目。 */
+data class SourceImportPreviewEntry(
+    val name: String,
+    val url: String,
+    val group: String,
+    val tone: SourceImportTone
+)
+
+/** P3: 预览条目色调（新增=good / 重复=muted / 异常=warn）。 */
+enum class SourceImportTone { GOOD, MUTED, WARN }
+
+/**
+ * P4: RSS 列表 UI 状态。
+ *
+ * 契约要求：RSS 列表 final state 可解释（loading / empty / success / error）。
+ * 状态流转：Idle → Loading → Success | Empty | Error
+ *
+ * TODO(core-blocker): Core 协议尚未暴露 `rss.list` / `rss.item.read` /
+ * `rss.subscription.*` / `rss.source.*`。当前 reducer 只能驱动 UI 状态
+ * （Loading/Error/Empty）；Success 列表数据需等待 Core 方法落地后通过
+ * Core bridge 拉取，本仓不缓存 RSS 文章内容（DomainState by Core）。
+ * 订阅元数据通过 [com.reader.android.data.network.RoomSubscriptionRepository]
+ * 持久化，与 Core 文章内容解耦。
+ */
+sealed class RssListState {
+    /** 初始态：尚未发起加载。 */
+    object Idle : RssListState()
+    /** 加载中：Core bridge 调用 rss.list（待 Core 落地）。 */
+    object Loading : RssListState()
+    /** 加载成功：展示订阅源列表。 */
+    data class Success(val sourceCount: Int) : RssListState()
+    /** 空态：无订阅源。 */
+    object Empty : RssListState()
+    /** 错误：Core 返回错误或超时。 */
+    data class Error(val message: String, val retryable: Boolean = true) : RssListState()
+}
+
+/**
+ * P3: WebDAV 配置状态。
+ *
+ * 契约要求：settings/WebDAV intent 接真实 adapter。
+ * 表单字段 + 测试/保存状态。
+ */
+data class WebDavConfigState(
+    val serverUrl: String = "",
+    val username: String = "",
+    val password: String = "",
+    val syncDir: String = "/reader/backup",
+    val testStatus: WebDavTestStatus = WebDavTestStatus.Idle,
+    val saveStatus: WebDavSaveStatus = WebDavSaveStatus.Idle,
+    val savedIdentifier: String? = null
+)
+
+/** P3: WebDAV 连接测试状态。 */
+sealed class WebDavTestStatus {
+    object Idle : WebDavTestStatus()
+    object Testing : WebDavTestStatus()
+    data class Success(val latencyMs: Long) : WebDavTestStatus()
+    data class Error(val message: String) : WebDavTestStatus()
+}
+
+/** P3: WebDAV 配置保存状态。 */
+sealed class WebDavSaveStatus {
+    object Idle : WebDavSaveStatus()
+    object Saving : WebDavSaveStatus()
+    object Saved : WebDavSaveStatus()
+    data class Error(val message: String) : WebDavSaveStatus()
+}
+
+/**
+ * P3: 权限状态。
+ *
+ * 契约要求：settings/权限 intent 接真实 adapter。
+ * 每种权限映射到当前状态。
+ */
+data class PermissionState(
+    val notifications: PermissionStatus = PermissionStatus.UNKNOWN,
+    val fileAccess: PermissionStatus = PermissionStatus.UNKNOWN,
+    val batteryOptimization: PermissionStatus = PermissionStatus.UNKNOWN
+)
+
+/** P3: 权限当前状态。 */
+enum class PermissionStatus {
+    GRANTED,
+    DENIED,
+    UNKNOWN
+}
+
+/** P3: 权限种类（用于 intent）。 */
+enum class PermissionKind {
+    NOTIFICATIONS,
+    FILE_ACCESS,
+    BATTERY_OPTIMIZATION
+}
 
 /**
  * The single UI state. Every field the contract requires is present:
@@ -461,7 +778,29 @@ data class ReaderUiState(
     val activeSession: ActiveSession? = null,
     val overlayState: OverlayState = OverlayState.None,
     val motionInterrupt: MotionInterrupt? = null,
-    val reducedMotion: Boolean = false
+    val reducedMotion: Boolean = false,
+    // 新增字段（S2/S4/S5/S6/S7/S8/M2/M5/M6）
+    /** 当前动效阶段（M2）。 */
+    val motionPhase: MotionPhase = MotionPhase.SETTLED,
+    /** 文本选择状态（S6）。 */
+    val textSelection: TextSelectionState = TextSelectionState(),
+    /** 阅读器控制层状态（S5）。 */
+    val readerControl: ReaderControlState = ReaderControlState(),
+    /** 异步结果守卫状态（M5）。 */
+    val asyncResult: AsyncResultState = AsyncResultState(),
+    /** 视口/折叠状态（M6）。 */
+    val viewport: ViewportState = ViewportState(),
+    /** 更多菜单状态（S8）。 */
+    val moreMenu: MoreMenuState = MoreMenuState(),
+    // P3 state slices
+    /** 书源导入 e2e 状态。 */
+    val sourceImport: SourceImportState = SourceImportState.Idle,
+    /** WebDAV 配置状态。 */
+    val webDavConfig: WebDavConfigState = WebDavConfigState(),
+    /** 权限状态。 */
+    val permissions: PermissionState = PermissionState(),
+    /** P4: RSS 列表 UI 状态（Loading/Empty/Success/Error）。 */
+    val rssList: RssListState = RssListState.Idle
 ) {
     /** True when the rendered route is the immersive reading surface (no control layer). */
     val isImmersiveReading: Boolean

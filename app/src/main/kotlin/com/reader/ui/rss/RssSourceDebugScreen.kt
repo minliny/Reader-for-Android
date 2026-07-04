@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -46,14 +47,9 @@ fun RssSourceDebugScreen(
 ) {
     val results = remember { rssSourceDebugResults() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            RssSourceDebugTopBar(onBack = onBack)
+    LibraryShellFrame(
+        backTopBar = { RssSourceDebugTopBar(onBack = onBack) },
+        contentRegion = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
@@ -63,13 +59,14 @@ fun RssSourceDebugScreen(
                     RssSourceDebugPanel(results = results)
                 }
             }
+        },
+        bottomActionHost = {
+            RssSourceDebugBottomActions(
+                onEdit = onEdit,
+                onDone = onDone
+            )
         }
-        RssSourceDebugBottomActions(
-            onEdit = onEdit,
-            onDone = onDone,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
+    )
 }
 
 @Composable

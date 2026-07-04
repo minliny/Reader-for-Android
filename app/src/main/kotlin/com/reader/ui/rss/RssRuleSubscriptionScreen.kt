@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -173,14 +174,9 @@ private fun RssRuleScaffold(
     bottom: (@Composable () -> Unit)?,
     content: LazyListScope.() -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            RssRuleTopBar(title = title, onBack = onBack)
+    LibraryShellFrame(
+        backTopBar = { RssRuleTopBar(title = title, onBack = onBack) },
+        contentRegion = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -192,13 +188,11 @@ private fun RssRuleScaffold(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 content = content
             )
+        },
+        bottomActionHost = {
+            bottom?.invoke()
         }
-        if (bottom != null) {
-            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                bottom()
-            }
-        }
-    }
+    )
 }
 
 @Composable

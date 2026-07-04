@@ -11,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
@@ -28,32 +29,53 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.reader.android.R
+import com.reader.api.Book
+import com.reader.ui.book.BookDetailScreen
+import com.reader.ui.book.BookDirectoryScreen
+import com.reader.ui.book.demoBookDetailRouteState
+import com.reader.ui.book.demoBookDirectoryRouteState
 import com.reader.ui.bookshelf.BookBatchManagementScreen
 import com.reader.ui.bookshelf.BookshelfScreen
+import com.reader.ui.bookshelf.BookshelfTabStateHost
+import com.reader.ui.bookshelf.BookshelfTabTopBar
+import com.reader.ui.bookshelf.BookshelfEmptyRouteScreen
+import com.reader.ui.bookshelf.BookshelfSortFilterRouteScreen
 import com.reader.ui.bookshelf.BookshelfSearchSettingsScreen
 import com.reader.ui.bookshelf.GroupManagementScreen
 import com.reader.ui.bookshelf.LocalImportScreen
 import com.reader.ui.demo.DemoRouteRegistry
 import com.reader.ui.demo.DemoRouteScreen
+import com.reader.ui.discover.DiscoverDemoPage
+import com.reader.ui.discover.DiscoverDemoRouteIds
+import com.reader.ui.discover.DiscoverDemoRouteScreen
+import com.reader.ui.discover.DiscoverDemoRouteShell
 import com.reader.ui.discover.DiscoverScreen
+import com.reader.ui.discover.DiscoverTabState
+import com.reader.ui.discover.DiscoverTabTopBar
+import com.reader.ui.discover.discoverDemoRouteState
 import com.reader.ui.motion.AppMotionTokens
-import com.reader.ui.motion.ReaderMotionTokens
 import com.reader.ui.motion.ReducedMotionResolver
 import com.reader.ui.motion.effectiveDuration
-import com.reader.ui.reading.ImmersiveReadingScreen
+import com.reader.ui.reading.FlowShellScreen
+import com.reader.ui.reading.ReaderShellScreen
 import com.reader.ui.rss.RssReadRecordScreen
 import com.reader.ui.rss.RssArticleHubScreen
 import com.reader.ui.rss.RssDetailScreen
+import com.reader.ui.rss.RssRemainingDemoRouteScreen
 import com.reader.ui.rss.RssOriginalScreen
 import com.reader.ui.rss.RssRefreshingScreen
 import com.reader.ui.rss.RssRuleSubscriptionApplyScreen
@@ -62,6 +84,8 @@ import com.reader.ui.rss.RssRuleSubscriptionEditScreen
 import com.reader.ui.rss.RssRuleSubscriptionScreen
 import com.reader.ui.rss.RssRuleSubscriptionTestScreen
 import com.reader.ui.rss.RssScreen
+import com.reader.ui.rss.RssTabState
+import com.reader.ui.rss.RssTabTopBar
 import com.reader.ui.rss.RssSearchScreen
 import com.reader.ui.rss.RssSourceActionsScreen
 import com.reader.ui.rss.RssSourceBatchScreen
@@ -80,10 +104,15 @@ import com.reader.ui.rss.RssSourceLoginScreen
 import com.reader.ui.rss.RssSourceLoginWebScreen
 import com.reader.ui.rss.RssSourceVarsScreen
 import com.reader.ui.rss.RssSubscriptionManagementScreen
+import com.reader.ui.restore.RestoreRouteIds
+import com.reader.ui.restore.RestoreScreen
+import com.reader.ui.restore.RestoreUiState
 import com.reader.ui.source.ImportBookSourceScreen
+import com.reader.ui.source.SourceDemoRouteScreen
 import com.reader.ui.search.SearchScreen
 import com.reader.ui.settings.AboutFeedbackScreen
 import com.reader.ui.settings.SettingsScreen
+import com.reader.ui.settings.SettingsTabTopBar
 import com.reader.ui.settings.SettingsGeneralScreen
 import com.reader.ui.settings.SourceManagementScreen
 import com.reader.ui.settings.SyncBackupScreen
@@ -106,7 +135,7 @@ import com.reader.ui.theme.readerExtraColors
  * Layout (mirrors `frontend-demo/styles/01-shell-layout.css`):
  * - TabShell: full-screen content with the floating pill bar bottom-aligned; the bar floats
  *   14dp above the system nav inset with 14dp side margins (handled inside [FloatingPillTabBar]).
- * - ImmersiveReading: full-screen text surface, NO control layer, NO tab bar.
+ * - ImmersiveReading: full-screen text surface; center tap pushes the `reader` control layer.
  */
 @Composable
 fun AppShell(
@@ -117,6 +146,8 @@ fun AppShell(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val reducedMotion = state.reducedMotion
+    var restoreUiState by remember { mutableStateOf(RestoreUiState()) }
+
     fun popBackTo(route: ReaderRoute, fallbackPops: Int = 1) {
         val targetIndex = state.backStack.indexOfLast { it == route }
         val popCount = if (targetIndex >= 0) {
@@ -128,6 +159,15 @@ fun AppShell(
             vm.dispatch(ReaderUiIntent.PopRoute)
         }
     }
+    fun enterReaderFromBook(book: Book) {
+        vm.dispatch(
+            ReaderUiIntent.EnterReaderFromAction(
+                sourceId = book.origin.ifEmpty { book.bookUrl },
+                bookUrl = book.bookUrl,
+                bookName = book.name
+            )
+        )
+    }
     fun navigateTo(route: ReaderRoute) {
         when (route) {
             is ReaderRoute.TabShell -> vm.dispatch(ReaderUiIntent.SelectTab(route.tab))
@@ -137,26 +177,83 @@ fun AppShell(
     fun navigateToRouteId(routeId: String) {
         navigateTo(DemoRouteRegistry.routeFor(routeId))
     }
-
-    // System back maps to app.route.pop when there is a pushed route to pop.
-    BackHandler(enabled = state.backStack.isNotEmpty()) {
-        vm.dispatch(ReaderUiIntent.PopRoute)
+    fun navigateFromReaderShell(route: ReaderRoute, targetRoute: String) {
+        when (route) {
+            is ReaderRoute.ImmersiveReading -> when (targetRoute) {
+                RouteIds.IMMERSIVE_READING -> Unit
+                RouteIds.READER_CONTROL -> vm.dispatch(
+                    ReaderUiIntent.PushRoute(ReaderRoute.ReaderControl(context = route.context))
+                )
+                RouteIds.SOURCE_SWITCH -> vm.dispatch(
+                    ReaderUiIntent.PushRoute(ReaderRoute.SourceSwitchFlow(route.context))
+                )
+                else -> navigateToRouteId(targetRoute)
+            }
+            is ReaderRoute.ReaderControl -> {
+                val previous = state.backStack.dropLast(1).lastOrNull()
+                when {
+                    targetRoute == RouteIds.IMMERSIVE_READING && previous is ReaderRoute.ImmersiveReading ->
+                        vm.dispatch(ReaderUiIntent.PopRoute)
+                    targetRoute == RouteIds.SOURCE_SWITCH -> vm.dispatch(
+                        ReaderUiIntent.PushRoute(ReaderRoute.SourceSwitchFlow(route.context ?: state.readerContext))
+                    )
+                    targetRoute == route.id -> Unit
+                    else -> navigateToRouteId(targetRoute)
+                }
+            }
+            is ReaderRoute.SourceSwitchFlow -> {
+                when (targetRoute) {
+                    RouteIds.SOURCE_SWITCH,
+                    RouteIds.READER_CONTROL -> vm.dispatch(ReaderUiIntent.PopRoute)
+                    RouteIds.IMMERSIVE_READING -> {
+                        vm.dispatch(ReaderUiIntent.PopRoute)
+                        if (state.backStack.dropLast(1).lastOrNull() is ReaderRoute.ReaderControl) {
+                            vm.dispatch(ReaderUiIntent.PopRoute)
+                        }
+                    }
+                    else -> {
+                        vm.dispatch(ReaderUiIntent.PopRoute)
+                        navigateToRouteId(targetRoute)
+                    }
+                }
+            }
+            else -> navigateToRouteId(targetRoute)
+        }
     }
 
-    when (val route = state.currentRoute) {
-        is ReaderRoute.ImmersiveReading -> {
-            // `immersive-reading`: full-screen text surface, NO control layer, NO tab bar.
-            AnimatedContent(
-                targetState = route.context,
-                transitionSpec = {
-                    readerEntryTransition(reducedMotion)
-                },
-                label = "reader.entry"
-            ) { targetContext ->
-                ImmersiveReadingScreen(targetContext)
-            }
+    // System back follows the overlay-first rule (MOTION_CONTRACT.md / FRONTEND_DEVELOPMENT_SLICE_MATRIX.md
+    // Slice 4): Back closes the topmost overlay (Keyboard / Sheet / Dialog / MoreMenu / ReaderControl)
+    // before popping the route. Hidden overlays have no hit area and don't intercept Back.
+    BackHandler(enabled = state.backStack.isNotEmpty() || state.overlayState !is OverlayState.None || state.moreMenu.open) {
+        when {
+            state.overlayState is OverlayState.Keyboard -> vm.dispatch(ReaderUiIntent.CloseKeyboard)
+            state.overlayState is OverlayState.Sheet -> vm.dispatch(ReaderUiIntent.CloseSheet)
+            state.overlayState is OverlayState.Dialog -> vm.dispatch(ReaderUiIntent.CloseDialog)
+            state.moreMenu.open -> vm.dispatch(ReaderUiIntent.CloseMoreMenu)
+            else -> vm.dispatch(ReaderUiIntent.PopRoute)
         }
+    }
 
+    val currentRoute = state.currentRoute
+    if (currentRoute is ReaderRoute.SourceSwitchFlow) {
+        FlowShellScreen(
+            route = currentRoute,
+            onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+            onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) }
+        )
+    } else if (currentRoute is ReaderRoute.ImmersiveReading ||
+        currentRoute is ReaderRoute.ReaderControl
+    ) {
+        ReaderShellScreen(
+            route = currentRoute,
+            fallbackContext = state.readerContext,
+            activeSession = state.activeSession,
+            onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+            onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
+            onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
+            onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) }
+        )
+    } else when (val route = currentRoute) {
         is ReaderRoute.Search -> {
             SearchScreen(
                 onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
@@ -173,7 +270,11 @@ fun AppShell(
         }
 
         ReaderRoute.ImportSource -> {
-            ImportBookSourceScreen(onDone = { vm.dispatch(ReaderUiIntent.PopRoute) })
+            ImportBookSourceScreen(
+                state = state.sourceImport,
+                dispatch = vm::dispatch,
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+            )
         }
 
         ReaderRoute.BookBatchManagement -> {
@@ -593,6 +694,146 @@ fun AppShell(
             )
         }
 
+        is ReaderRoute.BookState -> {
+            when (route.id) {
+                "book-detail" -> {
+                    val bookState = remember { demoBookDetailRouteState() }
+                    BookDetailScreen(
+                        state = bookState,
+                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onContinueReading = { enterReaderFromBook(bookState.book) },
+                        onBookDirectory = { navigateToRouteId("book-directory") },
+                        onSourceSwitch = { navigateToRouteId(RouteIds.SOURCE_SWITCH) },
+                        onRemoveFromBookshelf = { vm.dispatch(ReaderUiIntent.PopRoute) }
+                    )
+                }
+                "book-directory" -> {
+                    val directoryState = remember { demoBookDirectoryRouteState() }
+                    BookDirectoryScreen(
+                        state = directoryState,
+                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onOpenChapter = { enterReaderFromBook(directoryState.book) }
+                    )
+                }
+                "bookshelf-empty" -> {
+                    MainTabShellFrame(
+                        activeTab = MainTab.BOOKSHELF,
+                        onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                    ) {
+                        BookshelfEmptyRouteScreen(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+                            onDiscover = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.DISCOVER)) },
+                            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+                            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+                            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) }
+                        )
+                    }
+                }
+                "sort-filter" -> {
+                    MainTabShellFrame(
+                        activeTab = MainTab.BOOKSHELF,
+                        onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                    ) {
+                        BookshelfSortFilterRouteScreen(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onOpenBookFromCover = { book -> enterReaderFromBook(book) },
+                            onOpenBookFromAction = { book -> enterReaderFromBook(book) },
+                            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+                            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+                            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+                            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) }
+                        )
+                    }
+                }
+                else -> {
+                    DemoRouteScreen(
+                        routeId = route.id,
+                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onNavigate = { navigateToRouteId(it) }
+                    )
+                }
+            }
+        }
+
+        is ReaderRoute.RssState -> {
+            RssRemainingDemoRouteScreen(
+                routeId = route.id,
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onNavigate = { navigateToRouteId(it) }
+            )
+        }
+
+        is ReaderRoute.RestoreState -> {
+            fun navigateRestoreTarget(targetRouteId: String) {
+                if (targetRouteId == RestoreRouteIds.SyncBackup && state.backStack.any { it == ReaderRoute.SyncBackup }) {
+                    popBackTo(ReaderRoute.SyncBackup)
+                } else {
+                    navigateToRouteId(targetRouteId)
+                }
+            }
+            RestoreScreen(
+                state = restoreUiState,
+                routeId = route.id,
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onNavigate = ::navigateRestoreTarget,
+                onScopeToggle = { restoreUiState = restoreUiState.toggleScope(it) },
+                onConflictChoice = { conflictId, choice ->
+                    restoreUiState = restoreUiState.chooseConflict(conflictId, choice)
+                },
+                onViewLog = { navigateToRouteId("source-logs") }
+            )
+        }
+
+        is ReaderRoute.DiscoverState -> {
+            val discoverRouteState = discoverDemoRouteState(route.id)
+            if (discoverRouteState?.page == DiscoverDemoPage.Main) {
+                MainTabShellFrame(
+                    activeTab = MainTab.DISCOVER,
+                    onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                ) {
+                    DiscoverDemoRouteScreen(
+                        routeId = route.id,
+                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onNavigate = { navigateToRouteId(it) },
+                        onOpenBook = { sourceId, bookUrl, bookName ->
+                            vm.dispatch(
+                                ReaderUiIntent.EnterReaderFromAction(
+                                    sourceId = sourceId,
+                                    bookUrl = bookUrl,
+                                    bookName = bookName
+                                )
+                            )
+                        }
+                    )
+                }
+            } else {
+                DiscoverDemoRouteScreen(
+                    routeId = route.id,
+                    shell = discoverShellForRoute(route.id),
+                    onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                    onNavigate = { navigateToRouteId(it) },
+                    onOpenBook = { sourceId, bookUrl, bookName ->
+                        vm.dispatch(
+                            ReaderUiIntent.EnterReaderFromAction(
+                                sourceId = sourceId,
+                                bookUrl = bookUrl,
+                                bookName = bookName
+                            )
+                        )
+                    }
+                )
+            }
+        }
+
+        is ReaderRoute.SourceState -> {
+            SourceDemoRouteScreen(
+                routeId = route.id,
+                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onNavigate = { navigateToRouteId(it) }
+            )
+        }
+
         is ReaderRoute.Demo -> {
             DemoRouteScreen(
                 routeId = route.id,
@@ -602,27 +843,153 @@ fun AppShell(
         }
 
         is ReaderRoute.TabShell -> {
-            Box(Modifier.fillMaxSize()) {
+            val discoverState = remember { DiscoverTabState() }
+            val rssState = remember { RssTabState() }
+            MainTabShellFrame(
+                activeTab = state.activeTab,
+                onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) },
+                appTopBar = {
+                    when (state.activeTab) {
+                        MainTab.BOOKSHELF -> BookshelfTabTopBar(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) }
+                        )
+                        MainTab.DISCOVER -> DiscoverTabTopBar(state = discoverState)
+                        MainTab.RSS -> RssTabTopBar(
+                            state = rssState,
+                            onManageSources = {
+                                vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement))
+                            }
+                        )
+                        MainTab.SETTINGS -> SettingsTabTopBar()
+                    }
+                },
+                stateHost = {
+                    when (state.activeTab) {
+                        MainTab.BOOKSHELF -> BookshelfTabStateHost(
+                            onBookBatchManagement = {
+                                vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement))
+                            },
+                            onGroupManagement = {
+                                vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement))
+                            },
+                            onLocalImport = {
+                                vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport))
+                            },
+                            onBookDetail = {
+                                vm.dispatch(ReaderUiIntent.PushRoute(DemoRouteRegistry.routeFor("book-detail")))
+                            }
+                        )
+                        else -> Box(modifier = Modifier.size(0.dp))
+                    }
+                }
+            ) {
                 AnimatedContent(
                     targetState = state.activeTab,
                     transitionSpec = { tabSwitchTransition(reducedMotion) },
                     label = "app.tab.switch",
                     modifier = Modifier.fillMaxSize()
                 ) { tab ->
-                    TabContent(tab, vm, state.reducedMotion)
+                    TabContent(tab, vm, state.reducedMotion, discoverState, rssState)
                 }
-                FloatingPillTabBar(
-                    activeTab = state.activeTab,
-                    onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
             }
         }
+        else -> Unit
+    }
+}
+
+/**
+ * Main tab shell frame aligned with `frontend-demo/shared-shell-kit/kit.js`
+ * `renderMainTabShell`. Renders 5 fixed slots:
+ *
+ * 1. `statusBar` — default zero-size Box placeholder (native Android uses system status bar
+ *    inset; tab screens handle inset via their own TopBar `windowInsetsPadding`)
+ * 2. `appTopBar` — tab screens inject their own TopBar via slot lambda (BookshelfTabTopBar /
+ *    DiscoverTabTopBar / RssTabTopBar / SettingsTabTopBar); defaults to zero-size Box
+ * 3. `contentRegion` — `content` trailing lambda (always real content via `AnimatedContent`)
+ * 4. `stateHost` — tab screens inject state overlays (e.g. BookshelfTabStateHost); defaults to
+ *    zero-size Box; per demo CSS `display:contents`, slot preserved as addressable placeholder
+ * 5. `mainNav` — **self-rendering slot** (always `FloatingPillTabBar`); not exposed as lambda
+ *    because main nav is the shell's defining fixture, not a per-route variable
+ *
+ * `statusBar` / `appTopBar` / `stateHost` default to `Box(Modifier.size(0.dp))` per demo
+ * fixed-slot addressability contract (mirrors `display:contents` DOM anchor preservation).
+ */
+@Composable
+private fun MainTabShellFrame(
+    activeTab: MainTab,
+    onSelect: (MainTab) -> Unit,
+    statusBar: @Composable () -> Unit = { MainTabStatusBarSlot() },
+    appTopBar: @Composable () -> Unit = { MainTabAppTopBarSlot() },
+    stateHost: @Composable () -> Unit = { MainTabStateHostSlot() },
+    content: @Composable () -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val useLeftRail = maxWidth >= 600.dp
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = if (useLeftRail) 100.dp else 0.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                statusBar()
+                appTopBar()
+                Box(modifier = Modifier.weight(1f)) {
+                    content()
+                }
+            }
+            // stateHost slot: overlay-positioned (demo CSS: display:contents; rendered as overlay when populated)
+            stateHost()
+        }
+        // mainNav slot: self-rendered FloatingPillTabBar (shell's defining fixture, not injectable)
+        FloatingPillTabBar(
+            activeTab = activeTab,
+            onSelect = onSelect,
+            layout = if (useLeftRail) MainNavLayout.LeftRail else MainNavLayout.BottomPill,
+            modifier = if (useLeftRail) {
+                Modifier.align(Alignment.CenterStart)
+            } else {
+                Modifier.align(Alignment.BottomCenter)
+            }
+        )
     }
 }
 
 @Composable
-private fun TabContent(tab: MainTab, vm: AppShellViewModel, reducedMotion: Boolean) {
+private fun MainTabStatusBarSlot() {
+    // statusBar slot placeholder — native Android uses system status bar inset; tab screens
+    // handle inset via their own TopBar windowInsetsPadding. Zero-size Box preserves addressability.
+    Box(modifier = Modifier.size(0.dp))
+}
+
+@Composable
+private fun MainTabAppTopBarSlot() {
+    // appTopBar slot placeholder — tab screens inject their own TopBar via slot lambda.
+    // Zero-size Box preserves addressability per demo contract.
+    Box(modifier = Modifier.size(0.dp))
+}
+
+@Composable
+private fun MainTabStateHostSlot() {
+    // stateHost slot placeholder — tab screens inject state overlays via slot lambda.
+    // Zero-size Box preserves addressability per demo `display:contents` contract.
+    Box(modifier = Modifier.size(0.dp))
+}
+
+private fun discoverShellForRoute(routeId: String): DiscoverDemoRouteShell = when (routeId) {
+    DiscoverDemoRouteIds.SOURCE_LOGIN -> DiscoverDemoRouteShell.Library
+    DiscoverDemoRouteIds.RULE_TEST,
+    DiscoverDemoRouteIds.SOURCE_BULK -> DiscoverDemoRouteShell.Settings
+    else -> DiscoverDemoRouteShell.Auto
+}
+
+@Composable
+private fun TabContent(
+    tab: MainTab,
+    vm: AppShellViewModel,
+    reducedMotion: Boolean,
+    discoverState: DiscoverTabState,
+    rssState: RssTabState
+) {
     when (tab) {
         MainTab.BOOKSHELF -> BookshelfScreen(
             onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
@@ -644,13 +1011,12 @@ private fun TabContent(tab: MainTab, vm: AppShellViewModel, reducedMotion: Boole
                     )
                 )
             },
-            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
-            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
             onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
             onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
             onDiscover = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.DISCOVER)) }
         )
         MainTab.DISCOVER -> DiscoverScreen(
+            state = discoverState,
             onOpenBook = { sourceId, bookUrl, bookName ->
                 vm.dispatch(
                     ReaderUiIntent.EnterReaderFromAction(
@@ -660,9 +1026,12 @@ private fun TabContent(tab: MainTab, vm: AppShellViewModel, reducedMotion: Boole
                     )
                 )
             },
-            onOpenDiscoverControl = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Demo("discover-control"))) }
+            onOpenDiscoverControl = {
+                vm.dispatch(ReaderUiIntent.PushRoute(DemoRouteRegistry.routeFor("discover-control")))
+            }
         )
         MainTab.RSS -> RssScreen(
+            state = rssState,
             onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
             onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) },
             onOpenAll = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssAll)) },
@@ -763,10 +1132,23 @@ private fun PlaceholderTabScreen(title: String, body: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .defaultMinSize(minHeight = 58.dp)
                 .padding(top = 6.dp, start = 20.dp, end = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(text = title, style = ReaderTextStyles.appBarTitle, color = ink)
+            // fd-top-bar leading 44px slot (placeholder)
+            Spacer(Modifier.size(44.dp))
+            Text(
+                text = title,
+                style = ReaderTextStyles.appBarTitle,
+                color = ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            // fd-top-bar trailing 44px slot (placeholder)
+            Spacer(Modifier.size(44.dp))
         }
         Box(
             modifier = Modifier
@@ -809,22 +1191,5 @@ private fun tabSwitchTransition(reducedMotion: Boolean) =
             )
         ) togetherWith fadeOut(
             animationSpec = tween(durationMillis = AppMotionTokens.DurationTabPress.inWholeMilliseconds.toInt())
-        )
-    }
-
-/**
- * `reader.entry.coverToImmersive` / `reader.entry.actionToImmersive`: 240ms fade + 12px rise.
- * Under reduced motion: instant entry (MOTION_EFFECTS.md §6 acceptance).
- */
-private fun readerEntryTransition(reducedMotion: Boolean) =
-    if (reducedMotion) {
-        EnterTransition.None togetherWith ExitTransition.None
-    } else {
-        fadeIn(
-            animationSpec = tween(
-                durationMillis = ReaderMotionTokens.DurationReaderEntry.inWholeMilliseconds.toInt()
-            )
-        ) togetherWith fadeOut(
-            animationSpec = tween(durationMillis = ReaderMotionTokens.DurationBase.inWholeMilliseconds.toInt())
         )
     }

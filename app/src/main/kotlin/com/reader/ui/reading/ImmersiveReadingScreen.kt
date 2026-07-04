@@ -1,9 +1,13 @@
 package com.reader.ui.reading
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,10 +42,9 @@ import kotlinx.coroutines.launch
 /**
  * Immersive reading surface — `immersive-reading` (route-contract.js).
  *
- * Per FRONTEND_DEVELOPMENT_SLICE_MATRIX.md Slice 2 acceptance, the final state of reader
- * entry is immersive reading: the reader control layer (top bar, bottom chapter bar) MUST
- * NOT auto-appear. This composable therefore renders only the chapter text with no
- * Scaffold chrome; the control layer is Slice 3 material and is intentionally absent.
+ * Reader entry still lands in immersive reading: the reader control layer (top bar, bottom
+ * chapter bar) does not auto-appear. The demo's immersive info layer and transparent center
+ * hotzone are present; tapping the center zone pushes the explicit `reader` control route.
  *
  * Layout mirrors `frontend-demo/styles/01-shell-layout.css` `.fd-ir-reading-layer` 1:1
  * (px → dp at mdpi):
@@ -52,14 +56,49 @@ import kotlinx.coroutines.launch
  * surface performs no animated displacement of its own.
  */
 @Composable
-fun ImmersiveReadingScreen(context: ReaderContext) {
+fun ReaderReadingSurface(
+    title: String,
+    content: String,
+    modifier: Modifier = Modifier,
+    topPadding: Dp = 72.dp,
+    horizontalPadding: Dp = 32.dp,
+    bottomPadding: Dp = 48.dp
+) {
+    val readerInk = readerExtraColors().readerInk
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = topPadding)
+            .padding(horizontal = horizontalPadding)
+            .padding(bottom = bottomPadding)
+    ) {
+        Text(
+            text = title,
+            style = ReaderTextStyles.readerChapterTitle,
+            color = readerInk
+        )
+        // Demo h1 margin-bottom: 24px.
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = content,
+            style = ReaderTextStyles.readerBody,
+            color = readerInk
+        )
+    }
+}
+
+@Composable
+fun ImmersiveReadingScreen(
+    context: ReaderContext,
+    onOpenControls: () -> Unit
+) {
     val vm: ImmersiveReadingViewModel = viewModel(
         key = "immersive-${context.bookUrl}",
         factory = ImmersiveReadingViewModelFactory(context)
     )
     val state by vm.uiState.collectAsStateWithLifecycle()
     val content by vm.content.collectAsStateWithLifecycle()
-    val readerInk = readerExtraColors().readerInk
 
     when (val s = state) {
         ReadingUiState.Loading -> Box(
@@ -74,28 +113,77 @@ fun ImmersiveReadingScreen(context: ReaderContext) {
             Text(s.message, color = MaterialTheme.colorScheme.error)
         }
 
-        is ReadingUiState.Ready -> Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                // Demo .fd-ir-reading-layer: padding 72px top / 32px horizontal / 48px bottom.
-                .padding(top = 72.dp)
-                .padding(horizontal = 32.dp)
-                .padding(bottom = 48.dp)
-        ) {
-            Text(
-                text = s.book.name.ifEmpty { context.bookName },
-                style = ReaderTextStyles.readerChapterTitle,
-                color = readerInk
+        is ReadingUiState.Ready -> Box(Modifier.fillMaxSize()) {
+            ReaderReadingSurface(
+                title = s.book.name.ifEmpty { context.bookName },
+                content = content
             )
-            // Demo h1 margin-bottom: 24px.
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = content,
-                style = ReaderTextStyles.readerBody,
-                color = readerInk
+            ReaderImmersiveInfoLayer(
+                title = context.bookName.ifEmpty { s.book.name },
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+            ReaderTapZones(
+                onOpenControls = onOpenControls,
+                modifier = Modifier.fillMaxSize()
             )
         }
+    }
+}
+
+@Composable
+private fun ReaderImmersiveInfoLayer(title: String, modifier: Modifier = Modifier) {
+    val extra = readerExtraColors()
+    Box(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "${title.ifEmpty { "长夜余火" }} · 第 32 章 雨夜",
+                style = ReaderTextStyles.infoLayer,
+                color = extra.infoLayer,
+                maxLines = 1
+            )
+            Text("10:18", style = ReaderTextStyles.infoLayer, color = extra.infoLayer)
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        ) {
+            Text("38%", style = ReaderTextStyles.infoLayer, color = extra.infoLayer)
+            Text("第 1 / 3 页", style = ReaderTextStyles.infoLayer, color = extra.infoLayer)
+        }
+    }
+}
+
+@Composable
+private fun ReaderTapZones(
+    onOpenControls: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier) {
+        Spacer(
+            modifier = Modifier
+                .weight(0.28f)
+                .fillMaxHeight()
+        )
+        Box(
+            modifier = Modifier
+                .weight(0.44f)
+                .fillMaxHeight()
+                .clickable(onClick = onOpenControls)
+        )
+        Spacer(
+            modifier = Modifier
+                .weight(0.28f)
+                .fillMaxHeight()
+        )
     }
 }
 

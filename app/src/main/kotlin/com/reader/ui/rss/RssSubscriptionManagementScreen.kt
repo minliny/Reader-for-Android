@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -74,55 +75,52 @@ fun RssSubscriptionManagementScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        RssManagementTopBar(onBack = onBack)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                RssManageActionGrid(
-                    onCreateSource = onCreateSource,
-                    onImportSource = onImportSource,
-                    onRuleSubscription = onRuleSubscription,
-                    onManageGroups = onManageGroups
-                )
-            }
-            item {
-                RssManageFilterRow(
-                    activeFilter = activeFilter,
-                    onFilter = { activeFilter = it }
-                )
-            }
-            item {
-                RssManageSourceList(
-                    sources = filteredSources,
-                    onSourceActions = onSourceActions
-                )
-            }
-            item {
-                RssManageBatchRow(
-                    onBatch = onBatch,
-                    onDisable = onBatch,
-                    onExport = onExport
-                )
-            }
-            item {
-                RssRefreshSettingsCard(
-                    autoRefresh = autoRefresh,
-                    unreadNotice = unreadNotice,
-                    onAutoRefresh = { autoRefresh = it },
-                    onUnreadNotice = { unreadNotice = it }
-                )
+    LibraryShellFrame(
+        backTopBar = { RssManagementTopBar(onBack = onBack) },
+        contentRegion = {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    RssManageActionGrid(
+                        onCreateSource = onCreateSource,
+                        onImportSource = onImportSource,
+                        onRuleSubscription = onRuleSubscription,
+                        onManageGroups = onManageGroups
+                    )
+                }
+                item {
+                    RssManageFilterRow(
+                        activeFilter = activeFilter,
+                        onFilter = { activeFilter = it }
+                    )
+                }
+                item {
+                    RssManageSourceList(
+                        sources = filteredSources,
+                        onSourceActions = onSourceActions
+                    )
+                }
+                item {
+                    RssManageBatchRow(
+                        onBatch = onBatch,
+                        onDisable = onBatch,
+                        onExport = onExport
+                    )
+                }
+                item {
+                    RssRefreshSettingsCard(
+                        autoRefresh = autoRefresh,
+                        unreadNotice = unreadNotice,
+                        onAutoRefresh = { autoRefresh = it },
+                        onUnreadNotice = { unreadNotice = it }
+                    )
+                }
             }
         }
-    }
+    )
 }
 
 @Composable

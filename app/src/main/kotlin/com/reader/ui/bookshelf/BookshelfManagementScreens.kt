@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
+import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -170,10 +172,122 @@ fun BookshelfSearchSettingsScreen(
     var mergeSameAuthor by remember { mutableStateOf(true) }
     var searchHistory by remember { mutableStateOf(true) }
 
-    BookshelfManagementScaffold(
-        title = "书架与搜索",
-        onBack = onBack,
-        bottom = {
+    SettingsShellFrame(
+        backTopBar = { BookshelfManagementTopBar(title = "书架与搜索", onBack = onBack) },
+        settingsContent = {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    BookshelfSettingsSection(title = "书架") {
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_grid,
+                            title = "默认展示",
+                            side = {
+                                BookshelfSegment(
+                                    options = listOf("封面", "列表"),
+                                    selected = defaultView,
+                                    onSelected = { defaultView = it }
+                                )
+                            }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_columns,
+                            title = "封面列数",
+                            side = { BookshelfStepper(value = "3列") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_folder,
+                            title = "默认分组",
+                            side = { BookshelfSelectValue(value = "全部") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_badge,
+                            title = "显示更新标记",
+                            side = {
+                                BookshelfSwitch(
+                                    checked = showUpdateBadge,
+                                    onToggle = { showUpdateBadge = !showUpdateBadge }
+                                )
+                            }
+                        )
+                    }
+                }
+                item {
+                    BookshelfSettingsSection(title = "排序与筛选") {
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_sort,
+                            title = "书架排序",
+                            side = { BookshelfSelectValue(value = "最近更新") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_list,
+                            title = "展示范围",
+                            side = { BookshelfSelectValue(value = "全部") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_refresh,
+                            title = "更新状态",
+                            side = { BookshelfSelectValue(value = "不限") }
+                        )
+                    }
+                }
+                item {
+                    BookshelfSettingsSection(title = "搜索") {
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_search,
+                            title = "搜索范围",
+                            side = { BookshelfSelectValue(value = "全局") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_sort,
+                            title = "结果排序",
+                            side = { BookshelfSelectValue(value = "相关度") }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_people,
+                            title = "合并同名同作者",
+                            side = {
+                                BookshelfSwitch(
+                                    checked = mergeSameAuthor,
+                                    onToggle = { mergeSameAuthor = !mergeSameAuthor }
+                                )
+                            }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_clock,
+                            title = "搜索历史",
+                            side = {
+                                BookshelfSwitch(
+                                    checked = searchHistory,
+                                    onToggle = { searchHistory = !searchHistory }
+                                )
+                            }
+                        )
+                        BookshelfManagementDivider()
+                        BookshelfSettingsRow(
+                            iconRes = R.drawable.reader_ic_list,
+                            title = "搜索历史数量",
+                            side = { BookshelfSelectValue(value = "20条") }
+                        )
+                    }
+                }
+                item {
+                    BookshelfSettingsActionRow()
+                }
+            }
+        },
+        bottomActionHost = {
             BookshelfManagementBottomActions(
                 secondary = "取消",
                 primary = "保存",
@@ -181,113 +295,7 @@ fun BookshelfSearchSettingsScreen(
                 onPrimary = onBack
             )
         }
-    ) {
-        item {
-            BookshelfSettingsSection(title = "书架") {
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_grid,
-                    title = "默认展示",
-                    side = {
-                        BookshelfSegment(
-                            options = listOf("封面", "列表"),
-                            selected = defaultView,
-                            onSelected = { defaultView = it }
-                        )
-                    }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_columns,
-                    title = "封面列数",
-                    side = { BookshelfStepper(value = "3列") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_folder,
-                    title = "默认分组",
-                    side = { BookshelfSelectValue(value = "全部") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_badge,
-                    title = "显示更新标记",
-                    side = {
-                        BookshelfSwitch(
-                            checked = showUpdateBadge,
-                            onToggle = { showUpdateBadge = !showUpdateBadge }
-                        )
-                    }
-                )
-            }
-        }
-        item {
-            BookshelfSettingsSection(title = "排序与筛选") {
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_sort,
-                    title = "书架排序",
-                    side = { BookshelfSelectValue(value = "最近更新") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_list,
-                    title = "展示范围",
-                    side = { BookshelfSelectValue(value = "全部") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_refresh,
-                    title = "更新状态",
-                    side = { BookshelfSelectValue(value = "不限") }
-                )
-            }
-        }
-        item {
-            BookshelfSettingsSection(title = "搜索") {
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_search,
-                    title = "搜索范围",
-                    side = { BookshelfSelectValue(value = "全局") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_sort,
-                    title = "结果排序",
-                    side = { BookshelfSelectValue(value = "相关度") }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_people,
-                    title = "合并同名同作者",
-                    side = {
-                        BookshelfSwitch(
-                            checked = mergeSameAuthor,
-                            onToggle = { mergeSameAuthor = !mergeSameAuthor }
-                        )
-                    }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_clock,
-                    title = "搜索历史",
-                    side = {
-                        BookshelfSwitch(
-                            checked = searchHistory,
-                            onToggle = { searchHistory = !searchHistory }
-                        )
-                    }
-                )
-                BookshelfManagementDivider()
-                BookshelfSettingsRow(
-                    iconRes = R.drawable.reader_ic_list,
-                    title = "搜索历史数量",
-                    side = { BookshelfSelectValue(value = "20条") }
-                )
-            }
-        }
-        item {
-            BookshelfSettingsActionRow()
-        }
-    }
+    )
 }
 
 @Composable
@@ -297,25 +305,18 @@ private fun BookshelfManagementScaffold(
     bottom: @Composable () -> Unit,
     content: LazyListScope.() -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            BookshelfManagementTopBar(title = title, onBack = onBack)
+    LibraryShellFrame(
+        backTopBar = { BookshelfManagementTopBar(title = title, onBack = onBack) },
+        contentRegion = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 content = content
             )
-        }
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-            bottom()
-        }
-    }
+        },
+        bottomActionHost = { bottom() }
+    )
 }
 
 @Composable

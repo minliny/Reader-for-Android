@@ -14,8 +14,9 @@ Scope: 对齐 `Reader UI/frontend-demo/` 原型中的组件、文字、范围、
 | 启动切片 | `Reader UI/docs/ui-handoff/FRONTEND_DEVELOPMENT_SLICE_MATRIX.md` | `AppShell`、`ReaderUiReducer`、各 route composable |
 | 基础 token | `Reader UI/frontend-demo/tokens.css` | `ReaderTheme.kt` |
 | 映射表 | `Reader UI/frontend-demo/route-contract.js` + 当前 Android `app/src/main/kotlin/com/reader/ui/**` | `docs/design/ANDROID_FRONTEND_DEMO_MAPPING_TABLE.md` |
+| 开发计划 | 当前 Android mapping/spec 审计结果 | `docs/design/ANDROID_FRONTEND_DEVELOPMENT_PLAN.md` |
 | shell/书架/搜索/RSS | `frontend-demo/styles/00-foundation.css`、`01-shell-layout.css` | `AppShell.kt`、`FloatingPillTabBar.kt`、`BookshelfScreen.kt` |
-| 阅读正文与控制层 | `frontend-demo/styles/01-shell-layout.css`、`02-main-library.css`、`03-reader.css` | `ImmersiveReadingScreen.kt`；控制层待 Slice 3 |
+| 阅读正文与控制层 | `frontend-demo/styles/01-shell-layout.css`、`02-main-library.css`、`03-reader.css` | `ImmersiveReadingScreen.kt` + `ReaderControlScreen.kt`（top overlay / brightness rail / bottom sheet / full-page panel / utility panel / module nav） |
 | 设置/书源 | `frontend-demo/styles/04-settings-source.css`、`05-flow-adaptive.css` | Settings main tab and source import partially rewritten; subpages deferred |
 
 ## Alignment Rules
@@ -38,7 +39,7 @@ Scope: 对齐 `Reader UI/frontend-demo/` 原型中的组件、文字、范围、
 | Safe area | top 24, bottom 14, horizontal 16 | 使用系统 inset；视觉间距按 token 对齐 | `Partial` |
 | Top bar | min-height 58 | 主 tab 顶栏 58dp，含 status bar padding | `Aligned` |
 | Main nav | min-height 68 | 四等分 floating pill bottom nav | `Aligned` |
-| Reader sheet | min-height token 284, current quick sheet 330 | Slice 3 实现，不能出现在 immersive entry final state | `Deferred` |
+| Reader sheet | min-height token 284, current quick sheet 330 | `ReaderControlScreen` bottom sheet 330；不能出现在 immersive entry final state | `Partial` |
 | Font sans | system, SF Pro/PingFang/Microsoft YaHei | Android `FontFamily.Default`，中文 fallback 由系统承担 | `Aligned` |
 | Font serif | Songti/STSong/Noto Serif CJK | Android `FontFamily.Serif`，后续可接 Noto Serif CJK | `Partial` |
 | Paper | `#f8f4ec` body bg, `#fff8f4/#fff8f1` paper | `ReaderTheme.Paper/PaperBright` | `Aligned` |
@@ -66,7 +67,7 @@ Scope: 对齐 `Reader UI/frontend-demo/` 原型中的组件、文字、范围、
 | Discover/RSS | main tabs with real cards/chips/lists | `DiscoverScreen` and `RssScreen` main tabs; RSS subroutes placeholder | `Partial` |
 | Settings | settings shell rows/cards/chips/switches | `SettingsScreen` | `Partial`, main tab rows/cards/switches; bookshelf/search subpage prototype implemented; persistence deferred |
 | Immersive reading | text-only reading layer, no controls | `ImmersiveReadingScreen` | `Aligned` for Slice 2 |
-| Reader control layer | top info, bottom sheet, module nav, brightness rail | missing | `Deferred` Slice 3 |
+| Reader control layer | top info, bottom sheet, module nav, brightness rail | `ReaderControlScreen` (top overlay + brightness rail + bottom sheet + module nav + full/utility panels) | `Partial` |
 
 ## App Shell And Main Tabs
 
@@ -488,7 +489,7 @@ Style:
 Current Android:
 
 - `ImmersiveReadingScreen` aligns to Slice 2 final state.
-- It should stay text-only until Slice 3 explicitly adds a control overlay.
+- Control overlay lives in a separate `ReaderControlScreen` route, reached by middle tap; immersive entry stays text-only.
 
 ## Reader Control Layer
 
@@ -518,7 +519,7 @@ Style:
 
 Current Android:
 
-- Not implemented. Keep as `Deferred` until Slice 3 starts.
+- Implemented in `ReaderControlScreen`: top overlay (title + close), bottom sheet (grabber + actions grid + chapter panel + progress rail), right brightness rail with adjustable `--reader-brightness-dim` (0..0.32), full-page panels (directory/tts/appearance/settings), utility panels (cache/debug), and `readerModuleNav` slot. Reachable only via middle tap from immersive route; not auto-opened on entry.
 
 ## Overlay And Relative Layering
 
@@ -551,7 +552,7 @@ Current Android:
 3. Book grid: render real cover images and complete cover/list item press/focus behavior.
 4. Source import: complete batch JSON import behavior and success/error proof.
 5. Settings runtime behavior: wire persistence, WebDAV test/save/restore, permission intents, source detection/edit/log, and dialog/sheet overlays.
-6. Reader control layer: start Slice 3 after Slice 1-2 visual checks are green enough for regression review.
+6. Reader control layer: structure implemented in `ReaderControlScreen`; remaining work is visual evidence (compact portrait screenshots), motion timing adapters, and full/utility panel content depth.
 
 ## Component Development Checklist
 

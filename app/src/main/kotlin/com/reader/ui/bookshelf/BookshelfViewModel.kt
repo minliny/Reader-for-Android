@@ -3,24 +3,30 @@ package com.reader.ui.bookshelf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reader.api.Book
+import com.reader.api.ReaderCoreClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * Bookshelf data source.
  *
- * Core protocol v1 does not yet expose `bookshelf.list` (rb-bookshelf-protocol-gap), so the
- * Android side has no real local shelf table yet. Real bookshelf data is deferred until the Core
- * protocol exposes `bookshelf.list` or local Room persistence lands. Slice demos can opt in to a
- * local `fixture://` book through [seedFixtureBook], but production/default construction must
- * stay empty so demo data is never mistaken for a user's shelf.
+ * P2 rollback: Now backed by Core bridge `bookshelf.list` (DomainState owned by
+ * Reader-Core-Native per CONTRACT_FIRST_NATIVE_UI_PLAN §2). The previous
+ * `BookshelfRepository`/`FakeBookshelfRepository` self-made layer was removed —
+ * bookshelf data is DomainState, must come from Core, not from a platform-side
+ * repository.
+ *
+ * Cover/list press/focus state lives in [chromeState] (`viewMode`, `focusedBook`) and is
+ * observable via [chromeState] StateFlow for reducer/test verification. These are
+ * EphemeralState (PLAN §2, Native UI owned).
  */
-class BookshelfViewModel(
-    private val seedFixtureBook: Boolean = false
-) : ViewModel() {
+class BookshelfViewModel : ViewModel() {
+    private val core = ReaderCoreClient.get()
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -38,6 +44,10 @@ class BookshelfViewModel(
 
     fun setMoreMenuOpen(open: Boolean) {
         _chromeState.update { it.copy(isMoreMenuOpen = open) }
+    }
+
+    fun setFocusedBook(book: Book?) {
+        _chromeState.update { it.copy(focusedBook = book) }
     }
 
     fun toggleFilter() {
@@ -64,25 +74,40 @@ class BookshelfViewModel(
         }
     }
 
+    /**
+     * Load bookshelf from Core `bookshelf.list`. Core owns DomainState; Android only
+     * renders what Core returns. Empty result renders `UiState.Empty`.
+     */
     fun loadBooks() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            if (!seedFixtureBook) {
-                _continueReading.value = null
+            try {
+                val result = core.sendAndAwait("bookshelf.list", JSONObject())
+                val books = parseBookshelfList(result)
+                _uiState.value = if (books.isEmpty()) UiState.Empty else UiState.Success(books)
+                // Continue reading = first book on the shelf (Core owns ordering).
+                _continueReading.value = books.firstOrNull()
+            } catch (e: Exception) {
+                // Core not ready or command failed — show empty, not a fake fixture.
+                // P2 acceptance: bookshelf data comes from Core; no platform-side fallback.
                 _uiState.value = UiState.Empty
-                return@launch
+                _continueReading.value = null
             }
+        }
+    }
 
-            // Minimal opt-in Slice 2 fixture for demo/test surfaces only.
-            val fixture = Book(
-                bookUrl = "fixture://book/demo",
-                name = "示例书籍",
-                author = "Reader Demo",
-                origin = "fixture://",
-                intro = "用于演示书架封面到沉浸阅读的入口。"
+    private fun parseBookshelfList(data: JSONObject): List<Book> {
+        val arr = data.optJSONArray("books") ?: return emptyList()
+        return (0 until arr.length()).map { i ->
+            val b = arr.getJSONObject(i)
+            Book(
+                bookUrl = b.optString("bookId"),
+                name = b.optString("title"),
+                author = b.optString("author"),
+                coverUrl = b.optString("coverUrl"),
+                intro = b.optString("intro"),
+                origin = b.optString("origin")
             )
-            _continueReading.value = fixture
-            _uiState.value = UiState.Success(listOf(fixture))
         }
     }
 }
@@ -99,6 +124,7 @@ enum class BookshelfViewMode { COVER, LIST }
 data class BookshelfChromeState(
     val viewMode: BookshelfViewMode = BookshelfViewMode.COVER,
     val isMoreMenuOpen: Boolean = false,
+    val focusedBook: Book? = null,
     val filter: BookshelfFilterState = BookshelfFilterState()
 )
 

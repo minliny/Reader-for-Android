@@ -13,12 +13,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,15 +30,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reader.android.R
 import com.reader.ui.motion.AppMotionTokens
+import com.reader.ui.theme.ReaderElevations
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+
+enum class MainNavLayout { BottomPill, LeftRail }
 
 /**
  * Floating rounded-pill bottom navigation — the App Shell main tab bar.
@@ -57,6 +66,27 @@ import com.reader.ui.theme.readerExtraColors
 fun FloatingPillTabBar(
     activeTab: MainTab,
     onSelect: (MainTab) -> Unit,
+    layout: MainNavLayout = MainNavLayout.BottomPill,
+    modifier: Modifier = Modifier
+) {
+    when (layout) {
+        MainNavLayout.BottomPill -> BottomPillTabBar(
+            activeTab = activeTab,
+            onSelect = onSelect,
+            modifier = modifier
+        )
+        MainNavLayout.LeftRail -> LeftRailTabBar(
+            activeTab = activeTab,
+            onSelect = onSelect,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun BottomPillTabBar(
+    activeTab: MainTab,
+    onSelect: (MainTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val extra = readerExtraColors()
@@ -67,9 +97,9 @@ fun FloatingPillTabBar(
             .padding(horizontal = 14.dp, vertical = 14.dp)
             .fillMaxWidth()
             .defaultMinSize(minHeight = 68.dp)
-            .shadow(elevation = 12.dp, shape = ReaderShapes.xl, clip = false)
+            .shadow(elevation = ReaderElevations.softShadow, shape = ReaderShapes.xl, clip = false)
             .background(color = extra.navBackground, shape = ReaderShapes.xl)
-            .border(width = 1.dp, color = extra.hairline, shape = ReaderShapes.xl)
+            .border(width = 1.dp, color = extra.border, shape = ReaderShapes.xl)
             .padding(vertical = 7.dp, horizontal = 8.dp)
     ) {
         Row(
@@ -81,8 +111,53 @@ fun FloatingPillTabBar(
                     tab = tab,
                     isActive = tab == activeTab,
                     onSelect = { onSelect(tab) },
+                    layout = MainNavLayout.BottomPill,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeftRailTabBar(
+    activeTab: MainTab,
+    onSelect: (MainTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val extra = readerExtraColors()
+    // Demo tablet-expanded: left:16, top:50%, translateY(-50%), width:82, max-height:calc(100%-96).
+    // Parent (MainTabShellFrame) supplies fillMaxHeight; we center within it via wrapContentHeight.
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(start = 16.dp)
+            .width(82.dp)
+            .heightIn(max = 696.dp), // 100% - 96px approximation on phone-height viewport
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .shadow(elevation = ReaderElevations.softShadow, shape = ReaderShapes.xl, clip = false)
+                .background(color = extra.navBackground, shape = ReaderShapes.xl)
+                .border(width = 1.dp, color = extra.border, shape = ReaderShapes.xl)
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.width(66.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                MainTab.ORDER.forEach { tab ->
+                    TabItem(
+                        tab = tab,
+                        isActive = tab == activeTab,
+                        onSelect = { onSelect(tab) },
+                        layout = MainNavLayout.LeftRail,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp)
+                    )
+                }
             }
         }
     }
@@ -93,6 +168,7 @@ private fun TabItem(
     tab: MainTab,
     isActive: Boolean,
     onSelect: () -> Unit,
+    layout: MainNavLayout,
     modifier: Modifier = Modifier
 ) {
     val extra = readerExtraColors()
@@ -104,11 +180,14 @@ private fun TabItem(
         isPressed -> extra.hairline.copy(alpha = 0.4f)
         else -> Color.Transparent
     }
-    val contentColor = if (isActive) Color.White else extra.navInactive
+    val contentColor = if (isActive) extra.onPrimary else extra.navInactive
+    // Demo .fd-main-nav-item: grid-template-rows 30px 18px (portrait), 32px 16px (tablet-expanded).
+    val iconShellSize = if (layout == MainNavLayout.LeftRail) 32.dp else 30.dp
+    val labelLineHeight = if (layout == MainNavLayout.LeftRail) 16.dp else 18.dp
 
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = 54.dp)
+            .defaultMinSize(minHeight = if (layout == MainNavLayout.LeftRail) 58.dp else 54.dp)
             .background(color = backgroundColor, shape = ReaderShapes.xl)
             .clickable(
                 interactionSource = interactionSource,
@@ -121,9 +200,11 @@ private fun TabItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Icon shell 30×30 (demo .fd-main-nav-icon-shell), icon svg 24×24 (.fd-nav-icon).
+            // Icon shell (demo .fd-main-nav-icon-shell): 30×30 portrait / 32×32 tablet, circle clip.
             Box(
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier
+                    .size(iconShellSize)
+                    .clip(CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -137,7 +218,8 @@ private fun TabItem(
             Text(
                 text = tab.label,
                 style = ReaderTextStyles.tabLabel.copy(color = contentColor),
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

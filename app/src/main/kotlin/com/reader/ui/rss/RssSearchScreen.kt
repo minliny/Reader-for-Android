@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.android.R
+import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -53,33 +54,30 @@ fun RssSearchScreen(
     var activeScope by remember { mutableStateOf("全部") }
     val results = remember(activeScope) { rssSearchResults(activeScope) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        RssSearchTopBar(onBack = onBack)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                RssSearchPanel(
-                    activeScope = activeScope,
-                    onScope = { activeScope = it }
-                )
-            }
-            item {
-                RssSearchResultSection(
-                    results = results,
-                    onManageSources = onManageSources,
-                    onOpenArticle = onOpenArticle
-                )
+    LibraryShellFrame(
+        backTopBar = { RssSearchTopBar(onBack = onBack) },
+        contentRegion = {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    RssSearchPanel(
+                        activeScope = activeScope,
+                        onScope = { activeScope = it }
+                    )
+                }
+                item {
+                    RssSearchResultSection(
+                        results = results,
+                        onManageSources = onManageSources,
+                        onOpenArticle = onOpenArticle
+                    )
+                }
             }
         }
-    }
+    )
 }
 
 @Composable

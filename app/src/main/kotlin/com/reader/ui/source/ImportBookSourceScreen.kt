@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
+import com.reader.ui.shell.ReaderUiIntent
+import com.reader.ui.shell.SourceImportState
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -53,23 +56,66 @@ import java.net.URI
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * P3: Book-source import screen wired to the reducer's [SourceImportState]
+ * state machine (Idle → Parsing → Preview → Importing → Done | Error).
+ *
+ * State ownership: [state] is the slice of [com.reader.ui.shell.ReaderUiState]
+ * owned by the reducer. The screen never holds a parallel local state
+ * machine — it only owns the JSON input field (EphemeralState per PLAN §2)
+ * via [ImportBookSourceViewModel].
+ *
+ * Side effects: when the reducer transitions to `Parsing`, a
+ * [LaunchedEffect] calls [ImportBookSourceViewModel.importBookSource] (which
+ * bridges to Core `source.import`) and dispatches `CompleteSourceImport` or
+ * `FailSourceImport` with the result.
+ *
+ * Navigation: [onBack] pops the route; [onDismiss] dispatches
+ * `DismissSourceImportResult` to reset the state machine to Idle (used when
+ * the user dismisses the Done/Error result and stays on the screen for
+ * another import).
+ */
 @Composable
 fun ImportBookSourceScreen(
-    onDone: () -> Unit,
+    state: SourceImportState,
+    dispatch: (ReaderUiIntent) -> Unit,
+    onBack: () -> Unit,
     vm: ImportBookSourceViewModel = viewModel()
 ) {
     var conflictMode by remember { mutableStateOf("跳过重复") }
-    val previewRows = remember {
-        listOf(
-            SourcePreviewRow("起点中文网", "qidian.com · 起点导入", "新增", SourceTone.Good),
-            SourcePreviewRow("晋江文学城", "jjwx.example · 起点导入", "重复", SourceTone.Muted),
-            SourcePreviewRow("轻小说文库", "lightnovel.example · 测试书源", "新增", SourceTone.Good),
-            SourcePreviewRow("旧规则源", "old.example · 自定义", "重复", SourceTone.Muted),
-            SourcePreviewRow("失效示例源", "dead.example · 测试书源", "异常", SourceTone.Warn),
-            SourcePreviewRow("豆瓣阅读", "read.douban.com · 自定义", "新增", SourceTone.Good),
-            SourcePreviewRow("开源书源示例", "opensource.example · 测试书源", "新增", SourceTone.Good)
-        )
+    val json by vm.json.collectAsStateWithLifecycle()
+
+    // P3: Side effect — when the reducer enters Parsing, call Core
+    // `source.import` and dispatch the matching terminal intent. The
+    // LaunchedEffect keys on `state` so it re-fires only when the state
+    // actually transitions to Parsing (not on every recomposition).
+    LaunchedEffect(state) {
+        if (state is SourceImportState.Parsing) {
+            val result = vm.importBookSource(json)
+            if (result.success) {
+                dispatch(
+                    ReaderUiIntent.CompleteSourceImport(
+                        imported = 1,
+                        skipped = 0,
+                        failed = 0
+                    )
+                )
+            } else {
+                dispatch(ReaderUiIntent.FailSourceImport(result.data))
+            }
+        }
     }
+
+    // P3: State-dependent label for the import button and bottom action bar.
+    val importLabel = when (state) {
+        is SourceImportState.Parsing, SourceImportState.Importing -> "导入中..."
+        is SourceImportState.Done -> "导入成功"
+        is SourceImportState.Error -> "重试"
+        else -> "确认导入"
+    }
+    val importEnabled = state !is SourceImportState.Parsing &&
+                        state !is SourceImportState.Importing
+    val showDone = state is SourceImportState.Done
 
     Column(
         modifier = Modifier
@@ -77,7 +123,7 @@ fun ImportBookSourceScreen(
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SourceImportTopBar(onBack = onDone)
+        SourceImportTopBar(onBack = onBack)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -89,9 +135,66 @@ fun ImportBookSourceScreen(
                 title = "网络导入",
                 meta = "https://example.com/booksource.json",
                 actionLabel = "更换",
-                onAction = onDone
+                onAction = onBack
             )
-            SourceStatLine("共 24 个书源 · 18 个新增 · 4 个重复 · 2 个异常")
+            // P3: JSON input field — drives the reducer via ParseSourceImport(json).
+            SourceSectionTitle("书源 JSON")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 240.dp)
+                    .background(
+                        color = readerExtraColors().paper,
+                        shape = ReaderShapes.sm
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = ReaderShapes.sm
+                    )
+                    .padding(12.dp)
+            ) {
+                if (json.isEmpty()) {
+                    Text(
+                        text = "粘贴书源 JSON 数组...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = TextStyle(
+                            fontFamily = FontFamily.Default,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    )
+                }
+                BasicTextField(
+                    value = json,
+                    onValueChange = vm::updateJson,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(
+                        fontFamily = FontFamily.Default,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
+                )
+            }
+            // P3: State feedback for e2e closure (空/解析/成功/错误).
+            when (state) {
+                is SourceImportState.Parsing -> SourceStatLine("正在解析并导入...")
+                is SourceImportState.Importing -> SourceStatLine("正在写入书源...")
+                is SourceImportState.Done -> SourceStatLine(
+                    "导入成功（${state.imported} 成功 / ${state.skipped} 跳过 / ${state.failed} 失败）— 点击完成返回"
+                )
+                is SourceImportState.Error -> SourceStatLine("错误：${state.message}")
+                is SourceImportState.Preview -> SourceStatLine("已解析 ${state.entries.size} 条 — 点击确认导入")
+                else -> {
+                    if (json.isNotBlank()) {
+                        SourceStatLine("已粘贴 JSON — 点击确认导入")
+                    } else {
+                        SourceStatLine("粘贴书源 JSON 后点击确认导入")
+                    }
+                }
+            }
             SourceSectionTitle("冲突处理")
             SourceSegmentedControl(
                 options = listOf("跳过重复", "覆盖旧源", "保留两份"),
@@ -103,15 +206,25 @@ fun ImportBookSourceScreen(
                 meta = "可在导入后批量调整分组",
                 value = "保持原分组"
             )
-            SourcePreviewList(previewRows)
         }
         SourceBottomActionBar(
-            importEnabled = true,
-            importLabel = "确认导入",
-            onCancel = onDone,
-            onImport = onDone,
-            onDone = onDone,
-            showDone = false
+            importEnabled = importEnabled,
+            importLabel = importLabel,
+            onCancel = onBack,
+            onImport = {
+                // P3: Drive the reducer state machine via ParseSourceImport.
+                // The LaunchedEffect above observes Parsing and calls SourceApi.
+                if (state is SourceImportState.Done) {
+                    onBack()
+                } else if (state is SourceImportState.Error) {
+                    dispatch(ReaderUiIntent.DismissSourceImportResult)
+                    dispatch(ReaderUiIntent.ParseSourceImport(json))
+                } else {
+                    dispatch(ReaderUiIntent.ParseSourceImport(json))
+                }
+            },
+            onDone = onBack,
+            showDone = showDone
         )
     }
 }
