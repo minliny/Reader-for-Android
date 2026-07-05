@@ -69,6 +69,7 @@ android {
 
     sourceSets {
         getByName("main") {
+            java.srcDir("src/main/reader-ui-contract/kotlin")
             jniLibs.srcDirs("src/main/libs")
         }
     }
@@ -80,6 +81,9 @@ dependencies {
 
     // Kotlin Coroutines (for BookApi/SourceApi suspend facades + withContext)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Reader UI generated Kotlin contracts use kotlinx.serialization annotations.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // DataStore Preferences (for theme, reading settings)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
