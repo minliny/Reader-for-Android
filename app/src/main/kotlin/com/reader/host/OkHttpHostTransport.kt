@@ -1,5 +1,6 @@
 package com.reader.host
 
+import okhttp3.CookieJar
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,7 +18,7 @@ import java.util.concurrent.TimeUnit
  * network fetch.
  */
 class OkHttpHostTransport(
-    private val client: OkHttpClient = defaultClient()
+    private val client: OkHttpClient = defaultClient(null)
 ) : HttpFetch {
 
     override fun fetch(request: HttpRequest): HttpResponse {
@@ -44,15 +45,21 @@ class OkHttpHostTransport(
             val body = resp.body?.string() ?: ""
             val headers = resp.headers.toMultimap()
                 .mapValues { it.value.joinToString(", ") }
-            return HttpResponse(resp.code, body, headers)
+            val finalUrl = resp.request.url.toString()
+            return HttpResponse(resp.code, body, headers, finalUrl)
         }
     }
 
     companion object {
-        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .build()
+        fun defaultClient(cookieJar: CookieJar? = null): OkHttpClient {
+            val builder = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .followRedirects(true)
+            if (cookieJar != null) {
+                builder.cookieJar(cookieJar)
+            }
+            return builder.build()
+        }
     }
 }

@@ -1,6 +1,8 @@
 package com.reader.host;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,7 +80,56 @@ public final class HttpExecuteHandler implements CapabilityHandler {
             result.put("headers", res.headers());
         }
         result.put("body", res.body());
+        if (res.hasFinalUrl()) {
+            result.put("finalUrl", res.finalUrl());
+        }
+        List<Map<String, Object>> cookies = extractCookies(res);
+        if (!cookies.isEmpty()) {
+            result.put("cookies", cookies);
+        }
         return Json.stringify(result);
+    }
+
+    // OkHttp merges multiple Set-Cookie headers with ", " - but a cookie's
+    // expires date also contains a comma. This is a best-effort parse that
+    // splits on ", " and keeps the name=value segment of each fragment; it is
+    // sufficient for the login_cookie lane proof (Core re-parses via its own
+    // cookie store on the host.complete round-trip).
+    private static List<Map<String, Object>> extractCookies(HttpResponse res) {
+        List<Map<String, Object>> cookies = new ArrayList<>();
+        if (res.headers() == null) {
+            return cookies;
+        }
+        // OkHttp's Headers.toMultimap() lowercases all keys; do a case-insensitive
+        // lookup so "Set-Cookie" / "set-cookie" / "SET-COOKIE" all match.
+        String setCookie = null;
+        for (Map.Entry<String, String> e : res.headers().entrySet()) {
+            if ("set-cookie".equalsIgnoreCase(e.getKey())) {
+                setCookie = e.getValue();
+                break;
+            }
+        }
+        if (setCookie == null || setCookie.isEmpty()) {
+            return cookies;
+        }
+        for (String raw : setCookie.split(", ")) {
+            int semi = raw.indexOf(";");
+            String nameValue = (semi >= 0 ? raw.substring(0, semi) : raw).trim();
+            int eq = nameValue.indexOf("=");
+            if (eq <= 0) {
+                continue;
+            }
+            String name = nameValue.substring(0, eq).trim();
+            String value = nameValue.substring(eq + 1).trim();
+            if (name.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> cookie = new LinkedHashMap<>();
+            cookie.put("name", name);
+            cookie.put("value", value);
+            cookies.add(cookie);
+        }
+        return cookies;
     }
 
     private static String stringOrDefault(Object v, String def) {

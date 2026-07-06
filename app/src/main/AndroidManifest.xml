@@ -10,7 +10,8 @@
         android:label="Reader"
         android:supportsRtl="true"
         android:theme="@style/Theme.Reader"
-        android:allowBackup="true">
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name="com.reader.ui.MainActivity"

@@ -8,15 +8,21 @@ public final class HttpResponse {
     private final int status;
     private final String body;
     private final Map<String, String> headers;
+    private final String finalUrl;
 
     public HttpResponse(int status, String body) {
-        this(status, body, null);
+        this(status, body, null, null);
     }
 
     public HttpResponse(int status, String body, Map<String, String> headers) {
+        this(status, body, headers, null);
+    }
+
+    public HttpResponse(int status, String body, Map<String, String> headers, String finalUrl) {
         this.status = status;
         this.body = body == null ? "" : body;
         this.headers = headers == null ? null : headers;
+        this.finalUrl = finalUrl;
     }
 
     public int status() {
@@ -33,5 +39,13 @@ public final class HttpResponse {
 
     public boolean hasHeaders() {
         return headers != null;
+    }
+
+    public String finalUrl() {
+        return finalUrl;
+    }
+
+    public boolean hasFinalUrl() {
+        return finalUrl != null;
     }
 }

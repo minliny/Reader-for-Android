@@ -1,13 +1,22 @@
 package com.reader.api
 
+import com.reader.android.AppProvider
+import com.reader.android.data.adapter.CookieRecord
+import com.reader.android.data.adapter.CookieStore
 import com.reader.core.ReaderCoreRuntime
+import com.reader.host.CookieGetHandler
+import com.reader.host.CookieSetHandler
 import com.reader.host.HostRuntime
 import com.reader.host.HttpExecuteHandler
 import com.reader.host.HttpFetch
 import com.reader.host.OkHttpHostTransport
 import com.reader.host.ReaderCoreHostTransport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import org.json.JSONObject
 
 /**
@@ -74,11 +83,15 @@ class ReaderCoreClient private constructor(
                 INSTANCE ?: run {
                     val runtime = ReaderCoreRuntime(configJson)
                     val transport = ReaderCoreHostTransport(runtime)
+                    val cookieStore: CookieStore = AppProvider.cookieStore
+                    val cookieJar = CookieStoreJar(cookieStore)
                     val hostRuntime = HostRuntime.over(transport)
                         .register(
                             HttpExecuteHandler.CAPABILITY,
-                            HttpExecuteHandler(OkHttpHostTransport())
+                            HttpExecuteHandler(OkHttpHostTransport(OkHttpHostTransport.defaultClient(cookieJar)))
                         )
+                        .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
+                        .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
                         .start()
                     ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
                 }
@@ -95,15 +108,33 @@ class ReaderCoreClient private constructor(
          * HTTP transport. Production code must keep using [init].
          */
         @JvmStatic
-        fun initForTest(httpFetch: HttpFetch, configJson: String = "{}"): ReaderCoreClient {
+        fun initForTest(httpFetch: HttpFetch, configJson: String = "{}"): ReaderCoreClient =
+            initForTest(httpFetch, cookieStore = null, configJson)
+
+        /**
+         * Test-only entry point: injects a custom [HttpFetch] and optional
+         * [CookieStore]. When [cookieStore] is non-null, registers
+         * `cookie.get` / `cookie.set` handlers backed by it, mirroring the
+         * production wiring in [init]. Use this for login_cookie lane proof.
+         */
+        @JvmStatic
+        fun initForTest(
+            httpFetch: HttpFetch,
+            cookieStore: CookieStore?,
+            configJson: String = "{}"
+        ): ReaderCoreClient {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: run {
                     val runtime = ReaderCoreRuntime(configJson)
                     val transport = ReaderCoreHostTransport(runtime)
-                    val hostRuntime = HostRuntime.over(transport)
+                    var hostRuntime = HostRuntime.over(transport)
                         .register(HttpExecuteHandler.CAPABILITY, HttpExecuteHandler(httpFetch))
-                        .start()
-                    ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
+                    if (cookieStore != null) {
+                        hostRuntime = hostRuntime
+                            .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
+                            .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
+                    }
+                    ReaderCoreClient(runtime, hostRuntime.start()).also { INSTANCE = it }
                 }
             }
         }
@@ -119,3 +150,45 @@ class ReaderCoreClient private constructor(
 class CoreException(val errorJson: String) : RuntimeException(errorJson)
 
 class CoreTimeoutException(message: String) : RuntimeException(message)
+
+/**
+ * Adapts the suspend [CookieStore] to OkHttp's synchronous [CookieJar].
+ * OkHttp calls [loadForRequest] / [saveFromResponse] on its dispatcher
+ * threads; we bridge with [runBlocking] so the AndroidCookieManagerStore
+ * (which reads/writes android.webkit.CookieManager) stays on the same
+ * cookie source as the WebView host.
+ */
+private class CookieStoreJar(private val store: CookieStore) : CookieJar {
+
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        val records = cookies.map { c ->
+            CookieRecord(
+                name = c.name,
+                value = c.value,
+                domain = c.domain,
+                path = c.path,
+                secure = c.secure,
+                httpOnly = c.httpOnly,
+                expiresAt = if (c.persistent) c.expiresAt else null
+            )
+        }
+        runBlocking { store.save(url.toString(), records) }
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val scope = runBlocking { store.get(url.toString()) }
+        return scope.cookies.map { r ->
+            Cookie.Builder()
+                .name(r.name)
+                .value(r.value)
+                .domain(r.domain.ifEmpty { url.host })
+                .path(r.path.ifEmpty { "/" })
+                .apply {
+                    if (r.secure) secure()
+                    if (r.httpOnly) httpOnly()
+                    if (r.expiresAt != null) expiresAt(r.expiresAt)
+                }
+                .build()
+        }
+    }
+}
