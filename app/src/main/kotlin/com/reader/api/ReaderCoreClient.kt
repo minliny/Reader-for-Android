@@ -4,13 +4,17 @@ import com.reader.android.AppProvider
 import com.reader.android.data.adapter.CookieRecord
 import com.reader.android.data.adapter.CookieStore
 import com.reader.core.ReaderCoreRuntime
+import com.reader.host.AntiBotCapabilityHandler
+import com.reader.host.AndroidWebViewExecutor
 import com.reader.host.CookieGetHandler
 import com.reader.host.CookieSetHandler
 import com.reader.host.HostRuntime
 import com.reader.host.HttpExecuteHandler
 import com.reader.host.HttpFetch
+import com.reader.host.MediaDownloadCapabilityHandler
 import com.reader.host.OkHttpHostTransport
 import com.reader.host.ReaderCoreHostTransport
+import com.reader.host.WebViewEvaluateJavaScriptHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -92,6 +96,18 @@ class ReaderCoreClient private constructor(
                         )
                         .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
                         .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
+                        .register(
+                            WebViewEvaluateJavaScriptHandler.CAPABILITY,
+                            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor())
+                        )
+                        .register(
+                            AntiBotCapabilityHandler.CAPABILITY,
+                            AntiBotCapabilityHandler()
+                        )
+                        .register(
+                            MediaDownloadCapabilityHandler.CAPABILITY,
+                            MediaDownloadCapabilityHandler()
+                        )
                         .start()
                     ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
                 }
