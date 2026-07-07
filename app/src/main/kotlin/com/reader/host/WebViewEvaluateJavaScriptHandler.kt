@@ -4,10 +4,13 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -406,6 +409,14 @@ class AndroidWebViewExecutor(private val webView: WebView? = null) : WebViewExec
                         "$CAPABILITY_NAME unsupported documentKind: ${request.documentKind}"
                     )
                 }
+                // 阶段 4 — Wait for the page to finish loading before
+                // evaluating JS. Without this, `document.body` may be null
+                // when `evaluateJavascript` fires (loadDataWithBaseURL /
+                // loadUrl are async). We install a one-shot WebViewClient
+                // that completes a Deferred on onPageFinished, with a
+                // fallback timeout so a misbehaving page never blocks the
+                // host poll thread indefinitely.
+                awaitPageLoaded(wv, PAGE_LOAD_TIMEOUT_MS)
                 val value = evaluateJs(wv, request.javaScript, request.timeoutMillis)
                 WebViewEvaluationResult(
                     value = value,
@@ -420,8 +431,32 @@ class AndroidWebViewExecutor(private val webView: WebView? = null) : WebViewExec
         }
     }
 
+    /**
+     * 阶段 4 — Block until the WebView's [WebViewClient.onPageFinished] fires
+     * (or [timeoutMs] elapses). Installs a one-shot client that restores the
+     * previous client on exit. The timeout is a safety net — under normal
+     * operation `loadDataWithBaseURL` completes in milliseconds; if it does
+     * not, we proceed anyway and let [evaluateJs] surface whatever DOM state
+     * exists (better to return a content error than to block forever).
+     */
+    private suspend fun awaitPageLoaded(webView: WebView, timeoutMs: Long) {
+        val loaded = CompletableDeferred<Unit>()
+        val previousClient = webView.webViewClient
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                loaded.complete(Unit)
+            }
+        }
+        try {
+            withTimeoutOrNull(timeoutMs) { loaded.await() }
+        } finally {
+            webView.webViewClient = previousClient
+        }
+    }
+
     private companion object {
         private const val CAPABILITY_NAME = "webview.evaluateJavaScript"
+        private const val PAGE_LOAD_TIMEOUT_MS: Long = 10_000L
     }
 
     /**
