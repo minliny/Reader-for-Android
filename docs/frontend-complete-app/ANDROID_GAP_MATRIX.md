@@ -1,8 +1,8 @@
 # Android Complete App Gap Matrix
 
-Status: `SLICE_0_1_ANDROID_SOURCE_AUDIT_IN_PROGRESS`
+Status: `SLICE_0_1_ANDROID_SOURCE_AUDIT_REFRESHED`
 
-Date: 2026-07-04
+Date: 2026-07-07
 
 Target repo: `/Users/minliny/Documents/Reader for Android`
 
@@ -81,10 +81,9 @@ Android cannot be marked frontend-complete until:
 
 ## 7. Current Local Verification
 
-Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-04:
+Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-07:
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `./gradlew :app:compileDebugKotlin` | SOURCE FIXED, KSP BLOCKED | `ReaderTokenAdapter.kt` was fixed so `reader.motion.easing.*` aliases return a non-null `String` through a local smart-castable value. A fresh compile no longer reported the previous `ReaderTokenAdapter.kt:179` return-type error, but failed or stalled in `:app:kspDebugKotlin`: one run hit `Could not flush incremental caches ... app/build/kspCaches/debug/symbolLookups/lookups.tab`, and one `-Pksp.incremental=false` run stalled in KSP until interrupted. |
-| `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest` | BLOCKED AFTER SOURCE FIX | Full JVM verification still cannot be claimed because the Android build reaches KSP before unit tests. Current blocker is KSP/build-cache state, not a known registry adapter source error. |
+| `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest` | PASS | Current run completed successfully in 9s. `:app:kspDebugKotlin`, `:app:compileDebugKotlin`, `:app:kspDebugUnitTestKotlin`, `:app:compileDebugUnitTestKotlin`, and `:app:testDebugUnitTest` all passed. The older KSP/cache blocker is no longer current. |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
