@@ -7,6 +7,7 @@ import com.reader.android.data.adapter.CookieRecord
 import com.reader.android.data.adapter.CookieStore
 import com.reader.core.ReaderCoreRuntime
 import com.reader.host.AntiBotCapabilityHandler
+import com.reader.host.AntiBotDetectingHttpFetch
 import com.reader.host.AndroidWebViewExecutor
 import com.reader.host.BackgroundCancelHandler
 import com.reader.host.BackgroundScheduleHandler
@@ -38,7 +39,9 @@ import com.reader.host.HttpExecuteHandler
 import com.reader.host.HttpFetch
 import com.reader.host.LogEmitHandler
 import com.reader.host.MediaDownloadCapabilityHandler
+import com.reader.host.MediaDownloadHandler
 import com.reader.host.OkHttpHostTransport
+import com.reader.host.OkHttpMediaDownloadExecutor
 import com.reader.host.PersistenceGetHandler
 import com.reader.host.PersistencePutHandler
 import com.reader.host.ReaderCoreHostTransport
@@ -206,9 +209,20 @@ class ReaderCoreClient private constructor(
                 .register(
                     HttpExecuteHandler.CAPABILITY,
                     HttpExecuteHandler(
-                        OkHttpHostTransport(
-                            OkHttpHostTransport.defaultClient(cookieJar),
-                            httpCallRegistry
+                        // 阶段 5 — Wrap the OkHttp transport in
+                        // AntiBotDetectingHttpFetch so http.execute responses
+                        // are inspected for anti-bot markers (503+jschl,
+                        // reCAPTCHA, slider, etc.) before reaching Core. When
+                        // a challenge is detected, the decorator throws
+                        // AntiBotChallengeRequiredException, which the handler
+                        // maps to a retryable INTERNAL error with challenge
+                        // diagnostics in the message. Clean responses pass
+                        // through untouched (zero overhead on the happy path).
+                        AntiBotDetectingHttpFetch(
+                            OkHttpHostTransport(
+                                OkHttpHostTransport.defaultClient(cookieJar),
+                                httpCallRegistry
+                            )
                         )
                     )
                 )
@@ -226,7 +240,18 @@ class ReaderCoreClient private constructor(
                 )
                 .register(
                     MediaDownloadCapabilityHandler.CAPABILITY,
-                    MediaDownloadCapabilityHandler()
+                    MediaDownloadCapabilityHandler(
+                        // 阶段 5 — pass rootDir so savePath lands on disk.
+                        // When context is null (JVM test), rootDir stays null
+                        // and savePath is ignored (bytes stay in memory).
+                        handlerProvider = {
+                            MediaDownloadHandler(
+                                OkHttpMediaDownloadExecutor(
+                                    rootDir = context?.filesDir
+                                )
+                            )
+                        }
+                    )
                 )
                 .register(HostSmokeEchoHandler.CAPABILITY, HostSmokeEchoHandler())
                 // ── Slice B: Core Runtime capabilities ──

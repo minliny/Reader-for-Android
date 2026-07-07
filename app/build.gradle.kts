@@ -127,5 +127,7 @@ dependencies {
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     // MockWebServer for serving real Legado fixture responses offline (Task 12).
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    // 阶段 5 — MockWebServer for JVM tests (media.download savePath proof).
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
 }

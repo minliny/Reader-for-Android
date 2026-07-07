@@ -295,14 +295,22 @@ class StubMediaDownloadExecutor(
  * separate acceptance gate.
  */
 class OkHttpMediaDownloadExecutor(
-    private val client: OkHttpClient = OkHttpHostTransport.defaultClient()
+    private val client: OkHttpClient = OkHttpHostTransport.defaultClient(),
+    private val rootDir: java.io.File? = null
 ) : MediaDownloadExecutor {
 
     /**
      * Execute [request] via OkHttp. Performs real HTTP I/O (range GET / HEAD
-     * probe), downloads bytes to memory, computes SHA-256, and returns a
+     * probe), downloads bytes, computes SHA-256, and returns a
      * [MediaDownloadResult]. Network-level failures throw [IOException] so
      * the host adapter can map them to a structured `INTERNAL` error.
+     *
+     * 阶段 5 — When [request.savePath] is non-null and [rootDir] is
+     * configured, bytes are persisted to `rootDir/savePath` and the path is
+     * returned as [MediaDownloadResult.tempPath] so Core can reference the
+     * blob in later `media.playback` / `media.release` calls. When savePath
+     * is null or rootDir is unset, bytes stay in memory (alpha behavior) and
+     * tempPath remains null.
      *
      * HTTP status codes (200/206/304/4xx/5xx) are returned as-is in
      * [MediaDownloadResult.statusCode] — only transport failures throw.
@@ -383,9 +391,24 @@ class OkHttpMediaDownloadExecutor(
             val sha256Hex = digest.joinToString("") { "%02x".format(it) }
             val resourceId = "media-${sha256Hex.substring(0, 16)}"
 
+            // 阶段 5 — Persist to savePath if configured. The path is
+            // resolved under rootDir (sandboxed via canonicalFile so path
+            // traversal can't escape). On success, tempPath is the
+            // savePath string so Core can reference it; on I/O failure we
+            // throw IOException (mapped to INTERNAL by the handler).
+            val tempPath: String? = request.savePath?.takeIf { it.isNotBlank() && rootDir != null }?.let { sp ->
+                val target = resolveSafely(rootDir!!, sp)
+                target.parentFile?.mkdirs()
+                if (!target.parentFile.exists()) {
+                    throw IOException("cannot create parent dir for savePath: $sp")
+                }
+                target.writeBytes(bytes)
+                sp
+            }
+
             return MediaDownloadResult(
                 resourceId = resourceId,
-                tempPath = null,
+                tempPath = tempPath,
                 statusCode = resp.code,
                 contentType = contentType,
                 contentLength = contentLength,
@@ -396,5 +419,20 @@ class OkHttpMediaDownloadExecutor(
                 finalUrl = finalUrl
             )
         }
+    }
+
+    /**
+     * Resolve [path] under [root], rejecting path traversal (../) that
+     * escapes the root. Mirrors [DefaultHostFileSystem.resolveSafely] so the
+     * executor's file writes stay inside the host sandbox.
+     */
+    private fun resolveSafely(root: java.io.File, path: String): java.io.File {
+        val resolved = java.io.File(root, path)
+        val rootCanonical = root.canonicalFile
+        val resolvedCanonical = resolved.canonicalFile
+        if (!resolvedCanonical.path.startsWith(rootCanonical.path)) {
+            throw SecurityException("savePath escapes root: $path")
+        }
+        return resolvedCanonical
     }
 }
