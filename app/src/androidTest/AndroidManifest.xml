@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+            Test-only Activity used by `HostWebViewRebindProofTest` to host
+            a real `WebView` for rebind-contract proof. `exported=false`
+            because no production component should ever launch it.
+        -->
+        <activity
+            android:name="com.reader.WebViewHostActivity"
+            android:exported="false" />
+    </application>
+</manifest>

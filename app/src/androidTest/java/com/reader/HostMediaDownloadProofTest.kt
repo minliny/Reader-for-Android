@@ -25,11 +25,10 @@ import org.junit.runner.RunWith
  * touches the network. JNI / Core-event routing is already proven by
  * [CoreEndToEndTest].
  *
- * **Device-headless/App tier**: real blob download L1-L5 (OkHttp range GET,
- * HEAD probe, sha256 hashing, cache-keyed persistence, 304 handling) is
- * pending device proof and is NOT claimed here.
- * [com.reader.host.OkHttpMediaDownloadExecutor] currently throws
- * [NotImplementedError] in its init block (fail-closed).
+ * **Executor/App tier**: real OkHttp blob download is covered by
+ * [HostMediaRealDownloadProofTest] and [HostMediaMultiResourceProofTest].
+ * Full App-level media source-chain proof with persistent cache lifecycle is a
+ * separate acceptance gate.
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for the `media.download` lane.
  *

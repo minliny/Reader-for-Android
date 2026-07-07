@@ -112,12 +112,13 @@ class HostRouterDispatchProofTest {
     }
 
     /**
-     * Production executor [AndroidWebViewExecutor] (no Context) throws
+     * Production executor [AndroidWebViewExecutor] (no WebView bound) throws
      * [WebViewExecutorError.RequiresUiContext] → handler maps to `host.error`
      * with code `REQUIRES_UI_CONTEXT`. Proves the router dispatched to the
      * handler (unregistered would be `INTERNAL`) and the handler fail-closed
      * gracefully — mirroring the HarmonyOS `REQUIRES_UI_CONTEXT` pattern.
-     * Real WebView L1-L5 requires an Activity-tier UI binding (Phase 4).
+     * Real WebView L1-L5 requires an Activity-tier UI binding; the rebind
+     * path is proven by [HostWebViewRebindProofTest].
      */
     @Test
     fun webViewRenderLaneDispatchesToHandlerWithProductionExecutorReturnsRequiresUiContext() {

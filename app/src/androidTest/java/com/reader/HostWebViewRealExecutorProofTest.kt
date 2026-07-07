@@ -20,16 +20,14 @@ import org.junit.runner.RunWith
  * production wiring used by [com.reader.api.ReaderCoreClient.init] — fails
  * closed with `REQUIRES_UI_CONTEXT` (NOT `NOT_IMPLEMENTED`, NOT a raw
  * exception). This distinguishes "host has the capability but needs an
- * Activity-tier binding (Phase 4)" from "host never implemented this".
+ * Activity-tier binding" from "host never implemented this".
  *
  * Real WebView L1-L5 rendering (load HTML/URL, evaluate JS, capture
- * finalUrl/title) requires an Activity-attached WebView and is deferred to
- * Phase 4. This proof establishes the fail-closed contract: Core receives a
- * structured error and can mark the source `host_required` without crashing
- * the host adapter.
+ * finalUrl/title) requires an Activity-attached WebView. This proof
+ * establishes the fail-closed contract: Core receives a structured error and
+ * can mark the source `host_required` without crashing the host adapter.
  *
- * This is an executor-tier proof, NOT an App-level proof — `canEnterMainline`
- * remains false until Phase 4 delivers real WebView L1-L5.
+ * This is an executor-tier proof, NOT an App-level rendering proof.
  */
 @RunWith(AndroidJUnit4::class)
 class HostWebViewRealExecutorProofTest {
@@ -45,7 +43,7 @@ class HostWebViewRealExecutorProofTest {
         val adapter = HostAdapter()
         adapter.register(
             WebViewEvaluateJavaScriptHandler.CAPABILITY,
-            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(context = null))
+            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(webView = null))
         )
 
         val request = HostRequest(
@@ -63,7 +61,7 @@ class HostWebViewRealExecutorProofTest {
 
         val reply = adapter.dispatch(request)
         assertTrue(
-            "AndroidWebViewExecutor(null) must error with REQUIRES_UI_CONTEXT, got: ${reply.kind()}",
+            "AndroidWebViewExecutor(webView = null) must error with REQUIRES_UI_CONTEXT, got: ${reply.kind()}",
             reply.isError()
         )
         val error = reply as HostReply.Error
@@ -73,12 +71,13 @@ class HostWebViewRealExecutorProofTest {
             error.code()
         )
         assertFalse(
-            "REQUIRES_UI_CONTEXT must not be retryable (fail-closed — Phase 4 required)",
+            "REQUIRES_UI_CONTEXT must not be retryable without Activity-tier binding",
             error.retryable()
         )
         assertTrue(
-            "error message should mention UI context or Activity, got: ${error.message()}",
+            "error message should mention UI context or WebView binding, got: ${error.message()}",
             error.message().contains("UI context", ignoreCase = true) ||
+                error.message().contains("WebView", ignoreCase = true) ||
                 error.message().contains("Activity", ignoreCase = true)
         )
     }

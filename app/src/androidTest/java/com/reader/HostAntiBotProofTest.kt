@@ -26,10 +26,10 @@ import org.junit.runner.RunWith
  * execution is isolated via [StubAntiBotExecutor] so nothing touches the
  * network. JNI / Core-event routing is already proven by [CoreEndToEndTest].
  *
- * **Device-headless/App tier**: real anti_bot source L1-L5 (Cloudflare JS
- * challenge solving, slider captcha, reCAPTCHA v2) is pending device proof and
- * is NOT claimed here. [com.reader.host.OkHttpAntiBotExecutor] currently throws
- * [NotImplementedError] (fail-closed).
+ * **Executor/App tier**: real OkHttp fetch proof is covered by
+ * [HostAntiBotRealChallengeProofTest]. Advanced challenge solving
+ * (Cloudflare JS, slider captcha, reCAPTCHA v2) and App-level source-chain
+ * proof are separate acceptance gates.
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for the `anti_bot` lane.
  */

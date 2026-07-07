@@ -23,7 +23,8 @@ import org.junit.runner.RunWith
  * **Evidence tier**: device-headless (real Android device, no Activity).
  * NOT App-tier. Mirrors the HarmonyOS headless fail-closed proof.
  *
- * **canEnterMainline = false**: WebView needs Phase 4 Activity UI.
+ * This is not an App-tier WebView rendering proof; App-tier proof requires an
+ * Activity-attached WebView.
  */
 @RunWith(AndroidJUnit4::class)
 class HostWebViewP0HeadlessFailClosedProofTest {

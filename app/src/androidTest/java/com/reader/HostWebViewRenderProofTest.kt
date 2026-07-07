@@ -27,10 +27,10 @@ import org.junit.runner.RunWith
  * isolated via [StubWebViewExecutor] so nothing touches a real `WebView`.
  * JNI / Core-event routing is already proven by [CoreEndToEndTest].
  *
- * **Device-headless/App tier**: real WebView L1-L5 rendering (load HTML/URL,
- * evaluate JS via `WebView.evaluateJavascript`, capture finalUrl/title) is
- * pending device proof and is NOT claimed here. `AndroidWebViewExecutor`
- * currently throws [WebViewExecutorError.NotImplemented] (fail-closed).
+ * **Activity-tier/App tier**: real WebView L1-L5 rendering (load HTML/URL,
+ * evaluate JS via `WebView.evaluateJavascript`, capture finalUrl/title)
+ * requires an Activity-attached WebView. Headless proof uses
+ * [StubWebViewExecutor] and does not claim Activity-tier behavior.
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for `webview.evaluateJavaScript`.
  */
