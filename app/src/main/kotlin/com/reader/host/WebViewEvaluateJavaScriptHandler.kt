@@ -1,11 +1,16 @@
 package com.reader.host
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.webkit.WebView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * `webview.evaluateJavaScript` capability handler: bridges Core's WebView
@@ -23,12 +28,10 @@ import org.json.JSONObject
  * and returns `host.complete` with `{ value, finalUrl?, title? }` matching
  * `HostWebViewEvaluateJavaScriptResponse`.
  *
- * **Device-headless/App tier**: requires real `WebView` execution backed by
- * [AndroidWebViewExecutor] (load HTML/URL, evaluate JS via
- * `WebView.evaluateJavascript`, capture finalUrl/title). That executor is
- * currently a notImplemented stub — Core fails closed. Real WebView L1-L5
- * rendering proof is pending device proof and is NOT claimed here. The proof
- * tests use [StubWebViewExecutor].
+ * **Activity-tier/App tier**: real `WebView` execution must be backed by an
+ * Activity-attached [AndroidWebViewExecutor]. Headless tests deliberately fail
+ * closed with `REQUIRES_UI_CONTEXT`; handler/router proof tests use
+ * [StubWebViewExecutor].
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for `webview.evaluateJavaScript`.
  *
@@ -221,8 +224,9 @@ class WebViewEvaluateJavaScriptHandler(
 /**
  * Host-owned executor for WebView JavaScript evaluation. Implementations:
  * - [StubWebViewExecutor] — canned results/errors for handler/router proof tests.
- * - [AndroidWebViewExecutor] — production, backed by Android `WebView`
- *   (currently notImplemented, fail-closed).
+ * - [AndroidWebViewExecutor] — Android `WebView` executor that requires an
+ *   Activity/UI context and fails closed with `REQUIRES_UI_CONTEXT` when run
+ *   headlessly.
  *
  * `suspend` so production implementations can bridge to async WebView
  * callbacks (`WebView.evaluateJavascript` + `ValueCallback`, navigation
@@ -304,8 +308,7 @@ sealed class WebViewExecutorError(message: String) : Exception(message) {
      * the view hierarchy) that is not available in the current environment
      * (e.g. headless instrumented test). Maps to `host.error` code
      * `REQUIRES_UI_CONTEXT` with `retryable = false` — Core should fail closed
-     * and the Host must retry only after obtaining an Activity-tier binding
-     * (Phase 4).
+     * and the Host must retry only after obtaining an Activity-tier binding.
      */
     class RequiresUiContext(detail: String) :
         WebViewExecutorError("$CAPABILITY_NAME requires UI context (Activity/WebView): $detail")
@@ -335,47 +338,119 @@ class StubWebViewExecutor(
 }
 
 /**
- * Production executor backed by Android `WebView`. Attempts to construct a
- * [WebView] with the supplied [Context] and load the document. In a headless
- * instrumented-test environment (no Activity-tier UI binding), this throws
- * [WebViewExecutorError.RequiresUiContext] so Core fails closed with
- * `REQUIRES_UI_CONTEXT` — mirroring the HarmonyOS `REQUIRES_UI_CONTEXT` pattern.
+ * Production executor backed by Android `WebView`. Executes Core's
+ * `webview.evaluateJavaScript` requests against a caller-supplied [WebView]
+ * (typically the Activity-attached one bound in `MainActivity.onCreate`).
  *
- * Real WebView L1-L5 rendering (load HTML/URL, evaluate JS via
- * `WebView.evaluateJavascript`, capture finalUrl/title) requires an
- * Activity-attached WebView and is deferred to Phase 4. Until then the
- * handler/router tier is proven via [StubWebViewExecutor].
+ * **Lifecycle (Slice A — WebView real binding)**:
+ *  - At `ReaderCoreClient.init()` time no `WebView` exists yet (only the
+ *    Application context is available), so the wiring registers an
+ *    `AndroidWebViewExecutor(webView = null)`. Dispatch in this state
+ *    throws [WebViewExecutorError.RequiresUiContext] — same fail-closed
+ *    contract as before, but with a sharper diagnostic that names the
+ *    missing binding instead of the missing `Context`.
+ *  - `MainActivity.onCreate` creates the host `WebView` and calls
+ *    `ReaderCoreClient.get().bindWebViewExecutor(webView)`, which atomically
+ *    swaps the registered `webview.evaluateJavaScript` handler to one
+ *    backed by the real `WebView`. From that point on, real Core requests
+ *    execute JavaScript against the bound WebView and return rendered
+ *    results.
+ *  - On test/dev tear-down `bindWebViewExecutor(null)` reverts to fail-closed.
  *
- * @param context Optional [Context] (ideally an Activity). When null, the
- *   executor throws [WebViewExecutorError.RequiresUiContext] immediately
- *   (fail-closed).
+ * **Headless proof**: instrumented tests that do not bind a `WebView` (e.g.
+ * the existing P0 fail-closed proofs) still receive `REQUIRES_UI_CONTEXT`,
+ * which is the correct behavior: headless = no Activity-tier binding = Core
+ * fails closed and marks the source `host_required`.
+ *
+ * **Activity-tier proof**: a real WebView must be attached to a window for
+ * `WebView.evaluateJavascript` to drive the renderer; this class is
+ * responsible for evaluating JS, not for managing the WebView's view
+ * lifecycle. The caller (`MainActivity` or its container) is responsible for
+ * the `WebView`'s attachment.
+ *
+ * @param webView Optional real [WebView] bound to an Activity view hierarchy.
+ *   When null, the executor throws [WebViewExecutorError.RequiresUiContext]
+ *   immediately (fail-closed) so Core receives a structured error and does
+ *   not block waiting on a non-existent WebView.
  */
-class AndroidWebViewExecutor(private val context: Context? = null) : WebViewExecutor {
+class AndroidWebViewExecutor(private val webView: WebView? = null) : WebViewExecutor {
     override suspend fun evaluate(request: WebViewEvaluationRequest): WebViewEvaluationResult {
-        val ctx = context
-            ?: throw WebViewExecutorError.RequiresUiContext("no Context provided")
+        val wv = webView ?: throw WebViewExecutorError.RequiresUiContext(
+            "no WebView bound (headless or pre-MainActivity). " +
+                "Call ReaderCoreClient.get().bindWebViewExecutor(webView) in MainActivity.onCreate."
+        )
         return withContext(Dispatchers.Main) {
             try {
-                val webView = WebView(ctx)
-                // Attempt to load — this will succeed if we're on UI thread with
-                // a valid Context, but real JS evaluation requires an
-                // Activity-attached WebView.
-                if (request.documentKind == "url") {
-                    webView.loadUrl(request.url!!)
-                } else {
-                    webView.loadData(request.body!!, "text/html", "UTF-8")
+                when (request.documentKind) {
+                    "html" -> {
+                        val body = request.body
+                            ?: throw WebViewExecutorError.ExecutionFailed(
+                                "$CAPABILITY_NAME html document requires non-blank body"
+                            )
+                        wv.loadDataWithBaseURL(
+                            request.baseUrl,
+                            body,
+                            "text/html",
+                            "UTF-8",
+                            null
+                        )
+                    }
+                    "url" -> {
+                        val url = request.url
+                            ?: throw WebViewExecutorError.ExecutionFailed(
+                                "$CAPABILITY_NAME url document requires non-blank url"
+                            )
+                        wv.loadUrl(url)
+                    }
+                    else -> throw WebViewExecutorError.ExecutionFailed(
+                        "$CAPABILITY_NAME unsupported documentKind: ${request.documentKind}"
+                    )
                 }
-                throw WebViewExecutorError.RequiresUiContext(
-                    "WebView created but not attached to Activity (headless instrumented test). " +
-                        "Real WebView L1-L5 requires Activity-tier UI binding (Phase 4)."
+                val value = evaluateJs(wv, request.javaScript, request.timeoutMillis)
+                WebViewEvaluationResult(
+                    value = value,
+                    finalUrl = wv.url,
+                    title = wv.title
                 )
             } catch (e: WebViewExecutorError) {
                 throw e
             } catch (e: Exception) {
-                throw WebViewExecutorError.RequiresUiContext(
-                    "WebView construction/load failed: ${e.message}"
-                )
+                throw WebViewExecutorError.ExecutionFailed(e.message ?: "unknown error")
             }
+        }
+    }
+
+    private companion object {
+        private const val CAPABILITY_NAME = "webview.evaluateJavaScript"
+    }
+
+    /**
+     * Bridge `WebView.evaluateJavascript` (callback-based, fires on the
+     * WebView's thread) to a `suspend` function. Honors [timeoutMillis] via a
+     * main-thread `Handler` — when the timeout elapses, the continuation
+     * resumes with [WebViewExecutorError.Timeout] regardless of whether the
+     * callback eventually fires; the timeout runnable is removed from the
+     * queue once the callback completes.
+     */
+    private suspend fun evaluateJs(
+        webView: WebView,
+        javaScript: String,
+        timeoutMillis: Long?
+    ): String? = suspendCancellableCoroutine { cont ->
+        val mainHandler = Handler(Looper.getMainLooper())
+        val timeoutRunnable: Runnable? = timeoutMillis?.let { ms ->
+            Runnable {
+                if (cont.isActive) {
+                    cont.resumeWithException(WebViewExecutorError.Timeout(ms))
+                }
+            }.also { mainHandler.postDelayed(it, ms) }
+        }
+        cont.invokeOnCancellation {
+            timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        }
+        webView.evaluateJavascript(javaScript) { value ->
+            timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+            if (cont.isActive) cont.resume(value)
         }
     }
 }

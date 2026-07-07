@@ -18,10 +18,10 @@
  * Execution is isolated via [StubMediaDownloadExecutor] so nothing touches the
  * network.
  *
- * **Device-headless/App tier**: real HTTP download (OkHttp range GET, HEAD
- * probe, sha256 hashing, cache-keyed persistence, 304 redirect handling) is
- * pending device proof and is NOT claimed here. [OkHttpMediaDownloadExecutor]
- * currently throws [NotImplementedError] in its init (fail-closed).
+ * **Executor tier**: [OkHttpMediaDownloadExecutor] performs real HTTP I/O
+ * with range GET / HEAD probe, SHA-256 hashing, maxBytes enforcement, and
+ * conditional request headers. App-level source-chain proof and persistent
+ * cache integration remain separate acceptance gates.
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for the `media.download` lane.
  *
@@ -63,8 +63,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
  * `resourceId`, `tempPath`, `statusCode`, `contentType`, `contentLength`,
  * `etag`, `byteLength`, `sha256`, `fromCache`, `finalUrl`.
  *
- * @param executor Host-owned downloader ([StubMediaDownloadExecutor] for proof,
- *   [OkHttpMediaDownloadExecutor] for production — currently fail-closed).
+ * @param executor Host-owned downloader ([StubMediaDownloadExecutor] for
+ *   handler proof, [OkHttpMediaDownloadExecutor] for real HTTP execution).
  */
 class MediaDownloadHandler(
     private val executor: MediaDownloadExecutor
@@ -246,8 +246,7 @@ data class MediaDownloadResult(
 /**
  * Host-owned media downloader. Implementations:
  * - [StubMediaDownloadExecutor] — canned results for handler/router proof tests.
- * - [OkHttpMediaDownloadExecutor] — production, backed by OkHttp (currently
- *   [NotImplementedError] in init, fail-closed).
+ * - [OkHttpMediaDownloadExecutor] — production executor backed by OkHttp.
  *
  * Non-suspend: the alpha proof does not bridge to async platform APIs. Real
  * OkHttp execution may switch to suspend when streaming downloads + progress
@@ -291,9 +290,9 @@ class StubMediaDownloadExecutor(
  * [IOException] so the host adapter can map them to a structured `INTERNAL`
  * error.
  *
- * Device-headless/App tier proof (real blob download L1-L5 against Legado
- * audio sources with cache-keyed persistence + 304 handling) is pending
- * device proof. The handler/router tier is proven via [StubMediaDownloadExecutor].
+ * Real executor proof covers HTTP download and hashing. App-level proof
+ * against Legado media sources with persistent cache lifecycle remains a
+ * separate acceptance gate.
  */
 class OkHttpMediaDownloadExecutor(
     private val client: OkHttpClient = OkHttpHostTransport.defaultClient()

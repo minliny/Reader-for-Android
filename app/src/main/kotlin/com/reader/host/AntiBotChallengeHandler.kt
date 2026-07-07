@@ -17,10 +17,10 @@
  * The handler coordinates HTTP fetch + challenge detection; execution is
  * isolated via [StubAntiBotExecutor] so nothing touches the network.
  *
- * **Device-headless/App tier**: real anti_bot source L1-L5 (Cloudflare JS
- * challenge solving, slider captcha, reCAPTCHA v2) is pending device proof and
- * is NOT claimed here. [OkHttpAntiBotExecutor] currently throws
- * [NotImplementedError] (fail-closed).
+ * **Executor tier**: [OkHttpAntiBotExecutor] performs real OkHttp fetches with
+ * default UA / Referer injection. Advanced challenge solving (Cloudflare JS,
+ * slider captcha, reCAPTCHA v2) and App-level source-chain proof remain
+ * separate acceptance gates.
  *
  * **Mirrors**: iOS/HarmonyOS proof structure for the `anti_bot` lane.
  *
@@ -49,8 +49,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  * `message`, and `details` (`lane`, `challengeType`, `url`, `autoRetryable`,
  * `cookieJarId`) so Core can deserialize it into `HostErrorDiagnostics`.
  *
- * @param executor Host-owned HTTP fetcher ([StubAntiBotExecutor] for proof,
- *   [OkHttpAntiBotExecutor] for production — currently fail-closed).
+ * @param executor Host-owned HTTP fetcher ([StubAntiBotExecutor] for handler
+ *   proof, [OkHttpAntiBotExecutor] for real HTTP execution).
  * @param detector Response classifier (defaults to [AntiBotChallengeDetector]).
  */
 class AntiBotChallengeHandler(
@@ -142,8 +142,7 @@ class AntiBotChallengeHandler(
 /**
  * Host-owned HTTP fetcher for the `anti_bot` lane. Implementations:
  * - [StubAntiBotExecutor] — canned responses for handler/router proof tests.
- * - [OkHttpAntiBotExecutor] — production, backed by OkHttp (currently
- *   [NotImplementedError], fail-closed).
+ * - [OkHttpAntiBotExecutor] — production executor backed by OkHttp.
  *
  * Non-suspend: the anti-bot lane does not bridge to async platform APIs in the
  * alpha proof. Production may switch to suspend when real challenge solving

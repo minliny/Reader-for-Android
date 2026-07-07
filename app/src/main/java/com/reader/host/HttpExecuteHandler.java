@@ -83,6 +83,12 @@ public final class HttpExecuteHandler implements CapabilityHandler {
         if (res.hasFinalUrl()) {
             result.put("finalUrl", res.finalUrl());
         }
+        if (res.hasRequestTag()) {
+            // Host-assigned tag that Core can pass back via `http.cancel`
+            // to abort a future in-flight request. Null/absent when the
+            // transport doesn't track calls (e.g. JVM fake transport).
+            result.put("requestTag", res.requestTag());
+        }
         List<Map<String, Object>> cookies = extractCookies(res);
         if (!cookies.isEmpty()) {
             result.put("cookies", cookies);

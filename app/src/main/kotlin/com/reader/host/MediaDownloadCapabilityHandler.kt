@@ -16,13 +16,10 @@ import org.json.JSONObject
  * [MediaDownloadHandler.handle], and serializes the returned
  * `Map<String, Any?>` back to JSON for the [HostReply.complete] result.
  *
- * **Lazy executor construction**: [OkHttpMediaDownloadExecutor] throws
- * [NotImplementedError] in its `init` block (fail-closed stub). To avoid
- * crashing [ReaderCoreClient.init] at registration time, the adapter accepts a
- * [handlerProvider] lambda that is only invoked on the first `host.request`.
- * The default provider constructs [OkHttpMediaDownloadExecutor], so the
- * `NotImplementedError` is caught in [handle] and mapped to a structured
- * `NOT_IMPLEMENTED` error — Core fails closed without crashing the host.
+ * **Lazy executor construction**: the adapter accepts a [handlerProvider]
+ * lambda that is invoked on the first `host.request`, keeping registration
+ * cheap and allowing custom providers in tests. Constructor failures are
+ * mapped to structured host errors instead of crashing the host process.
  *
  * **Proof tier**: handler/router — mirrors [AntiBotCapabilityHandler].
  */
@@ -32,9 +29,8 @@ class MediaDownloadCapabilityHandler(
 ) : CapabilityHandler {
 
     override fun handle(request: HostRequest): HostReply {
-        // Lazily construct the handler + executor; OkHttpMediaDownloadExecutor
-        // throws NotImplementedError in its init block, so catch it here and
-        // map to a structured NOT_IMPLEMENTED error.
+        // Lazily construct the handler + executor and map construction
+        // failures to structured host errors.
         val handler: MediaDownloadHandler
         try {
             handler = handlerProvider()

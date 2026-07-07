@@ -1,20 +1,50 @@
 package com.reader.api
 
+import android.content.Context
+import android.webkit.WebView
 import com.reader.android.AppProvider
 import com.reader.android.data.adapter.CookieRecord
 import com.reader.android.data.adapter.CookieStore
 import com.reader.core.ReaderCoreRuntime
 import com.reader.host.AntiBotCapabilityHandler
 import com.reader.host.AndroidWebViewExecutor
+import com.reader.host.BackgroundCancelHandler
+import com.reader.host.BackgroundScheduleHandler
+import com.reader.host.CacheGetHandler
+import com.reader.host.CachePutHandler
+import com.reader.host.CookieClearHandler
 import com.reader.host.CookieGetHandler
 import com.reader.host.CookieSetHandler
+import com.reader.host.CredentialDeleteHandler
+import com.reader.host.CredentialGetHandler
+import com.reader.host.CredentialSetHandler
+import com.reader.host.DefaultHostCache
+import com.reader.host.DefaultHostFileSystem
+import com.reader.host.DefaultHostLogger
+import com.reader.host.FileReadHandler
+import com.reader.host.FileWriteHandler
+import com.reader.host.HostCache
+import com.reader.host.HostCachePersistenceAdapter
+import com.reader.host.HostFileSystem
+import com.reader.host.HostLogger
+import com.reader.host.HostPersistence
 import com.reader.host.HostRuntime
+import com.reader.host.HostSmokeEchoHandler
+import com.reader.host.HttpCancelHandler
+import com.reader.host.HttpCallRegistry
 import com.reader.host.HttpExecuteHandler
 import com.reader.host.HttpFetch
+import com.reader.host.LogEmitHandler
 import com.reader.host.MediaDownloadCapabilityHandler
 import com.reader.host.OkHttpHostTransport
+import com.reader.host.PersistenceGetHandler
+import com.reader.host.PersistencePutHandler
 import com.reader.host.ReaderCoreHostTransport
+import com.reader.host.SharedPreferencesHostPersistence
+import com.reader.host.SystemInfoHandler
+import com.reader.host.TimeNowHandler
 import com.reader.host.WebViewEvaluateJavaScriptHandler
+import com.reader.host.WebViewExecutor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -71,6 +101,27 @@ class ReaderCoreClient private constructor(
         runtime.cancel(requestId)
     }
 
+    /**
+     * Slice A — WebView real binding: rebind the `webview.evaluateJavaScript`
+     * capability to a real [WebView] (typically the one created in
+     * `MainActivity.onCreate`). Until this is called the registered executor
+     * has no [WebView] and dispatch fails closed with
+     * [com.reader.host.WebViewExecutorError.RequiresUiContext] —
+     * [com.reader.host.HostReply.error] code `REQUIRES_UI_CONTEXT`.
+     *
+     * Pass `null` to revert to the fail-closed state (used by tests/dev
+     * tear-down). The rebind is atomic: subsequent Core dispatches see the
+     * new executor; the previous executor is no longer referenced by the
+     * host runtime.
+     */
+    fun bindWebViewExecutor(webView: WebView?) {
+        val executor: WebViewExecutor = AndroidWebViewExecutor(webView)
+        hostRuntime.register(
+            WebViewEvaluateJavaScriptHandler.CAPABILITY,
+            WebViewEvaluateJavaScriptHandler(executor)
+        )
+    }
+
     fun close() {
         hostRuntime.stop()
         runtime.close()
@@ -82,20 +133,47 @@ class ReaderCoreClient private constructor(
         @Volatile
         private var INSTANCE: ReaderCoreClient? = null
 
-        fun init(configJson: String = "{}"): ReaderCoreClient {
+        fun init(configJson: String = "{}"): ReaderCoreClient = init(context = null, configJson)
+
+        /**
+         * Slice B — Core Runtime capability registration. When [context] is
+         * non-null (production), the file/cache/persistence handlers are
+         * backed by real Android storage ([DefaultHostFileSystem] rooted at
+         * `context.filesDir`). When null (JVM test), they fall back to
+         * in-memory doubles.
+         */
+        fun init(context: Context?, configJson: String = "{}"): ReaderCoreClient {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: run {
                     val runtime = ReaderCoreRuntime(configJson)
                     val transport = ReaderCoreHostTransport(runtime)
                     val cookieStore: CookieStore = AppProvider.cookieStore
                     val cookieJar = CookieStoreJar(cookieStore)
-                    val hostRuntime = HostRuntime.over(transport)
+                    val fs: HostFileSystem = context?.let {
+                        DefaultHostFileSystem(it.filesDir)
+                    } ?: com.reader.host.InMemoryHostFileSystem()
+                    val cache: HostCache = DefaultHostCache()
+                    val persistence: HostPersistence = context?.let {
+                        SharedPreferencesHostPersistence(
+                            it.getSharedPreferences("reader_core_host_persistence", Context.MODE_PRIVATE)
+                        )
+                    } ?: HostCachePersistenceAdapter(cache)
+                    val logger: HostLogger = DefaultHostLogger()
+                    val httpCallRegistry = HttpCallRegistry()
+                    var hostRuntimeBuilder = HostRuntime.over(transport)
                         .register(
                             HttpExecuteHandler.CAPABILITY,
-                            HttpExecuteHandler(OkHttpHostTransport(OkHttpHostTransport.defaultClient(cookieJar)))
+                            HttpExecuteHandler(
+                                OkHttpHostTransport(
+                                    OkHttpHostTransport.defaultClient(cookieJar),
+                                    httpCallRegistry
+                                )
+                            )
                         )
+                        .register(HttpCancelHandler.CAPABILITY, HttpCancelHandler(httpCallRegistry))
                         .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
                         .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
+                        .register(CookieClearHandler.CAPABILITY, CookieClearHandler(cookieStore))
                         .register(
                             WebViewEvaluateJavaScriptHandler.CAPABILITY,
                             WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(null))
@@ -108,7 +186,37 @@ class ReaderCoreClient private constructor(
                             MediaDownloadCapabilityHandler.CAPABILITY,
                             MediaDownloadCapabilityHandler()
                         )
-                        .start()
+                        .register(HostSmokeEchoHandler.CAPABILITY, HostSmokeEchoHandler())
+                        // ── Slice B: Core Runtime capabilities ──
+                        .register(FileReadHandler.CAPABILITY, FileReadHandler(fs))
+                        .register(FileWriteHandler.CAPABILITY, FileWriteHandler(fs))
+                        .register(CacheGetHandler.CAPABILITY, CacheGetHandler(cache))
+                        .register(CachePutHandler.CAPABILITY, CachePutHandler(cache))
+                        .register(PersistenceGetHandler.CAPABILITY, PersistenceGetHandler(persistence))
+                        .register(PersistencePutHandler.CAPABILITY, PersistencePutHandler(persistence))
+                        .register(LogEmitHandler.CAPABILITY, LogEmitHandler(logger))
+                        .register(TimeNowHandler.CAPABILITY, TimeNowHandler())
+                        .register(SystemInfoHandler.CAPABILITY, SystemInfoHandler())
+                    // ── Slice C: HostFacade — UI-facing capabilities ──
+                    // Only wire when context is available (production /
+                    // instrumented). JVM tests inject handlers manually.
+                    if (context != null) {
+                        // Slice C — production wiring: real system TTS
+                        // ([AndroidTtsEngine] backed by android.speech.tts).
+                        // JVM tests inject FakeAndroidTtsAdapter manually
+                        // because TextToSpeech requires a real Context.
+                        val facade = com.reader.host.HostFacade(
+                            context = context,
+                            tts = com.reader.android.data.adapter.AndroidTtsEngine(context),
+                            permission = AppProvider.permissionRuntimeAdapter,
+                            notification = com.reader.android.data.adapter.AndroidNotificationRuntimeAdapter(context),
+                            webDav = null,
+                            credentials = AppProvider.webDavCredentialStore,
+                            downloadCache = null
+                        )
+                        hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
+                    }
+                    val hostRuntime = hostRuntimeBuilder.start()
                     ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
                 }
             }

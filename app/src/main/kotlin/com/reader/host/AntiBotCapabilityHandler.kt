@@ -22,9 +22,9 @@ import org.json.JSONObject
  * - `headers` (optional, object) — request headers (UA, Accept, etc.).
  * - `cookieJarId` (optional, string) — per-source cookie jar id.
  *
- * The wrapped [AntiBotChallengeHandler.handle] already maps executor failures
- * (including [NotImplementedError] from [OkHttpAntiBotExecutor]) to structured
- * `host.error` replies, so this adapter only parses params and delegates.
+ * The wrapped [AntiBotChallengeHandler.handle] maps executor failures to
+ * structured `host.error` replies, so this adapter only parses params and
+ * delegates.
  *
  * **Proof tier**: handler/router — mirrors [WebViewEvaluateJavaScriptHandler].
  */
