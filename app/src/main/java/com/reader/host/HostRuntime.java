@@ -66,6 +66,16 @@ public final class HostRuntime {
     }
 
     /**
+     * Read-only accessor for the underlying [HostAdapter], so host-app callers
+     * (e.g. the UI layer's [HostRequestDispatcher]) can dispatch capability
+     * requests through the same registered handler set the poll thread uses,
+     * without having to re-register handlers on a separate adapter.
+     */
+    public HostAdapter adapter() {
+        return adapter;
+    }
+
+    /**
      * Offload {@code host.request} handler dispatch (and the reply send) to the
      * given executor so a slow capability (e.g. a real HTTP fetch) does not
      * block the single poll thread. When unset (the default), dispatch runs

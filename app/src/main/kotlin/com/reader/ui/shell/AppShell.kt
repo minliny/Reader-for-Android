@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.reader.android.R
 import com.reader.api.Book
+import com.reader.api.ReaderCoreClient
 import com.reader.ui.book.BookDetailScreen
 import com.reader.ui.book.BookDirectoryScreen
 import com.reader.ui.book.demoBookDetailRouteState
@@ -119,6 +121,10 @@ import com.reader.ui.settings.SyncBackupScreen
 import com.reader.ui.settings.WebDavConfigScreen
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Native Compose App Shell. Hosts the four main tabs (`书架 / 发现 / RSS / 设置`) above a
@@ -231,6 +237,68 @@ fun AppShell(
             state.overlayState is OverlayState.Dialog -> vm.dispatch(ReaderUiIntent.CloseDialog)
             state.moreMenu.open -> vm.dispatch(ReaderUiIntent.CloseMoreMenu)
             else -> vm.dispatch(ReaderUiIntent.PopRoute)
+        }
+    }
+
+    // ── Slice E: HostRequest effect collector ─────────────────────────────
+    // Observes `pendingHostRequests` from the reducer (pure) and actually
+    // dispatches each entry through the real HostAdapter. Deduplication by
+    // dispatchId avoids re-execution on recomposition; timeout prevents a
+    // stuck handler from blocking the queue indefinitely.
+    //
+    // Pattern follows the established `LaunchedEffect(key)` convention from
+    // ReaderNavHost (keyed on state-derived values, one-shot side-effect).
+    // Here the key is the pending queue size + the newest dispatchId, so the
+    // effect re-fires only when a new entry is stamped in.
+    val newestPending = state.pendingHostRequests.lastOrNull()
+    LaunchedEffect(newestPending?.dispatchId) {
+        val entry = newestPending ?: return@LaunchedEffect
+        // Skip if the queue is empty (entry already completed by a prior cycle)
+        // or if this is a re-fire for an already-processed id.
+        val currentPending = vm.state.value.pendingHostRequests
+        if (currentPending.none { it.dispatchId == entry.dispatchId }) return@LaunchedEffect
+
+        val result = try {
+            withTimeoutOrNull(HOST_REQUEST_TIMEOUT_MS) {
+                val dispatcher = HostRequestDispatcher(ReaderCoreClient.get().hostAdapter())
+                dispatcher.dispatch(entry)
+            }
+        } catch (e: Exception) {
+            HostRequestResult(
+                dispatchId = entry.dispatchId,
+                capability = entry.capability,
+                success = false,
+                errorCode = "INTERNAL",
+                errorMessage = "dispatcher threw: ${e.message}"
+            )
+        }
+        if (result == null) {
+            // Timeout — fail the entry so the reducer clears it from pending.
+            vm.dispatch(
+                ReaderUiIntent.HostRequestError(
+                    requestId = entry.dispatchId,
+                    capability = entry.capability,
+                    errorCode = "TIMEOUT",
+                    errorMessage = "host request exceeded ${HOST_REQUEST_TIMEOUT_MS}ms"
+                )
+            )
+        } else if (result.success) {
+            vm.dispatch(
+                ReaderUiIntent.HostRequestComplete(
+                    requestId = result.dispatchId,
+                    capability = result.capability,
+                    resultJson = result.resultJson ?: "{}"
+                )
+            )
+        } else {
+            vm.dispatch(
+                ReaderUiIntent.HostRequestError(
+                    requestId = result.dispatchId,
+                    capability = result.capability,
+                    errorCode = result.errorCode ?: "INTERNAL",
+                    errorMessage = result.errorMessage ?: ""
+                )
+            )
         }
     }
 
@@ -1056,6 +1124,9 @@ private fun appShellViewModelFactory(
 ) = viewModelFactory {
     initializer { AppShellViewModel(reducedMotionResolver) }
 }
+
+/** Timeout for a single HostRequest dispatch in the AppShell effect collector. */
+private const val HOST_REQUEST_TIMEOUT_MS: Long = 10_000L
 
 @Composable
 private fun PushedPlaceholderRouteScreen(title: String, body: String, onBack: () -> Unit) {

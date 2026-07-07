@@ -122,6 +122,14 @@ class ReaderCoreClient private constructor(
         )
     }
 
+    /**
+     * Slice E — Exposes the host runtime's registered [HostAdapter] so the
+     * UI layer (AppShell effect collector via [HostRequestDispatcher]) can
+     * dispatch `pendingHostRequests` through the same handler set the Core
+     * poll thread uses. Avoids re-registering handlers on a separate adapter.
+     */
+    fun hostAdapter(): com.reader.host.HostAdapter = hostRuntime.adapter()
+
     fun close() {
         hostRuntime.stop()
         runtime.close()
