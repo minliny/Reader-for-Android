@@ -98,7 +98,7 @@ class ReaderCoreClient private constructor(
                         .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
                         .register(
                             WebViewEvaluateJavaScriptHandler.CAPABILITY,
-                            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor())
+                            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(null))
                         )
                         .register(
                             AntiBotCapabilityHandler.CAPABILITY,

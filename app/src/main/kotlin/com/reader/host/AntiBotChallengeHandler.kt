@@ -32,6 +32,10 @@
 package com.reader.host
 
 import org.json.JSONObject
+import java.io.IOException
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * Coordinates HTTP fetch + anti-bot challenge detection for the `anti_bot`
@@ -319,23 +323,67 @@ class StubAntiBotExecutor(
 }
 
 /**
- * Production executor backed by OkHttp. Real anti-bot HTTP fetch (with cookie
- * jar scoping, UA rotation, Cloudflare JS challenge solving via WebView) is
- * **not yet implemented** — this stub throws [NotImplementedError] so Core
- * fails closed when the Host has not advertised real anti_bot capability.
+ * Production executor backed by OkHttp. Performs real HTTP GET fetches with
+ * default User-Agent + Referer injection. Does NOT solve challenges — returns
+ * the raw response for [AntiBotChallengeDetector] classification. Network-level
+ * failures throw [IOException] so [AntiBotChallengeHandler.handle] can map
+ * them to a structured `INTERNAL` error.
  *
- * Device-headless/App tier proof (real anti_bot source L1-L5) is pending
- * device proof. Until then the handler/router tier is proven via
- * [StubAntiBotExecutor].
+ * Cookie jar scoping (per-source `cookieJarId`), UA rotation, and Cloudflare
+ * JS challenge solving via WebView are deferred to beta. The `cookieJarId`
+ * parameter is accepted but not yet used.
  */
-class OkHttpAntiBotExecutor : AntiBotExecutor {
+class OkHttpAntiBotExecutor(
+    private val client: OkHttpClient = OkHttpHostTransport.defaultClient()
+) : AntiBotExecutor {
+
     override fun fetch(
         url: String,
         headers: Map<String, String>,
         cookieJarId: String?
     ): AntiBotHttpResponse {
-        throw NotImplementedError(
-            "OkHttpAntiBotExecutor not implemented — alpha proof uses StubAntiBotExecutor"
-        )
+        val builder = Request.Builder().url(url)
+
+        // Inject default User-Agent if caller did not supply one.
+        val hasUa = headers.keys.any { it.equals("User-Agent", ignoreCase = true) }
+        if (!hasUa) {
+            builder.header(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 12; Reader) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            )
+        }
+
+        // Inject Referer from URL origin if caller did not supply one.
+        val hasReferer = headers.keys.any { it.equals("Referer", ignoreCase = true) }
+        if (!hasReferer) {
+            val referer = refererFromUrl(url)
+            if (referer != null) {
+                builder.header("Referer", referer)
+            }
+        }
+
+        // Apply caller-supplied headers.
+        for ((key, value) in headers) {
+            builder.header(key, value)
+        }
+
+        client.newCall(builder.build()).execute().use { resp ->
+            val body = resp.body?.string() ?: ""
+            val responseHeaders = resp.headers.toMultimap()
+                .mapValues { it.value.joinToString(", ") }
+            val finalUrl = resp.request.url.toString()
+            return AntiBotHttpResponse(
+                statusCode = resp.code,
+                body = body,
+                headers = responseHeaders,
+                finalUrl = finalUrl
+            )
+        }
+    }
+
+    private fun refererFromUrl(url: String): String? {
+        val parsed = url.toHttpUrlOrNull() ?: return null
+        return "${parsed.scheme}://${parsed.host}/"
     }
 }

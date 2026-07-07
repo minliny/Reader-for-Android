@@ -112,18 +112,19 @@ class HostRouterDispatchProofTest {
     }
 
     /**
-     * Production executor [AndroidWebViewExecutor] throws
-     * [WebViewExecutorError.NotImplemented] → handler maps to `host.error`
-     * with code `NOT_IMPLEMENTED`. Proves the router dispatched to the handler
-     * (unregistered would be `INTERNAL`) and the handler fail-closed
-     * gracefully.
+     * Production executor [AndroidWebViewExecutor] (no Context) throws
+     * [WebViewExecutorError.RequiresUiContext] → handler maps to `host.error`
+     * with code `REQUIRES_UI_CONTEXT`. Proves the router dispatched to the
+     * handler (unregistered would be `INTERNAL`) and the handler fail-closed
+     * gracefully — mirroring the HarmonyOS `REQUIRES_UI_CONTEXT` pattern.
+     * Real WebView L1-L5 requires an Activity-tier UI binding (Phase 4).
      */
     @Test
-    fun webViewRenderLaneDispatchesToHandlerWithProductionExecutorReturnsNotImplemented() {
+    fun webViewRenderLaneDispatchesToHandlerWithProductionExecutorReturnsRequiresUiContext() {
         val adapter = HostAdapter()
         adapter.register(
             WebViewEvaluateJavaScriptHandler.CAPABILITY,
-            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor())
+            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(null))
         )
 
         val request = HostRequest(
@@ -141,17 +142,17 @@ class HostRouterDispatchProofTest {
 
         val reply = adapter.dispatch(request)
         assertTrue(
-            "webview.evaluateJavaScript must error with stub executor, got: ${reply.kind()}",
+            "webview.evaluateJavaScript must error with real executor, got: ${reply.kind()}",
             reply.isError()
         )
         val error = reply as HostReply.Error
         assertEquals(
-            "error code must be NOT_IMPLEMENTED (not INTERNAL — proves dispatch reached handler)",
-            "NOT_IMPLEMENTED",
+            "error code must be REQUIRES_UI_CONTEXT (not INTERNAL — proves dispatch reached handler)",
+            "REQUIRES_UI_CONTEXT",
             error.code()
         )
         assertFalse(
-            "NOT_IMPLEMENTED must not be retryable (fail-closed)",
+            "REQUIRES_UI_CONTEXT must not be retryable (fail-closed)",
             error.retryable()
         )
     }
@@ -209,17 +210,20 @@ class HostRouterDispatchProofTest {
     }
 
     /**
-     * Production executor [OkHttpAntiBotExecutor] throws `NotImplementedError`
-     * → [AntiBotChallengeHandler] maps to `host.error` with code
-     * `NOT_IMPLEMENTED`. Proves the router dispatched to the adapter (which
-     * delegates to the handler) rather than rejecting with `INTERNAL`.
+     * Production executor [OkHttpAntiBotExecutor] (real OkHttp GET) attempts
+     * to fetch `https://example.test/article` — the `.test` TLD does not
+     * resolve (RFC 2606), so OkHttp throws `IOException` →
+     * [AntiBotChallengeHandler] maps to `host.error` with code `INTERNAL`
+     * (retryable). Proves the router dispatched to the adapter (which
+     * delegates to the real executor) rather than rejecting with
+     * `INTERNAL / "unsupported capability"`.
      */
     @Test
-    fun antiBotLaneDispatchesToHandlerWithProductionExecutorReturnsNotImplemented() {
+    fun antiBotLaneDispatchesToHandlerWithProductionExecutorReturnsNetworkError() {
         val adapter = HostAdapter()
         adapter.register(
             AntiBotCapabilityHandler.CAPABILITY,
-            AntiBotCapabilityHandler() // default: OkHttpAntiBotExecutor (fail-closed)
+            AntiBotCapabilityHandler() // default: real OkHttpAntiBotExecutor
         )
 
         val request = HostRequest(
@@ -233,17 +237,17 @@ class HostRouterDispatchProofTest {
 
         val reply = adapter.dispatch(request)
         assertTrue(
-            "anti_bot.execute must error with stub executor, got: ${reply.kind()}",
+            "anti_bot.execute must error with real executor + unresolvable URL, got: ${reply.kind()}",
             reply.isError()
         )
         val error = reply as HostReply.Error
         assertEquals(
-            "error code must be NOT_IMPLEMENTED (not INTERNAL — proves dispatch reached handler)",
-            "NOT_IMPLEMENTED",
+            "error code must be INTERNAL (real fetch failed — proves dispatch reached handler)",
+            "INTERNAL",
             error.code()
         )
-        assertFalse(
-            "NOT_IMPLEMENTED must not be retryable (fail-closed)",
+        assertTrue(
+            "INTERNAL network error must be retryable",
             error.retryable()
         )
     }
@@ -305,19 +309,20 @@ class HostRouterDispatchProofTest {
     }
 
     /**
-     * Production executor `OkHttpMediaDownloadExecutor` throws
-     * `NotImplementedError` in its `init` block → [MediaDownloadCapabilityHandler]
-     * catches it lazily and returns `host.error` with code `NOT_IMPLEMENTED`.
-     * Proves the router dispatched to the adapter rather than rejecting with
-     * `INTERNAL`, and the adapter handled the fail-closed executor
-     * gracefully (no crash).
+     * Production executor `OkHttpMediaDownloadExecutor` (real OkHttp GET)
+     * attempts to fetch `https://example.test/audio.mp3` — the `.test` TLD
+     * does not resolve (RFC 2606), so OkHttp throws `IOException` →
+     * [MediaDownloadCapabilityHandler] maps to `host.error` with code
+     * `INTERNAL` (retryable). Proves the router dispatched to the adapter
+     * (which delegates to the real executor) rather than rejecting with
+     * `INTERNAL / "unsupported capability"`.
      */
     @Test
-    fun mediaDownloadLaneDispatchesToHandlerWithProductionExecutorReturnsNotImplemented() {
+    fun mediaDownloadLaneDispatchesToHandlerWithProductionExecutorReturnsNetworkError() {
         val adapter = HostAdapter()
         adapter.register(
             MediaDownloadCapabilityHandler.CAPABILITY,
-            MediaDownloadCapabilityHandler() // default: OkHttpMediaDownloadExecutor (fail-closed, TODO in init)
+            MediaDownloadCapabilityHandler() // default: real OkHttpMediaDownloadExecutor
         )
 
         val request = HostRequest(
@@ -331,17 +336,17 @@ class HostRouterDispatchProofTest {
 
         val reply = adapter.dispatch(request)
         assertTrue(
-            "media.download must error with stub executor, got: ${reply.kind()}",
+            "media.download must error with real executor + unresolvable URL, got: ${reply.kind()}",
             reply.isError()
         )
         val error = reply as HostReply.Error
         assertEquals(
-            "error code must be NOT_IMPLEMENTED (not INTERNAL — proves dispatch reached handler)",
-            "NOT_IMPLEMENTED",
+            "error code must be INTERNAL (real fetch failed — proves dispatch reached handler)",
+            "INTERNAL",
             error.code()
         )
-        assertFalse(
-            "NOT_IMPLEMENTED must not be retryable (fail-closed)",
+        assertTrue(
+            "INTERNAL network error must be retryable",
             error.retryable()
         )
     }

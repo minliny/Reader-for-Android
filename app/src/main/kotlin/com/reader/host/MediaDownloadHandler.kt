@@ -32,6 +32,12 @@
  */
 package com.reader.host
 
+import java.io.IOException
+import java.security.MessageDigest
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrl
+
 /**
  * Parses + validates a `media.download` request and delegates to
  * [MediaDownloadExecutor]. Validation is fail-closed: invalid params throw
@@ -279,22 +285,117 @@ class StubMediaDownloadExecutor(
 }
 
 /**
- * Production executor backed by OkHttp. Real media download (range GET,
- * HEAD probe, sha256 hashing, cache-keyed persistence, 304 handling, maxBytes
- * enforcement) is **not yet implemented** — this stub throws
- * [NotImplementedError] in its `init` block so Core fails closed when the
- * Host has not advertised real `media.download` capability.
+ * Production executor backed by OkHttp. Performs real HTTP I/O (range GET,
+ * HEAD probe, sha256 hashing, maxBytes enforcement, conditional GET via
+ * If-None-Match / If-Modified-Since). Network-level failures throw
+ * [IOException] so the host adapter can map them to a structured `INTERNAL`
+ * error.
  *
  * Device-headless/App tier proof (real blob download L1-L5 against Legado
- * audio sources) is pending device proof and is NOT claimed here. Until then
- * the handler/router tier is proven via [StubMediaDownloadExecutor].
+ * audio sources with cache-keyed persistence + 304 handling) is pending
+ * device proof. The handler/router tier is proven via [StubMediaDownloadExecutor].
  */
-class OkHttpMediaDownloadExecutor : MediaDownloadExecutor {
-    init {
-        TODO("OkHttpMediaDownloadExecutor not implemented — device-headless beta")
-    }
+class OkHttpMediaDownloadExecutor(
+    private val client: OkHttpClient = OkHttpHostTransport.defaultClient()
+) : MediaDownloadExecutor {
 
+    /**
+     * Execute [request] via OkHttp. Performs real HTTP I/O (range GET / HEAD
+     * probe), downloads bytes to memory, computes SHA-256, and returns a
+     * [MediaDownloadResult]. Network-level failures throw [IOException] so
+     * the host adapter can map them to a structured `INTERNAL` error.
+     *
+     * HTTP status codes (200/206/304/4xx/5xx) are returned as-is in
+     * [MediaDownloadResult.statusCode] — only transport failures throw.
+     */
     override fun execute(request: MediaDownloadRequest): MediaDownloadResult {
-        TODO("OkHttpMediaDownloadExecutor not implemented — device-headless beta")
+        val httpUrl = request.url.toHttpUrl()
+        val builder = Request.Builder().url(httpUrl)
+
+        // Apply caller-supplied headers first so they can override defaults.
+        for ((key, value) in request.headers) {
+            builder.header(key, value)
+        }
+
+        // Range request: bytes=start-end (or bytes=start- for open-ended).
+        if (request.rangeStart != null) {
+            val range = if (request.rangeEnd != null) {
+                "bytes=${request.rangeStart}-${request.rangeEnd}"
+            } else {
+                "bytes=${request.rangeStart}-"
+            }
+            builder.header("Range", range)
+        }
+
+        // Conditional GET headers.
+        request.ifNoneMatch?.let { builder.header("If-None-Match", it) }
+        request.ifModifiedSince?.let { builder.header("If-Modified-Since", it) }
+
+        when (request.method.uppercase()) {
+            "GET" -> { /* default: no body */ }
+            "HEAD" -> builder.head()
+            else -> builder.method(request.method, null)
+        }
+
+        client.newCall(builder.build()).execute().use { resp ->
+            val contentType = resp.header("Content-Type")
+            val contentLength = resp.header("Content-Length")?.toLongOrNull()
+            val etag = resp.header("ETag")
+            val finalUrl = resp.request.url.toString()
+
+            // HEAD probe: no body to download.
+            if (request.method.uppercase() == "HEAD") {
+                return MediaDownloadResult(
+                    resourceId = "media-head-${resp.code}",
+                    tempPath = null,
+                    statusCode = resp.code,
+                    contentType = contentType,
+                    contentLength = contentLength,
+                    etag = etag,
+                    byteLength = 0L,
+                    sha256 = null,
+                    fromCache = resp.code == 304,
+                    finalUrl = finalUrl
+                )
+            }
+
+            // GET: read bytes, enforce maxBytes, compute SHA-256.
+            val source = resp.body ?: throw IOException("response body is null")
+            val maxBytes = request.maxBytes ?: Long.MAX_VALUE
+            val sink = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            var total = 0L
+            source.byteStream().use { input ->
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > maxBytes) {
+                        throw IOException(
+                            "media.download exceeded maxBytes ($maxBytes) at $total bytes"
+                        )
+                    }
+                    sink.write(buffer, 0, read)
+                }
+            }
+
+            val bytes = sink.toByteArray()
+            val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+            val sha256Hex = digest.joinToString("") { "%02x".format(it) }
+            val resourceId = "media-${sha256Hex.substring(0, 16)}"
+
+            return MediaDownloadResult(
+                resourceId = resourceId,
+                tempPath = null,
+                statusCode = resp.code,
+                contentType = contentType,
+                contentLength = contentLength,
+                etag = etag,
+                byteLength = total,
+                sha256 = sha256Hex,
+                fromCache = resp.code == 304,
+                finalUrl = finalUrl
+            )
+        }
     }
 }

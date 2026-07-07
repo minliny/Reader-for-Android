@@ -1,6 +1,10 @@
 package com.reader.host
 
+import android.content.Context
+import android.webkit.WebView
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
@@ -180,6 +184,11 @@ class WebViewEvaluateJavaScriptHandler(
                     e.message ?: "$CAPABILITY execution failed",
                     true
                 )
+                is WebViewExecutorError.RequiresUiContext -> HostReply.error(
+                    "REQUIRES_UI_CONTEXT",
+                    e.message ?: "$CAPABILITY requires UI context",
+                    false
+                )
             }
         } catch (e: Exception) {
             return HostReply.error(
@@ -290,6 +299,17 @@ sealed class WebViewExecutorError(message: String) : Exception(message) {
     class ExecutionFailed(detail: String) :
         WebViewExecutorError("$CAPABILITY_NAME execution failed: $detail")
 
+    /**
+     * WebView execution requires a UI context (Activity / WebView attached to
+     * the view hierarchy) that is not available in the current environment
+     * (e.g. headless instrumented test). Maps to `host.error` code
+     * `REQUIRES_UI_CONTEXT` with `retryable = false` — Core should fail closed
+     * and the Host must retry only after obtaining an Activity-tier binding
+     * (Phase 4).
+     */
+    class RequiresUiContext(detail: String) :
+        WebViewExecutorError("$CAPABILITY_NAME requires UI context (Activity/WebView): $detail")
+
     private companion object {
         private const val CAPABILITY_NAME = "webview.evaluateJavaScript"
     }
@@ -315,17 +335,47 @@ class StubWebViewExecutor(
 }
 
 /**
- * Production executor backed by Android `WebView`. Real WebView execution
- * (load HTML/URL, evaluate JS via `WebView.evaluateJavascript`, capture
- * finalUrl/title) is **not yet implemented** — this stub throws
- * [WebViewExecutorError.NotImplemented] so Core fails closed when the Host
- * has not advertised real WebView capability.
+ * Production executor backed by Android `WebView`. Attempts to construct a
+ * [WebView] with the supplied [Context] and load the document. In a headless
+ * instrumented-test environment (no Activity-tier UI binding), this throws
+ * [WebViewExecutorError.RequiresUiContext] so Core fails closed with
+ * `REQUIRES_UI_CONTEXT` — mirroring the HarmonyOS `REQUIRES_UI_CONTEXT` pattern.
  *
- * Device-headless/App tier proof (real WebView L1-L5) is pending device proof.
- * Until then the handler/router tier is proven via [StubWebViewExecutor].
+ * Real WebView L1-L5 rendering (load HTML/URL, evaluate JS via
+ * `WebView.evaluateJavascript`, capture finalUrl/title) requires an
+ * Activity-attached WebView and is deferred to Phase 4. Until then the
+ * handler/router tier is proven via [StubWebViewExecutor].
+ *
+ * @param context Optional [Context] (ideally an Activity). When null, the
+ *   executor throws [WebViewExecutorError.RequiresUiContext] immediately
+ *   (fail-closed).
  */
-class AndroidWebViewExecutor : WebViewExecutor {
+class AndroidWebViewExecutor(private val context: Context? = null) : WebViewExecutor {
     override suspend fun evaluate(request: WebViewEvaluationRequest): WebViewEvaluationResult {
-        throw WebViewExecutorError.NotImplemented()
+        val ctx = context
+            ?: throw WebViewExecutorError.RequiresUiContext("no Context provided")
+        return withContext(Dispatchers.Main) {
+            try {
+                val webView = WebView(ctx)
+                // Attempt to load — this will succeed if we're on UI thread with
+                // a valid Context, but real JS evaluation requires an
+                // Activity-attached WebView.
+                if (request.documentKind == "url") {
+                    webView.loadUrl(request.url!!)
+                } else {
+                    webView.loadData(request.body!!, "text/html", "UTF-8")
+                }
+                throw WebViewExecutorError.RequiresUiContext(
+                    "WebView created but not attached to Activity (headless instrumented test). " +
+                        "Real WebView L1-L5 requires Activity-tier UI binding (Phase 4)."
+                )
+            } catch (e: WebViewExecutorError) {
+                throw e
+            } catch (e: Exception) {
+                throw WebViewExecutorError.RequiresUiContext(
+                    "WebView construction/load failed: ${e.message}"
+                )
+            }
+        }
     }
 }
