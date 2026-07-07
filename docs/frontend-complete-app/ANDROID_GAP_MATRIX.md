@@ -87,3 +87,23 @@ Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-07:
 | --- | --- | --- |
 | `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest` | PASS | Current run completed successfully in 9s. `:app:kspDebugKotlin`, `:app:compileDebugKotlin`, `:app:kspDebugUnitTestKotlin`, `:app:compileDebugUnitTestKotlin`, and `:app:testDebugUnitTest` all passed. The older KSP/cache blocker is no longer current. |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
+
+## 8. Device Proof (Instrumented)
+
+Device: `dc54254d` (OnePlus 8Pro IN2020), run via `adb shell am instrument` on 2026-07-07.
+
+| Test class | Tests | Result |
+| --- | --- | --- |
+| `com.reader.CoreRuntimeCapabilityInstrumentedProofTest` | 7 | PASS |
+| `com.reader.HostWebViewRebindProofTest` | 2 | PASS |
+| `com.reader.HostRouterDispatchProofTest` | 7 | PASS |
+| `com.reader.HostWebViewRealExecutorProofTest` | 1 | PASS |
+| `com.reader.HostMediaDownloadProofTest` | 8 | PASS |
+| `com.reader.HostAntiBotProofTest` | 6 | PASS |
+| `com.reader.HostWebViewP0HeadlessFailClosedProofTest` | 3 | PASS |
+| `com.reader.HostWebViewRenderProofTest` | 5 | PASS |
+| **Total** | **39** | **ALL PASS** |
+
+Fixes applied during device proof:
+- `FileReadHandler`: `DefaultHostFileSystem.read` was throwing `kotlin.io.NoSuchFileException` (Kotlin stdlib) instead of `java.nio.file.NoSuchFileException` (Java NIO) because `NoSuchFileException(file)` matched the Kotlin constructor `(File, File?, String?)` over the Java constructor `(String)`. Fixed by using fully-qualified `java.nio.file.NoSuchFileException(file.path)`.
+- `WebViewHostActivity`: moved from `androidTest` to `main` so `ActivityScenario.launch` resolves it to the target process (`com.reader.android`) instead of the test process (`com.reader.android.test`).

@@ -26,5 +26,9 @@
             android:name="com.reader.ui.evidence.EvidenceActivity"
             android:label="Evidence Runner"
             android:exported="false" />
+
+        <activity
+            android:name="com.reader.WebViewHostActivity"
+            android:exported="false" />
     </application>
 </manifest>

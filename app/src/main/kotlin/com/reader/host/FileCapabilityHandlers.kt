@@ -102,7 +102,7 @@ class DefaultHostFileSystem(private val root: File) : HostFileSystem {
     override fun read(path: String): ByteArray {
         val file = resolveSafely(root, path)
         if (!file.exists()) {
-            throw NoSuchFileException(file)
+            throw java.nio.file.NoSuchFileException(file.path)
         }
         if (file.isDirectory) {
             throw IOException("path is a directory: $path")
