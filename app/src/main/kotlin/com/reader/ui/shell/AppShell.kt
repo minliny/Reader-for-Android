@@ -319,7 +319,34 @@ fun AppShell(
             onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
-            onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) }
+            onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
+            onAsyncStateChange = { requestId, asyncState, value ->
+                // Bridge ImmersiveReadingViewModel load state → ReaderUiState.asyncResult (M5).
+                // The VM reports PENDING / COMPLETED / CANCELLED using context.entryRequestId;
+                // the reducer's async-result guard discards stale results when a newer entry
+                // supersedes the in-flight request.
+                val currentRouteId = vm.state.value.currentRoute.routeId
+                when (asyncState) {
+                    AsyncResultStateValue.PENDING -> vm.dispatch(
+                        ReaderUiIntent.StartAsyncRequest(
+                            fromRoute = currentRouteId,
+                            toRoute = RouteIds.IMMERSIVE_READING,
+                            requestId = requestId
+                        )
+                    )
+                    AsyncResultStateValue.COMPLETED -> vm.dispatch(
+                        ReaderUiIntent.CompleteAsyncRequest(
+                            requestId = requestId,
+                            value = value,
+                            currentRoute = currentRouteId
+                        )
+                    )
+                    AsyncResultStateValue.CANCELLED -> vm.dispatch(
+                        ReaderUiIntent.CancelAsyncRequest(requestId = requestId)
+                    )
+                    else -> Unit
+                }
+            }
         )
     } else when (val route = currentRoute) {
         is ReaderRoute.Search -> {

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
+import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
@@ -88,7 +89,8 @@ fun ReaderShellScreen(
     onNavigate: (String) -> Unit,
     activeSession: com.reader.ui.shell.ActiveSession? = null,
     onSessionToggle: () -> Unit = {},
-    onSessionStop: () -> Unit = {}
+    onSessionStop: () -> Unit = {},
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
 ) {
     val context = when (route) {
         is ReaderRoute.ImmersiveReading -> route.context
@@ -120,7 +122,11 @@ fun ReaderShellScreen(
             .background(readerExtraColors().paper)
     ) {
         // readingSurface slot
-        ReaderControlReadingSurface(context = context, fallbackTitle = title)
+        ReaderControlReadingSurface(
+            context = context,
+            fallbackTitle = title,
+            onAsyncStateChange = onAsyncStateChange
+        )
         // readerOverlayHost slot (named via branch wrapper)
         if (isImmersive) {
             ReaderShellImmersiveInfoLayer(
@@ -426,7 +432,13 @@ private fun FlowShellStepRegion(
     onNavigate: (String) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        ReaderControlReadingSurface(context = context, fallbackTitle = title)
+        // FlowShell is the source-switch continuation, not a fresh reader entry — the
+        // async-result guard (M5) is not engaged here; onAsyncStateChange stays null.
+        ReaderControlReadingSurface(
+            context = context,
+            fallbackTitle = title,
+            onAsyncStateChange = null
+        )
         ReaderControlTopOverlay(
             title = title,
             sourceLine = "优书网 · 第 32 章 雨夜",
@@ -465,11 +477,15 @@ private fun FlowShellComparisonRegion(
 }
 
 @Composable
-private fun ReaderControlReadingSurface(context: ReaderContext?, fallbackTitle: String) {
+private fun ReaderControlReadingSurface(
+    context: ReaderContext?,
+    fallbackTitle: String,
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+) {
     if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
             key = "immersive-${context.bookUrl}",
-            factory = ImmersiveReadingViewModelFactory(context)
+            factory = ImmersiveReadingViewModelFactory(context, onAsyncStateChange)
         )
         val readingState by vm.uiState.collectAsStateWithLifecycle()
         val content by vm.content.collectAsStateWithLifecycle()

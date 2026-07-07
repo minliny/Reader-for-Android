@@ -31,6 +31,7 @@ import com.reader.api.Book
 import com.reader.api.BookApi
 import com.reader.api.Chapter
 import com.reader.api.ReaderCoreClient
+import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -197,7 +198,8 @@ private fun ReaderTapZones(
  * stale result is discarded rather than overwriting the new surface.
  */
 class ImmersiveReadingViewModel(
-    private val context: ReaderContext
+    private val context: ReaderContext,
+    private val onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
 ) : ViewModel() {
 
     private val bookApi: BookApi? = if (context.sourceId.startsWith(FIXTURE_PREFIX)) null else BookApi(ReaderCoreClient.get())
@@ -211,6 +213,11 @@ class ImmersiveReadingViewModel(
     init { load() }
 
     private fun load() {
+        // Engage the async-result guard (motion.async.resultGuard, M5): mark this entry's
+        // request as PENDING so stale results from a previous entry can be discarded /
+        // superseded by the reducer. The requestId is the entry intent's requestId,
+        // carried on ReaderContext.entryRequestId.
+        onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.PENDING, null)
         if (context.sourceId.startsWith(FIXTURE_PREFIX)) {
             val book = Book(
                 bookUrl = context.bookUrl,
@@ -219,6 +226,7 @@ class ImmersiveReadingViewModel(
             )
             _uiState.value = ReadingUiState.Ready(book, emptyList())
             _content.value = FIXTURE_TEXT
+            onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.COMPLETED, _content.value)
             return
         }
         viewModelScope.launch {
@@ -232,13 +240,16 @@ class ImmersiveReadingViewModel(
                 val chapters: List<Chapter> = bookApi!!.toc(context.sourceId, book)
                 if (chapters.isEmpty()) {
                     _uiState.value = ReadingUiState.Error("无章节")
+                    onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.CANCELLED, null)
                     return@launch
                 }
                 _uiState.value = ReadingUiState.Ready(book, chapters)
                 val text = bookApi.content(context.sourceId, book, chapters.first())
                 _content.value = text
+                onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.COMPLETED, _content.value)
             } catch (e: Exception) {
                 _uiState.value = ReadingUiState.Error(e.message ?: "加载失败")
+                onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.CANCELLED, null)
             }
         }
     }
@@ -289,6 +300,9 @@ class ImmersiveReadingViewModel(
     }
 }
 
-fun ImmersiveReadingViewModelFactory(context: ReaderContext) = viewModelFactory {
-    initializer { ImmersiveReadingViewModel(context) }
+fun ImmersiveReadingViewModelFactory(
+    context: ReaderContext,
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+) = viewModelFactory {
+    initializer { ImmersiveReadingViewModel(context, onAsyncStateChange) }
 }
