@@ -23,6 +23,7 @@ import com.reader.host.DefaultHostFileSystem
 import com.reader.host.DefaultHostLogger
 import com.reader.host.FileReadHandler
 import com.reader.host.FileWriteHandler
+import com.reader.host.FileDeleteHandler
 import com.reader.host.HostCache
 import com.reader.host.HostCachePersistenceAdapter
 import com.reader.host.HostFileSystem
@@ -30,6 +31,7 @@ import com.reader.host.HostLogger
 import com.reader.host.HostPersistence
 import com.reader.host.HostRuntime
 import com.reader.host.HostSmokeEchoHandler
+import com.reader.host.HostTransport
 import com.reader.host.HttpCancelHandler
 import com.reader.host.HttpCallRegistry
 import com.reader.host.HttpExecuteHandler
@@ -156,7 +158,6 @@ class ReaderCoreClient private constructor(
                     val runtime = ReaderCoreRuntime(configJson)
                     val transport = ReaderCoreHostTransport(runtime)
                     val cookieStore: CookieStore = AppProvider.cookieStore
-                    val cookieJar = CookieStoreJar(cookieStore)
                     val fs: HostFileSystem = context?.let {
                         DefaultHostFileSystem(it.filesDir)
                     } ?: com.reader.host.InMemoryHostFileSystem()
@@ -167,67 +168,98 @@ class ReaderCoreClient private constructor(
                         )
                     } ?: HostCachePersistenceAdapter(cache)
                     val logger: HostLogger = DefaultHostLogger()
-                    val httpCallRegistry = HttpCallRegistry()
-                    var hostRuntimeBuilder = HostRuntime.over(transport)
-                        .register(
-                            HttpExecuteHandler.CAPABILITY,
-                            HttpExecuteHandler(
-                                OkHttpHostTransport(
-                                    OkHttpHostTransport.defaultClient(cookieJar),
-                                    httpCallRegistry
-                                )
-                            )
-                        )
-                        .register(HttpCancelHandler.CAPABILITY, HttpCancelHandler(httpCallRegistry))
-                        .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
-                        .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
-                        .register(CookieClearHandler.CAPABILITY, CookieClearHandler(cookieStore))
-                        .register(
-                            WebViewEvaluateJavaScriptHandler.CAPABILITY,
-                            WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(null))
-                        )
-                        .register(
-                            AntiBotCapabilityHandler.CAPABILITY,
-                            AntiBotCapabilityHandler()
-                        )
-                        .register(
-                            MediaDownloadCapabilityHandler.CAPABILITY,
-                            MediaDownloadCapabilityHandler()
-                        )
-                        .register(HostSmokeEchoHandler.CAPABILITY, HostSmokeEchoHandler())
-                        // ── Slice B: Core Runtime capabilities ──
-                        .register(FileReadHandler.CAPABILITY, FileReadHandler(fs))
-                        .register(FileWriteHandler.CAPABILITY, FileWriteHandler(fs))
-                        .register(CacheGetHandler.CAPABILITY, CacheGetHandler(cache))
-                        .register(CachePutHandler.CAPABILITY, CachePutHandler(cache))
-                        .register(PersistenceGetHandler.CAPABILITY, PersistenceGetHandler(persistence))
-                        .register(PersistencePutHandler.CAPABILITY, PersistencePutHandler(persistence))
-                        .register(LogEmitHandler.CAPABILITY, LogEmitHandler(logger))
-                        .register(TimeNowHandler.CAPABILITY, TimeNowHandler())
-                        .register(SystemInfoHandler.CAPABILITY, SystemInfoHandler())
-                    // ── Slice C: HostFacade — UI-facing capabilities ──
-                    // Only wire when context is available (production /
-                    // instrumented). JVM tests inject handlers manually.
-                    if (context != null) {
-                        // Slice C — production wiring: real system TTS
-                        // ([AndroidTtsEngine] backed by android.speech.tts).
-                        // JVM tests inject FakeAndroidTtsAdapter manually
-                        // because TextToSpeech requires a real Context.
-                        val facade = com.reader.host.HostFacade(
-                            context = context,
-                            tts = com.reader.android.data.adapter.AndroidTtsEngine(context),
-                            permission = AppProvider.permissionRuntimeAdapter,
-                            notification = com.reader.android.data.adapter.AndroidNotificationRuntimeAdapter(context),
-                            webDav = null,
-                            credentials = AppProvider.webDavCredentialStore,
-                            downloadCache = null
-                        )
-                        hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
-                    }
-                    val hostRuntime = hostRuntimeBuilder.start()
+                    val hostRuntime = buildHostRuntime(
+                        transport, cookieStore, fs, cache, persistence, logger, context
+                    )
                     ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
                 }
             }
+        }
+
+        /**
+         * Build the [HostRuntime] with all capabilities registered. Extracted
+         * from [init] so JVM tests can exercise the real registration code
+         * path without loading the native `.so` (which [ReaderCoreRuntime]
+         * requires). Production [init] calls this with a
+         * [ReaderCoreHostTransport]; tests inject a fake [HostTransport] and
+         * pass [context] = null to skip [com.reader.host.HostFacade] (whose
+         * TTS/Notification/Permission adapters need a real Android Context).
+         *
+         * The returned [HostRuntime] is started (poll thread running).
+         *
+         * `credential.resolve` is intentionally NOT registered here — see
+         * Gap D in `docs/host-app-contracts/02-local-storage-sync.md` §3.4.
+         */
+        @JvmSynthetic
+        internal fun buildHostRuntime(
+            transport: HostTransport,
+            cookieStore: CookieStore,
+            fs: HostFileSystem,
+            cache: HostCache,
+            persistence: HostPersistence,
+            logger: HostLogger,
+            context: Context?
+        ): HostRuntime {
+            val cookieJar = CookieStoreJar(cookieStore)
+            val httpCallRegistry = HttpCallRegistry()
+            var hostRuntimeBuilder = HostRuntime.over(transport)
+                .register(
+                    HttpExecuteHandler.CAPABILITY,
+                    HttpExecuteHandler(
+                        OkHttpHostTransport(
+                            OkHttpHostTransport.defaultClient(cookieJar),
+                            httpCallRegistry
+                        )
+                    )
+                )
+                .register(HttpCancelHandler.CAPABILITY, HttpCancelHandler(httpCallRegistry))
+                .register(CookieGetHandler.CAPABILITY, CookieGetHandler(cookieStore))
+                .register(CookieSetHandler.CAPABILITY, CookieSetHandler(cookieStore))
+                .register(CookieClearHandler.CAPABILITY, CookieClearHandler(cookieStore))
+                .register(
+                    WebViewEvaluateJavaScriptHandler.CAPABILITY,
+                    WebViewEvaluateJavaScriptHandler(AndroidWebViewExecutor(null))
+                )
+                .register(
+                    AntiBotCapabilityHandler.CAPABILITY,
+                    AntiBotCapabilityHandler()
+                )
+                .register(
+                    MediaDownloadCapabilityHandler.CAPABILITY,
+                    MediaDownloadCapabilityHandler()
+                )
+                .register(HostSmokeEchoHandler.CAPABILITY, HostSmokeEchoHandler())
+                // ── Slice B: Core Runtime capabilities ──
+                .register(FileReadHandler.CAPABILITY, FileReadHandler(fs))
+                .register(FileWriteHandler.CAPABILITY, FileWriteHandler(fs))
+                .register(FileDeleteHandler.CAPABILITY, FileDeleteHandler(fs))
+                .register(CacheGetHandler.CAPABILITY, CacheGetHandler(cache))
+                .register(CachePutHandler.CAPABILITY, CachePutHandler(cache))
+                .register(PersistenceGetHandler.CAPABILITY, PersistenceGetHandler(persistence))
+                .register(PersistencePutHandler.CAPABILITY, PersistencePutHandler(persistence))
+                .register(LogEmitHandler.CAPABILITY, LogEmitHandler(logger))
+                .register(TimeNowHandler.CAPABILITY, TimeNowHandler())
+                .register(SystemInfoHandler.CAPABILITY, SystemInfoHandler())
+            // ── Slice C: HostFacade — UI-facing capabilities ──
+            // Only wire when context is available (production /
+            // instrumented). JVM tests inject handlers manually.
+            if (context != null) {
+                // Slice C — production wiring: real system TTS
+                // ([AndroidTtsEngine] backed by android.speech.tts).
+                // JVM tests inject FakeAndroidTtsAdapter manually
+                // because TextToSpeech requires a real Context.
+                val facade = com.reader.host.HostFacade(
+                    context = context,
+                    tts = com.reader.android.data.adapter.AndroidTtsEngine(context),
+                    permission = AppProvider.permissionRuntimeAdapter,
+                    notification = com.reader.android.data.adapter.AndroidNotificationRuntimeAdapter(context),
+                    webDav = null,
+                    credentials = AppProvider.webDavCredentialStore,
+                    downloadCache = null
+                )
+                hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
+            }
+            return hostRuntimeBuilder.start()
         }
 
         fun get(): ReaderCoreClient = INSTANCE
