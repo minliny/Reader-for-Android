@@ -800,7 +800,11 @@ data class ReaderUiState(
     /** 权限状态。 */
     val permissions: PermissionState = PermissionState(),
     /** P4: RSS 列表 UI 状态（Loading/Empty/Success/Error）。 */
-    val rssList: RssListState = RssListState.Idle
+    val rssList: RssListState = RssListState.Idle,
+    /** Slice D: 待派发的 HostRequest 队列（effect-saga 模式）。 */
+    val pendingHostRequests: List<HostRequestDispatch> = emptyList(),
+    /** Slice D: 最近完成的 HostRequest 结果（用于 UI 反馈）。 */
+    val lastHostRequestResult: HostRequestResult? = null
 ) {
     /** True when the rendered route is the immersive reading surface (no control layer). */
     val isImmersiveReading: Boolean

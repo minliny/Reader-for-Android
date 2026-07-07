@@ -467,6 +467,45 @@ sealed class ReaderUiIntent {
     object DismissRssListResult : ReaderUiIntent() {
         override val requestId: String = generateRequestId()
     }
+
+    // ── Slice D: HostRequest dispatch ──────────────────────────────────────
+
+    /**
+     * Slice D — 派发一个 HostRequest 到 host 层。Reducer 把它加入
+     * [ReaderUiState.pendingHostRequests] 队列;UI 层观察队列并实际调用
+     * [com.reader.host.HostAdapter.dispatch]。完成后 UI 派发
+     * [HostRequestComplete] 或 [HostRequestError] 回 Reducer。
+     *
+     * @property capability host 能力名,如 `tts.system.start`、
+     *   `permission.check`、`notification.show`、`share.invoke`、
+     *   `clipboard.copy`、`device.vibrate`。
+     * @property paramsJson 能力参数 JSON。
+     */
+    data class DispatchHostRequest(
+        val capability: String,
+        val paramsJson: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Slice D — HostRequest 成功完成。 */
+    data class HostRequestComplete(
+        override val requestId: String,
+        val capability: String,
+        val resultJson: String
+    ) : ReaderUiIntent()
+
+    /** Slice D — HostRequest 失败。 */
+    data class HostRequestError(
+        override val requestId: String,
+        val capability: String,
+        val errorCode: String,
+        val errorMessage: String
+    ) : ReaderUiIntent()
+
+    /** Slice D — 清除 lastHostRequestResult。 */
+    object ClearHostRequestResult : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
 }
 
 private val requestCounter = java.util.concurrent.atomic.AtomicLong(0)

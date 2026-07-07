@@ -324,6 +324,41 @@ object ReaderUiReducer {
             )
         )
         ReaderUiIntent.DismissRssListResult -> state.copy(rssList = RssListState.Idle)
+
+        // ── Slice D: HostRequest dispatch ──
+        is ReaderUiIntent.DispatchHostRequest -> state.copy(
+            pendingHostRequests = state.pendingHostRequests + HostRequestDispatch(
+                dispatchId = intent.requestId,
+                capability = intent.capability,
+                paramsJson = intent.paramsJson
+            )
+        )
+        is ReaderUiIntent.HostRequestComplete -> {
+            val dispatch = state.pendingHostRequests.firstOrNull { it.dispatchId == intent.requestId }
+            state.copy(
+                pendingHostRequests = state.pendingHostRequests.filterNot { it.dispatchId == intent.requestId },
+                lastHostRequestResult = HostRequestResult(
+                    dispatchId = intent.requestId,
+                    capability = intent.capability,
+                    success = true,
+                    resultJson = intent.resultJson
+                )
+            ).also {
+                // Suppress unused warning; dispatch is available for logging if needed.
+                @Suppress("UNUSED_VARIABLE") dispatch
+            }
+        }
+        is ReaderUiIntent.HostRequestError -> state.copy(
+            pendingHostRequests = state.pendingHostRequests.filterNot { it.dispatchId == intent.requestId },
+            lastHostRequestResult = HostRequestResult(
+                dispatchId = intent.requestId,
+                capability = intent.capability,
+                success = false,
+                errorCode = intent.errorCode,
+                errorMessage = intent.errorMessage
+            )
+        )
+        ReaderUiIntent.ClearHostRequestResult -> state.copy(lastHostRequestResult = null)
     }
 
     /**
