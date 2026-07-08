@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reader.api.Book
 import com.reader.api.ReaderCoreClient
+import com.reader.api.SearchBook
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,12 @@ class BookshelfViewModel : ViewModel() {
 
     private val _continueReading = MutableStateFlow<Book?>(null)
     val continueReading: StateFlow<Book?> = _continueReading.asStateFlow()
+
+    // P0-2: real inShelf query source. Derived from the bookshelf.list response so
+    // search/discover/detail screens can check membership without a platform-side table
+    // (bookshelf is Core-owned DomainState per CORE_HOST_BOUNDARY.md §1.1).
+    private val _shelfBookUrls = MutableStateFlow<Set<String>>(emptySet())
+    val shelfBookUrls: StateFlow<Set<String>> = _shelfBookUrls.asStateFlow()
 
     private val _chromeState = MutableStateFlow(BookshelfChromeState())
     val chromeState: StateFlow<BookshelfChromeState> = _chromeState.asStateFlow()
@@ -87,11 +94,44 @@ class BookshelfViewModel : ViewModel() {
                 _uiState.value = if (books.isEmpty()) UiState.Empty else UiState.Success(books)
                 // Continue reading = first book on the shelf (Core owns ordering).
                 _continueReading.value = books.firstOrNull()
+                _shelfBookUrls.value = books.map { it.bookUrl }.toSet()
             } catch (e: Exception) {
                 // Core not ready or command failed — show empty, not a fake fixture.
                 // P2 acceptance: bookshelf data comes from Core; no platform-side fallback.
                 _uiState.value = UiState.Empty
                 _continueReading.value = null
+                _shelfBookUrls.value = emptySet()
+            }
+        }
+    }
+
+    /**
+     * P0-2: Add a book to the shelf via Core `bookshelf.book.add` CoreCommand.
+     * Core owns the bookshelf DomainState; Android only fires the command and refreshes.
+     * The book object uses the same field names as `bookshelf.list` response (`bookId`,
+     * `title`, `author`, `coverUrl`, `intro`, `origin`).
+     */
+    fun addToBookshelf(book: SearchBook) {
+        viewModelScope.launch {
+            try {
+                core.sendAndAwait("bookshelf.book.add", BookshelfWriteParams.buildAddParams(book))
+                loadBooks()
+            } catch (e: Exception) {
+                // Core not ready or command failed — shelf stays as-is; no fake fallback.
+            }
+        }
+    }
+
+    /**
+     * P0-2: Remove a book from the shelf via Core `bookshelf.book.remove` CoreCommand.
+     */
+    fun removeFromBookshelf(bookUrl: String) {
+        viewModelScope.launch {
+            try {
+                core.sendAndAwait("bookshelf.book.remove", BookshelfWriteParams.buildRemoveParams(bookUrl))
+                loadBooks()
+            } catch (e: Exception) {
+                // Core not ready or command failed — shelf stays as-is.
             }
         }
     }
@@ -136,4 +176,29 @@ data class BookshelfFilterState(
 ) {
     val isActive: Boolean
         get() = isOpen || group != "全部" || sort != "最近更新" || filter != "全部"
+}
+
+/**
+ * P0-2: Pure JSON params builders for `bookshelf.book.add` / `bookshelf.book.remove`
+ * CoreCommands. Extracted as internal object so JVM tests can verify the Core command
+ * contract (field names + structure) without a running Core runtime.
+ *
+ * Field names mirror the `bookshelf.list` response (`bookId`, `title`, `author`,
+ * `coverUrl`, `intro`, `origin`) — Core owns the bookshelf DomainState schema.
+ */
+internal object BookshelfWriteParams {
+    fun buildAddParams(book: SearchBook): JSONObject = JSONObject().apply {
+        put("book", JSONObject().apply {
+            put("bookId", book.bookUrl)
+            put("title", book.name)
+            put("author", book.author)
+            put("coverUrl", book.coverUrl)
+            put("intro", book.intro)
+            put("origin", book.origin)
+        })
+    }
+
+    fun buildRemoveParams(bookUrl: String): JSONObject = JSONObject().apply {
+        put("bookId", bookUrl)
+    }
 }

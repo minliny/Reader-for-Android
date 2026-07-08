@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.reader.android.R
 import com.reader.api.Book
+import com.reader.ui.bookshelf.BookshelfViewModel
 import com.reader.ui.demo.demoCoverDrawableRes
 import com.reader.ui.demo.demoCoverUrl
 import com.reader.ui.shell.LibraryShellFrame
@@ -68,7 +70,10 @@ fun BookDetailScreen(
     onContinueReading: () -> Unit,
     onBookDirectory: () -> Unit,
     onSourceSwitch: () -> Unit,
-    onRemoveFromBookshelf: () -> Unit
+    onRemoveFromBookshelf: () -> Unit,
+    // P0-2: share the Activity-scoped BookshelfViewModel so the "移除书架" button fires
+    // the real `bookshelf.book.remove` CoreCommand before navigating back.
+    bookshelfVm: BookshelfViewModel = viewModel()
 ) {
     BookLibraryScaffold(
         title = "书籍详情",
@@ -78,7 +83,10 @@ fun BookDetailScreen(
                 primaryLabel = "继续阅读",
                 dangerLabel = "移除书架",
                 onPrimary = onContinueReading,
-                onDanger = onRemoveFromBookshelf
+                onDanger = {
+                    bookshelfVm.removeFromBookshelf(state.book.bookUrl)
+                    onRemoveFromBookshelf()
+                }
             )
         }
     ) {

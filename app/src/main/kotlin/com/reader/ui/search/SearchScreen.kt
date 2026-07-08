@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.api.SearchBook
+import com.reader.ui.bookshelf.BookshelfViewModel
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
@@ -56,11 +57,16 @@ import com.reader.ui.theme.readerExtraColors
 fun SearchScreen(
     onBack: () -> Unit,
     onBookClick: (SearchBook) -> Unit,
-    vm: SearchViewModel = viewModel()
+    vm: SearchViewModel = viewModel(),
+    // P0-2: share the Activity-scoped BookshelfViewModel so search results can query
+    // real shelf membership (replacing the hardcoded `title == "三体"` stub) and fire
+    // `bookshelf.book.add` writes through the same Core-backed VM the bookshelf tab uses.
+    bookshelfVm: BookshelfViewModel = viewModel()
 ) {
     val query by vm.query.collectAsStateWithLifecycle()
     val state by vm.uiState.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
+    val shelfBookUrls by bookshelfVm.shelfBookUrls.collectAsStateWithLifecycle()
 
     val isAfter = state is SearchUiState.Success
     LibraryShellFrame(
@@ -91,6 +97,8 @@ fun SearchScreen(
                         is SearchUiState.Success -> SearchResultsList(
                             results = screenState.results,
                             onBookClick = onBookClick,
+                            shelfBookUrls = shelfBookUrls,
+                            onAddToBookshelf = { book -> bookshelfVm.addToBookshelf(book) },
                             modifier = Modifier.fillMaxSize()
                         )
 
@@ -454,6 +462,8 @@ private fun SearchBottomButton(
 private fun SearchResultsList(
     results: List<SearchBook>,
     onBookClick: (SearchBook) -> Unit,
+    shelfBookUrls: Set<String>,
+    onAddToBookshelf: (SearchBook) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -465,7 +475,7 @@ private fun SearchResultsList(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SearchSectionTitle("搜索结果")
                 Text(
-                    text = "找到 24 个结果 · 已标注书架状态",
+                    text = "找到 ${results.size} 个结果 · 已标注书架状态",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontSize = 12.sp,
@@ -478,19 +488,28 @@ private fun SearchResultsList(
             }
         }
         items(results, key = { "${it.origin}:${it.bookUrl}:${it.name}" }) { book ->
-            SearchResultRow(book = book, onClick = { onBookClick(book) })
+            SearchResultRow(
+                book = book,
+                inShelf = shelfBookUrls.contains(book.bookUrl),
+                onClick = { onBookClick(book) },
+                onAddToBookshelf = { onAddToBookshelf(book) }
+            )
         }
     }
 }
 
 @Composable
-private fun SearchResultRow(book: SearchBook, onClick: () -> Unit) {
+private fun SearchResultRow(
+    book: SearchBook,
+    inShelf: Boolean,
+    onClick: () -> Unit,
+    onAddToBookshelf: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     val title = book.name.ifBlank { "未命名书籍" }
     val author = book.author.ifBlank { "未知作者" }
     val origin = book.origin.ifBlank { "未知书源" }
-    val inShelf = title == "三体" || title == "三体全集" || title == "三体纪事"
 
     Row(
         modifier = Modifier
@@ -546,7 +565,12 @@ private fun SearchResultRow(book: SearchBook, onClick: () -> Unit) {
             }
         }
         SearchStatusPill(if (inShelf) "已在书架" else "未加入")
-        SearchPrimaryAction(text = if (inShelf) "阅读" else "加入书架", onClick = onClick)
+        // P0-2: when not on shelf, the primary action adds the book via Core
+        // `bookshelf.book.add`; when already on shelf, it opens the reader.
+        SearchPrimaryAction(
+            text = if (inShelf) "阅读" else "加入书架",
+            onClick = if (inShelf) onClick else onAddToBookshelf
+        )
     }
 }
 
