@@ -20,6 +20,15 @@ class ReadingProgressRepository(private val dao: ReadingProgressDao) {
     suspend fun getProgress(bookUrl: String): ReadingProgress? = dao.getByUrl(bookUrl)
 
     /**
+     * P0-3: Returns the most-recently-read books (by `lastReadTime` DESC). Used by the
+     * "continue reading" / "recent" surface on the bookshelf. Derived from the same
+     * `reading_progress` table as [getProgress] — no separate recent-reading entity.
+     */
+    suspend fun getRecent(limit: Int = 20): List<ReadingProgress> = dao.getRecent(limit)
+
+    suspend fun getAll(): List<ReadingProgress> = dao.getAll()
+
+    /**
      * Persist the current reading position. Callers should pass the latest known
      * `chapterIndex` / `page` / `progress` (from [com.reader.ui.shell.ReaderContext])
      * plus the loaded [Chapter] / `totalChapters` so the entity fields are complete.

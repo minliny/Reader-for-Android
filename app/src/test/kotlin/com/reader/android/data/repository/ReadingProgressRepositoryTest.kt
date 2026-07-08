@@ -133,6 +133,46 @@ class ReadingProgressRepositoryTest {
             "lastReadTime ${restored.lastReadTime} should be in [$before, $after]"
         }
     }
+
+    @Test
+    fun `getRecent returns books ordered by lastReadTime desc`() = runBlocking {
+        val dao = FakeReadingProgressDao()
+        val repo = ReadingProgressRepository(dao)
+
+        repo.saveProgress("b1", "书一", 0, 0, 0f, null, 5)
+        Thread.sleep(2)
+        repo.saveProgress("b2", "书二", 3, 1, 0.4f, null, 10)
+        Thread.sleep(2)
+        repo.saveProgress("b3", "书三", 1, 0, 0.1f, null, 8)
+
+        val recent = repo.getRecent(limit = 2)
+        assertEquals(2, recent.size)
+        assertEquals("b3", recent[0].bookUrl)
+        assertEquals("b2", recent[1].bookUrl)
+    }
+
+    @Test
+    fun `getRecent with limit larger than stored returns all`() = runBlocking {
+        val dao = FakeReadingProgressDao()
+        val repo = ReadingProgressRepository(dao)
+        repo.saveProgress("b1", "一", 0, 0, 0f, null, 1)
+        repo.saveProgress("b2", "二", 0, 0, 0f, null, 1)
+
+        val recent = repo.getRecent(limit = 100)
+        assertEquals(2, recent.size)
+    }
+
+    @Test
+    fun `getAll returns all progress ordered by lastReadTime desc`() = runBlocking {
+        val dao = FakeReadingProgressDao()
+        val repo = ReadingProgressRepository(dao)
+        repo.saveProgress("b1", "一", 0, 0, 0f, null, 1)
+        Thread.sleep(2)
+        repo.saveProgress("b2", "二", 0, 0, 0f, null, 1)
+
+        val all = repo.getAll()
+        assertEquals(listOf("b2", "b1"), all.map { it.bookUrl })
+    }
 }
 
 private class FakeReadingProgressDao : ReadingProgressDao {
@@ -140,6 +180,9 @@ private class FakeReadingProgressDao : ReadingProgressDao {
 
     override suspend fun getAll(): List<ReadingProgress> =
         storage.values.sortedByDescending { it.lastReadTime }
+
+    override suspend fun getRecent(limit: Int): List<ReadingProgress> =
+        storage.values.sortedByDescending { it.lastReadTime }.take(limit)
 
     override suspend fun getByUrl(bookUrl: String): ReadingProgress? = storage[bookUrl]
 

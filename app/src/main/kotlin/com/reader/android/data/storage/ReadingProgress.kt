@@ -29,6 +29,9 @@ interface ReadingProgressDao {
     @Query("SELECT * FROM reading_progress ORDER BY lastReadTime DESC")
     suspend fun getAll(): List<ReadingProgress>
 
+    @Query("SELECT * FROM reading_progress ORDER BY lastReadTime DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<ReadingProgress>
+
     @Query("SELECT * FROM reading_progress WHERE bookUrl = :bookUrl")
     suspend fun getByUrl(bookUrl: String): ReadingProgress?
 
@@ -48,9 +51,11 @@ interface ReadingProgressDao {
         CachedChapter::class,
         SyncOperationLog::class,
         BookmarkEntity::class,
-        RssSubscriptionEntity::class
+        RssSubscriptionEntity::class,
+        BookGroupEntity::class,
+        BookGroupAssignment::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,4 +64,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncOperationLogDao(): SyncOperationLogDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun rssSubscriptionDao(): RssSubscriptionDao
+    abstract fun bookGroupDao(): BookGroupDao
 }

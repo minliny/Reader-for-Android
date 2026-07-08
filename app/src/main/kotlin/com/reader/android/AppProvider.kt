@@ -13,11 +13,13 @@ import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.android.data.adapter.WebRuntimeAdapter
 import com.reader.android.data.network.RoomSubscriptionRepository
 import com.reader.android.data.network.SubscriptionRepository
+import com.reader.android.data.repository.BookGroupRepository
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.data.repository.ReadingProgressRepository
 import com.reader.android.data.storage.AppDatabase
+import com.reader.android.data.storage.BookGroupDao
 import com.reader.android.data.storage.BookmarkDao
 import com.reader.android.data.storage.CachedChapterDao
 import com.reader.android.data.storage.ChapterCacheManager
@@ -150,6 +152,20 @@ object AppProvider {
         }
     private var _chapterCacheManager: ChapterCacheManager? = null
 
+    val bookGroupDao: BookGroupDao
+        get() = requireDb().bookGroupDao()
+
+    /**
+     * P0-3: Book group repository. Wraps [bookGroupDao] for group CRUD + book↔group
+     * assignment. Groups are local-only definitions; book membership is keyed by
+     * `bookUrl` so it stays in sync with the Core-owned bookshelf. Lazily created.
+     */
+    val bookGroupRepository: BookGroupRepository
+        get() = _bookGroupRepo ?: BookGroupRepository(bookGroupDao).also {
+            _bookGroupRepo = it
+        }
+    private var _bookGroupRepo: BookGroupRepository? = null
+
     val bookmarkDao: BookmarkDao
         get() = requireDb().bookmarkDao()
 
@@ -223,6 +239,7 @@ object AppProvider {
         _subscriptionRepo = null
         _readingProgressRepo = null
         _chapterCacheManager = null
+        _bookGroupRepo = null
         _networkAllowed = false
         initialized = false
     }
