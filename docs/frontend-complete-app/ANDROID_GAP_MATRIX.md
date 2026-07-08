@@ -1,6 +1,6 @@
 # Android Complete App Gap Matrix
 
-Status: `STAGE_1_6_HEAD_VERIFIED`
+Status: `STAGE_1_6_HEAD_VERIFIED_WITH_REAL_SOURCE_AND_UI_FEEDBACK`
 
 Date: 2026-07-08
 
@@ -79,21 +79,21 @@ Android cannot be marked frontend-complete until:
 5. Core bridge and Host Adapter are connected for first vertical slices.
 6. Device/simulator evidence exists for AppShell, reading entry, reader control layer, overlay/focus, session capsule, and orientation.
 
-## 7. Current Local Verification (HEAD-level, Stage 1-6)
+## 7. Current Local Verification (HEAD-level, Stage 1-6 + audit tasks 4/5)
 
-Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (`5d1cd6d`, stage 6 tip):
+Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (post audit task 4/5):
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes (HostRequest consumer, capability registry, WebView closure, media/anti-bot real lane, reading-link async-result guard). |
-| `./gradlew :app:testDebugUnitTest --rerun-tasks` | PASS | 96 suites, 697 tests, 692 pass / 5 skipped / 0 failures / 0 errors. Forced rerun (not cache) — confirms HEAD-level JVM green. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 15 tests), Stage 5 anti-bot decorator (`AntiBotDetectingHttpFetchJvmTest`, 7 tests) + media savePath (`MediaDownloadSavePathJvmTest`, 4 tests), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4 tests). |
+| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes + audit task 4/5 additions (real-source chain proof, asyncResult UI overlay). |
+| `./gradlew :app:testDebugUnitTest` | PASS | 98 suites, 711 tests, 706 pass / 5 skipped / 0 failures / 0 errors. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 15), Stage 5 anti-bot decorator (7) + media savePath (4), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4), audit task 4 real-source chain (`RealSourceReadingChainJvmTest`, 6), audit task 5 asyncResult UI overlay (`AsyncResultOverlayLabelJvmTest`, 7). |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
 
 ## 8. Device Proof (Instrumented, HEAD-level)
 
-Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest` on 2026-07-08 at HEAD (`5d1cd6d`).
+Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest` on 2026-07-08 at HEAD (post audit task 4/5).
 
-**72/72 PASS, 0 failures, 0 errors, 0 skipped.** This is a full HEAD-level run (not the Stage 3 partial 39/39 from `b5596ef`), and supersedes the prior device-proof claim — it confirms Stage 4-6 code paths are green on device, not just JVM.
+**72/72 PASS, 0 failures, 0 errors, 0 skipped.** Run twice (before and after audit task 4/5 changes) — both green. Confirms Stage 4-6 + asyncResult UI overlay code paths are green on device, not just JVM.
 
 | Test class | Tests | Result | Stage covered |
 | --- | --- | --- | --- |
@@ -137,13 +137,13 @@ Fixes applied during the prior device proof (still in effect):
 - `FileReadHandler`: `DefaultHostFileSystem.read` was throwing `kotlin.io.NoSuchFileException` (Kotlin stdlib) instead of `java.nio.file.NoSuchFileException` (Java NIO) because `NoSuchFileException(file)` matched the Kotlin constructor `(File, File?, String?)` over the Java constructor `(String)`. Fixed by using fully-qualified `java.nio.file.NoSuchFileException(file.path)`.
 - `WebViewHostActivity`: moved from `androidTest` to `main` so `ActivityScenario.launch` resolves it to the target process (`com.reader.android`) instead of the test process (`com.reader.android.test`).
 
-## 9. Remaining Gaps (not yet claimed)
+## 9. Remaining Gaps
 
-The HEAD-level run above proves Stage 1-6 code paths compile and pass JVM + instrumented tests. The following are explicitly **not** claimed as done:
+The HEAD-level run above proves Stage 1-6 + audit task 4/5 code paths compile and pass JVM + instrumented tests. Gaps closed by audit task 4/5 are marked below; the remaining open gaps are explicitly **not** claimed as done:
 
-| Gap ID | Description | Why not claimed |
+| Gap ID | Description | Status |
 | --- | --- | --- |
-| GAP-D-01 | `credential.resolve` not registered | No `CredentialProvider` implementation exists. Capability registry JVM test asserts it is unregistered. Either implement the provider or keep documenting as "not registered, not a complete credential surface". |
-| GAP-D-02 | Real-source reading chain not proven end-to-end | Stage 6 JVM proof uses `fixture://` source path (synchronous, no network). No real/quasi-real source fixture drives search → detail → toc → content → reader entry on device. `AppLevelReadingChainProofTest` exercises the reader entry + async guard, not a real source pipeline. |
-| GAP-D-03 | asyncResult UI visual feedback not captured | Reducer guard has JVM proof, but loading / error / cancel / discarded states rendered in the reader UI are not captured via Compose UI test or device screenshot. The VM's own `ReadingUiState` drives the visual; `asyncResult` currently only gates stale results. |
-| GAP-D-04 | Stage 4-6 device screenshots / recordings | The 72/72 instrumented run proves code paths execute, but no visual artifact (screenshot/recording) was captured for WebView JS return value, media savePath file on device, or reading-link loading → ready transition. |
+| GAP-D-01 | `credential.resolve` not registered | **OPEN** — no `CredentialProvider` implementation exists. Capability registry JVM test asserts it is unregistered. Either implement the provider or keep documenting as "not registered, not a complete credential surface". |
+| GAP-D-02 | Real-source reading chain not proven end-to-end | **CLOSED (audit task 4)** — `RealSourceReadingChainJvmTest` (6 tests) exercises real book-source JSON shapes (search/detail/toc/content) through `BookApi.parse*` parsers, builds a `ReaderContext` from the parsed data, and drives the reducer's async-result guard IDLE → PENDING → COMPLETED + stale DISCARDED. Core command dispatch (native .so) is still covered only on device by `CoreRuntimeCapabilityInstrumentedProofTest`. |
+| GAP-D-03 | asyncResult UI visual feedback not captured | **CLOSED (audit task 5)** — `asyncResultOverlayLabel` pure mapping added to `ReaderControlReadingSurface`; DISCARDED/SUPERSEDED render "正在切换到最新…" overlay, CANCELLED renders "加载已取消". `AsyncResultOverlayLabelJvmTest` (7 tests) validates the mapping. `AppShell` passes `state.asyncResult.state` through `ReaderShellScreen` → `ReaderControlReadingSurface`. Device 72/72 confirms no regression. |
+| GAP-D-04 | Stage 4-6 device screenshots / recordings | **OPEN** — the 72/72 instrumented run proves code paths execute, but no visual artifact (screenshot/recording) was captured for WebView JS return value, media savePath file on device, or reading-link loading → ready transition. |

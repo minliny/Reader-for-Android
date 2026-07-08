@@ -320,6 +320,7 @@ fun AppShell(
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
             onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
+            asyncResultState = state.asyncResult.state,
             onAsyncStateChange = { requestId, asyncState, value ->
                 // Bridge ImmersiveReadingViewModel load state → ReaderUiState.asyncResult (M5).
                 // The VM reports PENDING / COMPLETED / CANCELLED using context.entryRequestId;

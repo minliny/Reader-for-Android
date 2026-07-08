@@ -90,7 +90,8 @@ fun ReaderShellScreen(
     activeSession: com.reader.ui.shell.ActiveSession? = null,
     onSessionToggle: () -> Unit = {},
     onSessionStop: () -> Unit = {},
-    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
+    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE
 ) {
     val context = when (route) {
         is ReaderRoute.ImmersiveReading -> route.context
@@ -125,7 +126,8 @@ fun ReaderShellScreen(
         ReaderControlReadingSurface(
             context = context,
             fallbackTitle = title,
-            onAsyncStateChange = onAsyncStateChange
+            onAsyncStateChange = onAsyncStateChange,
+            asyncResultState = asyncResultState
         )
         // readerOverlayHost slot (named via branch wrapper)
         if (isImmersive) {
@@ -480,7 +482,8 @@ private fun FlowShellComparisonRegion(
 private fun ReaderControlReadingSurface(
     context: ReaderContext?,
     fallbackTitle: String,
-    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
+    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE
 ) {
     if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
@@ -493,16 +496,51 @@ private fun ReaderControlReadingSurface(
             is ReadingUiState.Ready -> state.book.name.ifEmpty { context.bookName.ifEmpty { fallbackTitle } }
             else -> context.bookName.ifEmpty { fallbackTitle }
         }
-        ReaderReadingSurface(
-            title = title,
-            content = content.ifBlank { readerPreviewText(fallbackTitle) }
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            ReaderReadingSurface(
+                title = title,
+                content = content.ifBlank { readerPreviewText(fallbackTitle) }
+            )
+            // asyncResult visual feedback (M5): when the guard has DISCARDED or SUPERSEDED
+            // a stale result, surface a lightweight indicator so the user knows a newer
+            // entry is loading — rather than silently showing stale text.
+            asyncResultOverlayLabel(asyncResultState)?.let { label ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = ReaderTextStyles.infoLayer,
+                        color = readerExtraColors().infoLayer
+                    )
+                }
+            }
+        }
     } else {
         ReaderReadingSurface(
             title = "雨夜",
             content = readerPreviewText(fallbackTitle)
         )
     }
+}
+
+/**
+ * Maps [AsyncResultStateValue] to a user-visible overlay label. Returns null when
+ * no overlay is needed (IDLE / PENDING / COMPLETED — the VM's own [ReadingUiState]
+ * already drives loading / ready visuals). Returns a label for DISCARDED /
+ * SUPERSEDED so the async-result guard's stale-result handling is visible.
+ *
+ * Kept as a pure function so the mapping is JVM-testable without Compose.
+ */
+internal fun asyncResultOverlayLabel(state: AsyncResultStateValue): String? = when (state) {
+    AsyncResultStateValue.DISCARDED -> "正在切换到最新…"
+    AsyncResultStateValue.SUPERSEDED -> "正在切换到最新…"
+    AsyncResultStateValue.CANCELLED -> "加载已取消"
+    else -> null
 }
 
 @Composable
