@@ -79,21 +79,26 @@ Android cannot be marked frontend-complete until:
 5. Core bridge and Host Adapter are connected for first vertical slices.
 6. Device/simulator evidence exists for AppShell, reading entry, reader control layer, overlay/focus, session capsule, and orientation.
 
-## 7. Current Local Verification (HEAD-level, Stage 1-6 + audit tasks 3/4/5 + P1)
+## 7. Current Local Verification (HEAD-level, Stage 1-6 + audit tasks 3/4/5 + P1 + Gap closure)
 
-Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (post P1 source/RSS/WebDAV closure):
+Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (post Gap 1/4/6 closure):
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes + audit task 3/4/5 + P1-4 (TTS session) + P1-5 (source/RSS) + P1-6 (WebDAV/backup) additions. |
-| `./gradlew :app:testDebugUnitTest` | PASS | 106 suites, 815 tests, 810 pass / 5 skipped / 0 failures / 0 errors. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 21), Stage 5 anti-bot decorator (7) + media savePath (4), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4), audit task 3 credential.resolve (`WebDavCredentialProviderJvmTest`, 7), audit task 4 real-source chain (`RealSourceReadingChainJvmTest`, 6), audit task 5 asyncResult UI overlay (`AsyncResultOverlayLabelJvmTest`, 7), P1-4 TTS session (`TtsSessionControllerJvmTest`, 7), P1-5 source/RSS (`SourceRssCapabilityHandlersJvmTest`, 24), P1-6 WebDAV/backup (`WebDavCapabilityHandlersJvmTest`, 25). |
+| `./gradlew clean :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest` | PASS | 108 suites, 827 tests, 822 pass / 5 skipped / 0 failures / 0 errors. Covers all prior + P1 sync bridge (`SyncApiJvmTest`, 4 + `SyncPlanExecutorJvmTest`, 8) + MotionIdConstants migration (motion tests pass). |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
 
 ## 8. Device Proof (Instrumented, HEAD-level)
 
 Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` on 2026-07-08 at HEAD (post audit task 3/4/5).
 
-**75/75 PASS, 0 failures, 0 errors, 0 skipped.** Confirms Stage 4-6 + asyncResult UI overlay + credential.resolve + screenshot code paths are green on device, not just JVM. Includes real asyncResult overlay state injection (CANCELLED + DISCARDED) via AppShellViewModel dispatch.
+**75/75 PASS** (prior run) + **25 new P1 device tests** (Gap 6, compilation verified, pending emulator run):
+- `TtsSessionControllerDeviceProofTest` (4 tests) — TTS session state machine + fail-closed init
+- `SourceRssCapabilityDispatchProofTest` (6 tests) — 12 source/RSS capabilities dispatch
+- `WebDavCapabilityDispatchProofTest` (7 tests) — 8 webdav/backup capabilities + NOT_CONFIGURED
+- `AndroidWebDavClientMockWebServerProofTest` (3 tests) — PROPFIND/PUT/GET/DELETE/MKCOL + 503 retry
+- `BackupRestoreDeviceProofTest` (2 tests) — manifest validate + restore
+- `P1CapabilityRegistryDeviceProofTest` (3 tests) — 20 P1 capabilities registered on device
 
 | Test class | Tests | Result | Stage covered |
 | --- | --- | --- | --- |
@@ -168,3 +173,22 @@ P1 closes the gap between "data layer + adapters exist" and "UI can reach them t
 - `backup.restore` validates manifest via `BackupRestoreManager.validate()` + downloads entries via GET.
 
 `ReaderCoreClient.buildHostRuntime` wires `WebDavContext` on both JVM (via `fakeWebDavContext()` → `FakeWebDavClient`) and production (via `AppProvider.webDavClient` + `AppProvider.backupRestoreManager`) paths, mirroring the `SourceRssContext` pattern from P1-5.
+
+## 11. Gap Closure (Protocol Convergence / Sync Bridge / Device E2E)
+
+Section 10 closed P1 capability-level gaps. Section 11 closes three higher-level gaps identified in post-P1 audit:
+
+| Gap ID | Description | Closure | Status |
+| --- | --- | --- | --- |
+| GAP-1 | Core/UI protocol convergence — local stand-ins (`MotionIdConstants`, `RouteIds`, `ReaderUiState`, `ReaderUiIntent`, `MotionController`) still in use despite generated contract DTOs existing | **MotionIdConstants migrated**: 39/47 constants now delegate to generated `MotionId` enum via `MotionId.serialName` extension; 8 legacy constants with no enum counterpart retained as `const val`. `ReaderMotionAdapter` enhanced with `motionIdBySerialName` reverse lookup. `RouteIds` / `ReaderUiState` / `ReaderUiIntent` deferred (field sets don't overlap with generated DTOs — needs projector layer, not direct replacement). | **PARTIAL** (MotionIdConstants done; RouteIds/UiState/UiIntent deferred) |
+| GAP-4 | WebDAV/sync real product closure — Android P1-6 has Host capabilities but no Core sync.* bridge | **SyncApi.kt** created: 4 suspend wrappers (`merge`/`backup`/`webdavPlan`/`backupRetention`) over `ReaderCoreClient.sendAndAwait()`. **SyncPlanExecutor.kt** created: executes sync.* planner output through existing `webdav.*` Host handlers via `HostAdapter.dispatch()` (PUT→upload, GET→download, DELETE→delete, MKCOL→mkdir, PROPFIND→list + retention path deletion). 12 JVM tests pass. | **CLOSED** (Core sync.* → Android Host bridge complete) |
+| GAP-6 | P1 device-level E2E proof — P1 only had JVM proof; device tests covered Stage 4-6 only | 6 new device test files created (25 `@Test` methods): TTS session state machine + fail-closed init, 12 source/RSS capabilities dispatch, 8 webdav/backup capabilities + NOT_CONFIGURED, AndroidWebDavClient MockWebServer (PROPFIND/PUT/GET/DELETE/MKCOL + 503 retry), backup restore validate, P1 capability registry on device. Compilation verified. | **COMPILED** (pending emulator run) |
+
+### 11.1 Remaining Core Blockers (not closeable on Android side)
+
+| Gap | Core blocker | Android status |
+| --- | --- | --- |
+| GAP-2 | `search.history.*` — Core has `SearchKeyword`/`SearchBook` entities but no protocol methods | `SearchViewModel.kt` correctly marks `TODO(core-blocker)`; session-scoped history only |
+| GAP-3 | `rss.list` / `rss.item.read` — Core has `rss.subscription.*` / `rss.refresh` / `rss.parse` but no article list/read protocol | `RoomSubscriptionRepository.kt` correctly marks `TODO(core-blocker)`; subscription CRUD done via P1-5 |
+| GAP-5 | `reader.location.resolve` — Core is deterministic echo stub, no cross-fontsize/viewport reflow | Android has progress/cache-first; canonical location revision pending Core |
+| GAP-4 (partial) | `sync.conflict.resolve` — Core has `sync.merge` conflict detection but no user-resolution command | Android `SyncApi.merge()` returns conflicts list; UI resolution flow pending Core |

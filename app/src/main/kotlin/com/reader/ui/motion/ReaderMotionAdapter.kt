@@ -12,6 +12,18 @@ import io.reader.ui.contract.MotionId
 import io.reader.ui.contract.MotionSpecRegistry
 
 /**
+ * Returns the contract wire string for this [MotionId] — the `@SerialName` value from the
+ * generated contract enum. This is the authoritative accessor for motion ID strings;
+ * local code should prefer this over hand-maintained string literals.
+ *
+ * Backed by [motionIdSerialNames] until the kotlinx.serialization compiler plugin is wired
+ * (the runtime dependency alone does not generate `MotionId.serializer()`); the map mirrors
+ * the `@SerialName` annotations in the generated `MotionId` enum 1:1.
+ */
+val MotionId.serialName: String
+    get() = motionIdSerialNames.getValue(this)
+
+/**
  * Maps Reader UI generated MotionSpecRegistry entries into Compose animation specs.
  *
  * The generated registry owns duration/easing/token metadata. Android keeps only platform
@@ -92,12 +104,10 @@ private fun MotionId.localContractId(): String = when (this) {
     else -> contractName()
 }
 
-private fun MotionId.contractName(): String =
-    generatedMotionIdNames[this] ?: name
+private fun MotionId.contractName(): String = serialName
 
 private fun motionIdFromContractName(value: String): MotionId? =
-    generatedMotionIdNames.entries.firstOrNull { it.value == value }?.key
-        ?: legacyMotionIdAliases[value]
+    motionIdBySerialName[value] ?: legacyMotionIdAliases[value]
 
 private fun MotionId.allowsMovement(): Boolean = when (this) {
     MotionId.AppRoutePushForward,
@@ -138,7 +148,7 @@ private val legacyMotionIdAliases: Map<String, MotionId> = mapOf(
     MotionIdConstants.READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE to MotionId.ReaderSessionCapsuleControlPressToggle
 )
 
-private val generatedMotionIdNames: Map<MotionId, String> = mapOf(
+private val motionIdSerialNames: Map<MotionId, String> = mapOf(
     MotionId.AppFirstOpenEnter to "app.firstOpen.enter",
     MotionId.AppRoutePushForward to "app.route.push.forward",
     MotionId.AppRoutePopBackward to "app.route.pop.backward",
@@ -224,6 +234,10 @@ private val generatedMotionIdNames: Map<MotionId, String> = mapOf(
     MotionId.ViewportOrientationReshape to "viewport.orientation.reshape",
     MotionId.ViewportOrientationSettle to "viewport.orientation.settle"
 )
+
+private val motionIdBySerialName: Map<String, MotionId> by lazy {
+    motionIdSerialNames.entries.associate { (id, name) -> name to id }
+}
 
 private fun MotionEasing.toComposeEasing(): Easing = when (this) {
     MotionEasing.Linear,

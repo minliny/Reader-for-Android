@@ -2,6 +2,7 @@ package com.reader.ui.motion
 
 import com.reader.ui.shell.AppShellViewModel
 import com.reader.ui.shell.InterruptKind
+import io.reader.ui.contract.MotionId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1093,72 +1094,74 @@ data class TransientStateCleanup(
 
 /**
  * 47 个 Motion ID 常量（motion-controller.js 292-622）。
- * 与 [MotionIds] 现有 17 个常量互补：[MotionIds] 是早期 P0 子集别名，
- * 这里给出完整 47 项 authoritative 列表。
+ *
+ * 已迁移为生成枚举 [MotionId] 的薄兼容层：39 个有 1:1 枚举对应的常量委托给
+ * [MotionId.serialName]；8 个无对应枚举值的本地遗留字符串（用于 MOTION_CONTRACTS
+ * 的 key 查询与 legacyMotionIdAliases 别名桥接）保留字面量。
  */
 object MotionIdConstants {
     // App launch / route
-    const val APP_FIRST_OPEN_ENTER = "app.firstOpen.enter"
-    const val APP_ROUTE_PUSH_FORWARD = "app.route.push.forward"
-    const val APP_ROUTE_POP_BACKWARD = "app.route.pop.backward"
-    const val APP_ROUTE_REPLACE = "app.route.replace"
+    val APP_FIRST_OPEN_ENTER: String get() = MotionId.AppFirstOpenEnter.serialName
+    val APP_ROUTE_PUSH_FORWARD: String get() = MotionId.AppRoutePushForward.serialName
+    val APP_ROUTE_POP_BACKWARD: String get() = MotionId.AppRoutePopBackward.serialName
+    val APP_ROUTE_REPLACE: String get() = MotionId.AppRouteReplace.serialName
 
     // Tab / segment
     const val TAB_ITEM_PRESS = "tab.item.press"
-    const val TAB_ITEM_SELECT = "tab.item.select"
+    val TAB_ITEM_SELECT: String get() = MotionId.TabItemSelect.serialName
     const val TAB_ITEM_SWITCH = "tab.item.switch"
-    const val SEGMENT_ITEM_SWITCH = "segment.item.switch"
+    val SEGMENT_ITEM_SWITCH: String get() = MotionId.SegmentItemSwitch.serialName
 
     // Dropdown
-    const val DROPDOWN_TRIGGER_PRESS = "dropdown.trigger.press"
-    const val DROPDOWN_MENU_EXPAND = "dropdown.menu.expand"
+    val DROPDOWN_TRIGGER_PRESS: String get() = MotionId.DropdownTriggerPress.serialName
+    val DROPDOWN_MENU_EXPAND: String get() = MotionId.DropdownMenuExpand.serialName
     const val DROPDOWN_MENU_EXPAND_COLLAPSE = "dropdown.menu.expand/collapse"
-    const val DROPDOWN_MENU_COLLAPSE = "dropdown.menu.collapse"
+    val DROPDOWN_MENU_COLLAPSE: String get() = MotionId.DropdownMenuCollapse.serialName
     const val DROPDOWN_MENU_REPOSITION = "dropdown.menu.reposition"
     const val DROPDOWN_OPTION_PRESS = "dropdown.option.press"
-    const val DROPDOWN_OPTION_SELECT = "dropdown.option.select"
+    val DROPDOWN_OPTION_SELECT: String get() = MotionId.DropdownOptionSelect.serialName
 
     // Button / toggle
-    const val BUTTON_ACTIVATE = "button.activate"
-    const val TOGGLE_SWITCH = "toggle.switch"
+    val BUTTON_ACTIVATE: String get() = MotionId.ButtonActivate.serialName
+    val TOGGLE_SWITCH: String get() = MotionId.ToggleSwitch.serialName
 
     // Reader entry / control
-    const val READER_ENTRY_COVER_TO_IMMERSIVE = "reader.entry.coverToImmersive"
-    const val READER_ENTRY_ACTION_TO_IMMERSIVE = "reader.entry.actionToImmersive"
-    const val READER_CONTROL_HIDE = "reader.control.hide"
-    const val READER_CONTROL_HANDLE_PRESS = "reader.control.handle.press"
+    val READER_ENTRY_COVER_TO_IMMERSIVE: String get() = MotionId.ReaderEntryCoverToImmersive.serialName
+    val READER_ENTRY_ACTION_TO_IMMERSIVE: String get() = MotionId.ReaderEntryActionToImmersive.serialName
+    val READER_CONTROL_HIDE: String get() = MotionId.ReaderControlHide.serialName
+    val READER_CONTROL_HANDLE_PRESS: String get() = MotionId.ReaderControlHandlePress.serialName
     const val READER_CONTROL_HANDLE_DRAG = "reader.control.handle.drag"
-    const val READER_CONTROL_HANDLE_RELEASE = "reader.control.handle.release"
-    const val READER_CONTROL_DOCK_LONG_PRESS = "reader.control.dock.longPress"
-    const val READER_CONTROL_DOCK_DRAG = "reader.control.dock.drag"
-    const val READER_CONTROL_DOCK_RELEASE = "reader.control.dock.release"
-    const val READER_CONTROL_DOCK_REBOUND = "reader.control.dock.rebound"
+    val READER_CONTROL_HANDLE_RELEASE: String get() = MotionId.ReaderControlHandleRelease.serialName
+    val READER_CONTROL_DOCK_LONG_PRESS: String get() = MotionId.ReaderControlDockLongPress.serialName
+    val READER_CONTROL_DOCK_DRAG: String get() = MotionId.ReaderControlDockDrag.serialName
+    val READER_CONTROL_DOCK_RELEASE: String get() = MotionId.ReaderControlDockRelease.serialName
+    val READER_CONTROL_DOCK_REBOUND: String get() = MotionId.ReaderControlDockRebound.serialName
 
     // Reader session
-    const val READER_SESSION_AUTO_PAGE_START = "reader.session.autoPage.start"
-    const val READER_SESSION_TTS_START = "reader.session.tts.start"
-    const val READER_SESSION_CAPSULE_ENTER = "reader.session.capsule.enter"
-    const val READER_SESSION_CAPSULE_UPDATE = "reader.session.capsule.update"
+    val READER_SESSION_AUTO_PAGE_START: String get() = MotionId.ReaderSessionAutoPageStart.serialName
+    val READER_SESSION_TTS_START: String get() = MotionId.ReaderSessionTtsStart.serialName
+    val READER_SESSION_CAPSULE_ENTER: String get() = MotionId.ReaderSessionCapsuleEnter.serialName
+    val READER_SESSION_CAPSULE_UPDATE: String get() = MotionId.ReaderSessionCapsuleUpdate.serialName
     const val READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE = "reader.session.capsule.control.press/toggle"
-    const val READER_SESSION_CAPSULE_COUNTDOWN_TICK = "reader.session.capsule.countdownTick"
-    const val READER_SESSION_CAPSULE_VOICE_ICON_ACTIVE = "reader.session.capsule.voiceIcon.active"
-    const val READER_SESSION_CAPSULE_SWITCH = "reader.session.capsule.switch"
-    const val READER_SESSION_CAPSULE_EXIT = "reader.session.capsule.exit"
-    const val READER_SESSION_CONTROL_SPACE_ENTER = "reader.session.controlSpace.enter"
-    const val READER_SESSION_CONTROL_SPACE_UPDATE = "reader.session.controlSpace.update"
-    const val READER_SESSION_CONTROL_SPACE_EXIT = "reader.session.controlSpace.exit"
+    val READER_SESSION_CAPSULE_COUNTDOWN_TICK: String get() = MotionId.ReaderSessionCapsuleCountdownTick.serialName
+    val READER_SESSION_CAPSULE_VOICE_ICON_ACTIVE: String get() = MotionId.ReaderSessionCapsuleVoiceIconActive.serialName
+    val READER_SESSION_CAPSULE_SWITCH: String get() = MotionId.ReaderSessionCapsuleSwitch.serialName
+    val READER_SESSION_CAPSULE_EXIT: String get() = MotionId.ReaderSessionCapsuleExit.serialName
+    val READER_SESSION_CONTROL_SPACE_ENTER: String get() = MotionId.ReaderSessionControlSpaceEnter.serialName
+    val READER_SESSION_CONTROL_SPACE_UPDATE: String get() = MotionId.ReaderSessionControlSpaceUpdate.serialName
+    val READER_SESSION_CONTROL_SPACE_EXIT: String get() = MotionId.ReaderSessionControlSpaceExit.serialName
 
     // Reader module / page
-    const val READER_MODULE_SWITCH = "reader.module.switch"
+    val READER_MODULE_SWITCH: String get() = MotionId.ReaderModuleSwitch.serialName
     const val READER_PAGE_TURN_NEXT_PREV = "reader.page.turn.next/prev"
 
     // Motion interrupt 三态
-    const val MOTION_INTERRUPT_CANCEL = "motion.interrupt.cancel"
-    const val MOTION_INTERRUPT_REDIRECT = "motion.interrupt.redirect"
-    const val MOTION_INTERRUPT_COMPLETE_THEN_REPLACE = "motion.interrupt.completeThenReplace"
+    val MOTION_INTERRUPT_CANCEL: String get() = MotionId.MotionInterruptCancel.serialName
+    val MOTION_INTERRUPT_REDIRECT: String get() = MotionId.MotionInterruptRedirect.serialName
+    val MOTION_INTERRUPT_COMPLETE_THEN_REPLACE: String get() = MotionId.MotionInterruptCompleteThenReplace.serialName
 
     // Viewport orientation
-    const val VIEWPORT_ORIENTATION_PREPARE = "viewport.orientation.prepare"
-    const val VIEWPORT_ORIENTATION_RESHAPE = "viewport.orientation.reshape"
-    const val VIEWPORT_ORIENTATION_SETTLE = "viewport.orientation.settle"
+    val VIEWPORT_ORIENTATION_PREPARE: String get() = MotionId.ViewportOrientationPrepare.serialName
+    val VIEWPORT_ORIENTATION_RESHAPE: String get() = MotionId.ViewportOrientationReshape.serialName
+    val VIEWPORT_ORIENTATION_SETTLE: String get() = MotionId.ViewportOrientationSettle.serialName
 }
