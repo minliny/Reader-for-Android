@@ -278,14 +278,18 @@ class ReaderCoreClient private constructor(
                 // ([AndroidTtsEngine] backed by android.speech.tts).
                 // JVM tests inject FakeAndroidTtsAdapter manually
                 // because TextToSpeech requires a real Context.
+                // P1-4: the TtsSessionController wraps the engine and adds
+                // paragraph queue, multi-chapter progression, AudioFocus/
+                // BecomingNoisy recovery, and progress writeback.
                 val facade = com.reader.host.HostFacade(
                     context = context,
-                    tts = com.reader.android.data.adapter.AndroidTtsEngine(context),
+                    tts = AppProvider.ttsEngine,
                     permission = AppProvider.permissionRuntimeAdapter,
                     notification = com.reader.android.data.adapter.AndroidNotificationRuntimeAdapter(context),
                     webDav = null,
                     credentials = AppProvider.webDavCredentialStore,
-                    downloadCache = null
+                    downloadCache = null,
+                    ttsSessionController = AppProvider.ttsSessionController
                 )
                 hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
                 // ── credential.resolve (GAP-D-01 closed) ──

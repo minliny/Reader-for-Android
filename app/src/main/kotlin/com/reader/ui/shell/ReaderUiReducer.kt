@@ -125,7 +125,12 @@ object ReaderUiReducer {
             val ttsDispatch = HostRequestDispatch(
                 dispatchId = generateDispatchId("tts-start"),
                 capability = "tts.system.start",
-                paramsJson = JSONObject().put("text", intent.text).put("utteranceId", intent.requestId).toString()
+                paramsJson = JSONObject()
+                    .put("text", intent.text)
+                    .put("utteranceId", intent.requestId)
+                    .put("chapterTitle", intent.chapterTitle)
+                    .put("chapterIndex", intent.chapterIndex)
+                    .toString()
             )
             state.copy(
                 activeSession = ActiveSession(SessionType.TTS, playing = true),

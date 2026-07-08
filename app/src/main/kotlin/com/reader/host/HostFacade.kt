@@ -17,7 +17,10 @@ import com.reader.android.data.adapter.DownloadCacheManager
 import com.reader.android.data.adapter.PermissionRuntimeAdapter
 import com.reader.android.data.adapter.ReaderForegroundNotificationRequest
 import com.reader.android.data.adapter.ReaderNotificationPurpose
+import com.reader.android.data.adapter.TtsChapterRequest
 import com.reader.android.data.adapter.TtsPlaybackState
+import com.reader.android.data.adapter.TtsProgressUpdate
+import com.reader.android.data.adapter.TtsSessionController
 import com.reader.android.data.adapter.TtsUtterance
 import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.ui.shell.PermissionKind
@@ -56,6 +59,13 @@ class HostFacade(
     val webDav: AndroidWebDavClient?,
     val credentials: WebDavCredentialStore,
     val downloadCache: DownloadCacheManager?,
+    /**
+     * P1-4: Session-level TTS orchestrator. When present, `tts.system.*`
+     * handlers delegate to this controller (paragraph queue, multi-chapter
+     * progression, AudioFocus/BecomingNoisy recovery, progress writeback).
+     * When null (JVM test path), handlers fall back to direct engine calls.
+     */
+    val ttsSessionController: TtsSessionController? = null,
     val backgroundRegistry: BackgroundTaskRegistry = BackgroundTaskRegistry()
 ) {
     /**
@@ -71,6 +81,7 @@ class HostFacade(
         .register(TtsSystemPauseHandler.CAPABILITY, TtsSystemPauseHandler(this))
         .register(TtsSystemResumeHandler.CAPABILITY, TtsSystemResumeHandler(this))
         .register(TtsSystemStatusHandler.CAPABILITY, TtsSystemStatusHandler(this))
+        .register(TtsSystemProgressHandler.CAPABILITY, TtsSystemProgressHandler(this))
         .register(PermissionCheckHandler.CAPABILITY, PermissionCheckHandler(this))
         .register(PermissionRequestHandler.CAPABILITY, PermissionRequestHandler(this))
         .register(PermissionOpenSettingsHandler.CAPABILITY, PermissionOpenSettingsHandler(this))
@@ -92,7 +103,8 @@ class HostFacade(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// TTS handlers
+// TTS handlers — P1-4: delegate to TtsSessionController when present;
+// fall back to direct engine calls when null (JVM test path).
 // ════════════════════════════════════════════════════════════════════════════
 
 class TtsSystemStartHandler(private val facade: HostFacade) : CapabilityHandler {
@@ -102,11 +114,26 @@ class TtsSystemStartHandler(private val facade: HostFacade) : CapabilityHandler 
         }
         val text = params.optString("text", "")
         if (text.isEmpty()) return HostReply.error(INTERNAL, "text required", false)
-        val utteranceId = params.optString("utteranceId", "")
+        val chapterTitle = params.optString("chapterTitle", "")
+        val chapterIndex = params.optInt("chapterIndex", 0)
         try {
-            runBlocking {
-                facade.tts.init()
-                facade.tts.speak(TtsUtterance(text = text, utteranceId = utteranceId))
+            val controller = facade.ttsSessionController
+            if (controller != null) {
+                // P1-4: session-level start — paragraph queue + multi-chapter
+                // + AudioFocus + BecomingNoisy + progress writeback.
+                val started = runBlocking {
+                    controller.start(
+                        TtsChapterRequest(text = text, title = chapterTitle, index = chapterIndex)
+                    )
+                }
+                if (!started) return HostReply.error(INTERNAL, "TTS engine init failed", true)
+            } else {
+                // Legacy direct-speak path (JVM tests without controller).
+                val utteranceId = params.optString("utteranceId", "")
+                runBlocking {
+                    facade.tts.init()
+                    facade.tts.speak(TtsUtterance(text = text, utteranceId = utteranceId))
+                }
             }
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.start failed: ${e.message}", true)
@@ -118,7 +145,14 @@ class TtsSystemStartHandler(private val facade: HostFacade) : CapabilityHandler 
 
 class TtsSystemStopHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
-        try { runBlocking { facade.tts.stop() } } catch (e: Exception) {
+        try {
+            val controller = facade.ttsSessionController
+            if (controller != null) {
+                runBlocking { controller.stop() }
+            } else {
+                runBlocking { facade.tts.stop() }
+            }
+        } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.stop failed: ${e.message}", true)
         }
         return HostReply.complete(JSONObject().put("stopped", true).toString())
@@ -128,7 +162,14 @@ class TtsSystemStopHandler(private val facade: HostFacade) : CapabilityHandler {
 
 class TtsSystemPauseHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
-        try { runBlocking { facade.tts.pause() } } catch (e: Exception) {
+        try {
+            val controller = facade.ttsSessionController
+            if (controller != null) {
+                runBlocking { controller.pause() }
+            } else {
+                runBlocking { facade.tts.pause() }
+            }
+        } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.pause failed: ${e.message}", true)
         }
         return HostReply.complete(JSONObject().put("paused", true).toString())
@@ -138,7 +179,14 @@ class TtsSystemPauseHandler(private val facade: HostFacade) : CapabilityHandler 
 
 class TtsSystemResumeHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
-        try { runBlocking { facade.tts.resume() } } catch (e: Exception) {
+        try {
+            val controller = facade.ttsSessionController
+            if (controller != null) {
+                runBlocking { controller.resume() }
+            } else {
+                runBlocking { facade.tts.resume() }
+            }
+        } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.resume failed: ${e.message}", true)
         }
         return HostReply.complete(JSONObject().put("resumed", true).toString())
@@ -148,12 +196,42 @@ class TtsSystemResumeHandler(private val facade: HostFacade) : CapabilityHandler
 
 class TtsSystemStatusHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
+        val controller = facade.ttsSessionController
         val result = JSONObject()
         result.put("available", facade.tts.isAvailable())
         result.put("state", facade.tts.getState().name)
+        if (controller != null) {
+            result.put("started", controller.isStarted())
+            result.put("paused", controller.isPaused())
+        }
         return HostReply.complete(result.toString())
     }
     companion object { const val CAPABILITY = "tts.system.status" }
+}
+
+/**
+ * `tts.system.progress` — returns the current TTS playback progress
+ * (chapter index, paragraph index, total paragraphs, chapter title).
+ * Used by the UI to poll progress when the flow-based writeback is not
+ * available (e.g. process restart).
+ */
+class TtsSystemProgressHandler(private val facade: HostFacade) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val controller = facade.ttsSessionController
+            ?: return HostReply.error(INTERNAL, "tts session controller not wired", false)
+        val progress = controller.getCurrentProgress()
+        val result = JSONObject()
+        if (progress != null) {
+            result.put("chapterIndex", progress.chapterIndex)
+            result.put("paragraphIndex", progress.paragraphIndex)
+            result.put("totalParagraphs", progress.totalParagraphs)
+            result.put("chapterTitle", progress.chapterTitle)
+        }
+        result.put("started", controller.isStarted())
+        result.put("paused", controller.isPaused())
+        return HostReply.complete(result.toString())
+    }
+    companion object { const val CAPABILITY = "tts.system.progress"; private const val INTERNAL = "INTERNAL" }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

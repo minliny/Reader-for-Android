@@ -150,7 +150,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun AppShell(
     reducedMotionResolver: ReducedMotionResolver? = null,
     vm: AppShellViewModel = viewModel(
-        factory = appShellViewModelFactory(reducedMotionResolver)
+        factory = appShellViewModelFactory(
+            reducedMotionResolver,
+            // P1-4: bridge TtsSessionController.progressFlow → UpdateTtsProgress
+            // so the reducer's activeSession reflects real playback position.
+            if (com.reader.android.AppProvider.isInitialized) {
+                com.reader.android.AppProvider.ttsSessionController.progressFlow
+            } else null
+        )
     )
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -323,7 +330,14 @@ fun AppShell(
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
             onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
-            onStartTts = { text -> vm.dispatch(ReaderUiIntent.StartTtsSession(text = text)) },
+            onStartTts = { text ->
+                val ctx = state.readerContext
+                vm.dispatch(ReaderUiIntent.StartTtsSession(
+                    text = text,
+                    chapterTitle = ctx?.bookName ?: "",
+                    chapterIndex = ctx?.chapterIndex ?: 0
+                ))
+            },
             asyncResultState = state.asyncResult.state,
             onAsyncStateChange = { requestId, asyncState, value ->
                 // Bridge ImmersiveReadingViewModel load state → ReaderUiState.asyncResult (M5).
@@ -1163,9 +1177,10 @@ private fun TabContent(
 }
 
 private fun appShellViewModelFactory(
-    reducedMotionResolver: ReducedMotionResolver?
+    reducedMotionResolver: ReducedMotionResolver?,
+    ttsProgressFlow: kotlinx.coroutines.flow.Flow<com.reader.android.data.adapter.TtsProgressUpdate?>? = null
 ) = viewModelFactory {
-    initializer { AppShellViewModel(reducedMotionResolver) }
+    initializer { AppShellViewModel(reducedMotionResolver, ttsProgressFlow) }
 }
 
 /** Timeout for a single HostRequest dispatch in the AppShell effect collector. */

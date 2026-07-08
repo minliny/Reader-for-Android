@@ -1,13 +1,17 @@
 package com.reader.ui.shell
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.reader.android.data.adapter.TtsProgressUpdate
 import com.reader.ui.motion.MotionController
 import com.reader.ui.motion.MotionIdConstants
 import com.reader.ui.motion.ReducedMotionResolver
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Holds the single [ReaderUiState] and dispatches [ReaderUiIntent]s through
@@ -20,9 +24,15 @@ import kotlinx.coroutines.flow.update
  * P6 wiring: [MotionController] is attached at construction so every [dispatch] can map
  * the intent to its Motion ID (from `MotionController.contractFor`) and start a motion
  * transaction. The reducer stays pure; MotionController is the runtime side-effect layer.
+ *
+ * P1-4: [ttsProgressFlow] is collected so the TTS session controller's
+ * paragraph-level progress is written back to `activeSession.ttsSentenceIndex`
+ * / `ttsChapterIndex` via `UpdateTtsProgress` — closing the "UI action →
+ * Host/Core state writeback" loop.
  */
 class AppShellViewModel(
-    reducedMotionResolver: ReducedMotionResolver? = null
+    reducedMotionResolver: ReducedMotionResolver? = null,
+    ttsProgressFlow: Flow<TtsProgressUpdate?>? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -34,6 +44,20 @@ class AppShellViewModel(
         // P6: attach the motion runtime so dispatch() can fire motion transactions.
         MotionController.setReducedMotionResolver(reducedMotionResolver)
         MotionController.attachToViewModel(this)
+        // P1-4: collect TTS progress and dispatch UpdateTtsProgress so the
+        // reducer's activeSession reflects the real playback position.
+        if (ttsProgressFlow != null) {
+            viewModelScope.launch {
+                ttsProgressFlow.collect { progress ->
+                    if (progress != null) {
+                        dispatch(ReaderUiIntent.UpdateTtsProgress(
+                            sentenceIndex = progress.paragraphIndex,
+                            chapterIndex = progress.chapterIndex
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     fun dispatch(intent: ReaderUiIntent) {

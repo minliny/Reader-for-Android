@@ -2,13 +2,17 @@ package com.reader.android
 
 import android.content.Context
 import androidx.room.Room
+import com.reader.android.data.adapter.AndroidAudioFocusController
 import com.reader.android.data.adapter.AndroidCookieManagerStore
 import com.reader.android.data.adapter.AndroidPermissionRuntimeAdapter
+import com.reader.android.data.adapter.AndroidTtsEngine
 import com.reader.android.data.adapter.AndroidWebRuntimeAdapter
+import com.reader.android.data.adapter.AudioFocusController
 import com.reader.android.data.adapter.CookieStore
 import com.reader.android.data.adapter.FakeCookieStore
 import com.reader.android.data.adapter.FakeWebRuntimeAdapter
 import com.reader.android.data.adapter.PermissionRuntimeAdapter
+import com.reader.android.data.adapter.TtsSessionController
 import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.android.data.adapter.WebRuntimeAdapter
 import com.reader.android.data.network.RoomSubscriptionRepository
@@ -44,6 +48,9 @@ object AppProvider {
     private var _webDavCredentialStore: WebDavCredentialStore? = null
     private var _permissionRuntimeAdapter: PermissionRuntimeAdapter? = null
     private var _subscriptionRepo: SubscriptionRepository? = null
+    private var _ttsEngine: AndroidTtsEngine? = null
+    private var _audioFocusController: AudioFocusController? = null
+    private var _ttsSessionController: TtsSessionController? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
 
@@ -122,6 +129,43 @@ object AppProvider {
         _permissionRuntimeAdapter = adapter
     }
 
+    // ── TTS session (P1-4) ──
+
+    /**
+     * P1-4: Real TTS engine backed by Android's [android.speech.tts.TextToSpeech].
+     * Lazily created — only constructed when TTS is first used. Held as a
+     * singleton so the [ttsSessionController] and the HostFacade share the
+     * same engine instance.
+     */
+    val ttsEngine: AndroidTtsEngine
+        get() = _ttsEngine ?: error("AppProvider not initialized. Call AppProvider.init(context) first.")
+
+    /**
+     * P1-4: Audio focus controller for TTS playback. Uses [AndroidAudioFocusController]
+     * on-device; tests inject a fake via [initForAudioFocusController].
+     */
+    val audioFocusController: AudioFocusController
+        get() = _audioFocusController ?: error("AppProvider not initialized. Call AppProvider.init(context) first.")
+
+    fun initForAudioFocusController(controller: AudioFocusController) {
+        _audioFocusController = controller
+    }
+
+    /**
+     * P1-4: Session-level TTS orchestrator. Manages paragraph queue,
+     * multi-chapter progression, AudioFocus/BecomingNoisy recovery, and
+     * progress writeback via [TtsSessionController.progressFlow].
+     * Lazily created — depends on [ttsEngine] + [audioFocusController].
+     */
+    val ttsSessionController: TtsSessionController
+        get() = _ttsSessionController ?: TtsSessionController(
+            tts = ttsEngine,
+            audioFocusController = audioFocusController,
+            context = appContext
+        ).also { _ttsSessionController = it }
+
+    private var appContext: Context? = null
+
     // ── Database ──
 
     val readingProgressDao: ReadingProgressDao
@@ -197,6 +241,7 @@ object AppProvider {
 
     fun init(context: Context): AppProvider {
         if (initialized) return this
+        appContext = context.applicationContext
         @Suppress("DEPRECATION")
         db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "reader.db")
             .fallbackToDestructiveMigration()
@@ -211,6 +256,12 @@ object AppProvider {
         // notification / file-access / battery-optimization state. Tests
         // inject a fake via initForPermissionRuntimeAdapter.
         _permissionRuntimeAdapter = AndroidPermissionRuntimeAdapter(context.applicationContext)
+        // P1-4: wire the real TTS engine + audio focus controller so the
+        // session controller can manage paragraph queue, multi-chapter
+        // progression, AudioFocus/BecomingNoisy recovery, and progress
+        // writeback. Tests inject fakes via initForAudioFocusController.
+        _ttsEngine = AndroidTtsEngine(context.applicationContext)
+        _audioFocusController = AndroidAudioFocusController(context.applicationContext)
         initialized = true
         return this
     }
@@ -229,6 +280,11 @@ object AppProvider {
 
     /** Clean up between tests. */
     fun close() {
+        _ttsSessionController?.shutdown()
+        _ttsSessionController = null
+        _ttsEngine = null
+        _audioFocusController = null
+        appContext = null
         db?.close()
         db = null
         _bookSourceRepo = null
