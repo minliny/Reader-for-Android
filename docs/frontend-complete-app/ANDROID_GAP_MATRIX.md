@@ -1,8 +1,8 @@
 # Android Complete App Gap Matrix
 
-Status: `SLICE_0_1_ANDROID_SOURCE_AUDIT_REFRESHED`
+Status: `STAGE_1_6_HEAD_VERIFIED`
 
-Date: 2026-07-07
+Date: 2026-07-08
 
 Target repo: `/Users/minliny/Documents/Reader for Android`
 
@@ -79,31 +79,71 @@ Android cannot be marked frontend-complete until:
 5. Core bridge and Host Adapter are connected for first vertical slices.
 6. Device/simulator evidence exists for AppShell, reading entry, reader control layer, overlay/focus, session capsule, and orientation.
 
-## 7. Current Local Verification
+## 7. Current Local Verification (HEAD-level, Stage 1-6)
 
-Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-07:
+Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (`5d1cd6d`, stage 6 tip):
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest` | PASS | Current run completed successfully in 9s. `:app:kspDebugKotlin`, `:app:compileDebugKotlin`, `:app:kspDebugUnitTestKotlin`, `:app:compileDebugUnitTestKotlin`, and `:app:testDebugUnitTest` all passed. The older KSP/cache blocker is no longer current. |
+| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes (HostRequest consumer, capability registry, WebView closure, media/anti-bot real lane, reading-link async-result guard). |
+| `./gradlew :app:testDebugUnitTest --rerun-tasks` | PASS | 96 suites, 697 tests, 692 pass / 5 skipped / 0 failures / 0 errors. Forced rerun (not cache) — confirms HEAD-level JVM green. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 15 tests), Stage 5 anti-bot decorator (`AntiBotDetectingHttpFetchJvmTest`, 7 tests) + media savePath (`MediaDownloadSavePathJvmTest`, 4 tests), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4 tests). |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
 
-## 8. Device Proof (Instrumented)
+## 8. Device Proof (Instrumented, HEAD-level)
 
-Device: `dc54254d` (OnePlus 8Pro IN2020), run via `adb shell am instrument` on 2026-07-07.
+Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest` on 2026-07-08 at HEAD (`5d1cd6d`).
 
-| Test class | Tests | Result |
-| --- | --- | --- |
-| `com.reader.CoreRuntimeCapabilityInstrumentedProofTest` | 7 | PASS |
-| `com.reader.HostWebViewRebindProofTest` | 2 | PASS |
-| `com.reader.HostRouterDispatchProofTest` | 7 | PASS |
-| `com.reader.HostWebViewRealExecutorProofTest` | 1 | PASS |
-| `com.reader.HostMediaDownloadProofTest` | 8 | PASS |
-| `com.reader.HostAntiBotProofTest` | 6 | PASS |
-| `com.reader.HostWebViewP0HeadlessFailClosedProofTest` | 3 | PASS |
-| `com.reader.HostWebViewRenderProofTest` | 5 | PASS |
-| **Total** | **39** | **ALL PASS** |
+**72/72 PASS, 0 failures, 0 errors, 0 skipped.** This is a full HEAD-level run (not the Stage 3 partial 39/39 from `b5596ef`), and supersedes the prior device-proof claim — it confirms Stage 4-6 code paths are green on device, not just JVM.
 
-Fixes applied during device proof:
+| Test class | Tests | Result | Stage covered |
+| --- | --- | --- | --- |
+| `com.reader.AppLevelReadingChainProofTest` | 4 | PASS | Stage 6 (reading-link async guard + reader entry) |
+| `com.reader.CoreEndToEndTest` | 1 | PASS | Core bridge |
+| `com.reader.CoreRuntimeCapabilityInstrumentedProofTest` | 7 | PASS | Stage 2 (capability registry) |
+| `com.reader.CoreSmokeTest` | 3 | PASS | Core smoke |
+| `com.reader.HostAntiBotProofTest` | 6 | PASS | Stage 5 (anti_bot interception) |
+| `com.reader.HostAntiBotRealChallengeProofTest` | 4 | PASS | Stage 5 (anti_bot real challenge) |
+| `com.reader.HostHttpCookieRealNetworkProofTest` | 3 | PASS | http/cookie real network |
+| `com.reader.HostLocalBookParseProofTest` | 4 | PASS | local_book.parse |
+| `com.reader.HostLoginCookieProofTest` | 3 | PASS | login_cookie lane |
+| `com.reader.HostMediaDownloadProofTest` | 8 | PASS | Stage 5 (media.download savePath) |
+| `com.reader.HostMediaMultiResourceProofTest` | 3 | PASS | Stage 5 (media multi-resource) |
+| `com.reader.HostMediaRealDownloadProofTest` | 2 | PASS | Stage 5 (media real download) |
+| `com.reader.HostRouterDispatchProofTest` | 7 | PASS | Stage 1 (HostRequest dispatch) |
+| `com.reader.HostWebViewP0HeadlessFailClosedProofTest` | 3 | PASS | Stage 4 (WebView fail-closed) |
+| `com.reader.HostWebViewRealExecutorProofTest` | 1 | PASS | Stage 4 (WebView real executor) |
+| `com.reader.HostWebViewRebindProofTest` | 3 | PASS | Stage 4 (WebView JS closure proof) |
+| `com.reader.HostWebViewRenderProofTest` | 5 | PASS | Stage 4 (WebView render) |
+| `com.reader.UnifiedEvidenceInstrumentedTest` | 1 | PASS | unified evidence artifact |
+| `com.reader.android.data.adapter.AndroidPlatformRuntimeInstrumentedSmokeTest` | 4 | PASS | platform runtime smoke |
+| **Total** | **72** | **ALL PASS** | |
+
+### 8.1 Stage coverage mapping (HEAD-level evidence)
+
+| Stage | Commit | JVM proof | Device proof (HEAD run) |
+| --- | --- | --- | --- |
+| 1 — HostRequest consumer | `d4fffc0` | `ReaderUiReducerTest` (async queue) | `HostRouterDispatchProofTest` (7) |
+| 2 — Capability registry | `6185668` | `HostCapabilityRegistryJvmTest` (15) | `CoreRuntimeCapabilityInstrumentedProofTest` (7) |
+| 3 — Device proof baseline | `b5596ef` | — | (superseded by this HEAD run) |
+| 4 — WebView closure | `d085548` | — | `HostWebViewRebindProofTest` (3) + `HostWebViewRealExecutorProofTest` (1) + `HostWebViewRenderProofTest` (5) + `HostWebViewP0HeadlessFailClosedProofTest` (3) |
+| 5 — media/anti-bot real lane | `49c9c7d` | `AntiBotDetectingHttpFetchJvmTest` (7) + `MediaDownloadSavePathJvmTest` (4) | `HostMediaDownloadProofTest` (8) + `HostMediaMultiResourceProofTest` (3) + `HostMediaRealDownloadProofTest` (2) + `HostAntiBotProofTest` (6) + `HostAntiBotRealChallengeProofTest` (4) |
+| 6 — Reading-link async guard | `5d1cd6d` | `ReadingLinkAsyncGuardJvmTest` (4) | `AppLevelReadingChainProofTest` (4) |
+
+### 8.2 Prior device proof (superseded)
+
+The 39/39 run from `b5596ef` (2026-07-07, OnePlus 8Pro) is preserved here for history. It predates Stage 4/5/6 commits and therefore could not — and did not — prove those code paths on device. The HEAD-level 72/72 run above is the current authoritative device proof.
+
+Fixes applied during the prior device proof (still in effect):
 - `FileReadHandler`: `DefaultHostFileSystem.read` was throwing `kotlin.io.NoSuchFileException` (Kotlin stdlib) instead of `java.nio.file.NoSuchFileException` (Java NIO) because `NoSuchFileException(file)` matched the Kotlin constructor `(File, File?, String?)` over the Java constructor `(String)`. Fixed by using fully-qualified `java.nio.file.NoSuchFileException(file.path)`.
 - `WebViewHostActivity`: moved from `androidTest` to `main` so `ActivityScenario.launch` resolves it to the target process (`com.reader.android`) instead of the test process (`com.reader.android.test`).
+
+## 9. Remaining Gaps (not yet claimed)
+
+The HEAD-level run above proves Stage 1-6 code paths compile and pass JVM + instrumented tests. The following are explicitly **not** claimed as done:
+
+| Gap ID | Description | Why not claimed |
+| --- | --- | --- |
+| GAP-D-01 | `credential.resolve` not registered | No `CredentialProvider` implementation exists. Capability registry JVM test asserts it is unregistered. Either implement the provider or keep documenting as "not registered, not a complete credential surface". |
+| GAP-D-02 | Real-source reading chain not proven end-to-end | Stage 6 JVM proof uses `fixture://` source path (synchronous, no network). No real/quasi-real source fixture drives search → detail → toc → content → reader entry on device. `AppLevelReadingChainProofTest` exercises the reader entry + async guard, not a real source pipeline. |
+| GAP-D-03 | asyncResult UI visual feedback not captured | Reducer guard has JVM proof, but loading / error / cancel / discarded states rendered in the reader UI are not captured via Compose UI test or device screenshot. The VM's own `ReadingUiState` drives the visual; `asyncResult` currently only gates stale results. |
+| GAP-D-04 | Stage 4-6 device screenshots / recordings | The 72/72 instrumented run proves code paths execute, but no visual artifact (screenshot/recording) was captured for WebView JS return value, media savePath file on device, or reading-link loading → ready transition. |
