@@ -26,9 +26,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,11 +42,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.android.AppProvider
 import com.reader.android.R
+import com.reader.android.data.adapter.AuthMethod
+import com.reader.android.data.adapter.WebDavCredential
+import com.reader.api.ReaderCoreClient
+import com.reader.host.HostReply
+import com.reader.host.HostRequest
 import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 @Composable
 fun SettingsGeneralScreen(
@@ -214,14 +224,39 @@ fun SyncBackupScreen(
     onWebDavConfig: () -> Unit
 ) {
     val backups = remember { settingsBackupItems() }
+    var webDavCredential by remember { mutableStateOf<WebDavCredential?>(null) }
+    var connectStatus by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // P1-6: Load the real WebDAV credential (if any) from the keystore-backed
+    // store. The identifier "webdav.default" matches the one used by
+    // AndroidWebDavClient + WebDavCredentialProvider so all three (credential
+    // UI / webdav.* handlers / credential.resolve) share the same credential.
+    LaunchedEffect(Unit) {
+        if (AppProvider.isInitialized) {
+            runCatching {
+                webDavCredential = AppProvider.webDavCredentialStore.load("webdav.default")
+            }
+        }
+    }
+
+    val serverUrl = webDavCredential?.serverUrl ?: "未配置"
+    val account = when (val auth = webDavCredential?.auth) {
+        is AuthMethod.Basic -> auth.username
+        is AuthMethod.Digest -> auth.username
+        is AuthMethod.Bearer -> "Bearer Token"
+        null -> "未配置"
+    }
+    val passwordDisplay = if (webDavCredential != null) "******" else "未配置"
+
     SettingsSubpageScaffold(title = "同步与备份", onBack = onBack) {
         item {
             SettingsSubSection(title = "WebDAV 配置") {
-                SettingsInputRow(R.drawable.reader_ic_link, "服务器地址", "https://dav.example.com/reader/backup")
+                SettingsInputRow(R.drawable.reader_ic_link, "服务器地址", serverUrl)
                 SettingsSubDivider()
-                SettingsInputRow(R.drawable.reader_ic_people, "账号", "reader@example.com")
+                SettingsInputRow(R.drawable.reader_ic_people, "账号", account)
                 SettingsSubDivider()
-                SettingsInputRow(R.drawable.reader_ic_shield, "密码", "reader-demo-password")
+                SettingsInputRow(R.drawable.reader_ic_shield, "密码", passwordDisplay)
                 SettingsSubDivider()
                 SettingsInputRow(R.drawable.reader_ic_folder, "同步目录", "/ReaderBackup/ReaderAndroid")
             }
@@ -229,10 +264,50 @@ fun SyncBackupScreen(
         item {
             SettingsSectionActions(
                 actions = listOf(
-                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性"),
+                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性", onClick = {
+                        val url = webDavCredential?.serverUrl
+                        if (url.isNullOrEmpty()) {
+                            connectStatus = "请先配置 WebDAV 服务器地址"
+                            return@SettingsSubAction
+                        }
+                        connectStatus = "测试中..."
+                        scope.launch {
+                            runCatching {
+                                val params = JSONObject().put("url", url)
+                                val request = HostRequest(1L, 1L, "webdav.connect", params.toString())
+                                val reply = ReaderCoreClient.get().hostAdapter().dispatch(request)
+                                when {
+                                    reply?.isComplete() == true -> {
+                                        val result = JSONObject((reply as HostReply.Complete).resultJson())
+                                        connectStatus = if (result.getBoolean("connected")) {
+                                            "连接成功 (HTTP ${result.getInt("statusCode")})"
+                                        } else {
+                                            "连接失败: ${result.optString("message", "HTTP ${result.getInt("statusCode")}")}"
+                                        }
+                                    }
+                                    reply?.isError() == true -> {
+                                        val error = reply as HostReply.Error
+                                        connectStatus = "错误: ${error.message()}"
+                                    }
+                                    else -> {
+                                        connectStatus = "未知响应"
+                                    }
+                                }
+                            }.onFailure {
+                                connectStatus = "错误: ${it.message}"
+                            }
+                        }
+                    }),
                     SettingsSubAction(R.drawable.reader_ic_check, "保存配置", onWebDavConfig)
                 )
             )
+        }
+        if (connectStatus != null) {
+            item {
+                SettingsSubSection(title = "连通性测试") {
+                    SettingsInputRow(R.drawable.reader_ic_link, "结果", connectStatus!!)
+                }
+            }
         }
         item {
             SettingsBackupList(backups = backups)

@@ -1,6 +1,6 @@
 # Android Complete App Gap Matrix
 
-Status: `STAGE_1_6_HEAD_VERIFIED_FULL_GAP_CLOSURE`
+Status: `STAGE_1_6_HEAD_VERIFIED_FULL_GAP_CLOSURE + P1_SOURCE_RSS_WEBDAV_CLOSED`
 
 Date: 2026-07-08
 
@@ -79,14 +79,14 @@ Android cannot be marked frontend-complete until:
 5. Core bridge and Host Adapter are connected for first vertical slices.
 6. Device/simulator evidence exists for AppShell, reading entry, reader control layer, overlay/focus, session capsule, and orientation.
 
-## 7. Current Local Verification (HEAD-level, Stage 1-6 + audit tasks 3/4/5)
+## 7. Current Local Verification (HEAD-level, Stage 1-6 + audit tasks 3/4/5 + P1)
 
-Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (post audit task 3/4/5):
+Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at HEAD (post P1 source/RSS/WebDAV closure):
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes + audit task 3/4/5 additions (credential.resolve, real-source chain proof, asyncResult UI overlay, screenshot test). |
-| `./gradlew :app:testDebugUnitTest` | PASS | 99 suites, 717 tests, 712 pass / 5 skipped / 0 failures / 0 errors. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 15), Stage 5 anti-bot decorator (7) + media savePath (4), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4), audit task 3 credential.resolve (`WebDavCredentialProviderJvmTest`, 7), audit task 4 real-source chain (`RealSourceReadingChainJvmTest`, 6), audit task 5 asyncResult UI overlay (`AsyncResultOverlayLabelJvmTest`, 7). |
+| `./gradlew :app:compileDebugKotlin` | PASS | Compiles against current HEAD including Stage 1-6 changes + audit task 3/4/5 + P1-4 (TTS session) + P1-5 (source/RSS) + P1-6 (WebDAV/backup) additions. |
+| `./gradlew :app:testDebugUnitTest` | PASS | 106 suites, 815 tests, 810 pass / 5 skipped / 0 failures / 0 errors. Covers Stage 2 capability registry (`HostCapabilityRegistryJvmTest`, 21), Stage 5 anti-bot decorator (7) + media savePath (4), Stage 6 reading-link async guard (`ReadingLinkAsyncGuardJvmTest`, 4), audit task 3 credential.resolve (`WebDavCredentialProviderJvmTest`, 7), audit task 4 real-source chain (`RealSourceReadingChainJvmTest`, 6), audit task 5 asyncResult UI overlay (`AsyncResultOverlayLabelJvmTest`, 7), P1-4 TTS session (`TtsSessionControllerJvmTest`, 7), P1-5 source/RSS (`SourceRssCapabilityHandlersJvmTest`, 24), P1-6 WebDAV/backup (`WebDavCapabilityHandlersJvmTest`, 25). |
 | `git diff --check` | PASS | No whitespace errors in current diff. |
 
 ## 8. Device Proof (Instrumented, HEAD-level)
@@ -148,3 +148,23 @@ The HEAD-level run above proves Stage 1-6 + audit task 3/4/5 code paths compile 
 | GAP-D-02 | Real-source reading chain not proven end-to-end | **CLOSED (audit task 4)** — `RealSourceReadingChainJvmTest` (6 tests) exercises real book-source JSON shapes (search/detail/toc/content) through `BookApi.parse*` parsers, builds a `ReaderContext` from the parsed data, and drives the reducer's async-result guard IDLE → PENDING → COMPLETED + stale DISCARDED. Core command dispatch (native .so) is still covered only on device by `CoreRuntimeCapabilityInstrumentedProofTest`. |
 | GAP-D-03 | asyncResult UI visual feedback not captured | **CLOSED (audit task 5)** — `asyncResultOverlayLabel` pure mapping added to `ReaderControlReadingSurface`; DISCARDED/SUPERSEDED render "正在切换到最新…" overlay, CANCELLED renders "加载已取消". `AsyncResultOverlayLabelJvmTest` (7 tests) validates the mapping. `AppShell` passes `state.asyncResult.state` through `ReaderShellScreen` → `ReaderControlReadingSurface`. Device 75/75 confirms no regression. |
 | GAP-D-04 | Stage 4-6 device screenshots / recordings | **CLOSED (audit task 5)** — `Stage6AsyncResultOverlayScreenshotTest` (3 tests) launches `MainActivity` and captures PNG screenshots via `uiAutomation.takeScreenshot()`. The test obtains `AppShellViewModel` from the Activity's ViewModelStore and dispatches intent sequences to inject real asyncResult overlay states: `captureCancelledOverlayScreenshot` (StartAsyncRequest + CancelAsyncRequest → CANCELLED), `captureDiscardedOverlayScreenshot` (StartAsyncRequest(req-B) + CompleteAsyncRequest(req-A, stale) → DISCARDED). Screenshots persisted to `app/build/outputs/screenshots/`: `stage6_bookshelf_idle.png`, `stage6_asyncresult_cancelled.png`, `stage6_asyncresult_discarded.png`. Full device suite 75/75 green. |
+
+## 10. P1 Capability Closure (Source/RSS/WebDAV/Backup/TTS)
+
+P1 closes the gap between "data layer + adapters exist" and "UI can reach them through Host capabilities". Each subsystem now has a registered `HostRequest → HostAdapter.dispatch → HostReply` round-trip, JVM proof tests, and (where applicable) UI de-demo wiring.
+
+| P1 ID | Subsystem | Capabilities registered | JVM proof | UI de-demo | Status |
+| --- | --- | --- | --- | --- | --- |
+| P1-4 | TTS session | `tts.system.start/stop/pause/resume/status/progress` (via HostFacade, context-only) | `TtsSessionControllerJvmTest` (7) — AudioFocus recovery, multi-chapter progression, CancellationException re-throw fix | N/A (HostFacade already wired) | **CLOSED** (commit `6566d8ea`) |
+| P1-5 | Source / RSS | `source.list/add/remove/set_enabled/import/export`, `source.debug.run/detect`, `rss.subscription.list/add/delete`, `rss.refresh` (12 capabilities, pure-JVM) | `SourceRssCapabilityHandlersJvmTest` (24) — CRUD + import/export + debug + RSS parse/refresh + registration smoke | `RssScreen.kt` loads real subscriptions via `AppProvider.subscriptionRepository.getAll()` | **CLOSED** (commit `b2480078`) |
+| P1-6 | WebDAV / backup | `webdav.connect/upload/download/list/delete/mkdir`, `backup.create/restore` (8 capabilities, pure-JVM) | `WebDavCapabilityHandlersJvmTest` (25) — PROPFIND/PUT/GET/DELETE/MKCOL round-trip + backup manifest upload + restore validate/plan + NOT_CONFIGURED error path + registration smoke | `SyncBackupScreen` loads real WebDAV credential from `AppProvider.webDavCredentialStore.load("webdav.default")`, "测试网络连通性" button dispatches `webdav.connect` through `ReaderCoreClient.get().hostAdapter()` | **CLOSED** (this commit) |
+
+### 10.1 P1-6 Architecture
+
+`AndroidWebDavClient` (OkHttp-backed) integrates `RetryPolicy` (exponential backoff for 408/429/5xx) + `WebDavErrorMapper`. `AppProvider` exposes it as a lazy singleton alongside `BackupRestoreManager`. `WebDavCapabilityHandlers.kt` defines 8 pure-JVM `CapabilityHandler` implementations that delegate to `WebDavContext(client, backupRestoreManager)`:
+
+- When `client` is null (no credential configured), all `webdav.*` handlers return `NOT_CONFIGURED` error — UI can surface "请先配置 WebDAV 凭据" instead of crashing.
+- `backup.create` orchestrates PUT per entry + manifest upload.
+- `backup.restore` validates manifest via `BackupRestoreManager.validate()` + downloads entries via GET.
+
+`ReaderCoreClient.buildHostRuntime` wires `WebDavContext` on both JVM (via `fakeWebDavContext()` → `FakeWebDavClient`) and production (via `AppProvider.webDavClient` + `AppProvider.backupRestoreManager`) paths, mirroring the `SourceRssContext` pattern from P1-5.

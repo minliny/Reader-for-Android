@@ -48,6 +48,8 @@ object AppProvider {
     private var _webDavCredentialStore: WebDavCredentialStore? = null
     private var _permissionRuntimeAdapter: PermissionRuntimeAdapter? = null
     private var _subscriptionRepo: SubscriptionRepository? = null
+    private var _webDavClient: com.reader.android.data.adapter.AndroidWebDavClient? = null
+    private var _backupRestoreManager: com.reader.android.data.adapter.BackupRestoreManager? = null
     private var _ttsEngine: AndroidTtsEngine? = null
     private var _audioFocusController: AudioFocusController? = null
     private var _ttsSessionController: TtsSessionController? = null
@@ -112,6 +114,37 @@ object AppProvider {
     /** Keystore-backed WebDAV credential persistence. */
     val webDavCredentialStore: WebDavCredentialStore
         get() = _webDavCredentialStore ?: WebDavCredentialStore().also { _webDavCredentialStore = it }
+
+    /**
+     * P1-6: OkHttp-backed [com.reader.android.data.adapter.AndroidWebDavClient]
+     * wired to [webDavCredentialStore]. Lazily constructed — returns null
+     * when AppProvider is not initialized (JVM tests use
+     * [com.reader.host.fakeWebDavContext] instead).
+     *
+     * The credential identifier is the fixed string "webdav.default" so
+     * [com.reader.host.WebDavCredentialProvider] and this client resolve
+     * to the same stored credential.
+     */
+    val webDavClient: com.reader.android.data.adapter.AndroidWebDavClient?
+        get() = _webDavClient
+
+    /**
+     * P1-6: [com.reader.android.data.adapter.BackupRestoreManager] backed
+     * by [webDavClient]. Lazily constructed alongside the client.
+     */
+    val backupRestoreManager: com.reader.android.data.adapter.BackupRestoreManager?
+        get() = _backupRestoreManager
+
+    /**
+     * P1-6: inject a custom WebDAV client + backup manager for testing.
+     */
+    fun initForWebDavClient(
+        client: com.reader.android.data.adapter.AndroidWebDavClient?,
+        manager: com.reader.android.data.adapter.BackupRestoreManager? = null
+    ) {
+        _webDavClient = client
+        _backupRestoreManager = manager
+    }
 
     /**
      * P3: Unified permission runtime adapter. On-device this is
@@ -262,6 +295,15 @@ object AppProvider {
         // writeback. Tests inject fakes via initForAudioFocusController.
         _ttsEngine = AndroidTtsEngine(context.applicationContext)
         _audioFocusController = AndroidAudioFocusController(context.applicationContext)
+        // P1-6: wire the OkHttp-backed WebDAV client + BackupRestoreManager.
+        // The credential identifier "webdav.default" matches the one used
+        // by WebDavCredentialProvider so credential.resolve + webdav.* share
+        // the same stored credential.
+        _webDavClient = com.reader.android.data.adapter.AndroidWebDavClient(
+            credentialStore = webDavCredentialStore,
+            credentialIdentifier = "webdav.default"
+        )
+        _backupRestoreManager = com.reader.android.data.adapter.BackupRestoreManager(_webDavClient!!)
         initialized = true
         return this
     }
@@ -291,6 +333,8 @@ object AppProvider {
         _cookieStore = null
         _webRuntimeAdapter = null
         _webDavCredentialStore = null
+        _webDavClient = null
+        _backupRestoreManager = null
         _permissionRuntimeAdapter = null
         _subscriptionRepo = null
         _readingProgressRepo = null

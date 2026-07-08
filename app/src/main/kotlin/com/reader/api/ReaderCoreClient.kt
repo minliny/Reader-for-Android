@@ -53,9 +53,10 @@ import com.reader.host.SourceRssContext
 import com.reader.host.SourceSetVariableHandler
 import com.reader.host.SourceVariableStore
 import com.reader.host.SystemInfoHandler
-import com.reader.host.registerHandlers as registerSourceRssHandlers
 import com.reader.host.TimeNowHandler
+import com.reader.host.WebDavContext
 import com.reader.host.WebDavCredentialProvider
+import com.reader.host.registerHandlers as registerCapabilityHandlers
 import com.reader.host.WebViewEvaluateJavaScriptHandler
 import com.reader.host.WebViewExecutor
 import kotlinx.coroutines.Dispatchers
@@ -302,7 +303,26 @@ class ReaderCoreClient private constructor(
             } else {
                 com.reader.host.fakeSourceRssContext()
             }
-            hostRuntimeBuilder = sourceRssContext.registerSourceRssHandlers(hostRuntimeBuilder)
+            hostRuntimeBuilder = sourceRssContext.registerCapabilityHandlers(hostRuntimeBuilder)
+            // ── P1-6: WebDAV / backup capability handlers ──
+            // Pure-JVM (no Android Context) so registered on both paths
+            // (JVM tests + production). Production wires the real
+            // AndroidWebDavClient + BackupRestoreManager via AppProvider;
+            // JVM tests pass a fake WebDavContext via fakeWebDavContext().
+            // When the user hasn't configured WebDAV credentials yet, the
+            // production client is non-null but credentialStore.load() returns
+            // null — handlers still dispatch and return NOT_CONFIGURED on
+            // 401/auth-missing. JVM tests get a FakeWebDavClient so the
+            // handler logic (PUT/GET/PROPFIND round-trip) is exercised.
+            val webDavContext = if (context != null) {
+                WebDavContext(
+                    client = AppProvider.webDavClient,
+                    backupRestoreManager = AppProvider.backupRestoreManager
+                )
+            } else {
+                com.reader.host.fakeWebDavContext()
+            }
+            hostRuntimeBuilder = webDavContext.registerCapabilityHandlers(hostRuntimeBuilder)
             // ── Slice C: HostFacade — UI-facing capabilities ──
             // Only wire when context is available (production /
             // instrumented). JVM tests inject handlers manually.

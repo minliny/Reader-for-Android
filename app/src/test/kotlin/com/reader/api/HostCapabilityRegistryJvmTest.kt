@@ -58,6 +58,8 @@ import org.junit.Test
  * | source.debug.run/detect |    YES    |    YES     |   this    |  Host*Proof  |     P1-5       |
  * | rss.subscription.list/add/delete | YES | YES | this | Host*Proof | P1-5 (UI de-demo) |
  * | rss.refresh             |    YES     |    YES     |   this    |  Host*Proof  |     P1-5       |
+ * | webdav.connect/upload/download/list/delete/mkdir | YES | YES | this | Host*Proof | P1-6 (UI de-demo) |
+ * | backup.create/restore   |    YES     |    YES     |   this    |  Host*Proof  |     P1-6       |
  * | tts.system.* (5)        |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | permission.* (3)        |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | notification.* (3)      |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
@@ -225,6 +227,24 @@ class HostCapabilityRegistryJvmTest {
         assertRegistered("rss.subscription.add")
         assertRegistered("rss.subscription.delete")
         assertRegistered("rss.refresh")
+    }
+
+    // ── P1-6: WebDAV / backup capabilities (pure-JVM, registered on JVM + device) ──
+
+    @Test
+    fun `webdav file operation capabilities are registered`() {
+        assertRegistered("webdav.connect")
+        assertRegistered("webdav.upload")
+        assertRegistered("webdav.download")
+        assertRegistered("webdav.list")
+        assertRegistered("webdav.delete")
+        assertRegistered("webdav.mkdir")
+    }
+
+    @Test
+    fun `backup create and restore capabilities are registered`() {
+        assertRegistered("backup.create")
+        assertRegistered("backup.restore")
     }
 
     // ── HostFacade capabilities (NOT registered on JVM — require Context) ─

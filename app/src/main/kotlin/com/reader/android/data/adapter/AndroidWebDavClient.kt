@@ -1,5 +1,6 @@
 package com.reader.android.data.adapter
 
+import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -7,7 +8,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
- * P3: OkHttp-backed [WebDavClient] that integrates with [WebDavCredentialStore].
+ * OkHttp-backed [WebDavClient] that integrates with [WebDavCredentialStore]
+ * and applies [RetryPolicy] + [WebDavErrorMapper] for transient failures.
  *
  * Each [execute] call:
  *  1. Loads the [WebDavCredential] for [credentialIdentifier] from the
@@ -21,6 +23,10 @@ import java.util.concurrent.TimeUnit
  *     - [AuthMethod.Digest] → not implemented here (requires
  *       challenge-response flow); execute() returns 401 so the caller can
  *       surface the failure rather than silently degrading.
+ *  4. Retries retryable failures (408/429/5xx per [WebDavErrorMapper.isRetryable])
+ *     with exponential backoff per [retryPolicy]. Non-retryable statuses and
+ *     IOExceptions on the final attempt are returned as-is so the caller
+ *     (e.g. [BackupRestoreManager]) can surface a meaningful error.
  *
  * Tests inject [FakeWebDavClient] (no network); on-device the production
  * wiring lives in [com.reader.android.AppProvider].
@@ -28,10 +34,44 @@ import java.util.concurrent.TimeUnit
 class AndroidWebDavClient(
     private val credentialStore: WebDavCredentialStore,
     private val credentialIdentifier: String,
-    private val client: OkHttpClient = defaultClient()
+    private val client: OkHttpClient = defaultClient(),
+    /**
+     * P1-6: Retry policy for transient failures. Defaults to [RetryPolicy.DEFAULT]
+     * (3 retries, 1s → 2s → 4s backoff). Pass [RetryPolicy.NO_RETRY] to
+     * disable. JVM tests inject a no-retry policy or use [FakeWebDavClient].
+     */
+    private val retryPolicy: RetryPolicy = RetryPolicy.DEFAULT
 ) : WebDavClient {
 
     override suspend fun execute(request: WebDavRequest): WebDavResponse {
+        var lastResponse: WebDavResponse? = null
+        var lastError: Exception? = null
+        for (attempt in 0..retryPolicy.maxRetries) {
+            try {
+                val response = executeOnce(request)
+                lastResponse = response
+                // Success or non-retryable → return immediately.
+                if (!WebDavErrorMapper.isRetryable(response.statusCode)) {
+                    return response
+                }
+                // 401/403/404 etc. are non-retryable; only 408/429/5xx reach here.
+            } catch (e: Exception) {
+                lastError = e
+                // IOException is retryable (network blip); other exceptions are not.
+                if (attempt >= retryPolicy.maxRetries) throw e
+            }
+            // Backoff before next attempt (skip on the last iteration).
+            if (attempt < retryPolicy.maxRetries) {
+                delay(retryPolicy.backoffForAttempt(attempt))
+            }
+        }
+        // All retries exhausted — return the last response or throw the last error.
+        if (lastResponse != null) return lastResponse
+        if (lastError != null) throw lastError
+        return WebDavResponse(599, "retry exhausted")
+    }
+
+    private suspend fun executeOnce(request: WebDavRequest): WebDavResponse {
         val credential = credentialStore.load(credentialIdentifier)
         val builder = Request.Builder().url(request.url)
         // Caller-supplied headers take precedence (e.g. Depth / Overwrite / If).
