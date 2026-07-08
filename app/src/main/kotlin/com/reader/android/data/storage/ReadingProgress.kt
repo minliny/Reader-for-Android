@@ -19,6 +19,7 @@ data class ReadingProgress(
     val currentChapterTitle: String,
     val chapterIndex: Int = 0,
     val totalChapters: Int = 0,
+    val page: Int = 0,
     val scrollPosition: Float = 0f,
     val lastReadTime: Long = System.currentTimeMillis()
 )
@@ -49,7 +50,7 @@ interface ReadingProgressDao {
         BookmarkEntity::class,
         RssSubscriptionEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

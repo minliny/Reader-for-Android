@@ -39,9 +39,9 @@ class ReadingLinkAsyncGuardJvmTest {
         val ctx = fixtureContext(entryRequestId = "req-entry-1")
         val calls = mutableListOf<AsyncStateCall>()
 
-        val vm = ImmersiveReadingViewModel(ctx) { requestId, state, value ->
+        val vm = ImmersiveReadingViewModel(ctx, onAsyncStateChange = { requestId, state, value ->
             calls += AsyncStateCall(requestId, state, value)
-        }
+        })
 
         // fixture:// path is synchronous: PENDING fires in init, then COMPLETED after content set.
         assertEquals(2, calls.size)
@@ -65,9 +65,9 @@ class ReadingLinkAsyncGuardJvmTest {
     fun `callback sequence drives asyncResult idle to pending to completed`() {
         val ctx = fixtureContext(entryRequestId = "req-entry-2")
         val calls = mutableListOf<AsyncStateCall>()
-        ImmersiveReadingViewModel(ctx) { requestId, state, value ->
+        ImmersiveReadingViewModel(ctx, onAsyncStateChange = { requestId, state, value ->
             calls += AsyncStateCall(requestId, state, value)
-        }
+        })
 
         // Start from a fresh state (simulating AppShell after EnterReaderFromAction).
         var state = ReaderUiState()

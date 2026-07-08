@@ -16,6 +16,7 @@ import com.reader.android.data.network.SubscriptionRepository
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
+import com.reader.android.data.repository.ReadingProgressRepository
 import com.reader.android.data.storage.AppDatabase
 import com.reader.android.data.storage.BookmarkDao
 import com.reader.android.data.storage.CachedChapterDao
@@ -42,6 +43,9 @@ object AppProvider {
     private var _subscriptionRepo: SubscriptionRepository? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
+
+    /** P0-3: safe accessor for checking whether [init] has been called. */
+    val isInitialized: Boolean get() = initialized
 
     // ── Network gate ──
 
@@ -119,6 +123,17 @@ object AppProvider {
 
     val readingProgressDao: ReadingProgressDao
         get() = requireDb().readingProgressDao()
+
+    /**
+     * P0-3: Reading progress repository. Wraps [readingProgressDao] with field mapping
+     * between ReaderContext (in-memory) and ReadingProgress (Room entity). Lazily created
+     * so callers that never touch reading progress pay no cost.
+     */
+    val readingProgressRepository: ReadingProgressRepository
+        get() = _readingProgressRepo ?: ReadingProgressRepository(readingProgressDao).also {
+            _readingProgressRepo = it
+        }
+    private var _readingProgressRepo: ReadingProgressRepository? = null
 
     val cachedChapterDao: CachedChapterDao
         get() = requireDb().cachedChapterDao()

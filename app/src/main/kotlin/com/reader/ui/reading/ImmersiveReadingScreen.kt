@@ -16,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,10 +97,20 @@ fun ImmersiveReadingScreen(
 ) {
     val vm: ImmersiveReadingViewModel = viewModel(
         key = "immersive-${context.bookUrl}",
-        factory = ImmersiveReadingViewModelFactory(context)
+        factory = ImmersiveReadingViewModelFactory(
+            context = context,
+            readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null
+        )
     )
     val state by vm.uiState.collectAsStateWithLifecycle()
     val content by vm.content.collectAsStateWithLifecycle()
+
+    // P0-3: push the latest reading position (chapter/page/progress) into the VM so
+    // onCleared() persists the correct state. The context is updated by the reducer
+    // as the user reads, so this effect fires on every position change.
+    LaunchedEffect(context.chapterIndex, context.page, context.progress) {
+        vm.updatePosition(context.chapterIndex, context.page, context.progress)
+    }
 
     when (val s = state) {
         ReadingUiState.Loading -> Box(
@@ -199,7 +210,10 @@ private fun ReaderTapZones(
  */
 class ImmersiveReadingViewModel(
     private val context: ReaderContext,
-    private val onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+    private val onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
+    // P0-3: reading progress repository for restore-on-entry + save-on-leave.
+    // Null when AppProvider is unavailable (fixture paths / unit tests).
+    private val readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null
 ) : ViewModel() {
 
     private val bookApi: BookApi? = if (context.sourceId.startsWith(FIXTURE_PREFIX)) null else BookApi(ReaderCoreClient.get())
@@ -210,7 +224,58 @@ class ImmersiveReadingViewModel(
     private val _content = MutableStateFlow("")
     val content: StateFlow<String> = _content.asStateFlow()
 
+    // P0-3: track loaded chapters + book so saveProgress() can persist full metadata
+    // (currentChapterUrl, currentChapterTitle, totalChapters) without re-fetching.
+    private var loadedChapters: List<Chapter> = emptyList()
+    private var loadedBook: Book? = null
+    // P0-3: latest reading position, updated by the UI via updatePosition().
+    // Initialized from context, updated as the user reads, saved in onCleared().
+    private var currentChapterIndex: Int = context.chapterIndex
+    private var currentPage: Int = context.page
+    private var currentProgress: Float = context.progress
+
     init { load() }
+
+    /**
+     * P0-3: Called by the UI layer (DisposableEffect / LaunchedEffect) to push the latest
+     * reading position into the VM so onCleared() persists the correct state.
+     */
+    fun updatePosition(chapterIndex: Int, page: Int, progress: Float) {
+        currentChapterIndex = chapterIndex
+        currentPage = page
+        currentProgress = progress
+    }
+
+    /**
+     * P0-3: Persist current reading position to Room. Called from onCleared() and can
+     * be called explicitly by the UI on chapter changes.
+     */
+    private fun saveProgress() {
+        val repo = readingProgressRepository ?: return
+        val chapters = loadedChapters
+        val chapter = chapters.getOrNull(currentChapterIndex)
+        viewModelScope.launch {
+            try {
+                repo.saveProgress(
+                    bookUrl = context.bookUrl,
+                    bookName = context.bookName,
+                    chapterIndex = currentChapterIndex,
+                    page = currentPage,
+                    progress = currentProgress,
+                    chapter = chapter,
+                    totalChapters = chapters.size,
+                    author = loadedBook?.author
+                )
+            } catch (e: Exception) {
+                // Best-effort persistence — don't crash on DB errors.
+            }
+        }
+    }
+
+    override fun onCleared() {
+        saveProgress()
+        super.onCleared()
+    }
 
     private fun load() {
         // Engage the async-result guard (motion.async.resultGuard, M5): mark this entry's
@@ -243,14 +308,37 @@ class ImmersiveReadingViewModel(
                     onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.CANCELLED, null)
                     return@launch
                 }
+                loadedBook = book
+                loadedChapters = chapters
                 _uiState.value = ReadingUiState.Ready(book, chapters)
-                val text = bookApi.content(context.sourceId, book, chapters.first())
+                // P0-3: restore last-saved chapter index from Room so re-entering a book
+                // after process restart lands on the last-read chapter, not chapter 0.
+                val restoredIndex = restoreChapterIndex(context.bookUrl, chapters.size)
+                val chapterToLoad = chapters.getOrNull(restoredIndex) ?: chapters.first()
+                currentChapterIndex = restoredIndex
+                val text = bookApi.content(context.sourceId, book, chapterToLoad)
                 _content.value = text
                 onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.COMPLETED, _content.value)
             } catch (e: Exception) {
                 _uiState.value = ReadingUiState.Error(e.message ?: "加载失败")
                 onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.CANCELLED, null)
             }
+        }
+    }
+
+    /**
+     * P0-3: Read the last-saved chapter index from Room. Falls back to the context's
+     * chapterIndex if the repository is unavailable or no saved progress exists.
+     */
+    private suspend fun restoreChapterIndex(bookUrl: String, totalChapters: Int): Int {
+        val repo = readingProgressRepository ?: return context.chapterIndex
+        return try {
+            val saved = repo.getProgress(bookUrl)
+            val savedIndex = saved?.chapterIndex ?: return context.chapterIndex
+            // Guard against stale indices beyond the current chapter list.
+            if (savedIndex in 0 until totalChapters) savedIndex else context.chapterIndex
+        } catch (e: Exception) {
+            context.chapterIndex
         }
     }
 
@@ -302,7 +390,8 @@ class ImmersiveReadingViewModel(
 
 fun ImmersiveReadingViewModelFactory(
     context: ReaderContext,
-    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null
+    onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
+    readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null
 ) = viewModelFactory {
-    initializer { ImmersiveReadingViewModel(context, onAsyncStateChange) }
+    initializer { ImmersiveReadingViewModel(context, onAsyncStateChange, readingProgressRepository) }
 }

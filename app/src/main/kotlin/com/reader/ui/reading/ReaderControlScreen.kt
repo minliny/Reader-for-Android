@@ -113,7 +113,11 @@ fun ReaderShellScreen(
     val ttsText: String = if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
             key = "immersive-${context.bookUrl}",
-            factory = ImmersiveReadingViewModelFactory(context, onAsyncStateChange)
+            factory = ImmersiveReadingViewModelFactory(
+                context = context,
+                onAsyncStateChange = onAsyncStateChange,
+                readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null
+            )
         )
         vm.content.collectAsStateWithLifecycle().value
     } else ""
@@ -510,7 +514,11 @@ private fun ReaderControlReadingSurface(
     if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
             key = "immersive-${context.bookUrl}",
-            factory = ImmersiveReadingViewModelFactory(context, onAsyncStateChange)
+            factory = ImmersiveReadingViewModelFactory(
+                context = context,
+                onAsyncStateChange = onAsyncStateChange,
+                readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null
+            )
         )
         val readingState by vm.uiState.collectAsStateWithLifecycle()
         val content by vm.content.collectAsStateWithLifecycle()
