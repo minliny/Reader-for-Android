@@ -32,6 +32,7 @@ import com.reader.api.Book
 import com.reader.api.BookApi
 import com.reader.api.Chapter
 import com.reader.api.ReaderCoreClient
+import com.reader.android.data.storage.ChapterCacheManager
 import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
 import com.reader.ui.theme.ReaderTextStyles
@@ -99,7 +100,8 @@ fun ImmersiveReadingScreen(
         key = "immersive-${context.bookUrl}",
         factory = ImmersiveReadingViewModelFactory(
             context = context,
-            readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null
+            readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null,
+            chapterCacheManager = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.chapterCacheManager else null
         )
     )
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -213,7 +215,11 @@ class ImmersiveReadingViewModel(
     private val onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
     // P0-3: reading progress repository for restore-on-entry + save-on-leave.
     // Null when AppProvider is unavailable (fixture paths / unit tests).
-    private val readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null
+    private val readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null,
+    // P0-4: chapter cache for cache-first content loading. Null when AppProvider
+    // is unavailable (fixture paths / unit tests). When non-null, the VM consults
+    // the cache before calling bookApi.content() and writes fetched text back.
+    private val chapterCacheManager: ChapterCacheManager? = null
 ) : ViewModel() {
 
     private val bookApi: BookApi? = if (context.sourceId.startsWith(FIXTURE_PREFIX)) null else BookApi(ReaderCoreClient.get())
@@ -316,7 +322,13 @@ class ImmersiveReadingViewModel(
                 val restoredIndex = restoreChapterIndex(context.bookUrl, chapters.size)
                 val chapterToLoad = chapters.getOrNull(restoredIndex) ?: chapters.first()
                 currentChapterIndex = restoredIndex
-                val text = bookApi.content(context.sourceId, book, chapterToLoad)
+                // P0-4: cache-first load — consult chapter cache before hitting Core,
+                // and persist fetched text so repeat reads / offline re-entry skip network.
+                val text = fetchChapterContentWithCache(
+                    cache = chapterCacheManager,
+                    cacheKey = chapterToLoad.url,
+                    title = chapterToLoad.title
+                ) { bookApi!!.content(context.sourceId, book, chapterToLoad) }
                 _content.value = text
                 onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.COMPLETED, _content.value)
             } catch (e: Exception) {
@@ -388,10 +400,34 @@ class ImmersiveReadingViewModel(
     }
 }
 
+/**
+ * P0-4: Cache-first chapter content loader. When [cache] is non-null, consults the cache
+ * before invoking [fetch]; on a miss, fetches from the network and writes the result back
+ * so repeat reads / offline re-entry skip the network. A null [cache] falls through to [fetch].
+ * Cache IO errors are swallowed (best-effort) so a corrupt cache never blocks reading.
+ */
+internal suspend fun fetchChapterContentWithCache(
+    cache: ChapterCacheManager?,
+    cacheKey: String,
+    title: String?,
+    fetch: suspend () -> String
+): String {
+    if (cache != null) {
+        val cached = runCatching { cache.get(cacheKey) }.getOrNull()
+        if (cached != null) return cached.content
+    }
+    val text = fetch()
+    if (cache != null) {
+        runCatching { cache.put(cacheKey, text, title, nextPageUrl = null) }
+    }
+    return text
+}
+
 fun ImmersiveReadingViewModelFactory(
     context: ReaderContext,
     onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
-    readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null
+    readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null,
+    chapterCacheManager: ChapterCacheManager? = null
 ) = viewModelFactory {
-    initializer { ImmersiveReadingViewModel(context, onAsyncStateChange, readingProgressRepository) }
+    initializer { ImmersiveReadingViewModel(context, onAsyncStateChange, readingProgressRepository, chapterCacheManager) }
 }

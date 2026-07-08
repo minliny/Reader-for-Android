@@ -20,6 +20,7 @@ import com.reader.android.data.repository.ReadingProgressRepository
 import com.reader.android.data.storage.AppDatabase
 import com.reader.android.data.storage.BookmarkDao
 import com.reader.android.data.storage.CachedChapterDao
+import com.reader.android.data.storage.ChapterCacheManager
 import com.reader.android.data.storage.RssSubscriptionDao
 import com.reader.android.data.storage.ReadingProgressDao
 
@@ -138,6 +139,17 @@ object AppProvider {
     val cachedChapterDao: CachedChapterDao
         get() = requireDb().cachedChapterDao()
 
+    /**
+     * P0-4: Chapter cache manager. Wraps [cachedChapterDao] so the reading VM can
+     * consult the disk cache before hitting `bookApi.content()` and persist fetched
+     * chapter text for offline / repeat reads. Lazily created.
+     */
+    val chapterCacheManager: ChapterCacheManager
+        get() = _chapterCacheManager ?: ChapterCacheManager(cachedChapterDao).also {
+            _chapterCacheManager = it
+        }
+    private var _chapterCacheManager: ChapterCacheManager? = null
+
     val bookmarkDao: BookmarkDao
         get() = requireDb().bookmarkDao()
 
@@ -209,6 +221,8 @@ object AppProvider {
         _webDavCredentialStore = null
         _permissionRuntimeAdapter = null
         _subscriptionRepo = null
+        _readingProgressRepo = null
+        _chapterCacheManager = null
         _networkAllowed = false
         initialized = false
     }
