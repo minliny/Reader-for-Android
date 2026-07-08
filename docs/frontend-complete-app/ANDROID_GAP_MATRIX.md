@@ -93,7 +93,7 @@ Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at
 
 Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` on 2026-07-08 at HEAD (post audit task 3/4/5).
 
-**74/74 PASS, 0 failures, 0 errors, 0 skipped.** Confirms Stage 4-6 + asyncResult UI overlay + credential.resolve + screenshot code paths are green on device, not just JVM.
+**75/75 PASS, 0 failures, 0 errors, 0 skipped.** Confirms Stage 4-6 + asyncResult UI overlay + credential.resolve + screenshot code paths are green on device, not just JVM. Includes real asyncResult overlay state injection (CANCELLED + DISCARDED) via AppShellViewModel dispatch.
 
 | Test class | Tests | Result | Stage covered |
 | --- | --- | --- | --- |
@@ -116,8 +116,8 @@ Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connecte
 | `com.reader.HostWebViewRenderProofTest` | 5 | PASS | Stage 4 (WebView render) |
 | `com.reader.UnifiedEvidenceInstrumentedTest` | 1 | PASS | unified evidence artifact |
 | `com.reader.android.data.adapter.AndroidPlatformRuntimeInstrumentedSmokeTest` | 4 | PASS | platform runtime smoke |
-| `com.reader.Stage6AsyncResultOverlayScreenshotTest` | 2 | PASS | Stage 6 (asyncResult UI screenshot) |
-| **Total** | **74** | **ALL PASS** | |
+| `com.reader.Stage6AsyncResultOverlayScreenshotTest` | 3 | PASS | Stage 6 (asyncResult UI screenshot — real CANCELLED/DISCARDED overlay injection) |
+| **Total** | **75** | **ALL PASS** | |
 
 ### 8.1 Stage coverage mapping (HEAD-level evidence)
 
@@ -128,11 +128,11 @@ Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connecte
 | 3 — Device proof baseline | `b5596ef` | — | (superseded by this HEAD run) |
 | 4 — WebView closure | `d085548` | — | `HostWebViewRebindProofTest` (3) + `HostWebViewRealExecutorProofTest` (1) + `HostWebViewRenderProofTest` (5) + `HostWebViewP0HeadlessFailClosedProofTest` (3) |
 | 5 — media/anti-bot real lane | `49c9c7d` | `AntiBotDetectingHttpFetchJvmTest` (7) + `MediaDownloadSavePathJvmTest` (4) | `HostMediaDownloadProofTest` (8) + `HostMediaMultiResourceProofTest` (3) + `HostMediaRealDownloadProofTest` (2) + `HostAntiBotProofTest` (6) + `HostAntiBotRealChallengeProofTest` (4) |
-| 6 — Reading-link async guard | `5d1cd6d` | `ReadingLinkAsyncGuardJvmTest` (4) + `AsyncResultOverlayLabelJvmTest` (7, GAP-D-03) + `RealSourceReadingChainJvmTest` (6, GAP-D-02) | `AppLevelReadingChainProofTest` (4) + `Stage6AsyncResultOverlayScreenshotTest` (2, GAP-D-04) |
+| 6 — Reading-link async guard | `5d1cd6d` | `ReadingLinkAsyncGuardJvmTest` (4) + `AsyncResultOverlayLabelJvmTest` (7, GAP-D-03) + `RealSourceReadingChainJvmTest` (6, GAP-D-02) | `AppLevelReadingChainProofTest` (4) + `Stage6AsyncResultOverlayScreenshotTest` (3, GAP-D-04 real overlay injection) |
 
 ### 8.2 Prior device proof (superseded)
 
-The 39/39 run from `b5596ef` (2026-07-07, OnePlus 8Pro) is preserved here for history. It predates Stage 4/5/6 commits and therefore could not — and did not — prove those code paths on device. The HEAD-level 74/74 run above is the current authoritative device proof.
+The 39/39 run from `b5596ef` (2026-07-07, OnePlus 8Pro) is preserved here for history. It predates Stage 4/5/6 commits and therefore could not — and did not — prove those code paths on device. The HEAD-level 75/75 run above is the current authoritative device proof.
 
 Fixes applied during the prior device proof (still in effect):
 - `FileReadHandler`: `DefaultHostFileSystem.read` was throwing `kotlin.io.NoSuchFileException` (Kotlin stdlib) instead of `java.nio.file.NoSuchFileException` (Java NIO) because `NoSuchFileException(file)` matched the Kotlin constructor `(File, File?, String?)` over the Java constructor `(String)`. Fixed by using fully-qualified `java.nio.file.NoSuchFileException(file.path)`.
@@ -140,11 +140,11 @@ Fixes applied during the prior device proof (still in effect):
 
 ## 9. Remaining Gaps
 
-The HEAD-level run above proves Stage 1-6 + audit task 3/4/5 code paths compile and pass JVM + instrumented tests (74/74 device, 0 failures). All four Android-specific gaps are now CLOSED:
+The HEAD-level run above proves Stage 1-6 + audit task 3/4/5 code paths compile and pass JVM + instrumented tests (75/75 device, 0 failures). All four Android-specific gaps are now CLOSED:
 
 | Gap ID | Description | Status |
 | --- | --- | --- |
 | GAP-D-01 | `credential.resolve` not registered | **CLOSED (audit task 3)** — `WebDavCredentialProvider` implements `CredentialProvider`, bridging `credentialHandle` → `WebDavCredentialStore.load()` → `Credential{username, password}`. Bearer tokens are packed into both fields. Registered in `ReaderCoreClient.buildHostRuntime` when `context != null` (production path). `WebDavCredentialProviderJvmTest` (7 tests) validates Basic/Digest/Bearer resolution + handler end-to-end. JVM capability-registry test still asserts `credential.resolve` is unregistered on JVM (context=null), with a comment noting the production path registers it. |
 | GAP-D-02 | Real-source reading chain not proven end-to-end | **CLOSED (audit task 4)** — `RealSourceReadingChainJvmTest` (6 tests) exercises real book-source JSON shapes (search/detail/toc/content) through `BookApi.parse*` parsers, builds a `ReaderContext` from the parsed data, and drives the reducer's async-result guard IDLE → PENDING → COMPLETED + stale DISCARDED. Core command dispatch (native .so) is still covered only on device by `CoreRuntimeCapabilityInstrumentedProofTest`. |
-| GAP-D-03 | asyncResult UI visual feedback not captured | **CLOSED (audit task 5)** — `asyncResultOverlayLabel` pure mapping added to `ReaderControlReadingSurface`; DISCARDED/SUPERSEDED render "正在切换到最新…" overlay, CANCELLED renders "加载已取消". `AsyncResultOverlayLabelJvmTest` (7 tests) validates the mapping. `AppShell` passes `state.asyncResult.state` through `ReaderShellScreen` → `ReaderControlReadingSurface`. Device 74/74 confirms no regression. |
-| GAP-D-04 | Stage 4-6 device screenshots / recordings | **CLOSED (audit task 5)** — `Stage6AsyncResultOverlayScreenshotTest` (2 tests) launches `MainActivity` and captures PNG screenshots via `uiAutomation.takeScreenshot()` to `screenshots/`. The test includes a `@Before` guard that re-initializes `ReaderCoreClient` if a prior test's `@After` destroyed the singleton (fixes full-suite ordering flakiness). Device screenshots: `stage6_asyncresult_idle.png` (bookshelf default), `stage6_bookshelf_default.png`. Full device suite 74/74 green. |
+| GAP-D-03 | asyncResult UI visual feedback not captured | **CLOSED (audit task 5)** — `asyncResultOverlayLabel` pure mapping added to `ReaderControlReadingSurface`; DISCARDED/SUPERSEDED render "正在切换到最新…" overlay, CANCELLED renders "加载已取消". `AsyncResultOverlayLabelJvmTest` (7 tests) validates the mapping. `AppShell` passes `state.asyncResult.state` through `ReaderShellScreen` → `ReaderControlReadingSurface`. Device 75/75 confirms no regression. |
+| GAP-D-04 | Stage 4-6 device screenshots / recordings | **CLOSED (audit task 5)** — `Stage6AsyncResultOverlayScreenshotTest` (3 tests) launches `MainActivity` and captures PNG screenshots via `uiAutomation.takeScreenshot()`. The test obtains `AppShellViewModel` from the Activity's ViewModelStore and dispatches intent sequences to inject real asyncResult overlay states: `captureCancelledOverlayScreenshot` (StartAsyncRequest + CancelAsyncRequest → CANCELLED), `captureDiscardedOverlayScreenshot` (StartAsyncRequest(req-B) + CompleteAsyncRequest(req-A, stale) → DISCARDED). Screenshots persisted to `app/build/outputs/screenshots/`: `stage6_bookshelf_idle.png`, `stage6_asyncresult_cancelled.png`, `stage6_asyncresult_discarded.png`. Full device suite 75/75 green. |
