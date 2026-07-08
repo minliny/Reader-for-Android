@@ -1,5 +1,7 @@
 package com.reader.ui.shell
 
+import com.reader.api.Book
+
 /**
  * Single source of truth for the App Shell UI state, aligned with
  * `docs/cross-platform-ui/CROSS_PLATFORM_STATE_MATRIX.md` and the reducer rule in
@@ -418,7 +420,7 @@ sealed class ReaderRoute {
     }
 
     /** Bookshelf/book demo states that collapse into the bookshelf/book native flow. */
-    data class BookState(val id: String) : ReaderRoute() {
+    data class BookState(val id: String, val book: Book? = null) : ReaderRoute() {
         val routeId: String get() = id
     }
 

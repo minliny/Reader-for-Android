@@ -50,10 +50,13 @@ import com.reader.ui.book.BookDetailScreen
 import com.reader.ui.book.BookDirectoryScreen
 import com.reader.ui.book.demoBookDetailRouteState
 import com.reader.ui.book.demoBookDirectoryRouteState
+import com.reader.ui.book.realBookDetailRouteState
+import com.reader.ui.book.realBookDirectoryRouteState
 import com.reader.ui.bookshelf.BookBatchManagementScreen
 import com.reader.ui.bookshelf.BookshelfScreen
 import com.reader.ui.bookshelf.BookshelfTabStateHost
 import com.reader.ui.bookshelf.BookshelfTabTopBar
+import com.reader.ui.bookshelf.BookshelfViewModel
 import com.reader.ui.bookshelf.BookshelfEmptyRouteScreen
 import com.reader.ui.bookshelf.BookshelfSortFilterRouteScreen
 import com.reader.ui.bookshelf.BookshelfSearchSettingsScreen
@@ -794,18 +797,22 @@ fun AppShell(
         is ReaderRoute.BookState -> {
             when (route.id) {
                 "book-detail" -> {
-                    val bookState = remember { demoBookDetailRouteState() }
+                    val bookState = remember(route.book) {
+                        route.book?.let { realBookDetailRouteState(it) } ?: demoBookDetailRouteState()
+                    }
                     BookDetailScreen(
                         state = bookState,
                         onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
                         onContinueReading = { enterReaderFromBook(bookState.book) },
-                        onBookDirectory = { navigateToRouteId("book-directory") },
+                        onBookDirectory = { navigateTo(ReaderRoute.BookState("book-directory", route.book)) },
                         onSourceSwitch = { navigateToRouteId(RouteIds.SOURCE_SWITCH) },
                         onRemoveFromBookshelf = { vm.dispatch(ReaderUiIntent.PopRoute) }
                     )
                 }
                 "book-directory" -> {
-                    val directoryState = remember { demoBookDirectoryRouteState() }
+                    val directoryState = remember(route.book) {
+                        route.book?.let { realBookDirectoryRouteState(it) } ?: demoBookDirectoryRouteState()
+                    }
                     BookDirectoryScreen(
                         state = directoryState,
                         onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
@@ -972,8 +979,8 @@ fun AppShell(
                             onLocalImport = {
                                 vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport))
                             },
-                            onBookDetail = {
-                                vm.dispatch(ReaderUiIntent.PushRoute(DemoRouteRegistry.routeFor("book-detail")))
+                            onBookDetail = { book ->
+                                vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-detail", book)))
                             }
                         )
                         else -> Box(modifier = Modifier.size(0.dp))
@@ -1112,21 +1119,28 @@ private fun TabContent(
             onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
             onDiscover = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.DISCOVER)) }
         )
-        MainTab.DISCOVER -> DiscoverScreen(
-            state = discoverState,
-            onOpenBook = { sourceId, bookUrl, bookName ->
-                vm.dispatch(
-                    ReaderUiIntent.EnterReaderFromAction(
-                        sourceId = sourceId,
-                        bookUrl = bookUrl,
-                        bookName = bookName
+        MainTab.DISCOVER -> {
+            // P0-2: share the Activity-scoped BookshelfViewModel so the discover shelf-dot
+            // reflects the real Core-owned bookshelf instead of the demo inShelf flag.
+            val bookshelfVm: BookshelfViewModel = viewModel()
+            val shelfBookUrls by bookshelfVm.shelfBookUrls.collectAsStateWithLifecycle()
+            DiscoverScreen(
+                state = discoverState,
+                onOpenBook = { sourceId, bookUrl, bookName ->
+                    vm.dispatch(
+                        ReaderUiIntent.EnterReaderFromAction(
+                            sourceId = sourceId,
+                            bookUrl = bookUrl,
+                            bookName = bookName
+                        )
                     )
-                )
-            },
-            onOpenDiscoverControl = {
-                vm.dispatch(ReaderUiIntent.PushRoute(DemoRouteRegistry.routeFor("discover-control")))
-            }
-        )
+                },
+                onOpenDiscoverControl = {
+                    vm.dispatch(ReaderUiIntent.PushRoute(DemoRouteRegistry.routeFor("discover-control")))
+                },
+                shelfBookUrls = shelfBookUrls
+            )
+        }
         MainTab.RSS -> RssScreen(
             state = rssState,
             onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },

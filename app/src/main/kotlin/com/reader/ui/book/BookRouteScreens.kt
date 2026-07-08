@@ -188,10 +188,33 @@ fun demoBookDetailRouteState(book: Book = demoLibraryBook()): BookDetailRouteSta
         previewChapters = demoBookPreviewChapters()
     )
 
+/**
+ * P0-2: Builds a [BookDetailRouteState] from a real [Book] carried by the route.
+ * Falls back to demo copy for blank fields so the hero card never renders empty text.
+ */
+fun realBookDetailRouteState(book: Book): BookDetailRouteState =
+    BookDetailRouteState(
+        book = book,
+        sourceName = book.origin.ifBlank { book.kind.ifBlank { "书源" } },
+        sourceMeta = book.latestChapterTitle.ifBlank { "已加入书架" },
+        intro = book.intro.ifBlank { "暂无简介" },
+        previewChapters = emptyList()
+    )
+
 fun demoBookDirectoryRouteState(book: Book = demoLibraryBook()): BookDirectoryRouteState =
     BookDirectoryRouteState(
         book = book,
         chapters = demoBookDirectoryChapters()
+    )
+
+/**
+ * P0-2: Builds a [BookDirectoryRouteState] from a real [Book]. Chapter list starts
+ * empty — the directory screen loads chapters from Core via BookApi on entry.
+ */
+fun realBookDirectoryRouteState(book: Book): BookDirectoryRouteState =
+    BookDirectoryRouteState(
+        book = book,
+        chapters = emptyList()
     )
 
 fun demoLibraryBook(): Book =

@@ -70,7 +70,11 @@ class DiscoverTabState {
 fun DiscoverScreen(
     state: DiscoverTabState,
     onOpenBook: (sourceId: String, bookUrl: String, bookName: String) -> Unit,
-    onOpenDiscoverControl: () -> Unit = {}
+    onOpenDiscoverControl: () -> Unit = {},
+    // P0-2: Core-owned bookshelf mirror, so the "in shelf" dot reflects real shelf state
+    // instead of the demo `inShelf` flag baked into DiscoverBook. Empty set falls back to
+    // the demo flag (e.g. before the shelf loads).
+    shelfBookUrls: Set<String> = emptySet()
 ) {
     with(state) {
         val books = remember(activeEntry, activeFilter, activeSort, refreshTick) {
@@ -139,7 +143,8 @@ fun DiscoverScreen(
                     books = books,
                     onOpenBook = { book ->
                         onOpenBook("fixture://discover", book.bookUrl, book.title)
-                    }
+                    },
+                    shelfBookUrls = shelfBookUrls
                 )
             }
         }
@@ -633,7 +638,11 @@ private fun DiscoverActionButton(
 }
 
 @Composable
-private fun DiscoverBookList(books: List<DiscoverBook>, onOpenBook: (DiscoverBook) -> Unit) {
+private fun DiscoverBookList(
+    books: List<DiscoverBook>,
+    onOpenBook: (DiscoverBook) -> Unit,
+    shelfBookUrls: Set<String> = emptySet()
+) {
     // Demo .fd-discover-book-list: plain section, no bg/border. Rows separated by border-top.
     Column(
         modifier = Modifier
@@ -643,14 +652,20 @@ private fun DiscoverBookList(books: List<DiscoverBook>, onOpenBook: (DiscoverBoo
             DiscoverBookRow(
                 book = book,
                 showTopDivider = index > 0,
-                onClick = { onOpenBook(book) }
+                onClick = { onOpenBook(book) },
+                shelfBookUrls = shelfBookUrls
             )
         }
     }
 }
 
 @Composable
-private fun DiscoverBookRow(book: DiscoverBook, showTopDivider: Boolean, onClick: () -> Unit) {
+private fun DiscoverBookRow(
+    book: DiscoverBook,
+    showTopDivider: Boolean,
+    onClick: () -> Unit,
+    shelfBookUrls: Set<String> = emptySet()
+) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     val rowBorderColor = Color(0xFFB4A697).copy(alpha = 0.24f)
@@ -676,12 +691,16 @@ private fun DiscoverBookRow(book: DiscoverBook, showTopDivider: Boolean, onClick
     ) {
         Box {
             DiscoverCoverTile(book)
+            // P0-2: in-shelf dot reflects the Core-owned bookshelf when shelfBookUrls is
+            // populated; otherwise falls back to the demo inShelf flag.
+            val inShelf = shelfBookUrls.isNotEmpty() && book.bookUrl in shelfBookUrls ||
+                (shelfBookUrls.isEmpty() && book.inShelf)
             // .fd-discover-shelf-dot: absolute 12x12, border 2px surface, circle
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .size(12.dp)
-                    .background(if (book.inShelf) colors.primary else extra.muted, ReaderShapes.pill)
+                    .background(if (inShelf) colors.primary else extra.muted, ReaderShapes.pill)
                     .border(2.dp, colors.surface, ReaderShapes.pill)
             )
         }
