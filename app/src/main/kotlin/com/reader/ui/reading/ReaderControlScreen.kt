@@ -90,6 +90,7 @@ fun ReaderShellScreen(
     activeSession: com.reader.ui.shell.ActiveSession? = null,
     onSessionToggle: () -> Unit = {},
     onSessionStop: () -> Unit = {},
+    onStartTts: (String) -> Unit = {},
     onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
     asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE
 ) {
@@ -107,6 +108,15 @@ fun ReaderShellScreen(
     }
     val title = context?.bookName?.takeIf { it.isNotBlank() } ?: "长夜余火"
     val isImmersive = routeId == RouteIds.IMMERSIVE_READING
+    // P0-5: fetch the same ImmersiveReadingViewModel instance (scoped by bookUrl key)
+    // to obtain current chapter text for TTS dispatch.
+    val ttsText: String = if (context != null) {
+        val vm: ImmersiveReadingViewModel = viewModel(
+            key = "immersive-${context.bookUrl}",
+            factory = ImmersiveReadingViewModelFactory(context, onAsyncStateChange)
+        )
+        vm.content.collectAsStateWithLifecycle().value
+    } else ""
     val readerRouteId = if (routeId == RouteIds.SOURCE_SWITCH) RouteIds.READER_CONTROL else routeId
     val fullPanelKind = readerFullPanelKind(readerRouteId)
     val utilityPanelKind = readerUtilityPanelKind(readerRouteId)
@@ -180,6 +190,10 @@ fun ReaderShellScreen(
                 fullPanelKind != null -> ReaderFullPagePanel(
                     kind = fullPanelKind,
                     onNavigate = onNavigate,
+                    ttsText = ttsText,
+                    onStartTts = onStartTts,
+                    onSessionToggle = onSessionToggle,
+                    onSessionStop = onSessionStop,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 34.dp)
@@ -194,6 +208,10 @@ fun ReaderShellScreen(
                 else -> ReaderControlBottomSheet(
                     routeId = readerRouteId,
                     onNavigate = onNavigate,
+                    ttsText = ttsText,
+                    onStartTts = onStartTts,
+                    onSessionToggle = onSessionToggle,
+                    onSessionStop = onSessionStop,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 18.dp)
@@ -451,6 +469,10 @@ private fun FlowShellStepRegion(
         ReaderControlBottomSheet(
             routeId = RouteIds.READER_CONTROL,
             onNavigate = onNavigate,
+            ttsText = "",
+            onStartTts = {},
+            onSessionToggle = {},
+            onSessionStop = {},
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(start = 12.dp, end = 12.dp, bottom = 18.dp)
@@ -915,6 +937,10 @@ private fun ReaderControlTopOverlay(
 private fun ReaderControlBottomSheet(
     routeId: String,
     onNavigate: (String) -> Unit,
+    ttsText: String,
+    onStartTts: (String) -> Unit,
+    onSessionToggle: () -> Unit,
+    onSessionStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val extra = readerExtraColors()
@@ -950,7 +976,7 @@ private fun ReaderControlBottomSheet(
         ) {
             when (readerPanelKind(routeId)) {
                 "directory" -> ReaderDirectoryPanel(onNavigate)
-                "tts" -> ReaderTtsPanel(onNavigate)
+                "tts" -> ReaderTtsPanel(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop)
                 "appearance" -> ReaderAppearancePanel(onNavigate)
                 "settings" -> ReaderSettingsPanel(onNavigate)
                 "search" -> ReaderSearchPanel(onNavigate)
@@ -966,6 +992,10 @@ private fun ReaderControlBottomSheet(
 private fun ReaderFullPagePanel(
     kind: String,
     onNavigate: (String) -> Unit,
+    ttsText: String,
+    onStartTts: (String) -> Unit,
+    onSessionToggle: () -> Unit,
+    onSessionStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val module = readerModules.firstOrNull { it.kind == kind } ?: readerModules.last()
@@ -979,7 +1009,7 @@ private fun ReaderFullPagePanel(
     ) {
         when (kind) {
             "directory" -> ReaderFullDirectoryContent(onNavigate)
-            "tts" -> ReaderFullTtsContent(onNavigate)
+            "tts" -> ReaderFullTtsContent(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop)
             "appearance" -> ReaderFullAppearanceContent(onNavigate)
             else -> ReaderFullSettingsContent(onNavigate)
         }
@@ -1090,10 +1120,18 @@ private fun ReaderFullDirectoryContent(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderFullTtsContent(onNavigate: (String) -> Unit) {
+private fun ReaderFullTtsContent(
+    onNavigate: (String) -> Unit,
+    ttsText: String,
+    onStartTts: (String) -> Unit,
+    onToggleSession: () -> Unit,
+    onStopSession: () -> Unit
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         ReaderIconOnlyAction(R.drawable.reader_ic_chevron_left, "上一句", {}, Modifier.weight(1f))
-        ReaderIconOnlyAction(R.drawable.reader_ic_play, "开始朗读", {}, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_play, "开始朗读", { onStartTts(ttsText) }, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_pause, "暂停", { onToggleSession() }, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_more, "停止", { onStopSession() }, Modifier.weight(1f))
         ReaderIconOnlyAction(R.drawable.reader_ic_chevron, "下一句", {}, Modifier.weight(1f))
     }
     ReaderFullSettingBlock(title = "语速", meta = "1.0x") {
@@ -1980,16 +2018,22 @@ private fun ReaderDirectoryPanel(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderTtsPanel(onNavigate: (String) -> Unit) {
+private fun ReaderTtsPanel(
+    onNavigate: (String) -> Unit,
+    ttsText: String,
+    onStartTts: (String) -> Unit,
+    onToggleSession: () -> Unit,
+    onStopSession: () -> Unit
+) {
     ReaderPanelTitle("朗读")
     ReaderPanelRow(R.drawable.reader_ic_tts, "系统女声", "1.0x · 当前句", null) {}
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        ReaderIconOnlyAction(R.drawable.reader_ic_pause, "暂停朗读", { onNavigate(RouteIds.READER_TTS) }, Modifier.weight(1f))
-        ReaderIconOnlyAction(R.drawable.reader_ic_play, "播放朗读", { onNavigate(RouteIds.READER_TTS) }, Modifier.weight(1f))
-        ReaderIconOnlyAction(R.drawable.reader_ic_more, "停止朗读", { onNavigate(RouteIds.READER_CONTROL) }, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_pause, "暂停朗读", { onToggleSession() }, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_play, "播放朗读", { onStartTts(ttsText); onNavigate(RouteIds.READER_TTS) }, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_more, "停止朗读", { onStopSession(); onNavigate(RouteIds.READER_CONTROL) }, Modifier.weight(1f))
     }
 }
 

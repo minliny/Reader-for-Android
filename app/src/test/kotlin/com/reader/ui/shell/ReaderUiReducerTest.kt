@@ -571,7 +571,7 @@ class ReaderUiReducerTest {
     fun `StartTtsSession sets activeSession to TTS playing`() {
         val next = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartTtsSession
+            ReaderUiIntent.StartTtsSession(text = "测试朗读文本")
         )
         val session = next.activeSession
         assertNotNull(session)
@@ -587,7 +587,7 @@ class ReaderUiReducerTest {
         )
         assertEquals(SessionType.AUTO_PAGE, withAutoPage.activeSession!!.type)
 
-        val withTts = ReaderUiReducer.reduce(withAutoPage, ReaderUiIntent.StartTtsSession)
+        val withTts = ReaderUiReducer.reduce(withAutoPage, ReaderUiIntent.StartTtsSession(text = "测试"))
         assertEquals(
             "TTS must replace autoPage — only one session at a time",
             SessionType.TTS,
@@ -599,7 +599,7 @@ class ReaderUiReducerTest {
     fun `activeSession is mutually exclusive - starting AUTO_PAGE replaces TTS`() {
         val withTts = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartTtsSession
+            ReaderUiIntent.StartTtsSession(text = "测试朗读文本")
         )
         assertEquals(SessionType.TTS, withTts.activeSession!!.type)
 
@@ -609,6 +609,60 @@ class ReaderUiReducerTest {
             SessionType.AUTO_PAGE,
             withAutoPage.activeSession!!.type
         )
+    }
+
+    // ── P0-5: DispatchHostRequest enqueued by session intents ──────────────
+
+    @Test
+    fun `StartTtsSession enqueues tts system start DispatchHostRequest`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "朗读内容")
+        )
+        assertEquals("pendingHostRequests must have 1 entry", 1, next.pendingHostRequests.size)
+        val dispatch = next.pendingHostRequests.first()
+        assertEquals("tts.system.start", dispatch.capability)
+        assertTrue("params must contain text", dispatch.paramsJson.contains("朗读内容"))
+    }
+
+    @Test
+    fun `StopSession enqueues tts system stop when TTS session active`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "朗读")
+        )
+        val stopped = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StopSession)
+        // StartTtsSession enqueues 1, StopSession enqueues 1 more
+        assertEquals("pendingHostRequests must have 2 entries", 2, stopped.pendingHostRequests.size)
+        val stopDispatch = stopped.pendingHostRequests.last()
+        assertEquals("tts.system.stop", stopDispatch.capability)
+    }
+
+    @Test
+    fun `ToggleSessionPlaying enqueues tts pause when playing`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "朗读")
+        )
+        assertTrue("must be playing initially", withTts.activeSession!!.playing)
+        val toggled = ReaderUiReducer.reduce(withTts, ReaderUiIntent.ToggleSessionPlaying)
+        assertFalse("must be paused after toggle", toggled.activeSession!!.playing)
+        val pauseDispatch = toggled.pendingHostRequests.last()
+        assertEquals("tts.system.pause", pauseDispatch.capability)
+    }
+
+    @Test
+    fun `ToggleSessionPlaying enqueues tts resume when paused`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "朗读")
+        )
+        val paused = ReaderUiReducer.reduce(withTts, ReaderUiIntent.ToggleSessionPlaying)
+        assertFalse("must be paused", paused.activeSession!!.playing)
+        val resumed = ReaderUiReducer.reduce(paused, ReaderUiIntent.ToggleSessionPlaying)
+        assertTrue("must be playing after resume", resumed.activeSession!!.playing)
+        val resumeDispatch = resumed.pendingHostRequests.last()
+        assertEquals("tts.system.resume", resumeDispatch.capability)
     }
 
     @Test
@@ -627,7 +681,7 @@ class ReaderUiReducerTest {
     fun `ToggleSessionPlaying flips playing flag without changing type`() {
         val withTts = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartTtsSession
+            ReaderUiIntent.StartTtsSession(text = "测试朗读文本")
         )
         assertTrue(withTts.activeSession!!.playing)
 
@@ -656,7 +710,7 @@ class ReaderUiReducerTest {
     fun `UpdateTtsProgress only affects TTS session`() {
         val withTts = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartTtsSession
+            ReaderUiIntent.StartTtsSession(text = "测试朗读文本")
         )
         val updated = ReaderUiReducer.reduce(
             withTts,
@@ -1219,7 +1273,7 @@ class ReaderUiReducerTest {
     fun `tab switch clears activeSession and overlayState (interrupt rule)`() {
         val withSession = ReaderUiReducer.reduce(
             ReaderUiState(activeTab = MainTab.BOOKSHELF),
-            ReaderUiIntent.StartTtsSession
+            ReaderUiIntent.StartTtsSession(text = "测试朗读文本")
         )
         val withOverlay = ReaderUiReducer.reduce(
             withSession,

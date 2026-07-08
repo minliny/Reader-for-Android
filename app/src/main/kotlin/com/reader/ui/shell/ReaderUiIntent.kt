@@ -164,9 +164,10 @@ sealed class ReaderUiIntent {
     }
 
     /** 启动 TTS 朗读会话（互斥：先清 AUTO_PAGE）。 */
-    object StartTtsSession : ReaderUiIntent() {
+    data class StartTtsSession(
+        val text: String,
         override val requestId: String = generateRequestId()
-    }
+    ) : ReaderUiIntent()
 
     /** 停止当前会话。 */
     object StopSession : ReaderUiIntent() {

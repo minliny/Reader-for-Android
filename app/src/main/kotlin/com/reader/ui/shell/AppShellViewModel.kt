@@ -127,7 +127,7 @@ class AppShellViewModel(
                 MotionController.contractFor(MotionIdConstants.READER_SESSION_AUTO_PAGE_START)?.defaultDurationMs
                     ?: 200L
             )
-            ReaderUiIntent.StartTtsSession -> Tuple4(
+            is ReaderUiIntent.StartTtsSession -> Tuple4(
                 MotionIdConstants.READER_SESSION_TTS_START,
                 from,
                 RouteIds.IMMERSIVE_READING,

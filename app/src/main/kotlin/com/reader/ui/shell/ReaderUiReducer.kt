@@ -1,5 +1,7 @@
 package com.reader.ui.shell
 
+import org.json.JSONObject
+
 /**
  * Pure reducer for [ReaderUiState]. No Android / Compose dependencies — fully unit-testable.
  *
@@ -114,16 +116,58 @@ object ReaderUiReducer {
 
         // ── 会话状态（S7）── MotionId: reader.session.autoPage.start / reader.session.tts.start
         // autoPage 与 tts 互斥：设置 activeSession 自动清掉另一种。
+        // P0-5: session intents also enqueue DispatchHostRequest so the AppShell
+        // effect collector drives the real TTS engine via HostAdapter.
         ReaderUiIntent.StartAutoPageSession -> state.copy(
             activeSession = ActiveSession(SessionType.AUTO_PAGE, playing = true)
         )
-        ReaderUiIntent.StartTtsSession -> state.copy(
-            activeSession = ActiveSession(SessionType.TTS, playing = true)
-        )
-        ReaderUiIntent.StopSession -> state.copy(activeSession = null)
-        ReaderUiIntent.ToggleSessionPlaying -> state.copy(
-            activeSession = state.activeSession?.copy(playing = !state.activeSession.playing)
-        )
+        is ReaderUiIntent.StartTtsSession -> {
+            val ttsDispatch = HostRequestDispatch(
+                dispatchId = generateDispatchId("tts-start"),
+                capability = "tts.system.start",
+                paramsJson = JSONObject().put("text", intent.text).put("utteranceId", intent.requestId).toString()
+            )
+            state.copy(
+                activeSession = ActiveSession(SessionType.TTS, playing = true),
+                pendingHostRequests = state.pendingHostRequests + ttsDispatch
+            )
+        }
+        ReaderUiIntent.StopSession -> {
+            val stopDispatch = state.activeSession?.takeIf { it.type == SessionType.TTS }?.let {
+                HostRequestDispatch(
+                    dispatchId = generateDispatchId("tts-stop"),
+                    capability = "tts.system.stop",
+                    paramsJson = "{}"
+                )
+            }
+            state.copy(
+                activeSession = null,
+                pendingHostRequests = if (stopDispatch != null) state.pendingHostRequests + stopDispatch else state.pendingHostRequests
+            )
+        }
+        ReaderUiIntent.ToggleSessionPlaying -> {
+            val session = state.activeSession
+            val newPlaying = !(session?.playing ?: false)
+            val dispatch = if (session?.type == SessionType.TTS) {
+                if (newPlaying) {
+                    HostRequestDispatch(
+                        dispatchId = generateDispatchId("tts-resume"),
+                        capability = "tts.system.resume",
+                        paramsJson = "{}"
+                    )
+                } else {
+                    HostRequestDispatch(
+                        dispatchId = generateDispatchId("tts-pause"),
+                        capability = "tts.system.pause",
+                        paramsJson = "{}"
+                    )
+                }
+            } else null
+            state.copy(
+                activeSession = session?.copy(playing = newPlaying),
+                pendingHostRequests = if (dispatch != null) state.pendingHostRequests + dispatch else state.pendingHostRequests
+            )
+        }
         is ReaderUiIntent.UpdateCountdown -> state.copy(
             activeSession = state.activeSession?.copy(countdownSeconds = intent.seconds)
         )
@@ -581,4 +625,6 @@ object ReaderUiReducer {
         PermissionKind.FILE_ACCESS -> current.copy(fileAccess = status)
         PermissionKind.BATTERY_OPTIMIZATION -> current.copy(batteryOptimization = status)
     }
+
+    private fun generateDispatchId(prefix: String): String = "$prefix-${System.nanoTime()}"
 }
