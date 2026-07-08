@@ -1,10 +1,13 @@
 package com.reader.host
 
 import com.reader.android.data.model.BookSource
+import com.reader.android.data.network.FakeRssItemRepository
+import com.reader.android.data.network.FakeSubscriptionRepository
+import com.reader.android.data.network.RssItem
+import com.reader.android.data.network.RssItemRepository
 import com.reader.android.data.network.RssParser
 import com.reader.android.data.network.RssSubscription
 import com.reader.android.data.network.SubscriptionRepository
-import com.reader.android.data.network.FakeSubscriptionRepository
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import kotlinx.coroutines.runBlocking
@@ -35,7 +38,8 @@ import org.json.JSONObject
 class SourceRssContext(
     val bookSourceRepository: BookSourceRepository,
     val subscriptionRepository: SubscriptionRepository,
-    val rssParser: RssParser = RssParser()
+    val rssParser: RssParser = RssParser(),
+    val rssItemRepository: RssItemRepository
 )
 
 // ── source.list ──────────────────────────────────────────────────────────────
@@ -349,6 +353,9 @@ class RssRefreshHandler(private val ctx: SourceRssContext) : CapabilityHandler {
         val lastGuid = feed.items.firstOrNull()?.guid
         runBlocking {
             ctx.subscriptionRepository.markUpdated(feedUrl, lastGuid)
+            // Cache parsed items so `rss.list` / `rss.item.read` can serve
+            // them locally as a fallback until Core lands those methods.
+            ctx.rssItemRepository.upsertAll(feedUrl, feed.items)
         }
 
         val itemsArr = JSONArray()
@@ -371,6 +378,93 @@ class RssRefreshHandler(private val ctx: SourceRssContext) : CapabilityHandler {
     companion object { const val CAPABILITY = "rss.refresh"; private const val INTERNAL = "INTERNAL" }
 }
 
+// ── rss.list ─────────────────────────────────────────────────────────────────
+
+/**
+ * `rss.list` — returns cached RSS articles as a JSON array. Backed by the
+ * local [RssItemRepository] cache populated by `rss.refresh`, so the UI can
+ * render the article list without waiting for Core to implement this method.
+ *
+ * Params:
+ *  - `feedUrl` (optional): filter to a single feed.
+ *  - `unreadOnly` (optional, default false): return only unread items.
+ *  - `limit` (optional, default 100): cap on items returned (ignored when
+ *    `unreadOnly=true` is set, since unread is typically a small set).
+ *
+ * Returns `{items: [...], count: N}`. Each item carries title/link/
+ * description/author/pubDate/guid. Read state is implicit: when
+ * `unreadOnly=true` is set, only unread items are returned.
+ */
+class RssListHandler(private val ctx: SourceRssContext) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
+        }
+        val feedUrl = params.optString("feedUrl", "")
+        val unreadOnly = params.optBoolean("unreadOnly", false)
+        val limit = params.optInt("limit", 100)
+
+        val items: List<RssItem> = runBlocking {
+            when {
+                feedUrl.isNotEmpty() -> ctx.rssItemRepository.listByFeed(feedUrl)
+                unreadOnly -> ctx.rssItemRepository.listUnread()
+                else -> ctx.rssItemRepository.listAll(limit)
+            }
+        }
+
+        val arr = JSONArray()
+        items.forEach { arr.put(rssItemToJson(it)) }
+        return HostReply.complete(JSONObject()
+            .put("items", arr)
+            .put("count", items.size)
+            .toString())
+    }
+
+    companion object { const val CAPABILITY = "rss.list"; private const val INTERNAL = "INTERNAL" }
+}
+
+// ── rss.item.read ─────────────────────────────────────────────────────────────
+
+/**
+ * `rss.item.read` — marks a cached RSS article as read/unread by GUID.
+ * Backed by [RssItemRepository.markRead] so the read-state persists across
+ * process death and survives feed re-fetch (items are keyed by GUID).
+ *
+ * Params:
+ *  - `guid` (required): the item GUID to update.
+ *  - `read` (required): true = mark read, false = mark unread.
+ *
+ * Returns `{marked: true, guid: "...", read: true/false}`.
+ */
+class RssItemReadHandler(private val ctx: SourceRssContext) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
+        }
+        val guid = params.optString("guid", "")
+        if (guid.isEmpty()) return HostReply.error(INTERNAL, "guid required", false)
+        if (!params.has("read")) return HostReply.error(INTERNAL, "read required", false)
+        val read = params.getBoolean("read")
+        runBlocking { ctx.rssItemRepository.markRead(guid, read) }
+        return HostReply.complete(JSONObject()
+            .put("marked", true)
+            .put("guid", guid)
+            .put("read", read)
+            .toString())
+    }
+
+    companion object { const val CAPABILITY = "rss.item.read"; private const val INTERNAL = "INTERNAL" }
+}
+
+/** Shared JSON shape for an [RssItem] — used by `rss.list` and `rss.refresh`. */
+private fun rssItemToJson(item: RssItem): JSONObject = JSONObject()
+    .put("title", item.title)
+    .put("link", item.link)
+    .put("description", item.description ?: JSONObject.NULL)
+    .put("author", item.author ?: JSONObject.NULL)
+    .put("pubDate", item.pubDate ?: JSONObject.NULL)
+    .put("guid", item.guid ?: JSONObject.NULL)
+
 /**
  * Convenience entry point: registers the full source/RSS capability set
  * onto a [HostRuntime] / [HostAdapter] chain. Called from
@@ -390,6 +484,8 @@ fun SourceRssContext.registerHandlers(runtime: HostRuntime): HostRuntime = runti
     .register(RssSubscriptionAddHandler.CAPABILITY, RssSubscriptionAddHandler(this))
     .register(RssSubscriptionDeleteHandler.CAPABILITY, RssSubscriptionDeleteHandler(this))
     .register(RssRefreshHandler.CAPABILITY, RssRefreshHandler(this))
+    .register(RssListHandler.CAPABILITY, RssListHandler(this))
+    .register(RssItemReadHandler.CAPABILITY, RssItemReadHandler(this))
 
 /**
  * Builds a [SourceRssContext] backed by fake repositories for JVM tests.
@@ -397,7 +493,8 @@ fun SourceRssContext.registerHandlers(runtime: HostRuntime): HostRuntime = runti
  */
 fun fakeSourceRssContext(
     bookSources: List<BookSource> = emptyList(),
-    subscriptions: List<RssSubscription> = emptyList()
+    subscriptions: List<RssSubscription> = emptyList(),
+    rssItemRepository: RssItemRepository = FakeRssItemRepository()
 ): SourceRssContext {
     val bookSourceRepo = FakeBookSourceRepository().apply {
         bookSources.forEach { add(it) }
@@ -405,5 +502,5 @@ fun fakeSourceRssContext(
     val subRepo = FakeSubscriptionRepository().apply {
         runBlocking { subscriptions.forEach { add(it) } }
     }
-    return SourceRssContext(bookSourceRepo, subRepo)
+    return SourceRssContext(bookSourceRepo, subRepo, rssItemRepository = rssItemRepository)
 }

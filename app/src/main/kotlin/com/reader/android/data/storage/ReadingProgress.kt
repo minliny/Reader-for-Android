@@ -52,10 +52,12 @@ interface ReadingProgressDao {
         SyncOperationLog::class,
         BookmarkEntity::class,
         RssSubscriptionEntity::class,
+        RssItemEntity::class,
         BookGroupEntity::class,
-        BookGroupAssignment::class
+        BookGroupAssignment::class,
+        SearchHistoryEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -64,5 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncOperationLogDao(): SyncOperationLogDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun rssSubscriptionDao(): RssSubscriptionDao
+    abstract fun rssItemDao(): RssItemDao
     abstract fun bookGroupDao(): BookGroupDao
+    abstract fun searchHistoryDao(): SearchHistoryDao
 }

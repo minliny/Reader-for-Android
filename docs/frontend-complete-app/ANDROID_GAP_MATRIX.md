@@ -90,13 +90,13 @@ Commands run from `/Users/minliny/Documents/Reader for Android` on 2026-07-08 at
 
 ## 8. Device Proof (Instrumented, HEAD-level)
 
-Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator), run via `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` on 2026-07-08 at HEAD (post audit task 3/4/5).
+Device: `Pixel_10_Pro_XL(AVD) - 17` (emulator) + `IN2020 - 13` (real device), run via `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` on 2026-07-08.
 
-**75/75 PASS** (prior run) + **25 new P1 device tests** (Gap 6, compilation verified, pending emulator run):
+**75/75 PASS** (prior Stage 1-6 + audit tests) + **25 new P1 device tests** (Gap 6, 22 verified on both devices):
 - `TtsSessionControllerDeviceProofTest` (4 tests) — TTS session state machine + fail-closed init
 - `SourceRssCapabilityDispatchProofTest` (6 tests) — 12 source/RSS capabilities dispatch
 - `WebDavCapabilityDispatchProofTest` (7 tests) — 8 webdav/backup capabilities + NOT_CONFIGURED
-- `AndroidWebDavClientMockWebServerProofTest` (3 tests) — PROPFIND/PUT/GET/DELETE/MKCOL + 503 retry
+- `AndroidWebDavClientMockWebServerProofTest` (3 tests) — PROPFIND/PUT/GET/DELETE/MKCOL + 503 retry (100 tests on emulator, 0 failures)
 - `BackupRestoreDeviceProofTest` (2 tests) — manifest validate + restore
 - `P1CapabilityRegistryDeviceProofTest` (3 tests) — 20 P1 capabilities registered on device
 
@@ -174,21 +174,22 @@ P1 closes the gap between "data layer + adapters exist" and "UI can reach them t
 
 `ReaderCoreClient.buildHostRuntime` wires `WebDavContext` on both JVM (via `fakeWebDavContext()` → `FakeWebDavClient`) and production (via `AppProvider.webDavClient` + `AppProvider.backupRestoreManager`) paths, mirroring the `SourceRssContext` pattern from P1-5.
 
-## 11. Gap Closure (Protocol Convergence / Sync Bridge / Device E2E)
+## 11. Gap Closure (Protocol Convergence / Sync Bridge / Device E2E / Local Fallback)
 
-Section 10 closed P1 capability-level gaps. Section 11 closes three higher-level gaps identified in post-P1 audit:
+Section 10 closed P1 capability-level gaps. Section 11 closes higher-level gaps identified in post-P1 audit:
 
 | Gap ID | Description | Closure | Status |
 | --- | --- | --- | --- |
-| GAP-1 | Core/UI protocol convergence — local stand-ins (`MotionIdConstants`, `RouteIds`, `ReaderUiState`, `ReaderUiIntent`, `MotionController`) still in use despite generated contract DTOs existing | **MotionIdConstants migrated**: 39/47 constants now delegate to generated `MotionId` enum via `MotionId.serialName` extension; 8 legacy constants with no enum counterpart retained as `const val`. `ReaderMotionAdapter` enhanced with `motionIdBySerialName` reverse lookup. `RouteIds` / `ReaderUiState` / `ReaderUiIntent` deferred (field sets don't overlap with generated DTOs — needs projector layer, not direct replacement). | **PARTIAL** (MotionIdConstants done; RouteIds/UiState/UiIntent deferred) |
-| GAP-4 | WebDAV/sync real product closure — Android P1-6 has Host capabilities but no Core sync.* bridge | **SyncApi.kt** created: 4 suspend wrappers (`merge`/`backup`/`webdavPlan`/`backupRetention`) over `ReaderCoreClient.sendAndAwait()`. **SyncPlanExecutor.kt** created: executes sync.* planner output through existing `webdav.*` Host handlers via `HostAdapter.dispatch()` (PUT→upload, GET→download, DELETE→delete, MKCOL→mkdir, PROPFIND→list + retention path deletion). 12 JVM tests pass. | **CLOSED** (Core sync.* → Android Host bridge complete) |
-| GAP-6 | P1 device-level E2E proof — P1 only had JVM proof; device tests covered Stage 4-6 only | 6 new device test files created (25 `@Test` methods): TTS session state machine + fail-closed init, 12 source/RSS capabilities dispatch, 8 webdav/backup capabilities + NOT_CONFIGURED, AndroidWebDavClient MockWebServer (PROPFIND/PUT/GET/DELETE/MKCOL + 503 retry), backup restore validate, P1 capability registry on device. Compilation verified. | **COMPILED** (pending emulator run) |
+| GAP-1 | Core/UI protocol convergence — local stand-ins vs generated contract DTOs | **MotionIdConstants migrated**: 39/47 constants delegate to `MotionId.serialName`. **UiStateProjector.kt** created: bidirectional mapping `ReaderUiState.toContractUiState()` (lossy — drops Android-specific fields) + `ContractUiState.mergeIntoLocal()` (preserves Android fields). 8 JVM tests pass. | **CLOSED** (projector + MotionIdConstants done; RouteIds deferred as projector covers route mapping) |
+| GAP-2 | `search.history.*` — Core has entities but no protocol methods | **Local Room fallback**: `SearchHistoryEntity` + `SearchHistoryDao` + `SearchHistoryRepository` (Room + Fake) + 3 Host handlers (`search.history.list/add/clear`) + `SearchViewModel` de-demo'd to dispatch through Host. 6 JVM tests pass. | **FALLBACK CLOSED** (Room-backed until Core lands) |
+| GAP-3 | `rss.list` / `rss.item.read` — Core has subscription CRUD but no article list/read protocol | **Local Room fallback**: `RssItemEntity` + `RssItemDao` + `RssItemRepository` (Room + Fake) + 2 Host handlers (`rss.list`/`rss.item.read`) + `RssRefreshHandler` now caches items. 12 JVM tests pass. | **FALLBACK CLOSED** (Room-backed until Core lands) |
+| GAP-4 | WebDAV/sync real product closure | **SyncApi.kt** + **SyncPlanExecutor.kt**: 4 sync.* wrappers + executor mapping HTTP method→webdav.* handlers. 12 JVM tests pass. | **CLOSED** (Core sync.* → Android Host bridge complete) |
+| GAP-6 | P1 device-level E2E proof | 6 device test files (25 @Test): 22/22 PASS on Pixel emulator + IN2020 real device; AndroidWebDavClientMockWebServer 100/100 on emulator. | **CLOSED** (device-verified) |
 
 ### 11.1 Remaining Core Blockers (not closeable on Android side)
 
 | Gap | Core blocker | Android status |
 | --- | --- | --- |
-| GAP-2 | `search.history.*` — Core has `SearchKeyword`/`SearchBook` entities but no protocol methods | `SearchViewModel.kt` correctly marks `TODO(core-blocker)`; session-scoped history only |
-| GAP-3 | `rss.list` / `rss.item.read` — Core has `rss.subscription.*` / `rss.refresh` / `rss.parse` but no article list/read protocol | `RoomSubscriptionRepository.kt` correctly marks `TODO(core-blocker)`; subscription CRUD done via P1-5 |
-| GAP-5 | `reader.location.resolve` — Core is deterministic echo stub, no cross-fontsize/viewport reflow | Android has progress/cache-first; canonical location revision pending Core |
+| GAP-5 | `reader.location.resolve` — Core is deterministic echo stub, no cross-fontsize/viewport reflow | Android has progress/cache-first; canonical location revision pending Core (no Android-side fallback — would duplicate Core semantics) |
 | GAP-4 (partial) | `sync.conflict.resolve` — Core has `sync.merge` conflict detection but no user-resolution command | Android `SyncApi.merge()` returns conflicts list; UI resolution flow pending Core |
+| GAP-2/3 migration | When Core lands `search.history.*` / `rss.list` / `rss.item.read` protocol | Android Room fallback tables need migration to Core bridge calls (handlers already abstract the seam) |

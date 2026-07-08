@@ -47,6 +47,7 @@ import com.reader.host.PersistenceGetHandler
 import com.reader.host.PersistencePutHandler
 import com.reader.host.ReaderCoreHostTransport
 import com.reader.host.SharedPreferencesHostPersistence
+import com.reader.host.SearchHistoryContext
 import com.reader.host.SourceGetVariableHandler
 import com.reader.host.SourceLoginHeaderMapHandler
 import com.reader.host.SourceRssContext
@@ -298,7 +299,8 @@ class ReaderCoreClient private constructor(
             val sourceRssContext = if (context != null) {
                 SourceRssContext(
                     bookSourceRepository = AppProvider.bookSourceRepository,
-                    subscriptionRepository = AppProvider.subscriptionRepository
+                    subscriptionRepository = AppProvider.subscriptionRepository,
+                    rssItemRepository = AppProvider.rssItemRepository
                 )
             } else {
                 com.reader.host.fakeSourceRssContext()
@@ -323,6 +325,19 @@ class ReaderCoreClient private constructor(
                 com.reader.host.fakeWebDavContext()
             }
             hostRuntimeBuilder = webDavContext.registerCapabilityHandlers(hostRuntimeBuilder)
+            // ── P2: Search history capability handlers ──
+            // Pure-JVM (no Android Context) so registered on both paths
+            // (JVM tests + production). Production wires the Room-backed
+            // [com.reader.android.data.repository.RoomSearchHistoryRepository]
+            // via AppProvider; JVM tests get a [com.reader.host.fakeSearchHistoryContext]
+            // backed by FakeSearchHistoryRepository. Local fallback until Core
+            // lands `search.history.*` protocol methods.
+            val searchHistoryContext = if (context != null) {
+                SearchHistoryContext(repository = AppProvider.searchHistoryRepository)
+            } else {
+                com.reader.host.fakeSearchHistoryContext()
+            }
+            hostRuntimeBuilder = searchHistoryContext.registerCapabilityHandlers(hostRuntimeBuilder)
             // ── Slice C: HostFacade — UI-facing capabilities ──
             // Only wire when context is available (production /
             // instrumented). JVM tests inject handlers manually.
