@@ -18,6 +18,7 @@ import com.reader.host.CookieGetHandler
 import com.reader.host.CookieSetHandler
 import com.reader.host.CredentialDeleteHandler
 import com.reader.host.CredentialGetHandler
+import com.reader.host.CredentialResolveHandler
 import com.reader.host.CredentialSetHandler
 import com.reader.host.DefaultHostCache
 import com.reader.host.DefaultHostFileSystem
@@ -48,6 +49,7 @@ import com.reader.host.ReaderCoreHostTransport
 import com.reader.host.SharedPreferencesHostPersistence
 import com.reader.host.SystemInfoHandler
 import com.reader.host.TimeNowHandler
+import com.reader.host.WebDavCredentialProvider
 import com.reader.host.WebViewEvaluateJavaScriptHandler
 import com.reader.host.WebViewExecutor
 import kotlinx.coroutines.Dispatchers
@@ -190,8 +192,11 @@ class ReaderCoreClient private constructor(
          *
          * The returned [HostRuntime] is started (poll thread running).
          *
-         * `credential.resolve` is intentionally NOT registered here — see
-         * Gap D in `docs/host-app-contracts/02-local-storage-sync.md` §3.4.
+         * `credential.resolve` is registered only when [context] is non-null
+         * (production / instrumented), bridged to [WebDavCredentialProvider]
+         * over [AppProvider.webDavCredentialStore]. JVM tests pass
+         * [context] = null and therefore do not register it — the capability
+         * registry JVM test asserts this gap-state for context=null.
          */
         @JvmSynthetic
         internal fun buildHostRuntime(
@@ -283,6 +288,16 @@ class ReaderCoreClient private constructor(
                     downloadCache = null
                 )
                 hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
+                // ── credential.resolve (GAP-D-01 closed) ──
+                // Bridge credential.resolve to WebDavCredentialStore via
+                // WebDavCredentialProvider. Only registered when context is
+                // non-null (production / instrumented) because the store is
+                // AppProvider.webDavCredentialStore. JVM tests stay unregistered
+                // and continue to assert the gap-state for context=null.
+                hostRuntimeBuilder = hostRuntimeBuilder.register(
+                    CredentialResolveHandler.CAPABILITY,
+                    CredentialResolveHandler(WebDavCredentialProvider(AppProvider.webDavCredentialStore))
+                )
             }
             return hostRuntimeBuilder.start()
         }

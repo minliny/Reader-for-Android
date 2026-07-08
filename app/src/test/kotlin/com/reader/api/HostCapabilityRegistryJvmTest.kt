@@ -62,16 +62,17 @@ import org.junit.Test
  * | background.schedule/cancel |  YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | credential.get/set/delete |  YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | storage.path            |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
- * | credential.resolve      | handler-only |   NO (Gap D) |  N/A   |     N/A      |      N/A       |
+ * | credential.resolve      |     YES     |  YES (ctx) |   N/A     |  see below   |  GAP-D-01 closed |
  *
  * "YES (ctx)" = registered only when `init(context)` is called with a non-null
  * Context (production / instrumented). JVM `init(null)` skips HostFacade
  * because TTS / Notification / Clipboard etc. require a real Android Context.
  *
- * `credential.resolve` is a protocol gap (Gap D, see
- * `docs/host-app-contracts/02-local-storage-sync.md` §3.4): the handler
- * exists but no `CredentialProvider` implementation is wired, so it is
- * intentionally NOT registered. Tracked separately.
+ * `credential.resolve` (GAP-D-01 closed): production path now registers it
+ * via `WebDavCredentialProvider` over `AppProvider.webDavCredentialStore`,
+ * bridging `credentialHandle` → `WebDavCredentialStore.load()` →
+ * `Credential{username, password}`. JVM tests pass context=null so it stays
+ * unregistered on JVM — the test below asserts that gap-state for JVM only.
  *
  * `anti_bot.execute` is host-private: Core never emits it directly. The Host
  * re-dispatches intercepted `http.execute` requests through it when
@@ -202,13 +203,15 @@ class HostCapabilityRegistryJvmTest {
         assertNotRegistered("storage.path")
     }
 
-    // ── Gap D: credential.resolve handler exists but is NOT registered ───
+    // ── credential.resolve: JVM context=null → not registered (production path registers it) ───
 
     @Test
-    fun `credential resolve is NOT registered because CredentialProvider is unimplemented Gap D`() {
-        // Handler exists (CredentialResolveHandler.java) but no
-        // CredentialProvider implementation is wired. Protocol gap tracked
-        // as Gap D in docs/host-app-contracts/02-local-storage-sync.md §3.4.
+    fun `credential resolve is NOT registered on JVM because context is null`() {
+        // Production path (context != null) now registers credential.resolve
+        // via WebDavCredentialProvider over AppProvider.webDavCredentialStore
+        // (GAP-D-01 closed). JVM tests pass context=null, so the HostFacade
+        // block (which includes the credential.resolve registration) is
+        // skipped — this test asserts that gap-state for the JVM path only.
         assertNotRegistered("credential.resolve")
     }
 

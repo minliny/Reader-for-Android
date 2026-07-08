@@ -103,6 +103,7 @@ dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
+    androidTestImplementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -125,6 +126,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     // MockWebServer for serving real Legado fixture responses offline (Task 12).
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     // 阶段 5 — MockWebServer for JVM tests (media.download savePath proof).
