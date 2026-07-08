@@ -53,6 +53,11 @@ import org.junit.Test
  * | media.download          |     YES     |    YES     |   this    |  Host*Proof  |     阶段 5     |
  * | anti_bot.execute        |     YES     |    YES (host-private) | this | Host*Proof | 阶段 5 (http.execute interception) |
  * | host.smoke.echo         |     YES     |    YES     |   this    |  Host*Proof  |      N/A       |
+ * | source.list/add/remove/set_enabled | YES | YES | this | Host*Proof | P1-5 (UI de-demo) |
+ * | source.import/export   |     YES     |    YES     |   this    |  Host*Proof  |     P1-5       |
+ * | source.debug.run/detect |    YES    |    YES     |   this    |  Host*Proof  |     P1-5       |
+ * | rss.subscription.list/add/delete | YES | YES | this | Host*Proof | P1-5 (UI de-demo) |
+ * | rss.refresh             |    YES     |    YES     |   this    |  Host*Proof  |     P1-5       |
  * | tts.system.* (5)        |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | permission.* (3)        |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | notification.* (3)      |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
@@ -63,6 +68,9 @@ import org.junit.Test
  * | credential.get/set/delete |  YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | storage.path            |     YES     |  YES (ctx) |   N/A     |  Host*Proof  |     阶段 6     |
  * | credential.resolve      |     YES     |  YES (ctx) |   N/A     |  see below   |  GAP-D-01 closed |
+ * | source.getVariable      |     YES     |    YES     |   this    |      N/A     |  Host/state fallback |
+ * | source.setVariable      |     YES     |    YES     |   this    |      N/A     |  Host/state fallback |
+ * | source.getLoginHeaderMap|     YES     |    YES     |   this    | login-store blocked | empty map fallback |
  *
  * "YES (ctx)" = registered only when `init(context)` is called with a non-null
  * Context (production / instrumented). JVM `init(null)` skips HostFacade
@@ -158,6 +166,13 @@ class HostCapabilityRegistryJvmTest {
     }
 
     @Test
+    fun `source state compatibility fallbacks are registered`() {
+        assertRegistered("source.getVariable")
+        assertRegistered("source.setVariable")
+        assertRegistered("source.getLoginHeaderMap")
+    }
+
+    @Test
     fun `runtime handlers log time system are registered`() {
         assertRegistered("log.emit")
         assertRegistered("time.now")
@@ -184,6 +199,32 @@ class HostCapabilityRegistryJvmTest {
     @Test
     fun `host smoke echo is registered`() {
         assertRegistered("host.smoke.echo")
+    }
+
+    // ── P1-5: Source / RSS capabilities (pure-JVM, registered on JVM + device) ──
+
+    @Test
+    fun `source crud and export capabilities are registered`() {
+        assertRegistered("source.list")
+        assertRegistered("source.add")
+        assertRegistered("source.remove")
+        assertRegistered("source.set_enabled")
+        assertRegistered("source.import")
+        assertRegistered("source.export")
+    }
+
+    @Test
+    fun `source debug capabilities are registered`() {
+        assertRegistered("source.debug.run")
+        assertRegistered("source.debug.detect")
+    }
+
+    @Test
+    fun `rss subscription and refresh capabilities are registered`() {
+        assertRegistered("rss.subscription.list")
+        assertRegistered("rss.subscription.add")
+        assertRegistered("rss.subscription.delete")
+        assertRegistered("rss.refresh")
     }
 
     // ── HostFacade capabilities (NOT registered on JVM — require Context) ─

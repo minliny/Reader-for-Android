@@ -1,5 +1,7 @@
 package com.reader.android.data.adapter
 
+import java.net.URI
+
 data class CookieRecord(
     val name: String,
     val value: String,
@@ -28,7 +30,16 @@ class FakeCookieStore : CookieStore {
     private val store = mutableMapOf<String, MutableList<CookieRecord>>()
 
     override suspend fun get(sourceUrl: String): CookieScope {
-        return CookieScope(sourceUrl, store[sourceUrl]?.toList() ?: emptyList())
+        val exact = store[sourceUrl]?.toList()
+        if (exact != null) return CookieScope(sourceUrl, exact)
+
+        val host = sourceUrl.hostOrDomain()
+        if (host.isEmpty()) return CookieScope(sourceUrl)
+        val matched = store
+            .filterKeys { it.hostOrDomain() == host }
+            .values
+            .flatten()
+        return CookieScope(sourceUrl, matched)
     }
 
     override suspend fun save(sourceUrl: String, cookies: List<CookieRecord>) {
@@ -41,10 +52,22 @@ class FakeCookieStore : CookieStore {
     }
 
     override suspend fun clear(sourceUrl: String) {
-        store.remove(sourceUrl)
+        if (store.remove(sourceUrl) != null) return
+        val host = sourceUrl.hostOrDomain()
+        if (host.isNotEmpty()) {
+            store.keys.filter { it.hostOrDomain() == host }.forEach { store.remove(it) }
+        }
     }
 
     override suspend fun clearAll() {
         store.clear()
+    }
+
+    private fun String.hostOrDomain(): String {
+        return try {
+            URI(this).host ?: this.removePrefix("http://").removePrefix("https://").substringBefore("/")
+        } catch (_: Exception) {
+            this.removePrefix("http://").removePrefix("https://").substringBefore("/")
+        }
     }
 }

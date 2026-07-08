@@ -59,6 +59,8 @@ class DataStoreBookSourceRepository(context: Context) : BookSourceRepository {
         return newSources.size
     }
 
+    override fun exportJson(): String = toJson(cached)
+
     suspend fun load() {
         val prefs = dataStore.data.first()
         val json = prefs[KEY_SOURCES] ?: "[]"

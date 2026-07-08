@@ -23,30 +23,25 @@ class CookieSetHandler(
         } catch (e: Exception) {
             return HostReply.error("INTERNAL", "invalid cookie.set params: ${e.message}", false)
         }
-        val url = params.optString("url", "")
-        if (url.isEmpty()) {
-            return HostReply.error("INTERNAL", "cookie.set requires non-empty url", false)
+        val scopeKey = params.optString("url", "").takeIf { it.isNotBlank() }
+            ?: params.optString("sessionId", "").takeIf { it.isNotBlank() }
+        if (scopeKey == null) {
+            return HostReply.error("INTERNAL", "cookie.set requires non-empty url or sessionId", false)
         }
-        val cookieObj = params.optJSONObject("cookie")
-        if (cookieObj == null) {
-            return HostReply.error("INTERNAL", "cookie.set requires cookie object", false)
+        val cookieValue = params.opt("cookie")
+        val record = when (cookieValue) {
+            is JSONObject -> cookieValue.toCookieRecord()
+            is String -> parseCookieHeader(cookieValue)
+            else -> null
         }
-        val name = cookieObj.optString("name", "")
-        val value = cookieObj.optString("value", "")
-        if (name.isEmpty()) {
+        if (record == null) {
+            return HostReply.error("INTERNAL", "cookie.set requires cookie object or header string", false)
+        }
+        if (record.name.isEmpty()) {
             return HostReply.error("INTERNAL", "cookie.set requires non-empty cookie name", false)
         }
-        val record = CookieRecord(
-            name = name,
-            value = value,
-            domain = cookieObj.optString("domain", ""),
-            path = cookieObj.optString("path", "/"),
-            secure = cookieObj.optBoolean("secure", false),
-            httpOnly = cookieObj.optBoolean("httpOnly", false),
-            expiresAt = if (cookieObj.has("expiresAt")) cookieObj.optLong("expiresAt") else null
-        )
         try {
-            runBlocking { cookieStore.save(url, listOf(record)) }
+            runBlocking { cookieStore.save(scopeKey, listOf(record)) }
         } catch (e: Exception) {
             return HostReply.error("INTERNAL", "cookie.set failed: ${e.message}", true)
         }
@@ -58,4 +53,48 @@ class CookieSetHandler(
     companion object {
         const val CAPABILITY = "cookie.set"
     }
+}
+
+private fun JSONObject.toCookieRecord(): CookieRecord = CookieRecord(
+    name = optString("name", ""),
+    value = optString("value", ""),
+    domain = optString("domain", ""),
+    path = optString("path", "/"),
+    secure = optBoolean("secure", false),
+    httpOnly = optBoolean("httpOnly", false),
+    expiresAt = optExpiresAt()
+)
+
+private fun JSONObject.optExpiresAt(): Long? {
+    if (!has("expiresAt") || isNull("expiresAt")) return null
+    return when (val raw = opt("expiresAt")) {
+        is Number -> raw.toLong()
+        is String -> raw.toLongOrNull()
+        else -> null
+    }
+}
+
+private fun parseCookieHeader(header: String): CookieRecord? {
+    val parts = header.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+    val first = parts.firstOrNull() ?: return null
+    val nameValue = first.split("=", limit = 2)
+    val name = nameValue.getOrNull(0).orEmpty()
+    val value = nameValue.getOrNull(1).orEmpty()
+    if (name.isBlank()) return null
+    var domain = ""
+    var path = "/"
+    var secure = false
+    var httpOnly = false
+    var expiresAt: Long? = null
+    parts.drop(1).forEach { part ->
+        val attr = part.split("=", limit = 2)
+        when (attr[0].lowercase()) {
+            "domain" -> domain = attr.getOrNull(1).orEmpty()
+            "path" -> path = attr.getOrNull(1).orEmpty().ifBlank { "/" }
+            "secure" -> secure = true
+            "httponly" -> httpOnly = true
+            "expires", "expiresat", "max-age" -> expiresAt = attr.getOrNull(1)?.toLongOrNull()
+        }
+    }
+    return CookieRecord(name, value, domain, path, secure, httpOnly, expiresAt)
 }

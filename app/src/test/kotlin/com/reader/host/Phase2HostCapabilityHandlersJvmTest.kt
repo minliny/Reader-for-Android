@@ -26,7 +26,9 @@ import org.junit.Test
  * remaining Reader UI contract gaps:
  *  - `host.smoke.echo` (registered into production init)
  *  - `http.cancel` + `HttpCallRegistry` (cancel in-flight OkHttp calls)
+ *  - `cookie.get` / `cookie.set` compatibility params
  *  - `cookie.clear` (clear scoped / all cookies)
+ *  - `source.getVariable` / `source.setVariable` fallback persistence
  *  - `storage.path` (fail-closed on JVM; instrumented tier covers real paths)
  *  - `credential.get` / `credential.set` / `credential.delete`
  *  - `background.schedule` / `background.cancel` (in-memory registry)
@@ -144,6 +146,77 @@ class Phase2HostCapabilityHandlersJvmTest {
         )
         assertTrue(reply.isError())
         assertEquals("INTERNAL", (reply as HostReply.Error).code())
+    }
+
+    // ── cookie.get / cookie.set compatibility ───────────────────────────
+
+    @Test
+    fun `cookie_set accepts legado header string and cookie_get filters by domain and name`() {
+        val store = FakeCookieStore()
+        val setReply = CookieSetHandler(store).handle(
+            HostRequest(1L, 2501L, CookieSetHandler.CAPABILITY,
+                JSONObject()
+                    .put("url", "https://login.example.test/auth")
+                    .put("cookie", "sid=abc123; Domain=login.example.test; Path=/; HttpOnly")
+                    .toString())
+        )
+        assertTrue("cookie.set must complete", setReply.isComplete())
+
+        val getReply = CookieGetHandler(store).handle(
+            HostRequest(1L, 2502L, CookieGetHandler.CAPABILITY,
+                JSONObject()
+                    .put("domain", "login.example.test")
+                    .put("name", "sid")
+                    .toString())
+        )
+        assertTrue("cookie.get must complete", getReply.isComplete())
+        val result = JSONObject((getReply as HostReply.Complete).resultJson())
+        val cookies = result.getJSONArray("cookies")
+        assertEquals(1, cookies.length())
+        assertEquals("sid", cookies.getJSONObject(0).getString("name"))
+        assertEquals("abc123", cookies.getJSONObject(0).getString("value"))
+    }
+
+    // ── source state compatibility fallbacks ────────────────────────────
+
+    @Test
+    fun `source_variable handlers persist across handler recreation`() {
+        val persistence = HostCachePersistenceAdapter(DefaultHostCache())
+        val firstStore = SourceVariableStore(persistence)
+        val setReply = SourceSetVariableHandler(firstStore).handle(
+            HostRequest(1L, 2601L, SourceSetVariableHandler.CAPABILITY,
+                JSONObject()
+                    .put("sourceId", "src-045")
+                    .put("key", "loginToken")
+                    .put("value", "tk-123")
+                    .toString())
+        )
+        assertTrue("source.setVariable must complete", setReply.isComplete())
+
+        val recreatedStore = SourceVariableStore(persistence)
+        val getReply = SourceGetVariableHandler(recreatedStore).handle(
+            HostRequest(1L, 2602L, SourceGetVariableHandler.CAPABILITY,
+                JSONObject()
+                    .put("sourceId", "src-045")
+                    .put("key", "loginToken")
+                    .toString())
+        )
+        assertTrue("source.getVariable must complete", getReply.isComplete())
+        val result = JSONObject((getReply as HostReply.Complete).resultJson())
+        assertTrue(result.getBoolean("found"))
+        assertEquals("tk-123", result.getString("value"))
+    }
+
+    @Test
+    fun `source_login_header_map returns empty result instead of unsupported failure`() {
+        val reply = SourceLoginHeaderMapHandler().handle(
+            HostRequest(1L, 2603L, SourceLoginHeaderMapHandler.CAPABILITY,
+                JSONObject().put("sourceId", "src-367").toString())
+        )
+        assertTrue("source.getLoginHeaderMap must complete", reply.isComplete())
+        val result = JSONObject((reply as HostReply.Complete).resultJson())
+        assertFalse("no Android login header store is wired yet", result.getBoolean("found"))
+        assertEquals(0, result.getJSONObject("headers").length())
     }
 
     // ── cookie.clear ────────────────────────────────────────────────────

@@ -963,6 +963,15 @@ fun AppShell(
         is ReaderRoute.TabShell -> {
             val discoverState = remember { DiscoverTabState() }
             val rssState = remember { RssTabState() }
+            // P1-5: load real RSS subscriptions from RoomSubscriptionRepository
+            // so the RSS tab renders real data instead of rssDemoSources().
+            LaunchedEffect(Unit) {
+                if (com.reader.android.AppProvider.isInitialized) {
+                    runCatching {
+                        rssState.subscriptions = com.reader.android.AppProvider.subscriptionRepository.getAll()
+                    }
+                }
+            }
             MainTabShellFrame(
                 activeTab = state.activeTab,
                 onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) },

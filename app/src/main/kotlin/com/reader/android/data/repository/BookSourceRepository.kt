@@ -12,6 +12,12 @@ interface BookSourceRepository {
     fun remove(url: String)
     fun setEnabled(url: String, enabled: Boolean)
     fun importJson(jsonString: String): Int
+
+    /**
+     * Exports all sources as a JSON array string. Mirrors [importJson] —
+     * the output of `exportJson()` can be fed back into `importJson()`.
+     */
+    fun exportJson(): String
 }
 
 class FakeBookSourceRepository : BookSourceRepository {
@@ -25,6 +31,8 @@ class FakeBookSourceRepository : BookSourceRepository {
     override fun getByUrl(url: String): BookSource? = sources.find { it.sourceUrl == url }
 
     override fun add(source: BookSource) {
+        // Dedupe by sourceUrl to mirror DataStoreBookSourceRepository
+        sources.removeAll { it.sourceUrl == source.sourceUrl }
         sources.add(source)
     }
 
@@ -49,6 +57,30 @@ class FakeBookSourceRepository : BookSourceRepository {
             count++
         }
         return count
+    }
+
+    override fun exportJson(): String {
+        val arr = JSONArray()
+        sources.forEach { source -> arr.put(sourceToJson(source)) }
+        return arr.toString()
+    }
+
+    private fun sourceToJson(source: BookSource): JSONObject = JSONObject().apply {
+        put("sourceUrl", source.sourceUrl)
+        put("sourceName", source.sourceName)
+        source.sourceGroup?.let { put("sourceGroup", it) }
+        put("enabled", source.enabled)
+        source.sourceComment?.let { put("sourceComment", it) }
+        source.searchUrl?.let { put("searchUrl", it) }
+        source.searchCharset?.let { put("searchCharset", it) }
+        source.searchMethod?.let { put("searchMethod", it) }
+        source.bookInfoUrl?.let { put("bookInfoUrl", it) }
+        source.tocUrl?.let { put("tocUrl", it) }
+        source.tocCharset?.let { put("tocCharset", it) }
+        source.contentUrl?.let { put("contentUrl", it) }
+        source.contentCharset?.let { put("contentCharset", it) }
+        source.header?.let { put("header", it) }
+        source.loginUrl?.let { put("loginUrl", it) }
     }
 
     private fun parseSource(obj: JSONObject): BookSource {

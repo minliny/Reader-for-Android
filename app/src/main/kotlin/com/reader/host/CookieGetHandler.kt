@@ -26,17 +26,22 @@ class CookieGetHandler(
         } catch (e: Exception) {
             return HostReply.error("INTERNAL", "invalid cookie.get params: ${e.message}", false)
         }
-        val url = params.optString("url", "")
-        if (url.isEmpty()) {
-            return HostReply.error("INTERNAL", "cookie.get requires non-empty url", false)
+        val scopeKey = params.optString("url", "").takeIf { it.isNotBlank() }
+            ?: params.optString("domain", "").takeIf { it.isNotBlank() }
+            ?: params.optString("sessionId", "").takeIf { it.isNotBlank() }
+        if (scopeKey == null) {
+            return HostReply.error("INTERNAL", "cookie.get requires url, domain, or sessionId", false)
         }
+        val requestedName = params.optString("name", "").takeIf { it.isNotBlank() }
         val scope = try {
-            runBlocking { cookieStore.get(url) }
+            runBlocking { cookieStore.get(scopeKey) }
         } catch (e: Exception) {
             return HostReply.error("INTERNAL", "cookie.get failed: ${e.message}", true)
         }
         val cookies = JSONArray()
-        scope.cookies.forEach { record ->
+        scope.cookies
+            .filter { requestedName == null || it.name == requestedName }
+            .forEach { record ->
             val cookie = JSONObject()
             cookie.put("name", record.name)
             cookie.put("value", record.value)

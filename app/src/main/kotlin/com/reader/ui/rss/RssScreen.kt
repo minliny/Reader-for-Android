@@ -54,8 +54,19 @@ class RssTabState {
     var activeMode by mutableStateOf("源列表")
     var activeFilter by mutableStateOf("全部")
     var refreshing by mutableStateOf(false)
+    // P1-5: real subscriptions loaded from RoomSubscriptionRepository via
+    // AppProvider. Falls back to demo data when AppProvider is not
+    // initialized (preview / JVM test).
+    var subscriptions by mutableStateOf<List<com.reader.android.data.network.RssSubscription>>(emptyList())
+        internal set
     val sources = rssDemoSources()
     val articles = rssDemoArticles()
+
+    /**
+     * Returns true if real subscription data has been loaded (de-demo'd).
+     * When true, the UI should render [subscriptions] instead of [sources].
+     */
+    fun hasRealSubscriptions(): Boolean = subscriptions.isNotEmpty()
 }
 
 @Composable

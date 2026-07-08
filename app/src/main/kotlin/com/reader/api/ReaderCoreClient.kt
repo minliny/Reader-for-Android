@@ -47,7 +47,13 @@ import com.reader.host.PersistenceGetHandler
 import com.reader.host.PersistencePutHandler
 import com.reader.host.ReaderCoreHostTransport
 import com.reader.host.SharedPreferencesHostPersistence
+import com.reader.host.SourceGetVariableHandler
+import com.reader.host.SourceLoginHeaderMapHandler
+import com.reader.host.SourceRssContext
+import com.reader.host.SourceSetVariableHandler
+import com.reader.host.SourceVariableStore
 import com.reader.host.SystemInfoHandler
+import com.reader.host.registerHandlers as registerSourceRssHandlers
 import com.reader.host.TimeNowHandler
 import com.reader.host.WebDavCredentialProvider
 import com.reader.host.WebViewEvaluateJavaScriptHandler
@@ -210,6 +216,7 @@ class ReaderCoreClient private constructor(
         ): HostRuntime {
             val cookieJar = CookieStoreJar(cookieStore)
             val httpCallRegistry = HttpCallRegistry()
+            val sourceVariableStore = SourceVariableStore(persistence)
             var hostRuntimeBuilder = HostRuntime.over(transport)
                 .register(
                     HttpExecuteHandler.CAPABILITY,
@@ -267,9 +274,35 @@ class ReaderCoreClient private constructor(
                 .register(CachePutHandler.CAPABILITY, CachePutHandler(cache))
                 .register(PersistenceGetHandler.CAPABILITY, PersistenceGetHandler(persistence))
                 .register(PersistencePutHandler.CAPABILITY, PersistencePutHandler(persistence))
+                .register(
+                    SourceGetVariableHandler.CAPABILITY,
+                    SourceGetVariableHandler(sourceVariableStore)
+                )
+                .register(
+                    SourceSetVariableHandler.CAPABILITY,
+                    SourceSetVariableHandler(sourceVariableStore)
+                )
+                .register(
+                    SourceLoginHeaderMapHandler.CAPABILITY,
+                    SourceLoginHeaderMapHandler()
+                )
                 .register(LogEmitHandler.CAPABILITY, LogEmitHandler(logger))
                 .register(TimeNowHandler.CAPABILITY, TimeNowHandler())
                 .register(SystemInfoHandler.CAPABILITY, SystemInfoHandler())
+            // ── P1-5: Source / RSS capability handlers ──
+            // Pure-JVM (no Android Context) so registered on both paths
+            // (JVM tests + production). Production wires the real DataStore +
+            // Room-backed repositories via AppProvider; JVM tests pass a fake
+            // SourceRssContext via buildHostRuntimeForTest.
+            val sourceRssContext = if (context != null) {
+                SourceRssContext(
+                    bookSourceRepository = AppProvider.bookSourceRepository,
+                    subscriptionRepository = AppProvider.subscriptionRepository
+                )
+            } else {
+                com.reader.host.fakeSourceRssContext()
+            }
+            hostRuntimeBuilder = sourceRssContext.registerSourceRssHandlers(hostRuntimeBuilder)
             // ── Slice C: HostFacade — UI-facing capabilities ──
             // Only wire when context is available (production /
             // instrumented). JVM tests inject handlers manually.
