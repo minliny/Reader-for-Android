@@ -78,6 +78,7 @@ class SyncPlanExecutorJvmTest {
         assertEquals("PUT", r.method)
         assertTrue(r.success)
         assertTrue(r.detail, r.detail.contains("201"))
+        assertEquals(201, r.statusCode)
         // Side effect: PUT stored the body via webdav.upload handler
         val stored = get("https://dav.ex.com/reader/a.txt")
         assertEquals(200, stored.statusCode)
@@ -182,10 +183,101 @@ class SyncPlanExecutorJvmTest {
         assertEquals("https://dav.ex.com/reader/b1.json", results[0].url)
         assertEquals("https://dav.ex.com/reader/b2.json", results[1].url)
         assertTrue(results[0].success)
-        assertEquals("deleted", results[0].detail)
+        assertEquals("HTTP 204", results[0].detail)
+        assertEquals(204, results[0].statusCode)
         assertTrue(results[1].success)
-        assertEquals("deleted", results[1].detail)
+        assertEquals("HTTP 204", results[1].detail)
+        assertEquals(204, results[1].statusCode)
         assertEquals("DELETE", results[0].method)
         assertEquals("DELETE", results[1].method)
+    }
+
+    // ── 业务失败语义：reply.isComplete() 不等于业务成功 ──────────────────────
+    // WebDAV handler 在 4xx/5xx 时仍返回 HostReply.complete(...)，但业务布尔字段
+    // (uploaded/downloaded/deleted/created/success) 为 false。executor 必须据此
+    // 报告 success=false，而不是仅凭 transport 完成就标记成功。
+
+    @Test
+    fun `executeWebDavPlan_reportsFailureWhenUploadReturns500`() {
+        val url = "https://dav.ex.com/reader/fail-upload.txt"
+        client.forceStatusCode(url, 500)
+        val results = executor.executeWebDavPlan(
+            listOf(planRequest("PUT", url, "body"))
+        )
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(500, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("500"))
+    }
+
+    @Test
+    fun `executeWebDavPlan_reportsFailureWhenDownloadReturns404`() {
+        val url = "https://dav.ex.com/reader/missing.txt"
+        client.forceStatusCode(url, 404)
+        val results = executor.executeWebDavPlan(
+            listOf(planRequest("GET", url))
+        )
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(404, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("404"))
+    }
+
+    @Test
+    fun `executeWebDavPlan_reportsFailureWhenDeleteReturns500`() {
+        val url = "https://dav.ex.com/reader/fail-delete.txt"
+        client.putContent(url, "x")
+        client.forceStatusCode(url, 500)
+        val results = executor.executeWebDavPlan(
+            listOf(planRequest("DELETE", url))
+        )
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(500, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("500"))
+    }
+
+    @Test
+    fun `executeWebDavPlan_reportsFailureWhenMkcolReturns500`() {
+        val url = "https://dav.ex.com/reader/fail-dir/"
+        client.forceStatusCode(url, 500)
+        val results = executor.executeWebDavPlan(
+            listOf(planRequest("MKCOL", url))
+        )
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(500, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("500"))
+    }
+
+    @Test
+    fun `executeWebDavPlan_reportsFailureWhenPropfindReturns500`() {
+        val url = "https://dav.ex.com/reader/fail-list/"
+        client.forceStatusCode(url, 500)
+        val results = executor.executeWebDavPlan(
+            listOf(planRequest("PROPFIND", url))
+        )
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(500, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("500"))
+    }
+
+    @Test
+    fun `executeRetention_reportsFailureWhenDeleteReturns500`() {
+        val url = "https://dav.ex.com/reader/retention-fail.json"
+        client.putContent(url, "1")
+        client.forceStatusCode(url, 500)
+        val results = executor.executeRetention(listOf(url))
+        assertEquals(1, results.size)
+        val r = results[0]
+        assertFalse(r.success)
+        assertEquals(500, r.statusCode)
+        assertTrue(r.detail, r.detail.contains("500"))
     }
 }

@@ -31,7 +31,13 @@ class SyncPlanExecutor(private val adapter: HostAdapter) {
                 "MKCOL" -> "webdav.mkdir"
                 "PROPFIND" -> "webdav.list"
                 else -> null
-            } ?: return@map WebDavExecutionResult(url, method, false, "unsupported method: $method")
+            } ?: return@map WebDavExecutionResult(
+                url = url,
+                method = method,
+                success = false,
+                detail = "unsupported method: $method",
+                statusCode = 0
+            )
 
             val params = JSONObject().apply {
                 put("url", url)
@@ -40,12 +46,40 @@ class SyncPlanExecutor(private val adapter: HostAdapter) {
             }
             val request = HostRequest(1L, 1L, capability, params.toString())
             val reply = adapter.dispatch(request)
-            val success = reply.isComplete()
-            val statusCode = if (success) {
-                val result = JSONObject((reply as HostReply.Complete).resultJson())
-                result.optInt("statusCode", 0)
-            } else 0
-            WebDavExecutionResult(url, method, success, "HTTP $statusCode")
+            // reply.isComplete() 只代表 transport 成功（handler 返回了结构化 JSON），
+            // 不代表业务成功。HostReply.error(...)（如 NOT_CONFIGURED / 参数非法）
+            // 时 isComplete() 为 false，直接判为失败。
+            if (!reply.isComplete()) {
+                val err = reply as HostReply.Error
+                return@map WebDavExecutionResult(
+                    url = url,
+                    method = method,
+                    success = false,
+                    detail = "host error: ${err.code()} - ${err.message()}",
+                    statusCode = 0
+                )
+            }
+            val result = JSONObject((reply as HostReply.Complete).resultJson())
+            val statusCode = result.optInt("statusCode", 0)
+            // 业务级成败字段：不同 HTTP 方法对应 handler 返回的不同布尔字段
+            // （PUT→uploaded, GET→downloaded, DELETE→deleted, MKCOL→created, PROPFIND→success）。
+            val businessField = when (method) {
+                "PUT" -> "uploaded"
+                "GET" -> "downloaded"
+                "DELETE" -> "deleted"
+                "MKCOL" -> "created"
+                "PROPFIND" -> "success"
+                else -> "success"
+            }
+            val businessSuccess = result.optBoolean(businessField, false)
+            val detail = if (businessSuccess) {
+                "HTTP $statusCode"
+            } else {
+                // 业务失败时优先带上 handler 提供的 message，便于 UI 展示真实原因
+                val msg = result.optString("message", "")
+                if (msg.isNotEmpty()) "HTTP $statusCode: $msg" else "HTTP $statusCode"
+            }
+            WebDavExecutionResult(url, method, businessSuccess, detail, statusCode)
         }
     }
 
@@ -57,12 +91,26 @@ class SyncPlanExecutor(private val adapter: HostAdapter) {
             val params = JSONObject().put("url", path)
             val request = HostRequest(1L, 1L, "webdav.delete", params.toString())
             val reply = adapter.dispatch(request)
-            WebDavExecutionResult(
-                url = path,
-                method = "DELETE",
-                success = reply.isComplete(),
-                detail = if (reply.isComplete()) "deleted" else "failed"
-            )
+            // 与 executeWebDavPlan 一致：transport 完成 ≠ 业务成功，
+            // 必须解析 webdav.delete 返回的 deleted 字段。
+            if (!reply.isComplete()) {
+                val err = reply as HostReply.Error
+                return@map WebDavExecutionResult(
+                    url = path,
+                    method = "DELETE",
+                    success = false,
+                    detail = "host error: ${err.code()} - ${err.message()}",
+                    statusCode = 0
+                )
+            }
+            val result = JSONObject((reply as HostReply.Complete).resultJson())
+            val statusCode = result.optInt("statusCode", 0)
+            val deleted = result.optBoolean("deleted", false)
+            val detail = if (deleted) "HTTP $statusCode" else {
+                val msg = result.optString("message", "")
+                if (msg.isNotEmpty()) "HTTP $statusCode: $msg" else "HTTP $statusCode"
+            }
+            WebDavExecutionResult(path, "DELETE", deleted, detail, statusCode)
         }
     }
 }
@@ -71,5 +119,6 @@ data class WebDavExecutionResult(
     val url: String,
     val method: String,
     val success: Boolean,
-    val detail: String
+    val detail: String,
+    val statusCode: Int = 0
 )
