@@ -408,6 +408,49 @@ object ReaderUiReducer {
             )
         )
         ReaderUiIntent.ClearHostRequestResult -> state.copy(lastHostRequestResult = null)
+
+        // ── P0: Source Switch 专用 reducer ──────────────────────────────────
+        // 不再走通用 PushRoute：SourceSwitchOpen 同时 push route 并进入 Loading，
+        // 让 reducer 可追踪换源专属状态。SourceSwitchClose 同时 pop route 并回到 Idle。
+        is ReaderUiIntent.SourceSwitchOpen -> {
+            val route = ReaderRoute.SourceSwitchFlow(context = state.readerContext)
+            state.copy(
+                backStack = state.backStack + route,
+                currentRoute = route,
+                sourceSwitch = SourceSwitchState.Loading,
+                motionInterrupt = null
+            )
+        }
+        ReaderUiIntent.SourceSwitchClose -> {
+            // 同时 pop route 并清换源状态
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                sourceSwitch = SourceSwitchState.Idle,
+                motionInterrupt = null
+            )
+        }
+        is ReaderUiIntent.SourceSwitchSelect -> {
+            // 仅在 Results 状态下更新选中源；其他状态为 no-op
+            val current = state.sourceSwitch
+            if (current is SourceSwitchState.Results) {
+                state.copy(
+                    sourceSwitch = current.copy(selectedSourceId = intent.sourceId)
+                )
+            } else {
+                state
+            }
+        }
+        is ReaderUiIntent.SourceSwitchResultsLoaded -> {
+            state.copy(
+                sourceSwitch = SourceSwitchState.Results(
+                    results = intent.results,
+                    selectedSourceId = null
+                )
+            )
+        }
     }
 
     /**

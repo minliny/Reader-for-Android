@@ -1,6 +1,7 @@
 package com.reader.ui.shell
 
 import com.reader.api.Book
+import io.reader.ui.contract.RouteShell
 
 /**
  * Single source of truth for the App Shell UI state, aligned with
@@ -577,6 +578,74 @@ val ReaderRoute.routeId: String
     }
 
 /**
+ * 将 [ReaderRoute] 映射到合同 [RouteShell] 枚举，供 MotionPolicyAdapter 解析 motion policy 使用。
+ *
+ * 映射规则对齐 generated/kotlin/Route.kt 的 RouteId → RouteShell 表：
+ * - 主 tab（书架/发现/RSS/设置）→ MainTabShell
+ * - 阅读器沉浸/控制层/换源 → ReaderShell / FlowShell
+ * - 书籍详情/目录/搜索/书源相关 → LibraryShell
+ * - 设置/同步/WebDAV/源管理 → SettingsShell
+ */
+fun ReaderRoute.shell(): RouteShell = when (this) {
+    is ReaderRoute.TabShell -> RouteShell.MainTabShell
+    is ReaderRoute.ImmersiveReading -> RouteShell.ReaderShell
+    is ReaderRoute.ReaderControl -> RouteShell.ReaderShell
+    is ReaderRoute.SourceSwitchFlow -> RouteShell.FlowShell
+    ReaderRoute.Search -> RouteShell.LibraryShell
+    ReaderRoute.ImportSource -> RouteShell.LibraryShell
+    ReaderRoute.BookBatchManagement -> RouteShell.LibraryShell
+    ReaderRoute.GroupManagement -> RouteShell.LibraryShell
+    ReaderRoute.LocalImport -> RouteShell.LibraryShell
+    ReaderRoute.BookshelfSearchSettings -> RouteShell.LibraryShell
+    ReaderRoute.SettingsGeneral -> RouteShell.SettingsShell
+    ReaderRoute.AboutFeedback -> RouteShell.SettingsShell
+    ReaderRoute.SyncBackup -> RouteShell.SettingsShell
+    ReaderRoute.WebDavConfig -> RouteShell.SettingsShell
+    ReaderRoute.SourceManagement -> RouteShell.SettingsShell
+    ReaderRoute.RssSearch -> RouteShell.LibraryShell
+    ReaderRoute.RssAll -> RouteShell.LibraryShell
+    ReaderRoute.RssStarred -> RouteShell.LibraryShell
+    ReaderRoute.RssRefreshing -> RouteShell.LibraryShell
+    ReaderRoute.RssSubscriptionManagement -> RouteShell.LibraryShell
+    ReaderRoute.RssDetail -> RouteShell.LibraryShell
+    ReaderRoute.RssOriginal -> RouteShell.LibraryShell
+    ReaderRoute.RssOriginalBrowser -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceEdit -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceImport -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceImportDetail -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceImportResult -> RouteShell.LibraryShell
+    ReaderRoute.RssRuleSubscription -> RouteShell.LibraryShell
+    ReaderRoute.RssRuleSubscriptionDetail -> RouteShell.LibraryShell
+    ReaderRoute.RssRuleSubscriptionEdit -> RouteShell.LibraryShell
+    ReaderRoute.RssRuleSubscriptionTest -> RouteShell.LibraryShell
+    ReaderRoute.RssRuleSubscriptionApply -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceGroups -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceGroupEdit -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceActions -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceBatch -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceExport -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceExportDetail -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceExportResult -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceBatchDisable -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceDebug -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceVars -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceLogin -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceLoginWeb -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceLoginCookie -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceLoginClear -> RouteShell.LibraryShell
+    ReaderRoute.RssSourcePin -> RouteShell.LibraryShell
+    ReaderRoute.RssSourceDisable -> RouteShell.LibraryShell
+    ReaderRoute.RssReadRecord -> RouteShell.LibraryShell
+    ReaderRoute.RssRecordClear -> RouteShell.LibraryShell
+    is ReaderRoute.BookState -> RouteShell.LibraryShell
+    is ReaderRoute.RssState -> RouteShell.LibraryShell
+    is ReaderRoute.RestoreState -> RouteShell.SettingsShell
+    is ReaderRoute.DiscoverState -> RouteShell.MainTabShell
+    is ReaderRoute.SourceState -> RouteShell.SettingsShell
+    is ReaderRoute.Demo -> RouteShell.LibraryShell
+}
+
+/**
  * 文本选择状态（S6）。记录当前阅读器内文本选区的起止 offset 与工具栏可见性。
  */
 data class TextSelectionState(
@@ -710,6 +779,39 @@ sealed class RssListState {
 }
 
 /**
+ * P0: 换源（source-switch）UI 状态机。
+ *
+ * 契约要求：source-switch 的 loading/results/selected 三态可在 final state 解释。
+ * 状态流转：Idle → Loading → Results(loaded, selected=null) → Results(loaded, selected=sourceId) → Idle
+ *
+ * 由专用 intent 驱动（SourceSwitchOpen / SourceSwitchResultsLoaded / SourceSwitchSelect /
+ * SourceSwitchClose），不再走通用 PushRoute，保证 reducer 可追踪换源专属状态。
+ */
+sealed class SourceSwitchState {
+    /** 初始空态：未进入换源流程。 */
+    object Idle : SourceSwitchState()
+    /** 加载中：换源页已打开，正在拉取可用书源列表。 */
+    object Loading : SourceSwitchState()
+    /** 结果已就绪：展示可用书源列表，selected 标记当前选中的源 id（null=未选）。 */
+    data class Results(
+        val results: List<SourceSwitchResult> = emptyList(),
+        val selectedSourceId: String? = null
+    ) : SourceSwitchState()
+}
+
+/** P0: 换源结果条目。 */
+data class SourceSwitchResult(
+    val sourceId: String,
+    val sourceName: String,
+    /** 最近章节信息，用于对比。 */
+    val latestChapter: String = "",
+    /** 字数统计，用于对比。 */
+    val wordCount: Int = 0,
+    /** 加载速度评级（1-5），用于对比。 */
+    val speedLevel: Int = 3
+)
+
+/**
  * P3: WebDAV 配置状态。
  *
  * 契约要求：settings/WebDAV intent 接真实 adapter。
@@ -803,6 +905,8 @@ data class ReaderUiState(
     val permissions: PermissionState = PermissionState(),
     /** P4: RSS 列表 UI 状态（Loading/Empty/Success/Error）。 */
     val rssList: RssListState = RssListState.Idle,
+    /** P0: 换源 UI 状态（Idle/Loading/Results）。 */
+    val sourceSwitch: SourceSwitchState = SourceSwitchState.Idle,
     /** Slice D: 待派发的 HostRequest 队列（effect-saga 模式）。 */
     val pendingHostRequests: List<HostRequestDispatch> = emptyList(),
     /** Slice D: 最近完成的 HostRequest 结果（用于 UI 反馈）。 */

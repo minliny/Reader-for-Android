@@ -509,6 +509,32 @@ sealed class ReaderUiIntent {
     object ClearHostRequestResult : ReaderUiIntent() {
         override val requestId: String = generateRequestId()
     }
+
+    // ── P0: Source Switch 专用 intents ───────────────────────────────────────
+    // 不再走通用 PushRoute，让 reducer 可追踪换源的 loading/results/selected 状态。
+
+    /** P0: 打开换源页（→ Loading，并 push SourceSwitchFlow route）。 */
+    data class SourceSwitchOpen(
+        val bookId: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 关闭换源页（→ Idle，并 pop route）。 */
+    object SourceSwitchClose : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** P0: 选择源（→ Results.selectedSourceId = sourceId）。 */
+    data class SourceSwitchSelect(
+        val sourceId: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 换源结果已就绪（→ Results）。 */
+    data class SourceSwitchResultsLoaded(
+        val results: List<SourceSwitchResult>,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
 }
 
 private val requestCounter = java.util.concurrent.atomic.AtomicLong(0)

@@ -810,7 +810,7 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
 )
 
     /**
-     * 84 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
+     * 87 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
      * `motion-controller.js` 的 from/to/interrupt/finalState 语义值。
      *
      * 对于在 `motion-controller.js` 中有定义的 Motion ID（62 条），from/to/interrupt/finalState
@@ -819,7 +819,7 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
      * 另有 5 条遗留 Motion ID（无 MotionId 枚举对应，如 "tab.item.press"）直接从
      * [MOTION_CONTROLLER_JS_SPECS] 补入，保证 [MotionIdConstants] 的 47 个常量全部可解析。
      *
-     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (84 条) +
+     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (87 条) +
      *                  motion-controller.js 300-649 (62 条 JS 语义 + 5 条遗留)。
      */
     private val MOTION_CONTRACTS: Map<String, MotionContract> = buildMap {

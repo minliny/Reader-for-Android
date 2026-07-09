@@ -204,7 +204,7 @@ fun AppShell(
                     ReaderUiIntent.PushRoute(ReaderRoute.ReaderControl(context = route.context))
                 )
                 RouteIds.SOURCE_SWITCH -> vm.dispatch(
-                    ReaderUiIntent.PushRoute(ReaderRoute.SourceSwitchFlow(route.context))
+                    ReaderUiIntent.SourceSwitchOpen(bookId = route.context?.bookUrl ?: "")
                 )
                 else -> navigateToRouteId(targetRoute)
             }
@@ -214,7 +214,7 @@ fun AppShell(
                     targetRoute == RouteIds.IMMERSIVE_READING && previous is ReaderRoute.ImmersiveReading ->
                         vm.dispatch(ReaderUiIntent.PopRoute)
                     targetRoute == RouteIds.SOURCE_SWITCH -> vm.dispatch(
-                        ReaderUiIntent.PushRoute(ReaderRoute.SourceSwitchFlow(route.context ?: state.readerContext))
+                        ReaderUiIntent.SourceSwitchOpen(bookId = (route.context ?: state.readerContext)?.bookUrl ?: "")
                     )
                     targetRoute == route.id -> Unit
                     else -> navigateToRouteId(targetRoute)
@@ -320,7 +320,10 @@ fun AppShell(
         FlowShellScreen(
             route = currentRoute,
             onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
-            onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) }
+            onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
+            sourceSwitch = state.sourceSwitch,
+            onSelectSource = { sourceId -> vm.dispatch(ReaderUiIntent.SourceSwitchSelect(sourceId)) },
+            onClose = { vm.dispatch(ReaderUiIntent.SourceSwitchClose) }
         )
     } else if (currentRoute is ReaderRoute.ImmersiveReading ||
         currentRoute is ReaderRoute.ReaderControl
@@ -822,7 +825,7 @@ fun AppShell(
                         onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
                         onContinueReading = { enterReaderFromBook(bookState.book) },
                         onBookDirectory = { navigateTo(ReaderRoute.BookState("book-directory", route.book)) },
-                        onSourceSwitch = { navigateToRouteId(RouteIds.SOURCE_SWITCH) },
+                        onSourceSwitch = { vm.dispatch(ReaderUiIntent.SourceSwitchOpen(bookId = route.book?.bookUrl ?: "")) },
                         onRemoveFromBookshelf = { vm.dispatch(ReaderUiIntent.PopRoute) }
                     )
                 }

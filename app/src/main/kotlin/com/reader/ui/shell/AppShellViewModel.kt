@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.reader.android.data.adapter.TtsProgressUpdate
 import com.reader.ui.motion.MotionController
 import com.reader.ui.motion.MotionIdConstants
+import com.reader.ui.motion.MotionPolicyAdapter
+import com.reader.ui.motion.serialName
 import com.reader.ui.motion.ReducedMotionResolver
+import io.reader.ui.contract.MotionOperation
+import io.reader.ui.contract.RouteShell
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -108,28 +112,68 @@ class AppShellViewModel(
                 MotionController.contractFor(MotionIdConstants.READER_ENTRY_ACTION_TO_IMMERSIVE)?.defaultDurationMs
                     ?: 240L
             )
-            is ReaderUiIntent.PushRoute -> Tuple4(
-                MotionIdConstants.APP_ROUTE_PUSH_FORWARD,
-                from,
-                intent.route.routeId,
-                MotionController.contractFor(MotionIdConstants.APP_ROUTE_PUSH_FORWARD)?.defaultDurationMs
-                    ?: 160L
-            )
-            ReaderUiIntent.PopRoute -> Tuple4(
-                MotionIdConstants.APP_ROUTE_POP_BACKWARD,
-                from,
-                current.backStack.dropLast(1).lastOrNull()?.routeId
-                    ?: current.activeTab.routeId,
-                MotionController.contractFor(MotionIdConstants.APP_ROUTE_POP_BACKWARD)?.defaultDurationMs
-                    ?: 160L
-            )
-            is ReaderUiIntent.ReplaceRoute -> Tuple4(
-                MotionIdConstants.APP_ROUTE_REPLACE,
-                from,
-                intent.route.routeId,
-                MotionController.contractFor(MotionIdConstants.APP_ROUTE_REPLACE)?.defaultDurationMs
-                    ?: 160L
-            )
+            is ReaderUiIntent.PushRoute -> {
+                // 接入 MotionPolicyAdapter：让 Push 走 policy 解析，获取最匹配的 MotionId。
+                // 解析失败时回退到 APP_ROUTE_PUSH_FORWARD 常量，保证向后兼容。
+                val toRoute = intent.route.routeId
+                val resolved = MotionPolicyAdapter.resolveRouteTransition(
+                    fromRoute = from,
+                    toRoute = toRoute,
+                    fromShell = current.currentRoute.shell(),
+                    toShell = intent.route.shell(),
+                    operation = MotionOperation.Push
+                )
+                val motionId = resolved?.serialName ?: MotionIdConstants.APP_ROUTE_PUSH_FORWARD
+                Tuple4(
+                    motionId,
+                    from,
+                    toRoute,
+                    MotionController.contractFor(motionId)?.defaultDurationMs
+                        ?: MotionController.contractFor(MotionIdConstants.APP_ROUTE_PUSH_FORWARD)?.defaultDurationMs
+                        ?: 160L
+                )
+            }
+            ReaderUiIntent.PopRoute -> {
+                val toRoute = current.backStack.dropLast(1).lastOrNull()?.routeId
+                    ?: current.activeTab.routeId
+                val toShell = current.backStack.dropLast(1).lastOrNull()?.shell()
+                    ?: RouteShell.MainTabShell
+                val resolved = MotionPolicyAdapter.resolveRouteTransition(
+                    fromRoute = from,
+                    toRoute = toRoute,
+                    fromShell = current.currentRoute.shell(),
+                    toShell = toShell,
+                    operation = MotionOperation.Pop
+                )
+                val motionId = resolved?.serialName ?: MotionIdConstants.APP_ROUTE_POP_BACKWARD
+                Tuple4(
+                    motionId,
+                    from,
+                    toRoute,
+                    MotionController.contractFor(motionId)?.defaultDurationMs
+                        ?: MotionController.contractFor(MotionIdConstants.APP_ROUTE_POP_BACKWARD)?.defaultDurationMs
+                        ?: 160L
+                )
+            }
+            is ReaderUiIntent.ReplaceRoute -> {
+                val toRoute = intent.route.routeId
+                val resolved = MotionPolicyAdapter.resolveRouteTransition(
+                    fromRoute = from,
+                    toRoute = toRoute,
+                    fromShell = current.currentRoute.shell(),
+                    toShell = intent.route.shell(),
+                    operation = MotionOperation.Replace
+                )
+                val motionId = resolved?.serialName ?: MotionIdConstants.APP_ROUTE_REPLACE
+                Tuple4(
+                    motionId,
+                    from,
+                    toRoute,
+                    MotionController.contractFor(motionId)?.defaultDurationMs
+                        ?: MotionController.contractFor(MotionIdConstants.APP_ROUTE_REPLACE)?.defaultDurationMs
+                        ?: 160L
+                )
+            }
             ReaderUiIntent.HideReaderControl -> Tuple4(
                 MotionIdConstants.READER_CONTROL_HIDE,
                 RouteIds.READER_CONTROL,
