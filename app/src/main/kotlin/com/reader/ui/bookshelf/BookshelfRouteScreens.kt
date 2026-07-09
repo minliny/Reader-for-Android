@@ -728,7 +728,8 @@ private fun BookshelfRouteMoreLayer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x2E1F1B17))
+                // 模态遮罩：映射到 ink 语义 token（onBackground）的半透明 scrim（0x2E1F1B17 → onBackground@0.18）
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f))
                 .clickable(onClick = onDismiss)
         )
         Column(

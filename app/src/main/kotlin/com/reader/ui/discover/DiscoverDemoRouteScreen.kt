@@ -624,10 +624,11 @@ private fun DiscoverSourceOption(
 
 @Composable
 private fun DiscoverInlineError(onNavigate: (String) -> Unit) {
+    val extra = readerExtraColors()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0x14D62222), ReaderShapes.md)
+            .background(extra.danger.copy(alpha = 0.08f), ReaderShapes.md)
             .padding(9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -635,21 +636,21 @@ private fun DiscoverInlineError(onNavigate: (String) -> Unit) {
         Icon(
             painter = painterResource(id = R.drawable.reader_ic_warning),
             contentDescription = null,
-            tint = Color(0xFF7D2F2B),
+            tint = extra.danger,
             modifier = Modifier.size(18.dp)
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = "入口解析失败",
                 style = discoverRouteTitleStyle(),
-                color = Color(0xFF7D2F2B),
+                color = extra.danger,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "当前书源的 exploreUrl 返回异常。",
                 style = discoverRouteMetaStyle(),
-                color = Color(0xFF7D2F2B),
+                color = extra.danger,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -928,7 +929,7 @@ private fun DiscoverToast(text: String) {
             style = discoverRouteMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(850)),
             color = Color.White,
             modifier = Modifier
-                .background(Color(0xDB2B251F), ReaderShapes.pill)
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.86f), ReaderShapes.pill)
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -946,7 +947,7 @@ private fun DiscoverConfirmDialog(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(Color(0x42231C16))
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.26f))
         )
         Column(
             modifier = Modifier
@@ -1861,7 +1862,7 @@ private fun DiscoverIconButton(
 @Composable
 private fun discoverToneColor(tone: DiscoverDemoTone): Color = when (tone) {
     DiscoverDemoTone.Good -> MaterialTheme.colorScheme.primary
-    DiscoverDemoTone.Warn -> Color(0xFF8B5A18)
+    DiscoverDemoTone.Warn -> readerExtraColors().accent
     DiscoverDemoTone.Muted -> readerExtraColors().muted
     DiscoverDemoTone.Loading -> MaterialTheme.colorScheme.tertiary
 }

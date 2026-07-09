@@ -118,7 +118,7 @@ private fun EvidenceScreen(onRun: suspend () -> UnifiedEvidenceArtifact) {
                 .fillMaxWidth()
                 .height(0.dp)
                 .weight(1f),
-            color = Color(0xFF1E1E1E)
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -127,7 +127,7 @@ private fun EvidenceScreen(onRun: suspend () -> UnifiedEvidenceArtifact) {
             ) {
                 Text(
                     text = output.ifEmpty { "Tap the button to run." },
-                    color = Color(0xFFD4D4D4),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.bodySmall
                 )

@@ -341,7 +341,7 @@ private fun RssReaderBodyCard() {
                     lineHeight = 28.sp,
                     fontWeight = FontWeight(500)
                 ),
-                color = Color(0xFF342F2A)
+                color = MaterialTheme.colorScheme.onBackground
             )
         }
     }

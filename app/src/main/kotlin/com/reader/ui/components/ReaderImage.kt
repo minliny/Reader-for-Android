@@ -9,7 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,7 +46,7 @@ fun ReaderImage(
     when (painter.state) {
         is AsyncImagePainter.State.Loading -> {
             Box(
-                modifier = modifier.background(Color(0x14000000)),
+                modifier = modifier.background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(strokeWidth = 2.dp)
@@ -54,7 +54,7 @@ fun ReaderImage(
         }
         is AsyncImagePainter.State.Error -> {
             Box(
-                modifier = modifier.background(Color(0x14000000)),
+                modifier = modifier.background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -72,7 +72,7 @@ fun ReaderImage(
             )
         }
         is AsyncImagePainter.State.Empty -> {
-            Box(modifier = modifier.background(Color(0x14000000)))
+            Box(modifier = modifier.background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)))
         }
     }
 }

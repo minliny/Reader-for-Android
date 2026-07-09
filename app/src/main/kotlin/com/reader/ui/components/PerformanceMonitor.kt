@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.reader.ui.theme.readerExtraColors
 import com.reader.ui.tokens.ReaderTokenAdapter
 import com.reader.ui.tokens.ReaderZIndexToken
 
@@ -99,10 +100,12 @@ fun FpsOverlay(
         }
     }
 
+    val extra = readerExtraColors()
+    // FPS 状态色映射到语义 token：good→forest / warn→accent / bad→danger
     val color = when {
-        fps >= 55 -> Color(0xFF367A4D)  // 绿色
-        fps >= 30 -> Color(0xFFB46E23)  // 黄色
-        else -> Color(0xFFD62222)        // 红色
+        fps >= 55 -> extra.forest   // 绿色
+        fps >= 30 -> extra.accent   // 黄色
+        else -> extra.danger        // 红色
     }
 
     Box(
