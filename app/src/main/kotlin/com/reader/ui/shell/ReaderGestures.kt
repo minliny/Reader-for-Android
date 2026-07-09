@@ -15,7 +15,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.reader.ui.motion.MotionController
-import com.reader.ui.motion.MotionIds
+import com.reader.ui.motion.MotionIdConstants
 import com.reader.ui.motion.ReaderMotionTokens
 import kotlinx.coroutines.launch
 
@@ -40,8 +40,24 @@ fun Modifier.readerPageSwipe(
             onDragEnd = { /* 在 onHorizontalDrag 内累计判断 */ }
         ) { change, dragAmount ->
             if (dragAmount < -threshold) {
+                MotionController.start(
+                    motionId = MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
+                    from = "page.current",
+                    to = "page.next",
+                    durationMs = MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs
+                        ?: 220L,
+                    reducedMotion = MotionController.reducedFrom(null)
+                )
                 onNextPage()
             } else if (dragAmount > threshold) {
+                MotionController.start(
+                    motionId = MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
+                    from = "page.current",
+                    to = "page.previous",
+                    durationMs = MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs
+                        ?: 220L,
+                    reducedMotion = MotionController.reducedFrom(null)
+                )
                 onPrevPage()
             }
         }
@@ -52,6 +68,9 @@ fun Modifier.readerPageSwipe(
 /**
  * 双指缩放调整字号
  * 契约：reader 字号 pinch 手势
+ *
+ * 注：契约中无 reader.font.size.pinch motionId，pinch 是连续手势不产生离散 motion transaction。
+ * 字号变化通过 UpdateReaderTypography intent 的 reducer 路径处理，不需要 motion 触发。
  */
 fun Modifier.readerFontSizePinch(
     onFontSizeChange: (Float) -> Unit
@@ -86,7 +105,7 @@ fun Modifier.readerControlHandle(
             onPress = {
                 // press 80ms
                 MotionController.start(
-                    motionId = MotionIds.READER_ENTRY_COVER_TO_IMMERSIVE,  // 占位，实际应有 reader.control.handle.press
+                    motionId = MotionIdConstants.READER_CONTROL_HANDLE_PRESS,
                     from = "handleIdle",
                     to = "handlePressed",
                     durationMs = ReaderMotionTokens.DurationMicro.inWholeMilliseconds,
@@ -99,7 +118,7 @@ fun Modifier.readerControlHandle(
         detectDragGestures(
             onDragStart = {
                 MotionController.start(
-                    motionId = "reader.control.handle.drag",
+                    motionId = MotionIdConstants.READER_CONTROL_HANDLE_DRAG,
                     from = "handlePressed",
                     to = "handleDragging",
                     durationMs = 0,  // drag 无 easing
@@ -117,7 +136,7 @@ fun Modifier.readerControlHandle(
                     }
                 }
                 MotionController.start(
-                    motionId = "reader.control.handle.release",
+                    motionId = MotionIdConstants.READER_CONTROL_HANDLE_RELEASE,
                     from = "handleDragging",
                     to = "controlLayerResolvedToSingleRouteState",
                     durationMs = ReaderMotionTokens.DurationFast.inWholeMilliseconds,
@@ -155,7 +174,7 @@ fun Modifier.readerDockDrag(
         detectTapGestures(
             onLongPress = {
                 MotionController.start(
-                    motionId = "reader.control.dock.longPress",
+                    motionId = MotionIdConstants.READER_CONTROL_DOCK_LONG_PRESS,
                     from = "fixedWidthDock, handlePressed",
                     to = "dockDragArmed",
                     durationMs = longPressDurationMs,
@@ -167,7 +186,7 @@ fun Modifier.readerDockDrag(
         detectDragGestures(
             onDragEnd = {
                 MotionController.start(
-                    motionId = "reader.control.dock.release",
+                    motionId = MotionIdConstants.READER_CONTROL_DOCK_RELEASE,
                     from = "dockDragging, dockOffset.previewClamped",
                     to = "dockOffset.committed",
                     durationMs = 0,  // 立即提交
@@ -190,7 +209,18 @@ fun Modifier.readerSelectionHandleDrag(
     onSelectionRangeUpdate: (Int) -> Unit
 ): Modifier = composed {
     pointerInput(Unit) {
-        detectDragGestures { change, dragAmount ->
+        detectDragGestures(
+            onDragStart = {
+                MotionController.start(
+                    motionId = MotionIdConstants.SELECTION_RANGE_SHOW,
+                    from = "selection.idle",
+                    to = "selection.active",
+                    durationMs = MotionController.contractFor(MotionIdConstants.SELECTION_RANGE_SHOW)?.defaultDurationMs
+                        ?: 160L,
+                    reducedMotion = MotionController.reducedFrom(null)
+                )
+            }
+        ) { change, dragAmount ->
             onSelectionRangeUpdate(dragAmount.x.toInt())
         }
     }
@@ -212,7 +242,7 @@ fun Modifier.readerSliderDrag(
         detectDragGestures(
             onDragStart = {
                 MotionController.start(
-                    motionId = "slider.drag.start",
+                    motionId = MotionIdConstants.SLIDER_DRAG_START,
                     from = "slider.idle",
                     to = "slider.dragging",
                     durationMs = 0,
@@ -221,7 +251,7 @@ fun Modifier.readerSliderDrag(
             },
             onDragEnd = {
                 MotionController.start(
-                    motionId = "slider.drag.release",
+                    motionId = MotionIdConstants.SLIDER_DRAG_RELEASE,
                     from = "slider.dragging",
                     to = "slider.released",
                     durationMs = ReaderMotionTokens.DurationFast.inWholeMilliseconds,  // 120ms snap

@@ -179,6 +179,83 @@ class AppShellViewModel(
                 MotionController.contractFor(MotionIdConstants.VIEWPORT_ORIENTATION_SETTLE)?.defaultDurationMs
                     ?: 120L
             )
+            // ── 翻页 ──
+            ReaderUiIntent.TurnPageNext -> Tuple4(
+                MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
+                "page.current", "page.next",
+                MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs
+                    ?: 220L
+            )
+            ReaderUiIntent.TurnPagePrev -> Tuple4(
+                MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
+                "page.current", "page.previous",
+                MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs
+                    ?: 220L
+            )
+
+            // ── 会话控制 ──
+            ReaderUiIntent.StopSession -> Tuple4(
+                MotionIdConstants.READER_SESSION_CAPSULE_EXIT,
+                "capsuleVisible", "capsuleHidden",
+                MotionController.contractFor(MotionIdConstants.READER_SESSION_CAPSULE_EXIT)?.defaultDurationMs
+                    ?: 160L
+            )
+            ReaderUiIntent.ToggleSessionPlaying -> Tuple4(
+                MotionIdConstants.READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE,
+                "playing.previous", "playing.next",
+                MotionController.contractFor(MotionIdConstants.READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE)?.defaultDurationMs
+                    ?: 120L
+            )
+
+            // ── Overlay 弹层 ──
+            is ReaderUiIntent.OpenKeyboard -> Tuple4(
+                MotionIdConstants.OVERLAY_KEYBOARD_ENTER_EXIT,
+                "hidden", "visible",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_KEYBOARD_ENTER_EXIT)?.defaultDurationMs
+                    ?: 240L
+            )
+            ReaderUiIntent.CloseKeyboard -> Tuple4(
+                MotionIdConstants.OVERLAY_KEYBOARD_ENTER_EXIT,
+                "visible", "hidden",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_KEYBOARD_ENTER_EXIT)?.defaultDurationMs
+                    ?: 240L
+            )
+            is ReaderUiIntent.OpenSheet -> Tuple4(
+                MotionIdConstants.OVERLAY_SHEET_ENTER,
+                "hidden", "visible",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_SHEET_ENTER)?.defaultDurationMs
+                    ?: 240L
+            )
+            ReaderUiIntent.CloseSheet -> Tuple4(
+                MotionIdConstants.OVERLAY_SHEET_EXIT,
+                "visible", "hidden",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_SHEET_EXIT)?.defaultDurationMs
+                    ?: 240L
+            )
+            is ReaderUiIntent.OpenDialog -> Tuple4(
+                MotionIdConstants.OVERLAY_DIALOG_ENTER,
+                "hidden", "visible",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_DIALOG_ENTER)?.defaultDurationMs
+                    ?: 240L
+            )
+            ReaderUiIntent.CloseDialog -> Tuple4(
+                MotionIdConstants.OVERLAY_DIALOG_EXIT,
+                "visible", "hidden",
+                MotionController.contractFor(MotionIdConstants.OVERLAY_DIALOG_EXIT)?.defaultDurationMs
+                    ?: 240L
+            )
+            is ReaderUiIntent.OpenMoreMenu -> Tuple4(
+                MotionIdConstants.DROPDOWN_MENU_EXPAND,
+                "closed", "open",
+                MotionController.contractFor(MotionIdConstants.DROPDOWN_MENU_EXPAND)?.defaultDurationMs
+                    ?: 160L
+            )
+            ReaderUiIntent.CloseMoreMenu -> Tuple4(
+                MotionIdConstants.DROPDOWN_MENU_COLLAPSE,
+                "open", "closed",
+                MotionController.contractFor(MotionIdConstants.DROPDOWN_MENU_COLLAPSE)?.defaultDurationMs
+                    ?: 120L
+            )
             // Intents with no motion contract — state field updates only.
             else -> null
         }

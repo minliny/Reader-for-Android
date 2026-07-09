@@ -48,28 +48,39 @@ import com.reader.android.R
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import io.reader.ui.contract.RouteShell
+import com.reader.ui.shell.DemoFlowShell
+import com.reader.ui.shell.DemoLibraryShell
+import com.reader.ui.shell.DemoMainTabShell
+import com.reader.ui.shell.DemoReaderShell
+import com.reader.ui.shell.DemoSettingsShell
+import com.reader.ui.shell.OverlayState
+import com.reader.ui.shell.ReaderUiIntent
+import com.reader.ui.shell.readerFontSizePinch
+import com.reader.ui.shell.readerPageSwipe
 
 @Composable
 fun DemoRouteScreen(
     routeId: String,
     onBack: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    onDispatch: (ReaderUiIntent) -> Unit = {},
+    overlayState: OverlayState = OverlayState.None
 ) {
     val page = remember(routeId) {
         DemoRouteRegistry.page(routeId)
-            ?: DemoRoutePage(id = routeId, title = routeId, shell = "", body = listOf(routeId))
+            ?: DemoRoutePage(id = routeId, title = routeId, shell = RouteShell.MainTabShell, body = listOf(routeId))
     }
     when {
-        routeId == "source-switch" -> ReaderDemoScreen(page, onBack, onNavigate)
+        routeId == "source-switch" -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
         routeId.startsWith("discover-") -> DiscoverDemoScreen(page, onBack, onNavigate)
         routeId.startsWith("rss-") -> RssDemoScreen(page, onBack, onNavigate)
         routeId in bookDemoRoutes -> BookDemoScreen(page, onBack, onNavigate)
-        routeId in readerDemoRoutes -> ReaderDemoScreen(page, onBack, onNavigate)
+        routeId in readerDemoRoutes -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
         routeId.startsWith("source-") -> SourceDemoScreen(page, onBack, onNavigate)
         routeId.startsWith("restore-") -> RestoreDemoScreen(page, onBack, onNavigate)
-        else -> DemoLibraryShell(title = page.cleanTitle(), onBack = onBack) {
-            item { DemoStateCard(iconRes = R.drawable.reader_ic_info, title = page.cleanTitle(), body = page.body.firstOrNull() ?: page.id) }
-        }
+        // 通用分发：按 Shell 类型
+        else -> renderGenericRoute(page, onBack, onNavigate, overlayState)
     }
 }
 
@@ -93,183 +104,136 @@ private val readerDemoRoutes = setOf(
 
 private fun DemoRoutePage.cleanTitle(): String = title.substringBefore("（").trim().ifEmpty { title }
 
-// MainTabShell / LibraryShell / ReaderShell ----------------------------------------------------
-
 @Composable
-private fun DemoMainTabShell(
-    title: String,
-    activeRoute: String,
-    onNavigate: (String) -> Unit,
-    content: LazyListScope.() -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            DemoTopBar(title = title)
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 118.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                content = content
-            )
-        }
-        DemoBottomNav(activeRoute = activeRoute, onNavigate = onNavigate, modifier = Modifier.align(Alignment.BottomCenter))
-    }
-}
-
-@Composable
-private fun DemoLibraryShell(
-    title: String,
-    onBack: () -> Unit,
-    bottomActions: List<DemoRouteAction> = emptyList(),
-    onNavigate: (String) -> Unit = {},
-    content: LazyListScope.() -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(Modifier.fillMaxSize()) {
-            DemoBackBar(title = title, onBack = onBack)
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 8.dp,
-                    bottom = if (bottomActions.isEmpty()) 28.dp else 92.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                content = content
-            )
-        }
-        if (bottomActions.isNotEmpty()) {
-            DemoBottomActions(
-                actions = bottomActions,
-                onNavigate = onNavigate,
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
-        }
-    }
-}
-
-@Composable
-private fun DemoTopBar(title: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 58.dp)
-            .padding(top = 6.dp, start = 20.dp, end = 20.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = ReaderTextStyles.appBarTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun DemoBackBar(title: String, onBack: () -> Unit) {
-    // Mirrors demo `fd-back-bar` grid: 44px 1fr 44px (kit.js backTopBar helper).
-    // Padding 6px 20px 0 per 00-foundation.css `.fd-top-bar, .fd-back-bar`.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 58.dp)
-            .padding(top = 6.dp, start = 20.dp, end = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clickable(onClick = onBack),
-            contentAlignment = Alignment.Center
+private fun renderGenericRoute(page: DemoRoutePage, onBack: () -> Unit, onNavigate: (String) -> Unit, overlayState: OverlayState = OverlayState.None) {
+    when (page.shell) {
+        RouteShell.MainTabShell -> DemoMainTabShell(
+            title = page.cleanTitle(),
+            activeRoute = "bookshelf",
+            onNavigate = onNavigate
         ) {
-            DemoIcon(R.drawable.reader_ic_chevron_left, size = 24.dp, tint = MaterialTheme.colorScheme.onBackground)
+            genericMainTabContent(page, onNavigate)
         }
-        Text(
-            text = title,
-            style = ReaderTextStyles.backBarTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
+        RouteShell.LibraryShell -> DemoLibraryShell(
+            title = page.cleanTitle(),
+            onBack = onBack,
+            bottomActions = page.actions,
+            onNavigate = onNavigate,
+            overlayState = overlayState
+        ) {
+            genericLibraryContent(page, onNavigate)
+        }
+        RouteShell.ReaderShell -> DemoReaderShell(
+            readingContent = { genericReaderContent(page) }
         )
-        // Trailing slot placeholder — demo `backTopBar` outputs `<span></span>` when trailingIcon
-        // is null (kit.js line 64), preserving the 44px 1fr 44px grid. Spacer mirrors that here.
-        Spacer(Modifier.size(44.dp))
+        RouteShell.SettingsShell -> DemoSettingsShell(
+            title = page.cleanTitle(),
+            onBack = onBack,
+            bottomActions = page.actions,
+            onNavigate = onNavigate,
+            overlayState = overlayState
+        ) {
+            genericSettingsContent(page, onNavigate)
+        }
+        RouteShell.FlowShell -> DemoFlowShell(
+            title = page.cleanTitle(),
+            onBack = onBack,
+            stepContent = { genericFlowContent(page) }
+        )
     }
 }
 
-@Composable
-private fun DemoBottomNav(activeRoute: String, onNavigate: (String) -> Unit, modifier: Modifier = Modifier) {
-    val items = listOf(
-        Triple("书架", "bookshelf", R.drawable.reader_ic_bookshelf),
-        Triple("发现", "discover", R.drawable.reader_ic_discover),
-        Triple("RSS", "rss", R.drawable.reader_ic_rss),
-        Triple("设置", "settings", R.drawable.reader_ic_gear)
-    )
-    val colors = MaterialTheme.colorScheme
-    val extra = readerExtraColors()
-    Row(
-        modifier = modifier
-            .padding(horizontal = 14.dp, vertical = 14.dp)
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 74.dp)
-            .background(extra.navBackground, ReaderShapes.xl)
-            .border(1.dp, colors.outline, ReaderShapes.xl)
-            .padding(horizontal = 8.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items.forEach { (label, route, icon) ->
-            val active = activeRoute == route
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .defaultMinSize(minHeight = 56.dp)
-                    .background(if (active) extra.primaryDark else Color.Transparent, ReaderShapes.xl)
-                    .clickable { onNavigate(route) }
-                    .padding(vertical = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                DemoIcon(icon, tint = if (active) colors.onPrimary else extra.navInactive)
-                Text(label, style = ReaderTextStyles.tabLabel, color = if (active) colors.onPrimary else extra.navInactive)
+private fun LazyListScope.genericMainTabContent(page: DemoRoutePage, onNavigate: (String) -> Unit) {
+    item { DemoStateCard(iconRes = R.drawable.reader_ic_info, title = page.cleanTitle(), body = page.body.firstOrNull() ?: page.id) }
+    if (page.body.size > 1) {
+        item {
+            DemoSectionCard(title = "详情") {
+                Column {
+                    page.body.drop(1).forEach { line ->
+                        Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+    if (page.actions.isNotEmpty()) {
+        item {
+            DemoSectionCard(title = "操作") {
+                Column {
+                    page.actions.forEach { action ->
+                        DemoListItem(title = action.label, trailingText = "›", onClick = { onNavigate(action.targetRoute) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.genericLibraryContent(page: DemoRoutePage, onNavigate: (String) -> Unit) {
+    item { DemoStateCard(iconRes = R.drawable.reader_ic_info, title = page.cleanTitle(), body = page.body.firstOrNull() ?: page.id) }
+    if (page.body.size > 1) {
+        item {
+            DemoSectionCard(title = "详情") {
+                Column {
+                    page.body.drop(1).forEach { line ->
+                        Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+    if (page.actions.isNotEmpty()) {
+        item {
+            DemoSectionCard(title = "操作") {
+                Column {
+                    page.actions.forEach { action ->
+                        DemoListItem(title = action.label, trailingText = "›", onClick = { onNavigate(action.targetRoute) })
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DemoBottomActions(
-    actions: List<DemoRouteAction>,
-    onNavigate: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.94f))
-            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        actions.take(2).forEachIndexed { index, action ->
-            DemoButton(
-                label = action.label,
-                primary = index == actions.lastIndex.coerceAtMost(1),
-                modifier = Modifier.weight(1f)
-            ) { onNavigate(action.targetRoute) }
+private fun genericReaderContent(page: DemoRoutePage) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        page.body.forEach { line ->
+            Text(line, style = ReaderTextStyles.readerBody, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(vertical = 8.dp))
+        }
+    }
+}
+
+private fun LazyListScope.genericSettingsContent(page: DemoRoutePage, onNavigate: (String) -> Unit) {
+    item {
+        DemoSectionCard(title = page.cleanTitle()) {
+            Column {
+                page.body.forEach { line ->
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        }
+    }
+    if (page.actions.isNotEmpty()) {
+        item {
+            DemoSectionCard(title = "操作") {
+                Column {
+                    page.actions.forEach { action ->
+                        DemoSettingsRow(title = action.label, onClick = { onNavigate(action.targetRoute) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun genericFlowContent(page: DemoRoutePage) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text(page.cleanTitle(), style = ReaderTextStyles.appBarTitle, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(Modifier.height(16.dp))
+        page.body.forEach { line ->
+            Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(vertical = 4.dp))
         }
     }
 }
@@ -976,7 +940,7 @@ private fun ChapterRowInline(chapter: DemoChapter, onNavigate: (String) -> Unit)
 // Reader ----------------------------------------------------------------------------------------
 
 @Composable
-private fun ReaderDemoScreen(page: DemoRoutePage, onBack: () -> Unit, onNavigate: (String) -> Unit) {
+private fun ReaderDemoScreen(page: DemoRoutePage, onBack: () -> Unit, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     val paragraphs = page.body.drop(1).filter { it.length > 18 }.take(8).ifEmpty {
         listOf("雨声在窗外连成一片，旧世界的线索在夜里慢慢浮出。")
     }
@@ -987,7 +951,13 @@ private fun ReaderDemoScreen(page: DemoRoutePage, onBack: () -> Unit, onNavigate
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .readerPageSwipe(
+                    onNextPage = { onDispatch(ReaderUiIntent.TurnPageNext) },
+                    onPrevPage = { onDispatch(ReaderUiIntent.TurnPagePrev) }
+                )
+                .readerFontSizePinch { zoom -> /* 字号 pinch 暂不触发 intent，留空 */ },
             contentPadding = PaddingValues(start = 30.dp, end = 30.dp, top = 78.dp, bottom = 190.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -1004,7 +974,7 @@ private fun ReaderDemoScreen(page: DemoRoutePage, onBack: () -> Unit, onNavigate
             }
         }
         ReaderInfoLayer(modifier = Modifier.align(Alignment.TopCenter))
-        ReaderBottomPanel(page = page, onBack = onBack, onNavigate = onNavigate, modifier = Modifier.align(Alignment.BottomCenter))
+        ReaderBottomPanel(page = page, onBack = onBack, onNavigate = onNavigate, onDispatch = onDispatch, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -1022,7 +992,7 @@ private fun ReaderInfoLayer(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ReaderBottomPanel(page: DemoRoutePage, onBack: () -> Unit, onNavigate: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun ReaderBottomPanel(page: DemoRoutePage, onBack: () -> Unit, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}, modifier: Modifier = Modifier) {
     val full = page.id.startsWith("reader-full")
     Column(
         modifier = modifier
@@ -1037,11 +1007,11 @@ private fun ReaderBottomPanel(page: DemoRoutePage, onBack: () -> Unit, onNavigat
             Text(readerPanelTitle(page.id), style = ReaderTextStyles.sectionTitle, color = MaterialTheme.colorScheme.onBackground)
             DemoTextButton(if (full) "收起" else "全屏") { onNavigate(readerFullTarget(page.id)) }
         }
-        ReaderProgress(page.id)
+        ReaderProgress(page.id, onDispatch)
         when (readerPanelKind(page.id)) {
             "directory" -> ReaderDirectoryPanel(full, onNavigate)
-            "tts" -> ReaderTtsPanel(full, onNavigate)
-            "appearance" -> ReaderAppearancePanel(full, onNavigate)
+            "tts" -> ReaderTtsPanel(full, onNavigate, onDispatch)
+            "appearance" -> ReaderAppearancePanel(full, onNavigate, onDispatch)
             "settings" -> ReaderSettingsPanel(full, onNavigate)
             "search" -> ReaderSearchPanel(onNavigate)
             "auto-page" -> ReaderAutoPagePanel(onNavigate)
@@ -1055,14 +1025,14 @@ private fun ReaderBottomPanel(page: DemoRoutePage, onBack: () -> Unit, onNavigat
 }
 
 @Composable
-private fun ReaderProgress(routeId: String) {
+private fun ReaderProgress(routeId: String, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoCard(alpha = 0.42f) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DemoTextButton("上一章") {}
+            DemoTextButton("上一章") { onDispatch(ReaderUiIntent.TurnPagePrev) }
             Box(Modifier.weight(1f).height(5.dp).background(readerExtraColors().hairline, ReaderShapes.pill)) {
                 Box(Modifier.fillMaxWidth(0.38f).height(5.dp).background(MaterialTheme.colorScheme.primary, ReaderShapes.pill))
             }
-            DemoTextButton("下一章") {}
+            DemoTextButton("下一章") { onDispatch(ReaderUiIntent.TurnPageNext) }
         }
         Text(if (routeId == "auto-page") "自动翻页 · 8 秒" else "38% · 第 1 / 3 页", style = denseMetaStyle(), color = readerExtraColors().muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
     }
@@ -1090,18 +1060,27 @@ private fun ReaderDirectoryPanel(full: Boolean, onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderTtsPanel(full: Boolean, onNavigate: (String) -> Unit) {
+private fun ReaderTtsPanel(full: Boolean, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoRow(R.drawable.reader_ic_book_open, "声音", "系统女声 · 1.0x", "朗读")
     DemoRow(R.drawable.reader_ic_clock, "当前句", "雨声在窗外连成一片", if (full) "第 1 句" else null)
-    DemoActionGrid(listOf(DemoRouteAction("开始", "tts"), DemoRouteAction("暂停", "tts"), DemoRouteAction("停止", "reader")), onNavigate)
+    DemoActionGrid(listOf(
+        DemoRouteAction("开始", "tts", onStart = { onDispatch(ReaderUiIntent.StartTtsSession(text = "雨声在窗外连成一片，旧世界的线索在夜里慢慢浮出。")) }),
+        DemoRouteAction("暂停", "tts", onStart = { onDispatch(ReaderUiIntent.ToggleSessionPlaying) }),
+        DemoRouteAction("停止", "reader", onStart = { onDispatch(ReaderUiIntent.StopSession) })
+    ), onNavigate)
 }
 
 @Composable
-private fun ReaderAppearancePanel(full: Boolean, onNavigate: (String) -> Unit) {
+private fun ReaderAppearancePanel(full: Boolean, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoSectionLabel("主题")
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        listOf(Color(0xFFFFF7EC), Color(0xFFF2E7D5), Color(0xFF1F1B17), Color(0xFFEAF0E2)).forEach {
-            Box(Modifier.size(if (full) 34.dp else 24.dp).background(it, ReaderShapes.sm).border(1.dp, readerExtraColors().hairline, ReaderShapes.sm))
+        listOf(
+            Color(0xFFFFF7EC) to "paper",
+            Color(0xFFF2E7D5) to "warm",
+            Color(0xFF1F1B17) to "paper-night",
+            Color(0xFFEAF0E2) to "green"
+        ).forEach { (color, themeId) ->
+            Box(Modifier.size(if (full) 34.dp else 24.dp).background(color, ReaderShapes.sm).border(1.dp, readerExtraColors().hairline, ReaderShapes.sm).clickable { onDispatch(ReaderUiIntent.UpdateReaderTheme(themeId = themeId)) })
         }
     }
     DemoRow(R.drawable.reader_ic_settings, "字号", "18", "+")
@@ -1527,7 +1506,10 @@ private fun DemoActionGrid(actions: List<DemoRouteAction>, onNavigate: (String) 
         actions.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { action ->
-                    DemoButton(action.label, modifier = Modifier.weight(1f)) { onNavigate(action.targetRoute) }
+                    DemoButton(action.label, modifier = Modifier.weight(1f)) {
+                        if (action.onStart != null) action.onStart!!()
+                        else onNavigate(action.targetRoute)
+                    }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -1536,7 +1518,7 @@ private fun DemoActionGrid(actions: List<DemoRouteAction>, onNavigate: (String) 
 }
 
 @Composable
-private fun DemoButton(
+fun DemoButton(
     label: String,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
@@ -1661,7 +1643,7 @@ private fun DemoBadge(label: String) {
 }
 
 @Composable
-private fun DemoIcon(@DrawableRes iconRes: Int, size: Dp = 20.dp, tint: Color = MaterialTheme.colorScheme.onBackground) {
+fun DemoIcon(@DrawableRes iconRes: Int, size: Dp = 20.dp, tint: Color = MaterialTheme.colorScheme.onBackground) {
     Icon(painter = painterResource(iconRes), contentDescription = null, tint = tint, modifier = Modifier.size(size))
 }
 

@@ -65,6 +65,7 @@ import com.reader.ui.bookshelf.LocalImportScreen
 import com.reader.ui.demo.DemoRouteRegistry
 import com.reader.ui.demo.DemoRouteScreen
 import com.reader.ui.discover.DiscoverDemoPage
+import com.reader.ui.shell.OverlayState
 import com.reader.ui.discover.DiscoverDemoRouteIds
 import com.reader.ui.discover.DiscoverDemoRouteScreen
 import com.reader.ui.discover.DiscoverDemoRouteShell
@@ -74,7 +75,9 @@ import com.reader.ui.discover.DiscoverTabTopBar
 import com.reader.ui.discover.discoverDemoRouteState
 import com.reader.ui.motion.AppMotionTokens
 import com.reader.ui.motion.ReducedMotionResolver
+import com.reader.ui.motion.ViewportClass
 import com.reader.ui.motion.effectiveDuration
+import com.reader.ui.motion.rememberViewportClass
 import com.reader.ui.reading.FlowShellScreen
 import com.reader.ui.reading.ReaderShellScreen
 import com.reader.ui.rss.RssReadRecordScreen
@@ -868,7 +871,9 @@ fun AppShell(
                     DemoRouteScreen(
                         routeId = route.id,
                         onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
-                        onNavigate = { navigateToRouteId(it) }
+                        onNavigate = { navigateToRouteId(it) },
+                        onDispatch = vm::dispatch,
+                        overlayState = state.overlayState
                     )
                 }
             }
@@ -922,7 +927,8 @@ fun AppShell(
                                     bookName = bookName
                                 )
                             )
-                        }
+                        },
+                        overlayState = state.overlayState
                     )
                 }
             } else {
@@ -939,7 +945,8 @@ fun AppShell(
                                 bookName = bookName
                             )
                         )
-                    }
+                    },
+                    overlayState = state.overlayState
                 )
             }
         }
@@ -956,7 +963,9 @@ fun AppShell(
             DemoRouteScreen(
                 routeId = route.id,
                 onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
-                onNavigate = { navigateToRouteId(it) }
+                onNavigate = { navigateToRouteId(it) },
+                onDispatch = vm::dispatch,
+                overlayState = state.overlayState
             )
         }
 
@@ -1050,8 +1059,10 @@ private fun MainTabShellFrame(
     stateHost: @Composable () -> Unit = { MainTabStateHostSlot() },
     content: @Composable () -> Unit
 ) {
+    val viewportClass = rememberViewportClass()  // 新增：激活 ViewportClassAdapter
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val useLeftRail = maxWidth >= 600.dp
+        val useLeftRail = viewportClass == ViewportClass.TABLET_EXPANDED ||
+            viewportClass == ViewportClass.EXPANDED_WIDTH  // 改用 ViewportClass 判断
         Box(
             modifier = Modifier
                 .fillMaxSize()

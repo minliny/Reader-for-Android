@@ -1,6 +1,7 @@
 package com.reader.ui.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -11,12 +12,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.readerExtraColors
 
 /**
@@ -37,12 +42,13 @@ import com.reader.ui.theme.readerExtraColors
 
 @Composable
 fun LibraryShellFrame(
+    overlayState: OverlayState = OverlayState.None,
     statusBar: @Composable () -> Unit = { LibraryShellStatusBarSlot() },
     backTopBar: @Composable () -> Unit,
     contentRegion: @Composable () -> Unit,
     bottomActionHost: @Composable () -> Unit = { LibraryBottomActionHostSlot() },
-    sheetHost: @Composable () -> Unit = { LibrarySheetHostSlot() },
-    dialogHost: @Composable () -> Unit = { LibraryDialogHostSlot() },
+    sheetHost: @Composable () -> Unit = { LibrarySheetHostSlot(overlayState) },
+    dialogHost: @Composable () -> Unit = { LibraryDialogHostSlot(overlayState) },
     stateHost: @Composable () -> Unit = { LibraryStateHostSlot() }
 ) {
     val paper = readerExtraColors().paper
@@ -95,13 +101,14 @@ fun LibraryShellFrame(
 
 @Composable
 fun SettingsShellFrame(
+    overlayState: OverlayState = OverlayState.None,
     statusBar: @Composable () -> Unit = { SettingsShellStatusBarSlot() },
     backTopBar: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
     bottomActionHost: @Composable () -> Unit = { SettingsBottomActionHostSlot() },
-    sheetHost: @Composable () -> Unit = { SettingsSheetHostSlot() },
+    sheetHost: @Composable () -> Unit = { SettingsSheetHostSlot(overlayState) },
     toastHost: @Composable () -> Unit = { SettingsToastHostSlot() },
-    dialogHost: @Composable () -> Unit = { SettingsDialogHostSlot() },
+    dialogHost: @Composable () -> Unit = { SettingsDialogHostSlot(overlayState) },
     settingsStateHost: @Composable () -> Unit = { SettingsStateHostSlot() }
 ) {
     val paper = readerExtraColors().paper
@@ -167,15 +174,75 @@ fun LibraryBottomActionHostSlot() {
 }
 
 @Composable
-fun LibrarySheetHostSlot() {
-    // sheetHost slot: display:contents; preserved as zero-size Box for addressability.
-    Box(modifier = Modifier.size(0.dp))
+fun LibrarySheetHostSlot(overlayState: OverlayState = OverlayState.None) {
+    // sheetHost slot: display:contents; renders Sheet overlay when overlayState is Sheet.
+    when (overlayState) {
+        is OverlayState.Sheet -> {
+            when (overlayState.content) {
+                is SheetContent.ReaderSetting -> {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, ReaderShapes.xl)
+                            .border(1.dp, readerExtraColors().hairline, ReaderShapes.xl)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "阅读设置 · ${overlayState.content.module}",
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                is SheetContent.BookshelfFilter -> {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, ReaderShapes.xl)
+                            .border(1.dp, readerExtraColors().hairline, ReaderShapes.xl)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "书架筛选 · ${overlayState.content.filterId}",
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+        else -> {}  // None/Keyboard/Dialog 不在此槽位渲染
+    }
 }
 
 @Composable
-fun LibraryDialogHostSlot() {
-    // dialogHost slot: display:contents; preserved as zero-size Box for addressability.
-    Box(modifier = Modifier.size(0.dp))
+fun LibraryDialogHostSlot(overlayState: OverlayState = OverlayState.None) {
+    // dialogHost slot: display:contents; renders Dialog overlay when overlayState is Dialog.
+    when (overlayState) {
+        is OverlayState.Dialog -> {
+            when (overlayState.content) {
+                is DialogContent.Confirm -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = {
+                            TextButton(onClick = overlayState.content.onConfirm) {
+                                Text("确认")
+                            }
+                        },
+                        dismissButton = { TextButton(onClick = {}) { Text("取消") } },
+                        title = { Text(overlayState.content.title) },
+                        text = { Text(overlayState.content.message) }
+                    )
+                }
+                is DialogContent.SourceSwitch -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = { TextButton(onClick = {}) { Text("切换") } },
+                        dismissButton = { TextButton(onClick = {}) { Text("取消") } },
+                        title = { Text("换源确认") },
+                        text = { Text("书源 ID：${overlayState.content.sourceId}") }
+                    )
+                }
+            }
+        }
+        else -> {}
+    }
 }
 
 @Composable
@@ -199,9 +266,41 @@ fun SettingsBottomActionHostSlot() {
 }
 
 @Composable
-fun SettingsSheetHostSlot() {
-    // sheetHost slot: display:contents; preserved as zero-size Box for addressability.
-    Box(modifier = Modifier.size(0.dp))
+fun SettingsSheetHostSlot(overlayState: OverlayState = OverlayState.None) {
+    // sheetHost slot: display:contents; renders Sheet overlay when overlayState is Sheet.
+    when (overlayState) {
+        is OverlayState.Sheet -> {
+            when (overlayState.content) {
+                is SheetContent.ReaderSetting -> {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, ReaderShapes.xl)
+                            .border(1.dp, readerExtraColors().hairline, ReaderShapes.xl)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "阅读设置 · ${overlayState.content.module}",
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                is SheetContent.BookshelfFilter -> {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, ReaderShapes.xl)
+                            .border(1.dp, readerExtraColors().hairline, ReaderShapes.xl)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "书架筛选 · ${overlayState.content.filterId}",
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+        else -> {}  // None/Keyboard/Dialog 不在此槽位渲染
+    }
 }
 
 @Composable
@@ -211,9 +310,37 @@ fun SettingsToastHostSlot() {
 }
 
 @Composable
-fun SettingsDialogHostSlot() {
-    // dialogHost slot: display:contents; preserved as zero-size Box for addressability.
-    Box(modifier = Modifier.size(0.dp))
+fun SettingsDialogHostSlot(overlayState: OverlayState = OverlayState.None) {
+    // dialogHost slot: display:contents; renders Dialog overlay when overlayState is Dialog.
+    when (overlayState) {
+        is OverlayState.Dialog -> {
+            when (overlayState.content) {
+                is DialogContent.Confirm -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = {
+                            TextButton(onClick = overlayState.content.onConfirm) {
+                                Text("确认")
+                            }
+                        },
+                        dismissButton = { TextButton(onClick = {}) { Text("取消") } },
+                        title = { Text(overlayState.content.title) },
+                        text = { Text(overlayState.content.message) }
+                    )
+                }
+                is DialogContent.SourceSwitch -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = { TextButton(onClick = {}) { Text("切换") } },
+                        dismissButton = { TextButton(onClick = {}) { Text("取消") } },
+                        title = { Text("换源确认") },
+                        text = { Text("书源 ID：${overlayState.content.sourceId}") }
+                    )
+                }
+            }
+        }
+        else -> {}
+    }
 }
 
 @Composable

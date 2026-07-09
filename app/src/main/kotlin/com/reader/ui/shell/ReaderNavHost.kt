@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.reader.ui.motion.MotionController
-import com.reader.ui.motion.MotionIds
+import com.reader.ui.motion.MotionIdConstants
 import com.reader.ui.motion.ReaderMotionTokens
 
 /**
@@ -40,9 +40,9 @@ fun ReaderRouteTransition(
     // 注册 Motion ID
     LaunchedEffect(targetRoute, transitionDirection) {
         val motionId = when (transitionDirection) {
-            RouteTransitionDirection.PUSH_FORWARD -> MotionIds.APP_ROUTE_PUSH
-            RouteTransitionDirection.POP_BACKWARD -> MotionIds.APP_ROUTE_POP
-            RouteTransitionDirection.REPLACE -> MotionIds.APP_ROUTE_REPLACE
+            RouteTransitionDirection.PUSH_FORWARD -> MotionIdConstants.APP_ROUTE_PUSH_FORWARD
+            RouteTransitionDirection.POP_BACKWARD -> MotionIdConstants.APP_ROUTE_POP_BACKWARD
+            RouteTransitionDirection.REPLACE -> MotionIdConstants.APP_ROUTE_REPLACE
         }
         MotionController.start(
             motionId = motionId,
