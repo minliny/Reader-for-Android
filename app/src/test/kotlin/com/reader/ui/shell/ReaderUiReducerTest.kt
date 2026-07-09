@@ -1871,4 +1871,260 @@ class ReaderUiReducerTest {
         assertEquals(RouteIds.SETTINGS_GENERAL, withSettings.backStack[1].routeId)
         assertEquals(RouteIds.SETTINGS_GENERAL, withSettings.currentRoute.routeId)
     }
+
+    // ── B2: book-detail 专用 reducer (BookDetailOpen/Loaded/LoadFailed/Close) ─────
+    // 契约：state-rule.fixtures.json `book-detail-error-requires-error-pagestate`
+    // （error 非空时 pageState 必须为 error 或 source-unavailable）。
+
+    @Test
+    fun `BookDetailOpen enters Loading and pushes book-detail route`() {
+        val initial = ReaderUiState(activeTab = MainTab.BOOKSHELF)
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.BookDetailOpen(bookUrl = "fixture://book/demo", requestId = "req-open")
+        )
+
+        assertEquals(BookDetailPageState.Loading, next.bookDetail)
+        assertEquals("book-detail", next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+        assertEquals("book-detail", next.backStack.last().routeId)
+    }
+
+    @Test
+    fun `BookDetailLoaded transitions Loading to Ready (data loaded shows detail)`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.BookDetailOpen(bookUrl = "fixture://book/demo")
+        )
+        assertEquals(BookDetailPageState.Loading, loading.bookDetail)
+
+        // data loaded → Ready（显示详情）
+        val ready = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.BookDetailLoaded(requestId = "req-loaded")
+        )
+        assertEquals(BookDetailPageState.Ready, ready.bookDetail)
+        // Loaded 不改路由，仍为 book-detail
+        assertEquals("book-detail", ready.currentRoute.routeId)
+    }
+
+    @Test
+    fun `BookDetailLoadFailed transitions to Error pageState satisfying error-requires-error-pagestate contract`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.BookDetailOpen(bookUrl = "fixture://book/demo")
+        )
+
+        // error → error pageState（契约：error 非空时 pageState 必须为 error）
+        val failed = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.BookDetailLoadFailed(message = "book.load not implemented", requestId = "req-fail")
+        )
+
+        assertTrue("Expected Error pageState, got ${failed.bookDetail::class}",
+            failed.bookDetail is BookDetailPageState.Error)
+        assertEquals(
+            "book.load not implemented",
+            (failed.bookDetail as BookDetailPageState.Error).message
+        )
+    }
+
+    @Test
+    fun `BookDetailClose pops route and resets bookDetail to Idle (close returns)`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(activeTab = MainTab.BOOKSHELF),
+            ReaderUiIntent.BookDetailOpen(bookUrl = "fixture://book/demo")
+        )
+        assertEquals(BookDetailPageState.Loading, loading.bookDetail)
+
+        // close → 回退，route popped，bookDetail 重置为 Idle
+        val afterClose = ReaderUiReducer.reduce(loading, ReaderUiIntent.BookDetailClose)
+
+        assertEquals(BookDetailPageState.Idle, afterClose.bookDetail)
+        assertTrue(afterClose.backStack.isEmpty())
+        assertEquals(MainTab.BOOKSHELF, (afterClose.currentRoute as ReaderRoute.TabShell).tab)
+    }
+
+    @Test
+    fun `book-detail back stack order preserved when pushing sub-route after BookDetailOpen`() {
+        val withDetail = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.BookDetailOpen(bookUrl = "fixture://book/demo")
+        )
+        assertEquals("book-detail", withDetail.backStack.last().routeId)
+
+        // 再 push book-directory 子路由 → back stack 顺序 [book-detail, book-directory]
+        val withDirectory = ReaderUiReducer.reduce(
+            withDetail,
+            ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-directory"), requestId = "req-dir")
+        )
+
+        assertEquals(2, withDirectory.backStack.size)
+        assertEquals("book-detail", withDirectory.backStack[0].routeId)
+        assertEquals("book-directory", withDirectory.backStack[1].routeId)
+        assertEquals("book-directory", withDirectory.currentRoute.routeId)
+
+        // pop 回到 book-detail
+        val afterBack = ReaderUiReducer.reduce(withDirectory, ReaderUiIntent.PopRoute)
+        assertEquals("book-detail", afterBack.currentRoute.routeId)
+        assertEquals(1, afterBack.backStack.size)
+    }
+
+    // ── B3: settings 专用 reducer (SettingsOpen/Close/TabSwitch/Overlay*) ────────
+    // 契约：state-rule.fixtures.json `settings-overlay-guard-tab-switch`
+    // （settings.overlay == expandedOption 时禁止 tab 切换）。
+
+    @Test
+    fun `SettingsOpen pushes settings sub-route and records activeTab`() {
+        val initial = ReaderUiState(
+            activeTab = MainTab.SETTINGS,
+            currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+        )
+
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.SYNC_BACKUP, requestId = "req-open")
+        )
+
+        assertEquals(SettingsTab.SYNC_BACKUP, next.settings.activeTab)
+        assertEquals(RouteIds.SYNC_BACKUP, next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+        assertEquals(RouteIds.SYNC_BACKUP, next.backStack.last().routeId)
+    }
+
+    @Test
+    fun `SettingsOpen for ABOUT tab pushes about-feedback route`() {
+        val initial = ReaderUiState(
+            activeTab = MainTab.SETTINGS,
+            currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+        )
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.ABOUT)
+        )
+        assertEquals(SettingsTab.ABOUT, next.settings.activeTab)
+        assertEquals(RouteIds.ABOUT_FEEDBACK, next.currentRoute.routeId)
+    }
+
+    @Test
+    fun `SettingsTabSwitch updates activeTab when overlay is NONE (tab switch changes UiState)`() {
+        val withSettings = ReaderUiReducer.reduce(
+            ReaderUiState(
+                activeTab = MainTab.SETTINGS,
+                currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+            ),
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.GENERAL)
+        )
+        assertEquals(SettingsTab.GENERAL, withSettings.settings.activeTab)
+
+        // tab switch → UiState 切换（overlay NONE 时允许）
+        val switched = ReaderUiReducer.reduce(
+            withSettings,
+            ReaderUiIntent.SettingsTabSwitch(tab = SettingsTab.ABOUT, requestId = "req-switch")
+        )
+        assertEquals(SettingsTab.ABOUT, switched.settings.activeTab)
+    }
+
+    @Test
+    fun `SettingsTabSwitch is no-op when overlay is EXPANDED_OPTION (settings-overlay-guard-tab-switch)`() {
+        val withSettings = ReaderUiReducer.reduce(
+            ReaderUiState(
+                activeTab = MainTab.SETTINGS,
+                currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+            ),
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.GENERAL)
+        )
+        // 展开 overlay
+        val expanded = ReaderUiReducer.reduce(withSettings, ReaderUiIntent.SettingsOverlayExpand)
+        assertEquals(SettingsOverlay.EXPANDED_OPTION, expanded.settings.overlay)
+
+        // tab 切换应被 async guard 拦截（no-op）
+        val switched = ReaderUiReducer.reduce(
+            expanded,
+            ReaderUiIntent.SettingsTabSwitch(tab = SettingsTab.ABOUT)
+        )
+        assertEquals("activeTab must not change when overlay is EXPANDED_OPTION",
+            SettingsTab.GENERAL, switched.settings.activeTab)
+    }
+
+    @Test
+    fun `SettingsOverlayCollapse releases guard and allows tab switch`() {
+        val withSettings = ReaderUiReducer.reduce(
+            ReaderUiState(
+                activeTab = MainTab.SETTINGS,
+                currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+            ),
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.GENERAL)
+        )
+        val expanded = ReaderUiReducer.reduce(withSettings, ReaderUiIntent.SettingsOverlayExpand)
+        // 收起 overlay 后 tab 切换应恢复
+        val collapsed = ReaderUiReducer.reduce(expanded, ReaderUiIntent.SettingsOverlayCollapse)
+        assertEquals(SettingsOverlay.NONE, collapsed.settings.overlay)
+
+        val switched = ReaderUiReducer.reduce(
+            collapsed,
+            ReaderUiIntent.SettingsTabSwitch(tab = SettingsTab.SYNC_BACKUP)
+        )
+        assertEquals(SettingsTab.SYNC_BACKUP, switched.settings.activeTab)
+    }
+
+    @Test
+    fun `SelectTab on settings route with overlay EXPANDED is no-op (guard via SelectTab)`() {
+        // settings 路由 + overlay 展开 → SelectTab 应被守卫拦截
+        val guarded = ReaderUiState(
+            activeTab = MainTab.SETTINGS,
+            currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS),
+            settings = SettingsState(activeTab = SettingsTab.GENERAL, overlay = SettingsOverlay.EXPANDED_OPTION)
+        )
+
+        val next = ReaderUiReducer.reduce(guarded, ReaderUiIntent.SelectTab(MainTab.BOOKSHELF))
+
+        assertEquals("activeTab must stay SETTINGS when overlay guard is active",
+            MainTab.SETTINGS, next.activeTab)
+        assertEquals(SettingsOverlay.EXPANDED_OPTION, next.settings.overlay)
+    }
+
+    @Test
+    fun `SettingsClose pops route and returns to settings tab (close returns)`() {
+        val withSettings = ReaderUiReducer.reduce(
+            ReaderUiState(
+                activeTab = MainTab.SETTINGS,
+                currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+            ),
+            ReaderUiIntent.SettingsOpen(tab = SettingsTab.SYNC_BACKUP)
+        )
+        assertEquals(RouteIds.SYNC_BACKUP, withSettings.currentRoute.routeId)
+
+        // close → 回退到 settings tab
+        val afterClose = ReaderUiReducer.reduce(withSettings, ReaderUiIntent.SettingsClose)
+
+        assertTrue(afterClose.backStack.isEmpty())
+        assertEquals(MainTab.SETTINGS, (afterClose.currentRoute as ReaderRoute.TabShell).tab)
+    }
+
+    @Test
+    fun `settings full cycle open tabswitch expand collapse close`() {
+        var state = ReaderUiState(
+            activeTab = MainTab.SETTINGS,
+            currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS)
+        )
+        // 1. open settings-general
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsOpen(tab = SettingsTab.GENERAL))
+        assertEquals(SettingsTab.GENERAL, state.settings.activeTab)
+        assertEquals(RouteIds.SETTINGS_GENERAL, state.currentRoute.routeId)
+
+        // 2. tab switch to ABOUT（overlay NONE → 允许）
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsTabSwitch(tab = SettingsTab.ABOUT))
+        assertEquals(SettingsTab.ABOUT, state.settings.activeTab)
+
+        // 3. expand overlay → tab switch 被守卫拦截
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsOverlayExpand)
+        val blockedState = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsTabSwitch(tab = SettingsTab.GENERAL))
+        assertEquals(SettingsTab.ABOUT, blockedState.settings.activeTab)
+
+        // 4. collapse → close
+        state = ReaderUiReducer.reduce(blockedState, ReaderUiIntent.SettingsOverlayCollapse)
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsClose)
+        assertTrue(state.backStack.isEmpty())
+    }
 }

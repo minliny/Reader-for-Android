@@ -451,16 +451,99 @@ object ReaderUiReducer {
                 )
             )
         }
+
+        // ── P0: book-detail 专用 reducer ──────────────────────────────────
+        // 不再走通用 PushRoute：BookDetailOpen 同时 push route 并进入 Loading，
+        // 让 reducer 可追踪 book-detail 的加载/就绪/错误三态。
+        // 契约：error 非空时 pageState 必须为 error 或 source-unavailable
+        // （state-rule.fixtures.json `book-detail-error-requires-error-pagestate`）。
+        is ReaderUiIntent.BookDetailOpen -> {
+            val route = ReaderRoute.BookState("book-detail")
+            state.copy(
+                backStack = state.backStack + route,
+                currentRoute = route,
+                bookDetail = BookDetailPageState.Loading,
+                motionInterrupt = null
+            )
+        }
+        ReaderUiIntent.BookDetailClose -> {
+            // 同时 pop route 并清 book-detail 状态
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                bookDetail = BookDetailPageState.Idle,
+                motionInterrupt = null
+            )
+        }
+        is ReaderUiIntent.BookDetailLoaded -> state.copy(
+            bookDetail = BookDetailPageState.Ready
+        )
+        is ReaderUiIntent.BookDetailLoadFailed -> state.copy(
+            // pageState=error 满足 `book-detail-error-requires-error-pagestate` 契约
+            bookDetail = BookDetailPageState.Error(message = intent.message)
+        )
+
+        // ── P0: settings 专用 reducer ─────────────────────────────────────
+        // 让 reducer 可追踪 settings 内部子 tab 切换与 overlay 展开状态。
+        // 契约：settings.overlay == EXPANDED_OPTION 时禁止 tab 切换
+        // （state-rule.fixtures.json `settings-overlay-guard-tab-switch`）。
+        is ReaderUiIntent.SettingsOpen -> {
+            val route = when (intent.tab) {
+                SettingsTab.GENERAL -> ReaderRoute.SettingsGeneral
+                SettingsTab.SYNC_BACKUP -> ReaderRoute.SyncBackup
+                SettingsTab.ABOUT -> ReaderRoute.AboutFeedback
+            }
+            state.copy(
+                backStack = state.backStack + route,
+                currentRoute = route,
+                settings = state.settings.copy(activeTab = intent.tab),
+                motionInterrupt = null
+            )
+        }
+        ReaderUiIntent.SettingsClose -> {
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                motionInterrupt = null
+            )
+        }
+        is ReaderUiIntent.SettingsTabSwitch -> {
+            // settings-overlay-guard-tab-switch: overlay == EXPANDED_OPTION 时禁止 tab 切换
+            if (state.settings.overlay == SettingsOverlay.EXPANDED_OPTION) {
+                state
+            } else {
+                state.copy(settings = state.settings.copy(activeTab = intent.tab))
+            }
+        }
+        ReaderUiIntent.SettingsOverlayExpand -> state.copy(
+            settings = state.settings.copy(overlay = SettingsOverlay.EXPANDED_OPTION)
+        )
+        ReaderUiIntent.SettingsOverlayCollapse -> state.copy(
+            settings = state.settings.copy(overlay = SettingsOverlay.NONE)
+        )
     }
 
     /**
      * `app.tab.switch`. Clears any pushed routes (Search / ImportSource / reader) — tab
      * switch is an interrupt (motion.interrupt.cancel) and must not leave dangling overlays
      * or a stale back stack.
+     *
+     * 契约守卫（state-rule.fixtures.json `settings-overlay-guard-tab-switch`）：
+     * 当 currentRoute 是 settings / settings-general / global-settings 且
+     * settings.overlay == EXPANDED_OPTION 时，tab 切换被 async guard 拦截（no-op）。
      */
     private fun selectTab(state: ReaderUiState, intent: ReaderUiIntent.SelectTab): ReaderUiState {
         if (intent.tab == state.activeTab && state.backStack.isEmpty()) {
             // Re-selecting the current tab: only pressed feedback is allowed (MOTION_EFFECTS §4).
+            return state
+        }
+        // settings-overlay-guard-tab-switch: settings overlay 展开时禁止 tab 切换
+        val onSettingsRoute = state.currentRoute.routeId in SETTINGS_OVERLAY_GUARD_ROUTES
+        if (onSettingsRoute && state.settings.overlay == SettingsOverlay.EXPANDED_OPTION) {
             return state
         }
         val cancelled = state.backStack.isNotEmpty()
@@ -675,4 +758,16 @@ object ReaderUiReducer {
     }
 
     private fun generateDispatchId(prefix: String): String = "$prefix-${System.nanoTime()}"
+
+    /**
+     * settings-overlay-guard-tab-switch 守卫覆盖的路由集合。
+     *
+     * 当 currentRoute.routeId 在此集合内且 settings.overlay == EXPANDED_OPTION 时，
+     * SelectTab 为 no-op（async guard，state-rule.fixtures.json）。
+     */
+    internal val SETTINGS_OVERLAY_GUARD_ROUTES: Set<String> = setOf(
+        MainTab.SETTINGS.routeId,
+        RouteIds.SETTINGS_GENERAL,
+        "global-settings"
+    )
 }

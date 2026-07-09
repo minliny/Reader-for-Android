@@ -535,6 +535,63 @@ sealed class ReaderUiIntent {
         val results: List<SourceSwitchResult>,
         override val requestId: String = generateRequestId()
     ) : ReaderUiIntent()
+
+    // ── P0: book-detail 专用 intents ──────────────────────────────────────────
+    // 让 reducer 可追踪 book-detail 的加载/就绪/错误三态，满足
+    // `book-detail-error-requires-error-pagestate` 契约（error 非空时 pageState 必须为 error）。
+
+    /** P0: 打开 book-detail（→ Loading，并 push BookState("book-detail") route）。 */
+    data class BookDetailOpen(
+        val bookUrl: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: book-detail 数据加载完成（→ Ready）。 */
+    data class BookDetailLoaded(
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: book-detail 加载失败（→ Error，pageState=error）。 */
+    data class BookDetailLoadFailed(
+        val message: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 关闭 book-detail（→ Idle，并 pop route）。 */
+    object BookDetailClose : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    // ── P0: settings 专用 intents ─────────────────────────────────────────────
+    // 让 reducer 可追踪 settings 内部子 tab 切换与 overlay 展开状态，满足
+    // `settings-overlay-guard-tab-switch` 契约（overlay 展开时禁止 tab 切换）。
+
+    /** P0: 打开 settings 子页（→ push 对应 route，更新 activeTab）。 */
+    data class SettingsOpen(
+        val tab: SettingsTab = SettingsTab.GENERAL,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 关闭 settings 子页（→ pop route）。 */
+    object SettingsClose : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** P0: 切换 settings 内部子 tab（被 overlay 守卫拦截时为 no-op）。 */
+    data class SettingsTabSwitch(
+        val tab: SettingsTab,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 展开 settings overlay（→ EXPANDED_OPTION，禁止 tab 切换）。 */
+    object SettingsOverlayExpand : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** P0: 收起 settings overlay（→ NONE，恢复 tab 切换）。 */
+    object SettingsOverlayCollapse : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
 }
 
 private val requestCounter = java.util.concurrent.atomic.AtomicLong(0)

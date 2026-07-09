@@ -779,6 +779,68 @@ sealed class RssListState {
 }
 
 /**
+ * P0: book-detail 页面状态机。
+ *
+ * 契约要求（state-rule.fixtures.json `book-detail-error-requires-error-pagestate`）：
+ * error 非空时 pageState 必须为 error 或 source-unavailable。
+ *
+ * 状态流转：Idle → Loading → Ready | Error | SourceUnavailable → Idle
+ *
+ * 由专用 intent 驱动（BookDetailOpen / BookDetailLoaded / BookDetailLoadFailed /
+ * BookDetailClose），让 reducer 可追踪 book-detail 的加载/就绪/错误三态，
+ * 满足 "error 非空时 pageState 必须为 error 或 source-unavailable" 的契约。
+ */
+sealed class BookDetailPageState {
+    /** 初始空态：未进入 book-detail。 */
+    object Idle : BookDetailPageState()
+    /** 加载中：book-detail 已打开，正在拉取书籍详情。 */
+    object Loading : BookDetailPageState()
+    /** 就绪：详情已加载，可渲染 hero/summary/chapter preview。 */
+    object Ready : BookDetailPageState()
+    /** 错误：加载失败（网络/解析错误），pageState=error。 */
+    data class Error(val message: String) : BookDetailPageState()
+    /** 源不可用：所有书源都无法提供详情，pageState=source-unavailable。 */
+    object SourceUnavailable : BookDetailPageState()
+}
+
+/**
+ * P0: settings 内部子 tab。
+ *
+ * settings 主 tab 是 [MainTab.SETTINGS]；这里描述 settings 页面内部的子分类
+ * （通用/同步/关于），用于 [SettingsState.activeTab]。
+ */
+enum class SettingsTab(val routeId: String) {
+    GENERAL("settings-general"),
+    SYNC_BACKUP("sync-backup"),
+    ABOUT("about-feedback")
+}
+
+/**
+ * P0: settings overlay 状态。
+ *
+ * 契约要求（state-rule.fixtures.json `settings-overlay-guard-tab-switch`）：
+ * settings.overlay == EXPANDED_OPTION 时禁止 tab 切换。
+ */
+enum class SettingsOverlay {
+    /** 无 overlay：tab 切换允许。 */
+    NONE,
+    /** 展开选项 overlay：tab 切换被守卫拦截（async guard）。 */
+    EXPANDED_OPTION
+}
+
+/**
+ * P0: settings 页面状态机。
+ *
+ * 跟踪 settings 内部子 tab 与 overlay 展开状态。当 overlay == EXPANDED_OPTION 时，
+ * SelectTab / SettingsTabSwitch 为 no-op（async guard），满足
+ * `settings-overlay-guard-tab-switch` 契约。
+ */
+data class SettingsState(
+    val activeTab: SettingsTab = SettingsTab.GENERAL,
+    val overlay: SettingsOverlay = SettingsOverlay.NONE
+)
+
+/**
  * P0: 换源（source-switch）UI 状态机。
  *
  * 契约要求：source-switch 的 loading/results/selected 三态可在 final state 解释。
@@ -907,6 +969,10 @@ data class ReaderUiState(
     val rssList: RssListState = RssListState.Idle,
     /** P0: 换源 UI 状态（Idle/Loading/Results）。 */
     val sourceSwitch: SourceSwitchState = SourceSwitchState.Idle,
+    /** P0: book-detail 页面状态（Idle/Loading/Ready/Error/SourceUnavailable）。 */
+    val bookDetail: BookDetailPageState = BookDetailPageState.Idle,
+    /** P0: settings 页面状态（子 tab + overlay 守卫）。 */
+    val settings: SettingsState = SettingsState(),
     /** Slice D: 待派发的 HostRequest 队列（effect-saga 模式）。 */
     val pendingHostRequests: List<HostRequestDispatch> = emptyList(),
     /** Slice D: 最近完成的 HostRequest 结果（用于 UI 反馈）。 */
