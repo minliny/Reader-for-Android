@@ -592,12 +592,12 @@ class MotionControllerTest {
         )
     }
 
-    // ── Phase 7: Full MotionSpecRegistry coverage (84 entries) ───────────────────
+    // ── Phase 7: Full MotionSpecRegistry coverage (87 entries) ───────────────────
 
     @Test
-    fun `all 84 MotionSpecRegistry entries resolve through contractFor`() {
+    fun `all 87 MotionSpecRegistry entries resolve through contractFor`() {
         val allSpecs = MotionSpecRegistry.all
-        assertEquals(84, allSpecs.size)
+        assertEquals(87, allSpecs.size)
         val unresolved = allSpecs.map { it.id.serialName }.filter { MotionController.contractFor(it) == null }
         assertTrue("Unresolved MotionIds: $unresolved", unresolved.isEmpty())
     }

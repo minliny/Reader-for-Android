@@ -1629,4 +1629,246 @@ class ReaderUiReducerTest {
         state = ReaderUiReducer.reduce(state, ReaderUiIntent.DismissRssListResult)
         assertEquals(RssListState.Idle, state.rssList)
     }
+
+    // ── P0: Source Switch 专用 reducer tests ─────────────────────────────────────
+
+    @Test
+    fun `SourceSwitchOpen enters Loading and pushes SourceSwitchFlow route`() {
+        val initial = ReaderUiState()
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SourceSwitchOpen(bookId = "fixture://book/demo", requestId = "req-open")
+        )
+
+        // 换源状态进入 Loading
+        assertEquals(SourceSwitchState.Loading, next.sourceSwitch)
+        // route 被推入 backStack
+        assertTrue("SourceSwitchFlow should be pushed onto backStack",
+            next.backStack.last() is ReaderRoute.SourceSwitchFlow)
+        assertTrue("currentRoute should be SourceSwitchFlow",
+            next.currentRoute is ReaderRoute.SourceSwitchFlow)
+    }
+
+    @Test
+    fun `SourceSwitchResultsLoaded transitions Loading to Results`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.SourceSwitchOpen(bookId = "fixture://book/demo")
+        )
+        assertEquals(SourceSwitchState.Loading, loading.sourceSwitch)
+
+        val results = listOf(
+            SourceSwitchResult(sourceId = "src-1", sourceName = "优书网", latestChapter = "第32章"),
+            SourceSwitchResult(sourceId = "src-2", sourceName = "笔趣阁", latestChapter = "第32章")
+        )
+        val withResults = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.SourceSwitchResultsLoaded(results = results, requestId = "req-loaded")
+        )
+
+        val switchState = withResults.sourceSwitch
+        assertTrue("Expected Results state, got ${switchState::class}", switchState is SourceSwitchState.Results)
+        val resultsState = switchState as SourceSwitchState.Results
+        assertEquals(2, resultsState.results.size)
+        assertEquals("优书网", resultsState.results[0].sourceName)
+        // 初始 selectedSourceId 应为 null（未选中任何源）
+        assertNull("selectedSourceId should be null after results loaded", resultsState.selectedSourceId)
+    }
+
+    @Test
+    fun `SourceSwitchSelect records the selected source id`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.SourceSwitchOpen(bookId = "fixture://book/demo")
+        )
+        val results = listOf(
+            SourceSwitchResult(sourceId = "src-1", sourceName = "优书网"),
+            SourceSwitchResult(sourceId = "src-2", sourceName = "笔趣阁")
+        )
+        val withResults = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.SourceSwitchResultsLoaded(results = results)
+        )
+
+        // 选择 src-2
+        val afterSelect = ReaderUiReducer.reduce(
+            withResults,
+            ReaderUiIntent.SourceSwitchSelect(sourceId = "src-2", requestId = "req-select")
+        )
+
+        val switchState = afterSelect.sourceSwitch as SourceSwitchState.Results
+        assertEquals("src-2", switchState.selectedSourceId)
+        // results 列表本身不应被改动
+        assertEquals(2, switchState.results.size)
+    }
+
+    @Test
+    fun `SourceSwitchSelect on non-Results state is a no-op`() {
+        // Idle 状态下 Select 应为 no-op
+        val idle = ReaderUiState(sourceSwitch = SourceSwitchState.Idle)
+        val next = ReaderUiReducer.reduce(
+            idle,
+            ReaderUiIntent.SourceSwitchSelect(sourceId = "src-1")
+        )
+        assertEquals(SourceSwitchState.Idle, next.sourceSwitch)
+
+        // Loading 状态下 Select 也应为 no-op
+        val loading = ReaderUiState(sourceSwitch = SourceSwitchState.Loading)
+        val nextLoading = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.SourceSwitchSelect(sourceId = "src-1")
+        )
+        assertEquals(SourceSwitchState.Loading, nextLoading.sourceSwitch)
+    }
+
+    @Test
+    fun `SourceSwitchClose returns to Idle and pops route`() {
+        // 先 open 进入 Loading 并 push route
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.SourceSwitchOpen(bookId = "fixture://book/demo")
+        )
+        assertTrue(loading.backStack.isNotEmpty())
+        assertEquals(SourceSwitchState.Loading, loading.sourceSwitch)
+
+        // close 应清状态并 pop route
+        val afterClose = ReaderUiReducer.reduce(loading, ReaderUiIntent.SourceSwitchClose)
+
+        assertEquals(SourceSwitchState.Idle, afterClose.sourceSwitch)
+        assertTrue("backStack should be empty after close", afterClose.backStack.isEmpty())
+        // currentRoute 应该回退到 tab shell
+        assertTrue(afterClose.currentRoute is ReaderRoute.TabShell)
+    }
+
+    @Test
+    fun `source-switch full cycle open loaded select close`() {
+        var state = ReaderUiState()
+        // 1. open → Loading
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SourceSwitchOpen(bookId = "book-1"))
+        assertEquals(SourceSwitchState.Loading, state.sourceSwitch)
+        assertTrue(state.currentRoute is ReaderRoute.SourceSwitchFlow)
+
+        // 2. results loaded → Results
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SourceSwitchResultsLoaded(
+            results = listOf(
+                SourceSwitchResult(sourceId = "src-a", sourceName = "源A"),
+                SourceSwitchResult(sourceId = "src-b", sourceName = "源B")
+            )
+        ))
+        assertTrue(state.sourceSwitch is SourceSwitchState.Results)
+
+        // 3. select → selectedSourceId 更新
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SourceSwitchSelect(sourceId = "src-b"))
+        assertEquals("src-b", (state.sourceSwitch as SourceSwitchState.Results).selectedSourceId)
+
+        // 4. close → Idle, route popped
+        state = ReaderUiReducer.reduce(state, ReaderUiIntent.SourceSwitchClose)
+        assertEquals(SourceSwitchState.Idle, state.sourceSwitch)
+        assertTrue(state.backStack.isEmpty())
+    }
+
+    // ── P0: book-detail / settings route/reducer focused tests ──────────────────
+
+    @Test
+    fun `book-detail route can be pushed and popped`() {
+        val initial = ReaderUiState(activeTab = MainTab.BOOKSHELF)
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-detail"), requestId = "req-detail")
+        )
+
+        assertEquals("book-detail", next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+        assertEquals("book-detail", next.backStack.last().routeId)
+
+        // pop 回到 bookshelf tab
+        val afterBack = ReaderUiReducer.reduce(next, ReaderUiIntent.PopRoute)
+        assertTrue(afterBack.backStack.isEmpty())
+        assertEquals(MainTab.BOOKSHELF, (afterBack.currentRoute as ReaderRoute.TabShell).tab)
+    }
+
+    @Test
+    fun `book-directory route can be pushed from book-detail`() {
+        val withDetail = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-detail"))
+        )
+        assertEquals("book-detail", withDetail.currentRoute.routeId)
+
+        val withDirectory = ReaderUiReducer.reduce(
+            withDetail,
+            ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-directory"), requestId = "req-dir")
+        )
+        assertEquals("book-directory", withDirectory.currentRoute.routeId)
+        assertEquals(2, withDirectory.backStack.size)
+        assertEquals("book-detail", withDirectory.backStack[0].routeId)
+        assertEquals("book-directory", withDirectory.backStack[1].routeId)
+
+        // pop 回到 book-detail
+        val afterBack = ReaderUiReducer.reduce(withDirectory, ReaderUiIntent.PopRoute)
+        assertEquals("book-detail", afterBack.currentRoute.routeId)
+        assertEquals(1, afterBack.backStack.size)
+    }
+
+    @Test
+    fun `settings-general route can be pushed and popped from settings tab`() {
+        val initial = ReaderUiState(activeTab = MainTab.SETTINGS, currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS))
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.PushRoute(ReaderRoute.SettingsGeneral, requestId = "req-settings")
+        )
+
+        assertEquals(RouteIds.SETTINGS_GENERAL, next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+
+        val afterBack = ReaderUiReducer.reduce(next, ReaderUiIntent.PopRoute)
+        assertTrue(afterBack.backStack.isEmpty())
+        assertEquals(MainTab.SETTINGS, (afterBack.currentRoute as ReaderRoute.TabShell).tab)
+    }
+
+    @Test
+    fun `sync-backup route can be pushed and popped from settings tab`() {
+        val initial = ReaderUiState(activeTab = MainTab.SETTINGS, currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS))
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.PushRoute(ReaderRoute.SyncBackup, requestId = "req-backup")
+        )
+
+        assertEquals(RouteIds.SYNC_BACKUP, next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+
+        val afterBack = ReaderUiReducer.reduce(next, ReaderUiIntent.PopRoute)
+        assertTrue(afterBack.backStack.isEmpty())
+        assertEquals(MainTab.SETTINGS, (afterBack.currentRoute as ReaderRoute.TabShell).tab)
+    }
+
+    @Test
+    fun `settings subpage route push does not change activeTab`() {
+        val initial = ReaderUiState(activeTab = MainTab.SETTINGS, currentRoute = ReaderRoute.TabShell(MainTab.SETTINGS))
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.PushRoute(ReaderRoute.AboutFeedback)
+        )
+
+        assertEquals("activeTab must stay SETTINGS after pushing settings subpage",
+            MainTab.SETTINGS, next.activeTab)
+        assertEquals(RouteIds.ABOUT_FEEDBACK, next.currentRoute.routeId)
+    }
+
+    @Test
+    fun `book-detail push then settings subpage push preserves backStack order`() {
+        val withDetail = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-detail"))
+        )
+        val withSettings = ReaderUiReducer.reduce(
+            withDetail,
+            ReaderUiIntent.PushRoute(ReaderRoute.SettingsGeneral)
+        )
+
+        assertEquals(2, withSettings.backStack.size)
+        assertEquals("book-detail", withSettings.backStack[0].routeId)
+        assertEquals(RouteIds.SETTINGS_GENERAL, withSettings.backStack[1].routeId)
+        assertEquals(RouteIds.SETTINGS_GENERAL, withSettings.currentRoute.routeId)
+    }
 }
