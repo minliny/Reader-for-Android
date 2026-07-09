@@ -513,9 +513,14 @@ sealed class ReaderUiIntent {
     // ── P0: Source Switch 专用 intents ───────────────────────────────────────
     // 不再走通用 PushRoute，让 reducer 可追踪换源的 loading/results/selected 状态。
 
-    /** P0: 打开换源页（→ Loading，并 push SourceSwitchFlow route）。 */
+    /** P0: 打开换源页（→ Loading，并 push SourceSwitchFlow route）。
+     *  bookId 为书唯一标识；bookName/sourceId 用于在无 readerContext 时
+     *  （如从 book-detail 直接进入换源）构造 fallback ReaderContext，
+     *  避免 FlowShell 回退到 demo 标题。 */
     data class SourceSwitchOpen(
         val bookId: String,
+        val bookName: String = "",
+        val sourceId: String = "",
         override val requestId: String = generateRequestId()
     ) : ReaderUiIntent()
 
@@ -592,6 +597,30 @@ sealed class ReaderUiIntent {
     object SettingsOverlayCollapse : ReaderUiIntent() {
         override val requestId: String = generateRequestId()
     }
+
+    // ── 阅读设置面板交互（hideStatusBar / 行为开关 / 单选）──────────────────────
+    // 这些 intent 让 reducer 可追踪阅读器设置面板的交互状态，满足
+    // "所有交互元素必须接线到 reducer dispatch" 的契约要求。
+
+    /** 切换"隐藏状态栏"开关（由 WindowInsetsControllerCompat 实施）。 */
+    data class SetHideStatusBar(
+        val enabled: Boolean,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** 更新阅读行为开关（autoPage/volumeKey/landscape/keepScreenOn/footerInfo/touchFeedback/autoCache 等）。 */
+    data class SetReaderBehaviorToggle(
+        val key: String,
+        val enabled: Boolean,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** 更新阅读设置单选项（pageTurnMethod/pageTurnAnimation/ttsRate/ttsVoice/ttsRange/ttsTimer 等）。 */
+    data class SetReaderChoice(
+        val key: String,
+        val value: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
 }
 
 private val requestCounter = java.util.concurrent.atomic.AtomicLong(0)

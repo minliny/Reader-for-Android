@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,10 +36,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -204,7 +210,11 @@ fun AppShell(
                     ReaderUiIntent.PushRoute(ReaderRoute.ReaderControl(context = route.context))
                 )
                 RouteIds.SOURCE_SWITCH -> vm.dispatch(
-                    ReaderUiIntent.SourceSwitchOpen(bookId = route.context?.bookUrl ?: "")
+                    ReaderUiIntent.SourceSwitchOpen(
+                        bookId = route.context?.bookUrl ?: "",
+                        bookName = route.context?.bookName ?: "",
+                        sourceId = route.context?.sourceId ?: ""
+                    )
                 )
                 else -> navigateToRouteId(targetRoute)
             }
@@ -213,9 +223,16 @@ fun AppShell(
                 when {
                     targetRoute == RouteIds.IMMERSIVE_READING && previous is ReaderRoute.ImmersiveReading ->
                         vm.dispatch(ReaderUiIntent.PopRoute)
-                    targetRoute == RouteIds.SOURCE_SWITCH -> vm.dispatch(
-                        ReaderUiIntent.SourceSwitchOpen(bookId = (route.context ?: state.readerContext)?.bookUrl ?: "")
-                    )
+                    targetRoute == RouteIds.SOURCE_SWITCH -> {
+                        val ctx = route.context ?: state.readerContext
+                        vm.dispatch(
+                            ReaderUiIntent.SourceSwitchOpen(
+                                bookId = ctx?.bookUrl ?: "",
+                                bookName = ctx?.bookName ?: "",
+                                sourceId = ctx?.sourceId ?: ""
+                            )
+                        )
+                    }
                     targetRoute == route.id -> Unit
                     else -> navigateToRouteId(targetRoute)
                 }
@@ -250,6 +267,24 @@ fun AppShell(
             state.overlayState is OverlayState.Dialog -> vm.dispatch(ReaderUiIntent.CloseDialog)
             state.moreMenu.open -> vm.dispatch(ReaderUiIntent.CloseMoreMenu)
             else -> vm.dispatch(ReaderUiIntent.PopRoute)
+        }
+    }
+
+    // ── 隐藏状态栏副作用（hideStatusBar toggle 接线）─────────────────────
+    // 观察 state.hideStatusBar，通过 WindowInsetsControllerCompat 隐藏/显示系统状态栏。
+    // 仅在 reader 路由（ImmersiveReading / ReaderControl）下生效；离开 reader 时恢复。
+    val hideStatusBarView = LocalView.current
+    val currentRouteForStatusBar = state.currentRoute
+    val isReaderRouteForStatusBar = currentRouteForStatusBar is ReaderRoute.ImmersiveReading ||
+        currentRouteForStatusBar is ReaderRoute.ReaderControl
+    val shouldHideStatusBar = state.hideStatusBar && isReaderRouteForStatusBar
+    LaunchedEffect(shouldHideStatusBar) {
+        val window = (hideStatusBarView.context as? ComponentActivity)?.window ?: return@LaunchedEffect
+        val controller = WindowCompat.getInsetsController(window, hideStatusBarView)
+        if (shouldHideStatusBar) {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.statusBars())
         }
     }
 
@@ -336,6 +371,7 @@ fun AppShell(
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
             onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
+            dispatch = vm::dispatch,
             onStartTts = { text ->
                 val ctx = state.readerContext
                 vm.dispatch(ReaderUiIntent.StartTtsSession(
@@ -825,7 +861,15 @@ fun AppShell(
                         onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
                         onContinueReading = { enterReaderFromBook(bookState.book) },
                         onBookDirectory = { navigateTo(ReaderRoute.BookState("book-directory", route.book)) },
-                        onSourceSwitch = { vm.dispatch(ReaderUiIntent.SourceSwitchOpen(bookId = route.book?.bookUrl ?: "")) },
+                        onSourceSwitch = {
+                            vm.dispatch(
+                                ReaderUiIntent.SourceSwitchOpen(
+                                    bookId = route.book?.bookUrl ?: "",
+                                    bookName = route.book?.name ?: "",
+                                    sourceId = route.book?.origin ?: ""
+                                )
+                            )
+                        },
                         onRemoveFromBookshelf = { vm.dispatch(ReaderUiIntent.PopRoute) }
                     )
                 }

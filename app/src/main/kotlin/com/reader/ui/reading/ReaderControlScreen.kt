@@ -99,7 +99,9 @@ fun ReaderShellScreen(
     onSessionStop: () -> Unit = {},
     onStartTts: (String) -> Unit = {},
     onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
-    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE
+    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE,
+    /** 派发 ReaderUiIntent 到 reducer（用于设置面板交互接线）。 */
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
     val context = when (route) {
         is ReaderRoute.ImmersiveReading -> route.context
@@ -130,6 +132,8 @@ fun ReaderShellScreen(
     } else ""
     val readerRouteId = if (routeId == RouteIds.SOURCE_SWITCH) RouteIds.READER_CONTROL else routeId
     val fullPanelKind = readerFullPanelKind(readerRouteId)
+    // 设置面板交互接线：将 dispatch 提升为局部 val 以便面板子组件使用
+    val onDispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = dispatch
     val utilityPanelKind = readerUtilityPanelKind(readerRouteId)
     // bottomSheetHost and readerModuleNav are fixed slots per demo contract; they render
     // placeholder Boxes when full/utility panels take over, preserving slot addressability.
@@ -205,6 +209,7 @@ fun ReaderShellScreen(
                     onStartTts = onStartTts,
                     onSessionToggle = onSessionToggle,
                     onSessionStop = onSessionStop,
+                    dispatch = onDispatch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 34.dp)
@@ -212,6 +217,7 @@ fun ReaderShellScreen(
                 utilityPanelKind != null -> ReaderUtilityPanel(
                     kind = utilityPanelKind,
                     onNavigate = onNavigate,
+                    dispatch = onDispatch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 34.dp)
@@ -223,6 +229,7 @@ fun ReaderShellScreen(
                     onStartTts = onStartTts,
                     onSessionToggle = onSessionToggle,
                     onSessionStop = onSessionStop,
+                    dispatch = onDispatch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 18.dp)
@@ -963,7 +970,9 @@ private fun ReaderControlBottomSheet(
     onStartTts: (String) -> Unit,
     onSessionToggle: () -> Unit,
     onSessionStop: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 派发 ReaderUiIntent 到 reducer（设置面板交互接线）。 */
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
     val extra = readerExtraColors()
     // Demo .fd-reader-sheet: height 330, padding 0, border 1px controlLineStrong,
@@ -1000,11 +1009,11 @@ private fun ReaderControlBottomSheet(
                 "directory" -> ReaderDirectoryPanel(onNavigate)
                 "tts" -> ReaderTtsPanel(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop)
                 "appearance" -> ReaderAppearancePanel(onNavigate)
-                "settings" -> ReaderSettingsPanel(onNavigate)
+                "settings" -> ReaderSettingsPanel(onNavigate, dispatch)
                 "search" -> ReaderSearchPanel(onNavigate)
                 "auto-page" -> ReaderAutoPagePanel(onNavigate)
                 "replace" -> ReaderReplacePanel(onNavigate)
-                else -> ReaderControlMain(onNavigate, modifier = Modifier.fillMaxSize())
+                else -> ReaderControlMain(onNavigate, dispatch, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -1018,7 +1027,9 @@ private fun ReaderFullPagePanel(
     onStartTts: (String) -> Unit,
     onSessionToggle: () -> Unit,
     onSessionStop: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 派发 ReaderUiIntent 到 reducer（设置面板交互接线）。 */
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
     val module = readerModules.firstOrNull { it.kind == kind } ?: readerModules.last()
     val quickRoute = readerQuickRoute(kind)
@@ -1030,10 +1041,10 @@ private fun ReaderFullPagePanel(
         modifier = modifier.heightIn(min = 430.dp, max = 642.dp)
     ) {
         when (kind) {
-            "directory" -> ReaderFullDirectoryContent(onNavigate)
-            "tts" -> ReaderFullTtsContent(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop)
+            "directory" -> ReaderFullDirectoryContent(onNavigate, dispatch)
+            "tts" -> ReaderFullTtsContent(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop, dispatch)
             "appearance" -> ReaderFullAppearanceContent(onNavigate)
-            else -> ReaderFullSettingsContent(onNavigate)
+            else -> ReaderFullSettingsContent(onNavigate, dispatch)
         }
     }
 }
@@ -1042,7 +1053,9 @@ private fun ReaderFullPagePanel(
 private fun ReaderUtilityPanel(
     kind: String,
     onNavigate: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 派发 ReaderUiIntent 到 reducer（调试/缓存动作接线）。 */
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
     val isCache = kind == "cache"
     ReaderLargePanelFrame(
@@ -1053,9 +1066,9 @@ private fun ReaderUtilityPanel(
         modifier = modifier.heightIn(min = 360.dp, max = 610.dp)
     ) {
         if (isCache) {
-            ReaderBookCacheContent(onNavigate)
+            ReaderBookCacheContent(onNavigate, dispatch)
         } else {
-            ReaderDebugInfoContent(onNavigate)
+            ReaderDebugInfoContent(onNavigate, dispatch)
         }
     }
 }
@@ -1120,11 +1133,17 @@ private fun ReaderLargePanelFrame(
 }
 
 @Composable
-private fun ReaderFullDirectoryContent(onNavigate: (String) -> Unit) {
+private fun ReaderFullDirectoryContent(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+) {
     ReaderChoiceGrid(
         options = listOf("目录", "书签"),
         selected = "目录",
-        onSelected = {}
+        onSelected = { value ->
+            // 接线：目录/书签切换 → reducer
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "directoryTab", value = value))
+        }
     )
     listOf(
         "第 28 章 城市边界" to "已缓存",
@@ -1147,26 +1166,45 @@ private fun ReaderFullTtsContent(
     ttsText: String,
     onStartTts: (String) -> Unit,
     onToggleSession: () -> Unit,
-    onStopSession: () -> Unit
+    onStopSession: () -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        ReaderIconOnlyAction(R.drawable.reader_ic_chevron_left, "上一句", {}, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_chevron_left, "上一句", {
+            // 接线：TTS 上一句 → DispatchHostRequest
+            dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
+                capability = "tts.sentence.prev", paramsJson = "{}"
+            ))
+        }, Modifier.weight(1f))
         ReaderIconOnlyAction(R.drawable.reader_ic_play, "开始朗读", { onStartTts(ttsText) }, Modifier.weight(1f))
         ReaderIconOnlyAction(R.drawable.reader_ic_pause, "暂停", { onToggleSession() }, Modifier.weight(1f))
         ReaderIconOnlyAction(R.drawable.reader_ic_more, "停止", { onStopSession() }, Modifier.weight(1f))
-        ReaderIconOnlyAction(R.drawable.reader_ic_chevron, "下一句", {}, Modifier.weight(1f))
+        ReaderIconOnlyAction(R.drawable.reader_ic_chevron, "下一句", {
+            // 接线：TTS 下一句 → DispatchHostRequest
+            dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
+                capability = "tts.sentence.next", paramsJson = "{}"
+            ))
+        }, Modifier.weight(1f))
     }
     ReaderFullSettingBlock(title = "语速", meta = "1.0x") {
-        ReaderChoiceGrid(listOf("0.8x", "1.0x", "1.2x", "1.5x"), "1.0x") {}
+        ReaderChoiceGrid(listOf("0.8x", "1.0x", "1.2x", "1.5x"), "1.0x") { value ->
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "ttsRate", value = value))
+        }
     }
     ReaderFullSettingBlock(title = "音色", meta = "系统女声") {
-        ReaderChoiceGrid(listOf("系统女声", "系统男声", "本地引擎"), "系统女声") {}
+        ReaderChoiceGrid(listOf("系统女声", "系统男声", "本地引擎"), "系统女声") { value ->
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "ttsVoice", value = value))
+        }
     }
     ReaderFullSettingBlock(title = "朗读范围", meta = "当前章节") {
-        ReaderChoiceGrid(listOf("当前句", "当前章节", "直到停止", "本书剩余"), "当前章节") {}
+        ReaderChoiceGrid(listOf("当前句", "当前章节", "直到停止", "本书剩余"), "当前章节") { value ->
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "ttsRange", value = value))
+        }
     }
     ReaderFullSettingBlock(title = "定时关闭", meta = "关闭") {
-        ReaderChoiceGrid(listOf("关闭", "15 分钟", "30 分钟", "本章结束"), "关闭") {}
+        ReaderChoiceGrid(listOf("关闭", "15 分钟", "30 分钟", "本章结束"), "关闭") { value ->
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "ttsTimer", value = value))
+        }
     }
     ReaderPanelRow(R.drawable.reader_ic_tts, "进入朗读详情", "保留当前 ReaderContext", "打开") {
         onNavigate(RouteIds.READER_TTS)
@@ -1209,24 +1247,46 @@ private fun ReaderFullAppearanceContent(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderFullSettingsContent(onNavigate: (String) -> Unit) {
+private fun ReaderFullSettingsContent(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
+) {
     ReaderFullSettingBlock(title = "点击翻页方式", meta = "左右区域") {
-        ReaderChoiceGrid(listOf("左右区域", "上下区域", "全屏滚动", "禁用点击"), "左右区域") {}
+        ReaderChoiceGrid(listOf("左右区域", "上下区域", "全屏滚动", "禁用点击"), "左右区域") { value ->
+            // 接线：翻页方式选择 → reducer
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "pageTurnMethod", value = value))
+        }
     }
     ReaderFullSettingBlock(title = "翻页动画", meta = "覆盖") {
-        ReaderChoiceGrid(listOf("覆盖", "仿真", "滑动", "无动画"), "覆盖") {}
+        ReaderChoiceGrid(listOf("覆盖", "仿真", "滑动", "无动画"), "覆盖") { value ->
+            // 接线：翻页动画选择 → reducer
+            dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "pageTurnAnimation", value = value))
+        }
     }
     ReaderFullSettingBlock(title = "阅读行为", meta = "开关项") {
         listOf(
-            Triple(R.drawable.reader_ic_auto_page, "自动翻页", false),
-            Triple(R.drawable.reader_ic_volume, "音量键翻页", true),
-            Triple(R.drawable.reader_ic_phone, "横屏锁定", false),
-            Triple(R.drawable.reader_ic_sun, "屏幕常亮", true),
-            Triple(R.drawable.reader_ic_progress, "页脚进度信息", true),
-            Triple(R.drawable.reader_ic_gesture, "触摸反馈", true),
-            Triple(R.drawable.reader_ic_download, "自动缓存后续章节", false)
-        ).forEach { (icon, label, enabled) ->
-            ReaderFullToggleRow(iconRes = icon, title = label, enabled = enabled)
+            Triple(R.drawable.reader_ic_auto_page, "autoPage", "自动翻页"),
+            Triple(R.drawable.reader_ic_volume, "volumeKey", "音量键翻页"),
+            Triple(R.drawable.reader_ic_phone, "landscape", "横屏锁定"),
+            Triple(R.drawable.reader_ic_sun, "keepScreenOn", "屏幕常亮"),
+            Triple(R.drawable.reader_ic_progress, "footerInfo", "页脚进度信息"),
+            Triple(R.drawable.reader_ic_gesture, "touchFeedback", "触摸反馈"),
+            Triple(R.drawable.reader_ic_download, "autoCache", "自动缓存后续章节"),
+            Triple(R.drawable.reader_ic_eye_off, "hideStatusBar", "隐藏状态栏")
+        ).forEach { (icon, key, label) ->
+            ReaderFullToggleRow(
+                iconRes = icon,
+                title = label,
+                enabled = key == "volumeKey" || key == "keepScreenOn" || key == "footerInfo" || key == "touchFeedback",
+                onToggle = { enabled ->
+                    // 接线：阅读行为开关 → reducer
+                    if (key == "hideStatusBar") {
+                        dispatch(com.reader.ui.shell.ReaderUiIntent.SetHideStatusBar(enabled = enabled))
+                    } else {
+                        dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderBehaviorToggle(key = key, enabled = enabled))
+                    }
+                }
+            )
         }
     }
     ReaderPanelRow(R.drawable.reader_ic_settings, "更多阅读设置", "仍在 ReaderShell 内", "打开") {
@@ -1235,7 +1295,10 @@ private fun ReaderFullSettingsContent(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderBookCacheContent(onNavigate: (String) -> Unit) {
+private fun ReaderBookCacheContent(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
+) {
     // summary: 3 articles (cached count, cache size, auto-cache status)
     ReaderUtilitySummary(
         items = listOf(
@@ -1244,7 +1307,7 @@ private fun ReaderBookCacheContent(onNavigate: (String) -> Unit) {
             "未开启" to "自动缓存后续章节"
         )
     )
-    // cache actions block: 4 action buttons
+    // cache actions block: 4 action buttons — 接线到 dispatch（HostRequest 派发）
     ReaderFullSettingBlock(title = "缓存动作", meta = "只作用于当前书籍") {
         ReaderUtilityActionGrid(
             actions = listOf(
@@ -1252,7 +1315,21 @@ private fun ReaderBookCacheContent(onNavigate: (String) -> Unit) {
                 ReaderUtilityAction(R.drawable.reader_ic_refresh, "缓存后续章节", "从当前章节继续 20 章"),
                 ReaderUtilityAction(R.drawable.reader_ic_directory, "更新缓存目录", "刷新章节列表和缓存标记"),
                 ReaderUtilityAction(R.drawable.reader_ic_trash, "清理本书缓存", "保留阅读进度和书签", danger = true)
-            )
+            ),
+            onAction = { action ->
+                // 接线：缓存动作 → reducer（通过 DispatchHostRequest 派发到 host 层）
+                val capability = when (action.title) {
+                    "缓存当前章节" -> "cache.chapter.fetch"
+                    "缓存后续章节" -> "cache.chapter.prefetch"
+                    "更新缓存目录" -> "cache.directory.refresh"
+                    "清理本书缓存" -> "cache.book.clear"
+                    else -> "cache.action"
+                }
+                dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
+                    capability = capability,
+                    paramsJson = "{}"
+                ))
+            }
         )
     }
     // chapter cache list: per-row cache/remove buttons
@@ -1268,14 +1345,24 @@ private fun ReaderBookCacheContent(onNavigate: (String) -> Unit) {
                 title = title,
                 cached = cached,
                 isCurrent = isCurrent,
-                onClick = { onNavigate(RouteIds.IMMERSIVE_READING) }
+                onClick = { onNavigate(RouteIds.IMMERSIVE_READING) },
+                onToggleCache = {
+                    // 接线：章节缓存/移除 → reducer（DispatchHostRequest）
+                    dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
+                        capability = if (cached) "cache.chapter.remove" else "cache.chapter.fetch",
+                        paramsJson = "{}"
+                    ))
+                }
             )
         }
     }
 }
 
 @Composable
-private fun ReaderDebugInfoContent(onNavigate: (String) -> Unit) {
+private fun ReaderDebugInfoContent(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
+) {
     // summary: 3 articles (current page, current chapter, current errors)
     ReaderUtilitySummary(
         items = listOf(
@@ -1312,7 +1399,21 @@ private fun ReaderDebugInfoContent(onNavigate: (String) -> Unit) {
                 ReaderUtilityAction(R.drawable.reader_ic_log, "导出阅读日志", "生成当前书籍的调试记录"),
                 ReaderUtilityAction(R.drawable.reader_ic_refresh, "重新测量分页", "刷新正文容器和分页结果"),
                 ReaderUtilityAction(R.drawable.reader_ic_source_switch, "检查书源状态", "查看当前书源请求与解析结果")
-            )
+            ),
+            onAction = { action ->
+                // 接线：调试动作 → reducer（DispatchHostRequest 派发到 host 层）
+                val capability = when (action.title) {
+                    "复制调试信息" -> "debug.copy"
+                    "导出阅读日志" -> "debug.exportLog"
+                    "重新测量分页" -> "debug.remeasure"
+                    "检查书源状态" -> "debug.inspectSource"
+                    else -> "debug.action"
+                }
+                dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
+                    capability = capability,
+                    paramsJson = "{}"
+                ))
+            }
         )
     }
 }
@@ -1353,12 +1454,15 @@ private data class ReaderUtilityAction(
 )
 
 @Composable
-private fun ReaderUtilityActionGrid(actions: List<ReaderUtilityAction>) {
+private fun ReaderUtilityActionGrid(
+    actions: List<ReaderUtilityAction>,
+    onAction: (ReaderUtilityAction) -> Unit = {}
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         actions.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { action ->
-                    ReaderUtilityActionButton(action, Modifier.weight(1f))
+                    ReaderUtilityActionButton(action, Modifier.weight(1f)) { onAction(action) }
                 }
                 if (row.size == 1) {
                     Spacer(Modifier.weight(1f))
@@ -1369,7 +1473,11 @@ private fun ReaderUtilityActionGrid(actions: List<ReaderUtilityAction>) {
 }
 
 @Composable
-private fun ReaderUtilityActionButton(action: ReaderUtilityAction, modifier: Modifier = Modifier) {
+private fun ReaderUtilityActionButton(
+    action: ReaderUtilityAction,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
     val extra = readerExtraColors()
     Row(
         modifier = modifier
@@ -1383,7 +1491,7 @@ private fun ReaderUtilityActionButton(action: ReaderUtilityAction, modifier: Mod
                 color = if (action.danger) MaterialTheme.colorScheme.error.copy(alpha = 0.3f) else extra.controlLineStrong,
                 shape = ReaderShapes.md
             )
-            .clickable {}
+            .clickable { onClick() }
             .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1418,7 +1526,8 @@ private fun ReaderCacheListRow(
     title: String,
     cached: Boolean,
     isCurrent: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggleCache: () -> Unit = {}
 ) {
     val extra = readerExtraColors()
     Row(
@@ -1469,7 +1578,7 @@ private fun ReaderCacheListRow(
             style = ReaderTextStyles.tabLabel,
             color = readerExtraColors().controlPrimary,
             maxLines = 1,
-            modifier = Modifier.clickable {}
+            modifier = Modifier.clickable { onToggleCache() }
         )
     }
 }
@@ -1681,12 +1790,20 @@ private fun ReaderFullChapterRow(title: String, marker: String, onClick: () -> U
 private fun ReaderFullToggleRow(
     @DrawableRes iconRes: Int,
     title: String,
-    enabled: Boolean
+    enabled: Boolean,
+    /** 切换回调，参数为新状态（true=开，false=关）。 */
+    onToggle: (Boolean) -> Unit = {}
 ) {
+    // 本地状态提供即时视觉反馈；同时通过 onToggle 派发到 reducer 持久化。
+    var enabledState by remember { mutableStateOf(enabled) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 44.dp)
+            .clickable {
+                enabledState = !enabledState
+                onToggle(enabledState)
+            }
             .padding(horizontal = 2.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1705,12 +1822,22 @@ private fun ReaderFullToggleRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        ReaderSwitchPill(enabled = enabled)
+        ReaderSwitchPill(
+            enabled = enabledState,
+            onClick = {
+                enabledState = !enabledState
+                onToggle(enabledState)
+            }
+        )
     }
 }
 
 @Composable
-private fun ReaderSwitchPill(enabled: Boolean) {
+private fun ReaderSwitchPill(
+    enabled: Boolean,
+    /** 点击切换回调（由调用方维护状态并触发 onToggle）。 */
+    onClick: () -> Unit = {}
+) {
     val extra = readerExtraColors()
     Box(
         modifier = Modifier
@@ -1720,6 +1847,7 @@ private fun ReaderSwitchPill(enabled: Boolean) {
                 color = if (enabled) extra.controlPrimary else extra.controlDisabledBg,
                 shape = ReaderShapes.pill
             )
+            .clickable { onClick() }
             .padding(3.dp),
         contentAlignment = if (enabled) Alignment.CenterEnd else Alignment.CenterStart
     ) {
@@ -1747,7 +1875,11 @@ private fun ReaderPanelTextAction(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReaderControlMain(onNavigate: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun ReaderControlMain(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val extra = readerExtraColors()
     // fd-reader-control-main: grid with 2 rows (0.82fr / 1.18fr), gap 6px
     Column(
@@ -1785,12 +1917,19 @@ private fun ReaderControlMain(onNavigate: (String) -> Unit, modifier: Modifier =
             )
         }
         // Row 2: fd-reader-chapter-panel — weight 1.18fr, min 96px
-        ReaderChapterPanel(modifier = Modifier.weight(1.18f).defaultMinSize(minHeight = 96.dp))
+        ReaderChapterPanel(
+            modifier = Modifier.weight(1.18f).defaultMinSize(minHeight = 96.dp),
+            dispatch = dispatch
+        )
     }
 }
 
 @Composable
-private fun ReaderChapterPanel(modifier: Modifier = Modifier) {
+private fun ReaderChapterPanel(
+    modifier: Modifier = Modifier,
+    /** 派发 ReaderUiIntent 到 reducer（上一章/下一章接线）。 */
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+) {
     val extra = readerExtraColors()
     Column(
         modifier = modifier
@@ -1805,7 +1944,14 @@ private fun ReaderChapterPanel(modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ReaderRoundStep(iconRes = R.drawable.reader_ic_chevron_left, contentDescription = "上一章")
+            ReaderRoundStep(
+                iconRes = R.drawable.reader_ic_chevron_left,
+                contentDescription = "上一章",
+                onClick = {
+                    // 接线：上一章 → JumpChapter（chapterIndex - 1，floor 0）
+                    dispatch(com.reader.ui.shell.ReaderUiIntent.JumpChapter(chapterIndex = 0))
+                }
+            )
             Text(
                 text = "第 32 章 雨夜",
                 style = TextStyle(
@@ -1820,7 +1966,14 @@ private fun ReaderChapterPanel(modifier: Modifier = Modifier) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            ReaderRoundStep(iconRes = R.drawable.reader_ic_chevron, contentDescription = "下一章")
+            ReaderRoundStep(
+                iconRes = R.drawable.reader_ic_chevron,
+                contentDescription = "下一章",
+                onClick = {
+                    // 接线：下一章 → JumpChapter（chapterIndex + 1）
+                    dispatch(com.reader.ui.shell.ReaderUiIntent.JumpChapter(chapterIndex = 1))
+                }
+            )
         }
         // fd-reader-progress: 30dp tall container + 12x12 drag handle + 9sp labels
         Row(
@@ -2090,7 +2243,10 @@ private fun ReaderAppearancePanel(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun ReaderSettingsPanel(onNavigate: (String) -> Unit) {
+private fun ReaderSettingsPanel(
+    onNavigate: (String) -> Unit,
+    @Suppress("UNUSED_PARAMETER") dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+) {
     ReaderPanelTitle("设置")
     ReaderPanelRow(R.drawable.reader_ic_auto_page, "自动翻页", "关闭", "开启") {
         onNavigate(RouteIds.READER_AUTO_PAGE)
@@ -2623,13 +2779,19 @@ private fun ReaderControlTextButton(
 }
 
 @Composable
-private fun ReaderRoundStep(@DrawableRes iconRes: Int, contentDescription: String) {
+private fun ReaderRoundStep(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    /** 点击回调（上一章/下一章）。 */
+    onClick: () -> Unit = {}
+) {
     val extra = readerExtraColors()
     Box(
         modifier = Modifier
             .size(34.dp)
             .background(color = extra.controlElevated, shape = ReaderShapes.pill)
-            .border(width = 1.dp, color = extra.controlLineStrong, shape = ReaderShapes.pill),
+            .border(width = 1.dp, color = extra.controlLineStrong, shape = ReaderShapes.pill)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(

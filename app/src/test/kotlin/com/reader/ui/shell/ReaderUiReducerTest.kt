@@ -1650,6 +1650,70 @@ class ReaderUiReducerTest {
     }
 
     @Test
+    fun `SourceSwitchOpen preserves bookId on route when readerContext is null`() {
+        // 从 book-detail 直接进入换源：state.readerContext 为 null，reducer 必须用
+        // intent 的 bookId/bookName/sourceId 构造 fallback context，避免 FlowShell
+        // 回退到 demo 标题。
+        val initial = ReaderUiState() // readerContext == null
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SourceSwitchOpen(
+                bookId = "book-xyz",
+                bookName = "示例书名",
+                sourceId = "src-1",
+                requestId = "req-open"
+            )
+        )
+
+        val route = next.currentRoute as ReaderRoute.SourceSwitchFlow
+        val ctx = route.context
+        assertNotNull("SourceSwitchFlow should carry a fallback context when readerContext is null", ctx)
+        assertEquals("book-xyz", ctx?.bookUrl)
+        assertEquals("示例书名", ctx?.bookName)
+        assertEquals("src-1", ctx?.sourceId)
+        // fallback context 不应回写到 state.readerContext —— 换源并非全新 reader entry
+        assertNull("readerContext must NOT be mutated by SourceSwitchOpen", next.readerContext)
+    }
+
+    @Test
+    fun `SourceSwitchOpen reuses existing readerContext when present`() {
+        // reader shell 内进入换源：优先复用 state.readerContext，忽略 intent 的 fallback 字段
+        val existing = ReaderUiState(
+            readerContext = ReaderContext(
+                sourceId = "real-src",
+                bookUrl = "real-book-url",
+                bookName = "真实书名",
+                entry = ReaderEntry.COVER_TO_IMMERSIVE,
+                entryRequestId = "req-orig"
+            )
+        )
+        val next = ReaderUiReducer.reduce(
+            existing,
+            ReaderUiIntent.SourceSwitchOpen(
+                bookId = "stale-book-id",
+                bookName = "stale-name",
+                sourceId = "stale-src"
+            )
+        )
+
+        val route = next.currentRoute as ReaderRoute.SourceSwitchFlow
+        assertEquals("real-book-url", route.context?.bookUrl)
+        assertEquals("真实书名", route.context?.bookName)
+        assertEquals("real-src", route.context?.sourceId)
+    }
+
+    @Test
+    fun `SourceSwitchOpen with empty sourceId falls back to bookId as sourceId`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.SourceSwitchOpen(bookId = "book-only", bookName = "n", sourceId = "")
+        )
+        val ctx = (next.currentRoute as ReaderRoute.SourceSwitchFlow).context
+        assertEquals("book-only", ctx?.bookUrl)
+        assertEquals("book-only", ctx?.sourceId)
+    }
+
+    @Test
     fun `SourceSwitchResultsLoaded transitions Loading to Results`() {
         val loading = ReaderUiReducer.reduce(
             ReaderUiState(),
@@ -2126,5 +2190,71 @@ class ReaderUiReducerTest {
         state = ReaderUiReducer.reduce(blockedState, ReaderUiIntent.SettingsOverlayCollapse)
         state = ReaderUiReducer.reduce(state, ReaderUiIntent.SettingsClose)
         assertTrue(state.backStack.isEmpty())
+    }
+
+    // ── 阅读设置面板交互（hideStatusBar / 行为开关 / 单选）──────────────────────
+
+    @Test
+    fun `SetHideStatusBar toggles hideStatusBar field`() {
+        val initial = ReaderUiState()
+        assertFalse(initial.hideStatusBar)
+        val enabled = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SetHideStatusBar(enabled = true)
+        )
+        assertTrue(enabled.hideStatusBar)
+        val disabled = ReaderUiReducer.reduce(
+            enabled,
+            ReaderUiIntent.SetHideStatusBar(enabled = false)
+        )
+        assertFalse(disabled.hideStatusBar)
+    }
+
+    @Test
+    fun `SetReaderBehaviorToggle updates readerBehaviorToggles map`() {
+        val initial = ReaderUiState()
+        assertTrue(initial.readerBehaviorToggles.isEmpty())
+        val updated = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "autoPage", enabled = true)
+        )
+        assertEquals(true, updated.readerBehaviorToggles["autoPage"])
+        // 覆盖已存在的 key
+        val toggled = ReaderUiReducer.reduce(
+            updated,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "autoPage", enabled = false)
+        )
+        assertEquals(false, toggled.readerBehaviorToggles["autoPage"])
+        // 多个 key 共存
+        val multi = ReaderUiReducer.reduce(
+            toggled,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "volumeKey", enabled = true)
+        )
+        assertEquals(false, multi.readerBehaviorToggles["autoPage"])
+        assertEquals(true, multi.readerBehaviorToggles["volumeKey"])
+    }
+
+    @Test
+    fun `SetReaderChoice updates readerChoices map`() {
+        val initial = ReaderUiState()
+        assertTrue(initial.readerChoices.isEmpty())
+        val updated = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SetReaderChoice(key = "pageTurnMethod", value = "上下区域")
+        )
+        assertEquals("上下区域", updated.readerChoices["pageTurnMethod"])
+        // 覆盖已存在的 key
+        val changed = ReaderUiReducer.reduce(
+            updated,
+            ReaderUiIntent.SetReaderChoice(key = "pageTurnMethod", value = "全屏滚动")
+        )
+        assertEquals("全屏滚动", changed.readerChoices["pageTurnMethod"])
+        // 多个 key 共存
+        val multi = ReaderUiReducer.reduce(
+            changed,
+            ReaderUiIntent.SetReaderChoice(key = "ttsRate", value = "1.5x")
+        )
+        assertEquals("全屏滚动", multi.readerChoices["pageTurnMethod"])
+        assertEquals("1.5x", multi.readerChoices["ttsRate"])
     }
 }

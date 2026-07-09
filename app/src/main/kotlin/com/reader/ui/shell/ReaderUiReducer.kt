@@ -413,7 +413,19 @@ object ReaderUiReducer {
         // 不再走通用 PushRoute：SourceSwitchOpen 同时 push route 并进入 Loading，
         // 让 reducer 可追踪换源专属状态。SourceSwitchClose 同时 pop route 并回到 Idle。
         is ReaderUiIntent.SourceSwitchOpen -> {
-            val route = ReaderRoute.SourceSwitchFlow(context = state.readerContext)
+            // 优先复用 readerContext（reader shell 内进入换源）；
+            // 无 readerContext 时（如从 book-detail 直接进入换源），用 intent 的
+            // bookId/bookName/sourceId 构造 fallback context，避免 FlowShell 回退到
+            // demo 标题。注意：不写入 state.readerContext —— 换源并非全新 reader entry，
+            // popRoute 时该 fallback context 随 route 一起释放。
+            val context = state.readerContext ?: ReaderContext(
+                sourceId = intent.sourceId.ifEmpty { intent.bookId },
+                bookUrl = intent.bookId,
+                bookName = intent.bookName,
+                entry = ReaderEntry.ACTION_TO_IMMERSIVE,
+                entryRequestId = intent.requestId
+            )
+            val route = ReaderRoute.SourceSwitchFlow(context = context)
             state.copy(
                 backStack = state.backStack + route,
                 currentRoute = route,
@@ -524,6 +536,17 @@ object ReaderUiReducer {
         )
         ReaderUiIntent.SettingsOverlayCollapse -> state.copy(
             settings = state.settings.copy(overlay = SettingsOverlay.NONE)
+        )
+
+        // ── 阅读设置面板交互 ──────────────────────────────────────────────────
+        // hideStatusBar / 行为开关 / 单选项：reducer 纯状态更新，
+        // 平台副作用（WindowInsetsControllerCompat）由 UI 层 LaunchedEffect 观察 state 触发。
+        is ReaderUiIntent.SetHideStatusBar -> state.copy(hideStatusBar = intent.enabled)
+        is ReaderUiIntent.SetReaderBehaviorToggle -> state.copy(
+            readerBehaviorToggles = state.readerBehaviorToggles + (intent.key to intent.enabled)
+        )
+        is ReaderUiIntent.SetReaderChoice -> state.copy(
+            readerChoices = state.readerChoices + (intent.key to intent.value)
         )
     }
 

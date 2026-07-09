@@ -976,7 +976,14 @@ data class ReaderUiState(
     /** Slice D: 待派发的 HostRequest 队列（effect-saga 模式）。 */
     val pendingHostRequests: List<HostRequestDispatch> = emptyList(),
     /** Slice D: 最近完成的 HostRequest 结果（用于 UI 反馈）。 */
-    val lastHostRequestResult: HostRequestResult? = null
+    val lastHostRequestResult: HostRequestResult? = null,
+    // ── 阅读设置面板交互状态 ──────────────────────────────────────────────────
+    /** 是否隐藏系统状态栏（阅读器设置面板"隐藏状态栏"开关，由 WindowInsetsControllerCompat 实施）。 */
+    val hideStatusBar: Boolean = false,
+    /** 阅读行为开关集合（自动翻页/音量键/横屏/常亮/页脚/触摸/缓存等），key 为 toggle 标识。 */
+    val readerBehaviorToggles: Map<String, Boolean> = emptyMap(),
+    /** 阅读设置单选集合（点击翻页方式/翻页动画/语速/音色/朗读范围/定时关闭等），key=block 标识, value=选中项。 */
+    val readerChoices: Map<String, String> = emptyMap()
 ) {
     /** True when the rendered route is the immersive reading surface (no control layer). */
     val isImmersiveReading: Boolean
