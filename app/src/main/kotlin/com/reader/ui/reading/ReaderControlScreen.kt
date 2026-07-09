@@ -81,6 +81,12 @@ import com.reader.ui.theme.readerExtraColors
  *
  * `readerTextSelectionLayer` is an overlay sub-slot of `readerOverlayHost`; it preserves a
  * zero-size Box placeholder when selection is closed (per demo fixed-slot contract).
+ *
+ * ── 布局常量说明（dp token 评估）──
+ * 本文件中的 raw dp 值（7/9/10/72/92/258/360/610 等）均为 demo 控制面板的局部布局调校
+ * 常量，无对应的 ReaderSpacingToken / ReaderSizeToken / ReaderRadiusToken 契约 token。
+ * 已确认 size-token 值（82/284/58/68/320）未在此文件出现，故无 token 可迁移项；
+ * 这些 dp 值不构成 token 违规，属于 screen-local demo 布局参数（per B2-B4 task 5 评估结论）。
  */
 @Composable
 fun ReaderShellScreen(

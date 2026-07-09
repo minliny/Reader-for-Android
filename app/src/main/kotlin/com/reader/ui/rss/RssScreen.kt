@@ -49,6 +49,8 @@ import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import com.reader.ui.tokens.ReaderColorToken
+import com.reader.ui.tokens.ReaderTokenAdapter
 
 class RssTabState {
     var activeMode by mutableStateOf("源列表")
@@ -860,7 +862,7 @@ private fun RssChip(text: String, active: Boolean, onClick: () -> Unit) {
         Text(
             text = text,
             style = rssButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
-            color = if (active) colors.onPrimary else Color(0xFF564D44),
+            color = if (active) colors.onPrimary else extra.muted,
             maxLines = 1
         )
     }
@@ -894,9 +896,10 @@ private fun RssStatusBadge(label: String, tone: RssTone) {
     // .is-muted: bg rgba(127,118,108,0.12), color --fd-muted.
     val extra = readerExtraColors()
     val (bgColor, dotColor) = when (tone) {
-        RssTone.Good -> Color(0xFF36795B).copy(alpha = 0.12f) to Color(0xFF2F6B52)
-        RssTone.Warn -> Color(0xFFB46E23).copy(alpha = 0.14f) to Color(0xFF8B5829)
-        RssTone.Muted -> Color(0xFF7F766C).copy(alpha = 0.12f) to extra.muted
+        // 语义色：Good/Warn 使用 STATUS_GOOD/STATUS_WARN token，Muted 使用 extra.muted
+        RssTone.Good -> ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD).copy(alpha = 0.12f) to ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD)
+        RssTone.Warn -> ReaderTokenAdapter.color(ReaderColorToken.STATUS_WARN).copy(alpha = 0.14f) to ReaderTokenAdapter.color(ReaderColorToken.STATUS_WARN)
+        RssTone.Muted -> extra.muted.copy(alpha = 0.12f) to extra.muted
     }
     Box(
         modifier = Modifier

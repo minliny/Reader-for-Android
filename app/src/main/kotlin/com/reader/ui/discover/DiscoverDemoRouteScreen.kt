@@ -62,6 +62,8 @@ import com.reader.ui.shell.SettingsToastHostSlot
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import com.reader.ui.tokens.ReaderTokenAdapter
+import com.reader.ui.tokens.ReaderZIndexToken
 import coil.compose.AsyncImage
 
 enum class DiscoverDemoRouteShell {
@@ -220,7 +222,7 @@ private fun DiscoverDemoMainRouteScreen(
                 onNavigate = onNavigate,
                 modifier = Modifier
                     .matchParentSize()
-                    .zIndex(4f)
+                    .zIndex(ReaderTokenAdapter.zIndex(ReaderZIndexToken.OVERLAY))
             )
         }
     }

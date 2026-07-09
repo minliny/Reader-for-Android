@@ -567,11 +567,12 @@ private fun DiscoverPrimaryAction(
             .shadow(elevation = 2.dp, shape = ReaderShapes.sm, clip = false)
             .background(
                 brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(Color(0xFF436F88), Color(0xFF315F78))
+                    // 主操作按钮渐变：使用 Material3 primary → primaryContainer 语义 token
+                    colors = listOf(colors.primary, colors.primaryContainer)
                 ),
                 shape = ReaderShapes.sm
             )
-            .border(1.dp, Color(0x6F2D5D76), ReaderShapes.sm)
+            .border(1.dp, colors.primary.copy(alpha = 0.43f), ReaderShapes.sm)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.Center,
@@ -610,7 +611,7 @@ private fun DiscoverActionButton(
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = 32.dp)
-            .background(Color(0xDDEEE8DF), ReaderShapes.pill)
+            .background(extra.surfaceSoft, ReaderShapes.pill)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -668,8 +669,9 @@ private fun DiscoverBookRow(
 ) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
-    val rowBorderColor = Color(0xFFB4A697).copy(alpha = 0.24f)
-    val introColor = Color(0xFF5C554D)
+    // 行分割线/简介色：使用语义 border / muted token
+    val rowBorderColor = extra.border.copy(alpha = 0.24f)
+    val introColor = extra.muted
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -825,7 +827,7 @@ private fun DiscoverFilterButton(
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = 32.dp)
-            .background(if (active) colors.primary.copy(alpha = 0.12f) else Color(0xDDEEE8DF), ReaderShapes.pill)
+            .background(if (active) colors.primary.copy(alpha = 0.12f) else extra.surfaceSoft, ReaderShapes.pill)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),

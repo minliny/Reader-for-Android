@@ -48,6 +48,8 @@ import com.reader.android.R
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import com.reader.ui.tokens.ReaderColorToken
+import com.reader.ui.tokens.ReaderTokenAdapter
 import io.reader.ui.contract.RouteShell
 import com.reader.ui.shell.DemoFlowShell
 import com.reader.ui.shell.DemoLibraryShell
@@ -1073,14 +1075,16 @@ private fun ReaderTtsPanel(full: Boolean, onNavigate: (String) -> Unit, onDispat
 @Composable
 private fun ReaderAppearancePanel(full: Boolean, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoSectionLabel("主题")
+    // 读者主题色板：使用语义 token（paper / metaBackground / PAPER_NIGHT / STATUS_GOOD）
+    val extra = readerExtraColors()
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         listOf(
-            Color(0xFFFFF7EC) to "paper",
-            Color(0xFFF2E7D5) to "warm",
-            Color(0xFF1F1B17) to "paper-night",
-            Color(0xFFEAF0E2) to "green"
+            extra.paper to "paper",
+            extra.metaBackground to "warm",
+            ReaderTokenAdapter.color(ReaderColorToken.PAPER_NIGHT) to "paper-night",
+            ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD).copy(alpha = 0.12f) to "green"
         ).forEach { (color, themeId) ->
-            Box(Modifier.size(if (full) 34.dp else 24.dp).background(color, ReaderShapes.sm).border(1.dp, readerExtraColors().hairline, ReaderShapes.sm).clickable { onDispatch(ReaderUiIntent.UpdateReaderTheme(themeId = themeId)) })
+            Box(Modifier.size(if (full) 34.dp else 24.dp).background(color, ReaderShapes.sm).border(1.dp, extra.hairline, ReaderShapes.sm).clickable { onDispatch(ReaderUiIntent.UpdateReaderTheme(themeId = themeId)) })
         }
     }
     DemoRow(R.drawable.reader_ic_settings, "字号", "18", "+")
