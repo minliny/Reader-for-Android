@@ -2,6 +2,37 @@
 
 Android reading app — Compose + Material 3 native host for Reader-Core-Native and Reader UI Contract.
 
+## P0 链路闭环交付（2026-07-10）
+
+Reader for Android 完成 Contract-first Native UI Architecture 的 P0 链路全闭环。5 条 P0 链路（bookshelf / reader / source-switch / book-detail / settings）× A-F 六列全部 ✅，矩阵 120/120 全绿。
+
+### 交付成果
+
+**B1 — MotionPolicyAdapter 接入 + source-switch reducer（3 commits）**
+- `MotionPolicyAdapter` 接入 `AppShellViewModel`，生产环境调用 `MotionPolicyAdapter.resolve`
+- source-switch 专用 reducer intent 落地（`ReaderUiReducer` 中 handler 非 stub）
+- `FlowShell` smoke 接线验证
+
+**B2-B4 — reducer + focused tests + token 清理（2 commits）**
+- book-detail / settings reducer intent 补齐
+- 24 focused tests 落地（覆盖各链路 reducer / motion / screen）
+- raw `Color(0x` / `zIndex` 字面量全清理，统一引用 `ReaderTheme.tokens.*` 语义 token
+
+**B6 — BookshelfRoute + 非 P0 文件清理（1 commit）**
+- `BookshelfRouteScreens` 接线
+- 非 P0 文件 raw `Color` 清理
+
+### 验收
+
+- `./gradlew compileDebugKotlin`：BUILD SUCCESSFUL
+- `./gradlew test`：899 tests，0 failures
+- P0 链路矩阵：120/120 全绿（退出码 0）
+
+### 遗留
+
+- `SourceSwitchScreenSmokeTest` 需设备/模拟器运行（instrumented test）
+- `ReaderControlScreen` 残留 raw `dp` 标注为 demo 布局常量（非 token 化目标）
+
 ## Current architecture role
 
 Reader for Android is the Compose native host app in the Contract-first Native UI Architecture.
