@@ -142,11 +142,15 @@ private fun MotionId.finalStateFallback(): String = when (this) {
     else -> "motionSettled"
 }
 
-private val legacyMotionIdAliases: Map<String, MotionId> = mapOf(
-    MotionIdConstants.TAB_ITEM_SWITCH to MotionId.TabSwitch,
-    MotionIdConstants.READER_PAGE_TURN_NEXT_PREV to MotionId.ReaderPageTurnNextPrev,
-    MotionIdConstants.READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE to MotionId.ReaderSessionCapsuleControlPressToggle
-)
+// lazy: avoids top-level init-order NPE — MotionIdConstants.* computed getters
+// call motionIdSerialNames which is declared after this val.
+private val legacyMotionIdAliases: Map<String, MotionId> by lazy {
+    mapOf(
+        MotionIdConstants.TAB_ITEM_SWITCH to MotionId.TabSwitch,
+        MotionIdConstants.READER_PAGE_TURN_NEXT_PREV to MotionId.ReaderPageTurnNextPrev,
+        MotionIdConstants.READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE to MotionId.ReaderSessionCapsuleControlPressToggle
+    )
+}
 
 private val motionIdSerialNames: Map<MotionId, String> = mapOf(
     MotionId.AppFirstOpenEnter to "app.firstOpen.enter",

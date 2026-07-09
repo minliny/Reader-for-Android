@@ -1,6 +1,7 @@
 package com.reader.ui.motion
 
 import com.reader.ui.shell.InterruptKind
+import io.reader.ui.contract.MotionSpecRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -450,7 +451,7 @@ class MotionControllerTest {
         )!!
 
         assertEquals("immersiveReadingHotZonesRestored", contract.finalState)
-        assertEquals(160L, contract.defaultDurationMs)
+        assertEquals(240L, contract.defaultDurationMs)
     }
 
     // ── Event log + listeners ────────────────────────────────────────────────────
@@ -589,5 +590,15 @@ class MotionControllerTest {
             sizeBefore,
             received.size
         )
+    }
+
+    // ── Phase 7: Full MotionSpecRegistry coverage (84 entries) ───────────────────
+
+    @Test
+    fun `all 84 MotionSpecRegistry entries resolve through contractFor`() {
+        val allSpecs = MotionSpecRegistry.all
+        assertEquals(84, allSpecs.size)
+        val unresolved = allSpecs.map { it.id.serialName }.filter { MotionController.contractFor(it) == null }
+        assertTrue("Unresolved MotionIds: $unresolved", unresolved.isEmpty())
     }
 }

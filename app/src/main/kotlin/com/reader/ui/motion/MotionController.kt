@@ -2,7 +2,9 @@ package com.reader.ui.motion
 
 import com.reader.ui.shell.AppShellViewModel
 import com.reader.ui.shell.InterruptKind
+import io.reader.ui.contract.Motion
 import io.reader.ui.contract.MotionId
+import io.reader.ui.contract.MotionSpecRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -421,600 +423,451 @@ object MotionController {
     /** 事件日志上限（motion-controller.js 1189）。 */
     private const val MAX_EVENTS = 120
 
+/**
+ * motion-controller.js 语义契约（from/to/interrupt/finalState）。
+ * 从 frontend-demo-optimized/motion-controller.js 行 300-649 提取，供 [MotionController.MOTION_CONTRACTS] 合并使用。
+ */
+private data class MotionControllerJsSpec(
+    val from: List<String>,
+    val to: List<String>,
+    val interrupt: List<String>,
+    val finalState: String
+)
+
+private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = mapOf(
+        "app.launch" to MotionControllerJsSpec(
+            from = listOf("coldStart", "deepLinkStart"),
+            to = listOf("shellVisible", "entryRouteReady"),
+            interrupt = listOf("deepLinkRedirect", "reducedMotion", "appBackgrounded"),
+            finalState = "shellVisible"
+        ),
+        "app.route" to MotionControllerJsSpec(
+            from = listOf("route.current"),
+            to = listOf("route.target"),
+            interrupt = listOf("newRoute", "back", "replace", "destroy"),
+            finalState = "route.targetVisible"
+        ),
+        "button.destructive" to MotionControllerJsSpec(
+            from = listOf("armed", "pressed", "confirming"),
+            to = listOf("confirmed", "cancelled"),
+            interrupt = listOf("cancel", "overlayDismiss", "routeChange"),
+            finalState = "confirmationResolved"
+        ),
+        "reader.entry" to MotionControllerJsSpec(
+            from = listOf("sourceRoute", "coverPressed"),
+            to = listOf("immersiveReading"),
+            interrupt = listOf("back", "routeChange", "snapshotUnavailable"),
+            finalState = "immersiveReadingWithoutControlLayer"
+        ),
+        "reader.control" to MotionControllerJsSpec(
+            from = listOf("controlHidden", "controlVisible", "dragging", "docked"),
+            to = listOf("controlHidden", "controlVisible", "dockOffsetCommitted"),
+            interrupt = listOf("back", "routeChange", "orientationPrepare", "pointerCancel"),
+            finalState = "controlLayerLegalPosition"
+        ),
+        "reader.module" to MotionControllerJsSpec(
+            from = listOf("module.active"),
+            to = listOf("module.targetActive"),
+            interrupt = listOf("routeChange", "switchTarget"),
+            finalState = "oneActiveReaderModule"
+        ),
+        "reader.quick" to MotionControllerJsSpec(
+            from = listOf("quickIdle", "quickPressed"),
+            to = listOf("targetPanel", "loading", "committed"),
+            interrupt = listOf("routeChange", "panelDismiss", "newQuickAction"),
+            finalState = "quickActionResolved"
+        ),
+        "reader.session" to MotionControllerJsSpec(
+            from = listOf("inactive", "autoPage", "tts", "capsuleVisible", "controlSpaceVisible"),
+            to = listOf("autoPage", "tts", "capsuleVisible", "controlSpaceVisible", "inactive"),
+            interrupt = listOf("mutualSessionSwitch", "stop", "exitReader", "orientationPrepare", "routeChange"),
+            finalState = "singleSessionOwner"
+        ),
+        "reader.page" to MotionControllerJsSpec(
+            from = listOf("page.current"),
+            to = listOf("page.next", "page.previous"),
+            interrupt = listOf("chapterJump", "autoPageTick", "manualTurn", "routeChange"),
+            finalState = "pageIndexCommitted"
+        ),
+        "reader.chapter" to MotionControllerJsSpec(
+            from = listOf("chapter.current"),
+            to = listOf("chapter.target"),
+            interrupt = listOf("newJump", "routeChange", "sessionTick"),
+            finalState = "chapterAnchorCommitted"
+        ),
+        "reader.sourceSwitch" to MotionControllerJsSpec(
+            from = listOf("readerVisible", "sourceOverlayOpen"),
+            to = listOf("sourceOverlayOpen", "sourceCommitted", "readerVisible"),
+            interrupt = listOf("dismiss", "routeChange", "newSource"),
+            finalState = "readerSourceResolved"
+        ),
+        "motion.interrupt" to MotionControllerJsSpec(
+            from = listOf("motionRunning", "pressed", "dragging", "loading", "overlayEntering"),
+            to = listOf("latestTarget", "cancelled", "redirected", "replaced"),
+            interrupt = listOf("newInterrupt", "destroy", "routeChange"),
+            finalState = "latestStateOwnsSurface"
+        ),
+        "app.firstOpen.enter" to MotionControllerJsSpec(
+            from = listOf("coldStart", "deepLinkStart"),
+            to = listOf("shellVisible", "entryRouteReady"),
+            interrupt = listOf("deepLinkRedirect", "resumeInsteadOfColdStart", "reducedMotion"),
+            finalState = "entryRouteVisibleOnce"
+        ),
+        "app.route.push.forward" to MotionControllerJsSpec(
+            from = listOf("route.current"),
+            to = listOf("route.targetOnStack"),
+            interrupt = listOf("backBeforeSettle", "replaceBeforeSettle", "newPush"),
+            finalState = "targetRouteVisibleAndStackUpdated"
+        ),
+        "app.route.pop.backward" to MotionControllerJsSpec(
+            from = listOf("route.current"),
+            to = listOf("route.previousOnStack"),
+            interrupt = listOf("newPushBeforeSettle", "replaceBeforeSettle", "emptyBackStack"),
+            finalState = "previousRouteVisibleAndStackPopped"
+        ),
+        "app.route.replace" to MotionControllerJsSpec(
+            from = listOf("route.current"),
+            to = listOf("route.replacedTarget"),
+            interrupt = listOf("newReplace", "backBeforeCommit", "sessionStartRedirect"),
+            finalState = "targetRouteVisibleWithoutNewBackEntry"
+        ),
+        "tab.item.press" to MotionControllerJsSpec(
+            from = listOf("idle"),
+            to = listOf("pressed"),
+            interrupt = listOf("pointerCancel", "pointerLeave", "routeChange"),
+            finalState = "pressedReleased"
+        ),
+        "tab.item.select" to MotionControllerJsSpec(
+            from = listOf("inactive"),
+            to = listOf("active"),
+            interrupt = listOf("switchTarget", "routeChange"),
+            finalState = "selectedTabActive"
+        ),
+        "tab.item.switch" to MotionControllerJsSpec(
+            from = listOf("activeTab.previous"),
+            to = listOf("activeTab.next"),
+            interrupt = listOf("switchTargetAgain", "routeChange", "pointerCancel"),
+            finalState = "oneActiveTabAndStableBarSize"
+        ),
+        "tab.switch" to MotionControllerJsSpec(
+            from = listOf("activeTab.previous"),
+            to = listOf("activeTab.next"),
+            interrupt = listOf("switchTargetAgain", "routeChange", "pointerCancel"),
+            finalState = "oneActiveTabAndStableBarSize"
+        ),
+        "segment.item.switch" to MotionControllerJsSpec(
+            from = listOf("segment.previous"),
+            to = listOf("segment.next"),
+            interrupt = listOf("switchTargetAgain", "routeChange", "pointerCancel", "stateReset"),
+            finalState = "oneActiveSegmentAndStableGroupSize"
+        ),
+        "dropdown.trigger.press" to MotionControllerJsSpec(
+            from = listOf("closed", "open"),
+            to = listOf("triggerPressed"),
+            interrupt = listOf("pointerCancel", "openAnotherDropdown", "routeChange"),
+            finalState = "triggerReleased"
+        ),
+        "dropdown.menu.expand" to MotionControllerJsSpec(
+            from = listOf("closed", "anchorMeasured"),
+            to = listOf("open"),
+            interrupt = listOf("openAnotherDropdown", "back", "routeChange", "viewportChanged"),
+            finalState = "openAtLegalAnchor"
+        ),
+        "dropdown.menu.expand/collapse" to MotionControllerJsSpec(
+            from = listOf("closed", "open"),
+            to = listOf("open", "closed"),
+            interrupt = listOf("openAnotherDropdown", "back", "routeChange", "viewportChanged"),
+            finalState = "closedOrOpenAtLegalAnchor"
+        ),
+        "dropdown.menu.collapse" to MotionControllerJsSpec(
+            from = listOf("open"),
+            to = listOf("closed"),
+            interrupt = listOf("routeChange", "openAnotherDropdown", "destroy"),
+            finalState = "closedAndFocusReturnedToTrigger"
+        ),
+        "dropdown.menu.reposition" to MotionControllerJsSpec(
+            from = listOf("openAtPreviousAnchor"),
+            to = listOf("openAtLegalAnchor"),
+            interrupt = listOf("collapse", "routeChange", "newViewportMetrics"),
+            finalState = "openWithinViewportOrSheetFallback"
+        ),
+        "dropdown.option.press" to MotionControllerJsSpec(
+            from = listOf("optionIdle"),
+            to = listOf("optionPressed"),
+            interrupt = listOf("pointerCancel", "collapse", "routeChange"),
+            finalState = "optionReleased"
+        ),
+        "dropdown.option.select" to MotionControllerJsSpec(
+            from = listOf("open", "optionPressed"),
+            to = listOf("valueCommitted", "closedOrOpen"),
+            interrupt = listOf("routeChange", "newSelection", "collapse"),
+            finalState = "valueAndSemanticsCommitted"
+        ),
+        "button.activate" to MotionControllerJsSpec(
+            from = listOf("pressed", "enabled"),
+            to = listOf("commandCommitted", "loading", "idle"),
+            interrupt = listOf("disabledBeforeRelease", "routeChange", "submitCancelled"),
+            finalState = "commandStateResolved"
+        ),
+        "toggle.switch" to MotionControllerJsSpec(
+            from = listOf("checked.previous"),
+            to = listOf("checked.next"),
+            interrupt = listOf("revert", "routeChange", "pointerCancel"),
+            finalState = "checkedSemanticsCommitted"
+        ),
+        "reader.entry.coverToImmersive" to MotionControllerJsSpec(
+            from = listOf("sourceRoute", "coverPressed", "coverSnapshotMeasured"),
+            to = listOf("immersiveReading"),
+            interrupt = listOf("snapshotUnavailable", "backBeforeCommit", "routeChange"),
+            finalState = "immersiveReadingNoControlLayerAndSourceBackStackKept"
+        ),
+        "reader.entry.actionToImmersive" to MotionControllerJsSpec(
+            from = listOf("sourceRoute", "actionPressed"),
+            to = listOf("immersiveReading"),
+            interrupt = listOf("backBeforeCommit", "routeChange"),
+            finalState = "immersiveReadingNoControlLayerAndSourceBackStackKept"
+        ),
+        "reader.control.hide" to MotionControllerJsSpec(
+            from = listOf("controlLayerVisible"),
+            to = listOf("immersiveReading"),
+            interrupt = listOf("showAgain", "routeChange", "orientationPrepare"),
+            finalState = "immersiveReadingHotZonesRestored"
+        ),
+        "reader.control.handle.press" to MotionControllerJsSpec(
+            from = listOf("handleIdle", "controlLayerVisible"),
+            to = listOf("handlePressed"),
+            interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare"),
+            finalState = "handlePressedFeedbackVisible"
+        ),
+        "reader.control.handle.drag" to MotionControllerJsSpec(
+            from = listOf("handlePressed"),
+            to = listOf("handleDragging", "dragOffsetPreview"),
+            interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare"),
+            finalState = "dragOffsetPreviewOnly"
+        ),
+        "reader.control.handle.release" to MotionControllerJsSpec(
+            from = listOf("handleDragging", "handlePressed"),
+            to = listOf("snapBack", "expandCommitted", "collapseCommitted"),
+            interrupt = listOf("routeChange", "orientationPrepare"),
+            finalState = "controlLayerResolvedToSingleRouteState"
+        ),
+        "reader.control.dock.longPress" to MotionControllerJsSpec(
+            from = listOf("fixedWidthDock", "handlePressed"),
+            to = listOf("dockDragArmed"),
+            interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare", "viewportClassChange"),
+            finalState = "dockDragReadyWithinBounds"
+        ),
+        "reader.control.dock.drag" to MotionControllerJsSpec(
+            from = listOf("dockDragArmed", "dockOffset.previous"),
+            to = listOf("dockOffset.previewClamped"),
+            interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare", "viewportClassChange"),
+            finalState = "dockPreviewOffsetWithinMovableSpace"
+        ),
+        "reader.control.dock.release" to MotionControllerJsSpec(
+            from = listOf("dockDragging", "dockOffset.previewClamped"),
+            to = listOf("dockOffset.committed"),
+            interrupt = listOf("routeChange", "orientationPrepare", "viewportClassChange"),
+            finalState = "dockOffsetSavedForViewportClass"
+        ),
+        "reader.control.dock.rebound" to MotionControllerJsSpec(
+            from = listOf("dockOffset.saved", "bounds.changed"),
+            to = listOf("dockOffset.clamped"),
+            interrupt = listOf("routeChange", "orientationPrepare"),
+            finalState = "dockOffsetLegalInCurrentBounds"
+        ),
+        "reader.session.autoPage.start" to MotionControllerJsSpec(
+            from = listOf("controlLayerVisible", "session.inactiveOrTts"),
+            to = listOf("immersiveReading", "session.autoPage", "capsuleVisible"),
+            interrupt = listOf("ttsStart", "stop", "exitReader", "routeChange"),
+            finalState = "autoPageOwnsSessionAndCapsule"
+        ),
+        "reader.session.tts.start" to MotionControllerJsSpec(
+            from = listOf("controlLayerVisible", "ttsPageVisible", "session.inactiveOrAutoPage"),
+            to = listOf("immersiveReading", "session.tts", "capsuleVisible"),
+            interrupt = listOf("autoPageStart", "stop", "exitReader", "routeChange"),
+            finalState = "ttsOwnsSessionAndCapsule"
+        ),
+        "reader.session.capsule.enter" to MotionControllerJsSpec(
+            from = listOf("sessionActive", "capsuleHidden"),
+            to = listOf("capsuleVisible"),
+            interrupt = listOf("sessionSwitch", "stop", "controlLayerOpen", "exitReader"),
+            finalState = "capsuleVisibleAtReaderStatusAnchor"
+        ),
+        "reader.session.capsule.update" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible", "session.previousState"),
+            to = listOf("capsuleVisible", "session.nextState"),
+            interrupt = listOf("sessionSwitch", "stop", "controlLayerOpen", "exitReader"),
+            finalState = "capsuleInternalStateUpdated"
+        ),
+        "reader.session.capsule.control.press/toggle" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible", "playing.previous"),
+            to = listOf("capsuleVisible", "playing.next"),
+            interrupt = listOf("pointerCancel", "sessionStop", "controlLayerOpen", "exitReader"),
+            finalState = "playingStateCommittedInsideCapsule"
+        ),
+        "reader.session.capsule.control.press-toggle" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible", "playing.previous"),
+            to = listOf("capsuleVisible", "playing.next"),
+            interrupt = listOf("pointerCancel", "sessionStop", "controlLayerOpen", "exitReader"),
+            finalState = "playingStateCommittedInsideCapsule"
+        ),
+        "reader.session.capsule.countdownTick" to MotionControllerJsSpec(
+            from = listOf("countdown.previous"),
+            to = listOf("countdown.next"),
+            interrupt = listOf("pause", "sessionSwitch", "pageTurn", "stop"),
+            finalState = "latestCountdownVisibleInFixedWidthSlot"
+        ),
+        "reader.session.capsule.voiceIcon.active" to MotionControllerJsSpec(
+            from = listOf("ttsPlaying"),
+            to = listOf("ttsPlayingVisualActive"),
+            interrupt = listOf("pause", "reducedMotion", "sessionSwitch", "stop"),
+            finalState = "voiceIconActiveOnlyWhilePlaying"
+        ),
+        "reader.session.capsule.switch" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible", "session.previousType"),
+            to = listOf("capsuleVisible", "session.nextType"),
+            interrupt = listOf("stop", "controlLayerOpen", "exitReader"),
+            finalState = "singleCapsuleWithNextSessionType"
+        ),
+        "reader.session.capsule.exit" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible"),
+            to = listOf("capsuleHidden"),
+            interrupt = listOf("sessionRestart", "routeChange", "destroy"),
+            finalState = "capsuleHiddenAndHitTargetReleased"
+        ),
+        "reader.session.controlSpace.enter" to MotionControllerJsSpec(
+            from = listOf("capsuleVisible", "controlLayerOpening"),
+            to = listOf("controlSpaceVisible"),
+            interrupt = listOf("controlLayerClose", "sessionStop", "orientationPrepare"),
+            finalState = "singleRunningControlOwnerInControlLayer"
+        ),
+        "reader.session.controlSpace.update" to MotionControllerJsSpec(
+            from = listOf("controlSpaceVisible", "session.previousState"),
+            to = listOf("controlSpaceVisible", "session.nextState"),
+            interrupt = listOf("sessionStop", "controlLayerClose", "orientationPrepare"),
+            finalState = "controlSpaceInternalStateUpdated"
+        ),
+        "reader.session.controlSpace.exit" to MotionControllerJsSpec(
+            from = listOf("controlSpaceVisible", "controlLayerClosing"),
+            to = listOf("capsuleVisible", "immersiveReading"),
+            interrupt = listOf("sessionStop", "exitReader", "orientationPrepare"),
+            finalState = "singleCapsuleOwnerInImmersiveReading"
+        ),
+        "reader.module.switch" to MotionControllerJsSpec(
+            from = listOf("readerModule.previous", "controlLayerVisible"),
+            to = listOf("readerModule.next", "controlLayerVisible"),
+            interrupt = listOf("routeChange", "switchTargetAgain", "hideControlLayer"),
+            finalState = "oneActiveReaderModuleAndStableModuleBar"
+        ),
+        "reader.page.turn.next/prev" to MotionControllerJsSpec(
+            from = listOf("page.current"),
+            to = listOf("page.nextOrPrevious"),
+            interrupt = listOf("oppositeTurn", "chapterJump", "routeChange", "sessionTick"),
+            finalState = "pageIndexCommittedAndPageInfoAnchored"
+        ),
+        "reader.page.turn.next-prev" to MotionControllerJsSpec(
+            from = listOf("page.current"),
+            to = listOf("page.nextOrPrevious"),
+            interrupt = listOf("oppositeTurn", "chapterJump", "routeChange", "sessionTick"),
+            finalState = "pageIndexCommittedAndPageInfoAnchored"
+        ),
+        "motion.interrupt.cancel" to MotionControllerJsSpec(
+            from = listOf("motionRunning", "pressed", "dragging", "entering"),
+            to = listOf("latestCommittedState"),
+            interrupt = listOf("newInterrupt", "destroy"),
+            finalState = "transientMotionCleared"
+        ),
+        "motion.interrupt.redirect" to MotionControllerJsSpec(
+            from = listOf("motionRunningTowardOldTarget"),
+            to = listOf("motionRunningTowardNewTarget"),
+            interrupt = listOf("newTarget", "routeChange", "destroy"),
+            finalState = "newTargetOwnsMotion"
+        ),
+        "motion.interrupt.completeThenReplace" to MotionControllerJsSpec(
+            from = listOf("requiredStateMotion", "loadingMinimumVisible"),
+            to = listOf("replacementState"),
+            interrupt = listOf("userBack", "routeChange", "newerAsyncResult"),
+            finalState = "replacementVisibleOnlyIfStillCurrent"
+        ),
+        "viewport.orientation.prepare" to MotionControllerJsSpec(
+            from = listOf("viewportStable"),
+            to = listOf("viewportFrozen"),
+            interrupt = listOf("routeChange", "newMetricsBeforeFreeze"),
+            finalState = "routeReaderSessionOverlayFocusFrozen"
+        ),
+        "viewport.orientation.reshape" to MotionControllerJsSpec(
+            from = listOf("viewportFrozen", "viewportStable"),
+            to = listOf("viewportReshaped"),
+            interrupt = listOf("newMetrics", "foldChange", "routeChange"),
+            finalState = "readerOverlayCapsuleDockReanchored"
+        ),
+        "viewport.orientation.settle" to MotionControllerJsSpec(
+            from = listOf("viewportReshaped"),
+            to = listOf("viewportStable"),
+            interrupt = listOf("newMetrics", "routeChange"),
+            finalState = "focusPointerSessionMicroMotionRestored"
+        )
+)
+
     /**
-     * 47 个 Motion ID 的契约表（motion-controller.js 292-622）。
-     * P0 子集完整定义；其余同样给出 from/to/interrupt/finalState/reducedMotion。
+     * 84 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
+     * `motion-controller.js` 的 from/to/interrupt/finalState 语义值。
+     *
+     * 对于在 `motion-controller.js` 中有定义的 Motion ID（62 条），from/to/interrupt/finalState
+     * 使用 JS 侧的语义值；对于仅存在于生成契约中的 Motion ID（22 条），回退到 spec 字段。
+     *
+     * 另有 5 条遗留 Motion ID（无 MotionId 枚举对应，如 "tab.item.press"）直接从
+     * [MOTION_CONTROLLER_JS_SPECS] 补入，保证 [MotionIdConstants] 的 47 个常量全部可解析。
+     *
+     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (84 条) +
+     *                  motion-controller.js 300-649 (62 条 JS 语义 + 5 条遗留)。
      */
     private val MOTION_CONTRACTS: Map<String, MotionContract> = buildMap {
-        // ---- P0：App launch / route ----
-        put(
-            "app.firstOpen.enter",
-            MotionContract(
-                motionId = "app.firstOpen.enter",
-                from = listOf("coldStart", "deepLinkStart"),
-                to = listOf("shellVisible", "entryRouteReady"),
-                interrupt = listOf("deepLinkRedirect", "resumeInsteadOfColdStart", "reducedMotion"),
-                finalState = "entryRouteVisibleOnce",
-                reducedMotion = "Render shell and entry route immediately; do not replay on route, tab, or back actions.",
-                defaultDurationMs = 280L
+        MotionSpecRegistry.all.forEach { spec ->
+            val serialName = spec.id.serialName
+            val jsSpec = MOTION_CONTROLLER_JS_SPECS[serialName]
+            put(
+                serialName,
+                MotionContract(
+                    motionId = serialName,
+                    from = jsSpec?.from ?: buildList {
+                        spec.operation?.let { add(it.name) }
+                        spec.containerRole?.let { add(it.name) }
+                        if (isEmpty()) add("idle")
+                    },
+                    to = jsSpec?.to ?: buildList {
+                        spec.visualPattern?.let { add(it.name) }
+                        add(spec.implementationKind.name)
+                    },
+                    interrupt = jsSpec?.interrupt ?: listOf(spec.interruptPolicy.name),
+                    finalState = jsSpec?.finalState ?: spec.id.name,
+                    reducedMotion = spec.reducedMotionPolicy.name,
+                    defaultDurationMs = spec.durationMs.toLong()
+                )
             )
-        )
-        put(
-            "app.route.push.forward",
-            MotionContract(
-                motionId = "app.route.push.forward",
-                from = listOf("route.current"),
-                to = listOf("route.targetOnStack"),
-                interrupt = listOf("backBeforeSettle", "replaceBeforeSettle", "newPush"),
-                finalState = "targetRouteVisibleAndStackUpdated",
-                reducedMotion = "Update stack and content immediately without forward slide.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "app.route.pop.backward",
-            MotionContract(
-                motionId = "app.route.pop.backward",
-                from = listOf("route.current"),
-                to = listOf("route.previousOnStack"),
-                interrupt = listOf("newPushBeforeSettle", "replaceBeforeSettle", "emptyBackStack"),
-                finalState = "previousRouteVisibleAndStackPopped",
-                reducedMotion = "Pop stack and render previous route immediately without backward slide.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "app.route.replace",
-            MotionContract(
-                motionId = "app.route.replace",
-                from = listOf("route.current"),
-                to = listOf("route.replacedTarget"),
-                interrupt = listOf("newReplace", "backBeforeCommit", "sessionStartRedirect"),
-                finalState = "targetRouteVisibleWithoutNewBackEntry",
-                reducedMotion = "Replace route state in place with no push/pop movement.",
-                defaultDurationMs = 160L
-            )
-        )
-
-        // ---- Tab / segment ----
-        put(
-            "tab.item.press",
-            MotionContract(
-                motionId = "tab.item.press",
-                from = listOf("idle"),
-                to = listOf("pressed"),
-                interrupt = listOf("pointerCancel", "pointerLeave", "routeChange"),
-                finalState = "pressedReleased",
-                reducedMotion = "Keep pressed feedback instant and do not move tab layout.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "tab.item.select",
-            MotionContract(
-                motionId = "tab.item.select",
-                from = listOf("inactive"),
-                to = listOf("active"),
-                interrupt = listOf("switchTarget", "routeChange"),
-                finalState = "selectedTabActive",
-                reducedMotion = "Commit selected color/icon/text state without background travel.",
-                defaultDurationMs = 120L
-            )
-        )
-        put(
-            "tab.item.switch",
-            MotionContract(
-                motionId = "tab.item.switch",
-                from = listOf("activeTab.previous"),
-                to = listOf("activeTab.next"),
-                interrupt = listOf("switchTargetAgain", "routeChange", "pointerCancel"),
-                finalState = "oneActiveTabAndStableBarSize",
-                reducedMotion = "Switch active state instantly and keep indicator static.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "segment.item.switch",
-            MotionContract(
-                motionId = "segment.item.switch",
-                from = listOf("segment.previous"),
-                to = listOf("segment.next"),
-                interrupt = listOf("switchTargetAgain", "routeChange", "pointerCancel", "stateReset"),
-                finalState = "oneActiveSegmentAndStableGroupSize",
-                reducedMotion = "Commit selected segment state immediately without indicator travel or layout movement.",
-                defaultDurationMs = 120L
-            )
-        )
-
-        // ---- Dropdown ----
-        put(
-            "dropdown.trigger.press",
-            MotionContract(
-                motionId = "dropdown.trigger.press",
-                from = listOf("closed", "open"),
-                to = listOf("triggerPressed"),
-                interrupt = listOf("pointerCancel", "openAnotherDropdown", "routeChange"),
-                finalState = "triggerReleased",
-                reducedMotion = "Apply trigger pressed state instantly without chevron travel.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "dropdown.menu.expand",
-            MotionContract(
-                motionId = "dropdown.menu.expand",
-                from = listOf("closed", "anchorMeasured"),
-                to = listOf("open"),
-                interrupt = listOf("openAnotherDropdown", "back", "routeChange", "viewportChanged"),
-                finalState = "openAtLegalAnchor",
-                reducedMotion = "Measure anchor, then show menu immediately without fade or y-offset.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "dropdown.menu.expand/collapse",
-            MotionContract(
-                motionId = "dropdown.menu.expand/collapse",
-                from = listOf("closed", "open"),
-                to = listOf("open", "closed"),
-                interrupt = listOf("openAnotherDropdown", "back", "routeChange", "viewportChanged"),
-                finalState = "closedOrOpenAtLegalAnchor",
-                reducedMotion = "Commit final open/closed state immediately after anchor measurement.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "dropdown.menu.collapse",
-            MotionContract(
-                motionId = "dropdown.menu.collapse",
-                from = listOf("open"),
-                to = listOf("closed"),
-                interrupt = listOf("routeChange", "openAnotherDropdown", "destroy"),
-                finalState = "closedAndFocusReturnedToTrigger",
-                reducedMotion = "Hide menu and release focus/click target immediately.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "dropdown.menu.reposition",
-            MotionContract(
-                motionId = "dropdown.menu.reposition",
-                from = listOf("openAtPreviousAnchor"),
-                to = listOf("openAtLegalAnchor"),
-                interrupt = listOf("collapse", "routeChange", "newViewportMetrics"),
-                finalState = "openWithinViewportOrSheetFallback",
-                reducedMotion = "Recompute placement and snap to legal bounds without animated travel.",
-                defaultDurationMs = 120L
-            )
-        )
-        put(
-            "dropdown.option.press",
-            MotionContract(
-                motionId = "dropdown.option.press",
-                from = listOf("optionIdle"),
-                to = listOf("optionPressed"),
-                interrupt = listOf("pointerCancel", "collapse", "routeChange"),
-                finalState = "optionReleased",
-                reducedMotion = "Apply option pressed state instantly without moving menu container.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "dropdown.option.select",
-            MotionContract(
-                motionId = "dropdown.option.select",
-                from = listOf("open", "optionPressed"),
-                to = listOf("valueCommitted", "closedOrOpen"),
-                interrupt = listOf("routeChange", "newSelection", "collapse"),
-                finalState = "valueAndSemanticsCommitted",
-                reducedMotion = "Update value, check/icon, and close single-select menus immediately.",
-                defaultDurationMs = 120L
-            )
-        )
-
-        // ---- Button / toggle ----
-        put(
-            "button.activate",
-            MotionContract(
-                motionId = "button.activate",
-                from = listOf("pressed", "enabled"),
-                to = listOf("commandCommitted", "loading", "idle"),
-                interrupt = listOf("disabledBeforeRelease", "routeChange", "submitCancelled"),
-                finalState = "commandStateResolved",
-                reducedMotion = "Commit button command state without scale or label crossfade.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "toggle.switch",
-            MotionContract(
-                motionId = "toggle.switch",
-                from = listOf("checked.previous"),
-                to = listOf("checked.next"),
-                interrupt = listOf("revert", "routeChange", "pointerCancel"),
-                finalState = "checkedSemanticsCommitted",
-                reducedMotion = "Update check/thumb/background and semantics instantly.",
-                defaultDurationMs = 120L
-            )
-        )
-
-        // ---- P0：Reader entry / control ----
-        put(
-            "reader.entry.coverToImmersive",
-            MotionContract(
-                motionId = "reader.entry.coverToImmersive",
-                from = listOf("sourceRoute", "coverPressed", "coverSnapshotMeasured"),
-                to = listOf("immersiveReading"),
-                interrupt = listOf("snapshotUnavailable", "backBeforeCommit", "routeChange"),
-                finalState = "immersiveReadingNoControlLayerAndSourceBackStackKept",
-                reducedMotion = "Use cover press and reader surface reveal; skip shared-element movement.",
-                defaultDurationMs = 240L
-            )
-        )
-        put(
-            "reader.entry.actionToImmersive",
-            MotionContract(
-                motionId = "reader.entry.actionToImmersive",
-                from = listOf("sourceRoute", "actionPressed"),
-                to = listOf("immersiveReading"),
-                interrupt = listOf("backBeforeCommit", "routeChange"),
-                finalState = "immersiveReadingNoControlLayerAndSourceBackStackKept",
-                reducedMotion = "Use action press plus immediate reader surface reveal.",
-                defaultDurationMs = 240L
-            )
-        )
-        put(
-            "reader.control.hide",
-            MotionContract(
-                motionId = "reader.control.hide",
-                from = listOf("controlLayerVisible"),
-                to = listOf("immersiveReading"),
-                interrupt = listOf("showAgain", "routeChange", "orientationPrepare"),
-                finalState = "immersiveReadingHotZonesRestored",
-                reducedMotion = "Hide control layer immediately and restore immersive hit regions.",
-                defaultDurationMs = 160L
-            )
-        )
-
-        // ---- P0：Reader control handle ----
-        put(
-            "reader.control.handle.press",
-            MotionContract(
-                motionId = "reader.control.handle.press",
-                from = listOf("handleIdle", "controlLayerVisible"),
-                to = listOf("handlePressed"),
-                interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare"),
-                finalState = "handlePressedFeedbackVisible",
-                reducedMotion = "Commit pressed state without scale or pull preview.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "reader.control.handle.drag",
-            MotionContract(
-                motionId = "reader.control.handle.drag",
-                from = listOf("handlePressed"),
-                to = listOf("handleDragging", "dragOffsetPreview"),
-                interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare"),
-                finalState = "dragOffsetPreviewOnly",
-                reducedMotion = "Track drag semantics without panel translation.",
-                defaultDurationMs = 0L
-            )
-        )
-        put(
-            "reader.control.handle.release",
-            MotionContract(
-                motionId = "reader.control.handle.release",
-                from = listOf("handleDragging", "handlePressed"),
-                to = listOf("snapBack", "expandCommitted", "collapseCommitted"),
-                interrupt = listOf("routeChange", "orientationPrepare"),
-                finalState = "controlLayerResolvedToSingleRouteState",
-                reducedMotion = "Resolve expand, collapse, or snap-back immediately without panel travel.",
-                defaultDurationMs = 160L
-            )
-        )
-
-        // ---- Reader control dock ----
-        put(
-            "reader.control.dock.longPress",
-            MotionContract(
-                motionId = "reader.control.dock.longPress",
-                from = listOf("fixedWidthDock", "handlePressed"),
-                to = listOf("dockDragArmed"),
-                interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare", "viewportClassChange"),
-                finalState = "dockDragReadyWithinBounds",
-                reducedMotion = "Arm dock movement without scale or halo animation.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "reader.control.dock.drag",
-            MotionContract(
-                motionId = "reader.control.dock.drag",
-                from = listOf("dockDragArmed", "dockOffset.previous"),
-                to = listOf("dockOffset.previewClamped"),
-                interrupt = listOf("pointerCancel", "routeChange", "orientationPrepare", "viewportClassChange"),
-                finalState = "dockPreviewOffsetWithinMovableSpace",
-                reducedMotion = "Update clamped dock offset directly while keeping dock dimensions fixed.",
-                defaultDurationMs = 0L
-            )
-        )
-        put(
-            "reader.control.dock.release",
-            MotionContract(
-                motionId = "reader.control.dock.release",
-                from = listOf("dockDragging", "dockOffset.previewClamped"),
-                to = listOf("dockOffset.committed"),
-                interrupt = listOf("routeChange", "orientationPrepare", "viewportClassChange"),
-                finalState = "dockOffsetSavedForViewportClass",
-                reducedMotion = "Commit the legal dock offset immediately without snap movement.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "reader.control.dock.rebound",
-            MotionContract(
-                motionId = "reader.control.dock.rebound",
-                from = listOf("dockOffset.saved", "bounds.changed"),
-                to = listOf("dockOffset.clamped"),
-                interrupt = listOf("routeChange", "orientationPrepare"),
-                finalState = "dockOffsetLegalInCurrentBounds",
-                reducedMotion = "Clamp dock offset to the current movable space immediately.",
-                defaultDurationMs = 120L
-            )
-        )
-
-        // ---- Reader session ----
-        put(
-            "reader.session.autoPage.start",
-            MotionContract(
-                motionId = "reader.session.autoPage.start",
-                from = listOf("controlLayerVisible", "session.inactiveOrTts"),
-                to = listOf("immersiveReading", "session.autoPage", "capsuleVisible"),
-                interrupt = listOf("ttsStart", "stop", "exitReader", "routeChange"),
-                finalState = "autoPageOwnsSessionAndCapsule",
-                reducedMotion = "Set autoPage session, replace route, and show capsule immediately.",
-                defaultDurationMs = 200L
-            )
-        )
-        put(
-            "reader.session.tts.start",
-            MotionContract(
-                motionId = "reader.session.tts.start",
-                from = listOf("controlLayerVisible", "ttsPageVisible", "session.inactiveOrAutoPage"),
-                to = listOf("immersiveReading", "session.tts", "capsuleVisible"),
-                interrupt = listOf("autoPageStart", "stop", "exitReader", "routeChange"),
-                finalState = "ttsOwnsSessionAndCapsule",
-                reducedMotion = "Set TTS session, replace route, and show capsule immediately.",
-                defaultDurationMs = 200L
-            )
-        )
-
-        // ---- P0：Reader session capsule ----
-        put(
-            "reader.session.capsule.enter",
-            MotionContract(
-                motionId = "reader.session.capsule.enter",
-                from = listOf("sessionActive", "capsuleHidden"),
-                to = listOf("capsuleVisible"),
-                interrupt = listOf("sessionSwitch", "stop", "controlLayerOpen", "exitReader"),
-                finalState = "capsuleVisibleAtReaderStatusAnchor",
-                reducedMotion = "Show capsule at anchor immediately without container scale or y-offset.",
-                defaultDurationMs = 200L
-            )
-        )
-        put(
-            "reader.session.capsule.update",
-            MotionContract(
-                motionId = "reader.session.capsule.update",
-                from = listOf("capsuleVisible", "session.previousState"),
-                to = listOf("capsuleVisible", "session.nextState"),
-                interrupt = listOf("sessionSwitch", "stop", "controlLayerOpen", "exitReader"),
-                finalState = "capsuleInternalStateUpdated",
-                reducedMotion = "Update internal icon, text, and count without replaying capsule enter.",
-                defaultDurationMs = 120L
-            )
-        )
-        put(
-            "reader.session.capsule.control.press/toggle",
-            MotionContract(
-                motionId = "reader.session.capsule.control.press/toggle",
-                from = listOf("capsuleVisible", "playing.previous"),
-                to = listOf("capsuleVisible", "playing.next"),
-                interrupt = listOf("pointerCancel", "sessionStop", "controlLayerOpen", "exitReader"),
-                finalState = "playingStateCommittedInsideCapsule",
-                reducedMotion = "Commit play/pause icon and state instantly; do not open control layer.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "reader.session.capsule.countdownTick",
-            MotionContract(
-                motionId = "reader.session.capsule.countdownTick",
-                from = listOf("countdown.previous"),
-                to = listOf("countdown.next"),
-                interrupt = listOf("pause", "sessionSwitch", "pageTurn", "stop"),
-                finalState = "latestCountdownVisibleInFixedWidthSlot",
-                reducedMotion = "Replace number immediately in the fixed-width slot.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "reader.session.capsule.voiceIcon.active",
-            MotionContract(
-                motionId = "reader.session.capsule.voiceIcon.active",
-                from = listOf("ttsPlaying"),
-                to = listOf("ttsPlayingVisualActive"),
-                interrupt = listOf("pause", "reducedMotion", "sessionSwitch", "stop"),
-                finalState = "voiceIconActiveOnlyWhilePlaying",
-                reducedMotion = "Keep voice icon static while preserving playing semantics.",
-                defaultDurationMs = 80L
-            )
-        )
-        put(
-            "reader.session.capsule.switch",
-            MotionContract(
-                motionId = "reader.session.capsule.switch",
-                from = listOf("capsuleVisible", "session.previousType"),
-                to = listOf("capsuleVisible", "session.nextType"),
-                interrupt = listOf("stop", "controlLayerOpen", "exitReader"),
-                finalState = "singleCapsuleWithNextSessionType",
-                reducedMotion = "Swap capsule internal content immediately at the same anchor.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "reader.session.capsule.exit",
-            MotionContract(
-                motionId = "reader.session.capsule.exit",
-                from = listOf("capsuleVisible"),
-                to = listOf("capsuleHidden"),
-                interrupt = listOf("sessionRestart", "routeChange", "destroy"),
-                finalState = "capsuleHiddenAndHitTargetReleased",
-                reducedMotion = "Hide capsule and release hit target immediately.",
-                defaultDurationMs = 160L
-            )
-        )
-
-        // ---- P0：Reader session controlSpace ----
-        put(
-            "reader.session.controlSpace.enter",
-            MotionContract(
-                motionId = "reader.session.controlSpace.enter",
-                from = listOf("capsuleVisible", "controlLayerOpening"),
-                to = listOf("controlSpaceVisible"),
-                interrupt = listOf("controlLayerClose", "sessionStop", "orientationPrepare"),
-                finalState = "singleRunningControlOwnerInControlLayer",
-                reducedMotion = "Hide capsule and show running control space without morph.",
-                defaultDurationMs = 200L
-            )
-        )
-        put(
-            "reader.session.controlSpace.update",
-            MotionContract(
-                motionId = "reader.session.controlSpace.update",
-                from = listOf("controlSpaceVisible", "session.previousState"),
-                to = listOf("controlSpaceVisible", "session.nextState"),
-                interrupt = listOf("sessionStop", "controlLayerClose", "orientationPrepare"),
-                finalState = "controlSpaceInternalStateUpdated",
-                reducedMotion = "Update internal running state instantly.",
-                defaultDurationMs = 120L
-            )
-        )
-        put(
-            "reader.session.controlSpace.exit",
-            MotionContract(
-                motionId = "reader.session.controlSpace.exit",
-                from = listOf("controlSpaceVisible", "controlLayerClosing"),
-                to = listOf("capsuleVisible", "immersiveReading"),
-                interrupt = listOf("sessionStop", "exitReader", "orientationPrepare"),
-                finalState = "singleCapsuleOwnerInImmersiveReading",
-                reducedMotion = "Hide running control space and show capsule without morph.",
-                defaultDurationMs = 200L
-            )
-        )
-
-        // ---- Reader module / page ----
-        put(
-            "reader.module.switch",
-            MotionContract(
-                motionId = "reader.module.switch",
-                from = listOf("readerModule.previous", "controlLayerVisible"),
-                to = listOf("readerModule.next", "controlLayerVisible"),
-                interrupt = listOf("routeChange", "switchTargetAgain", "hideControlLayer"),
-                finalState = "oneActiveReaderModuleAndStableModuleBar",
-                reducedMotion = "Commit active module and panel content immediately; keep module nav dimensions stable.",
-                defaultDurationMs = 160L
-            )
-        )
-        put(
-            "reader.page.turn.next/prev",
-            MotionContract(
-                motionId = "reader.page.turn.next/prev",
-                from = listOf("page.current"),
-                to = listOf("page.nextOrPrevious"),
-                interrupt = listOf("oppositeTurn", "chapterJump", "routeChange", "sessionTick"),
-                finalState = "pageIndexCommittedAndPageInfoAnchored",
-                reducedMotion = "Commit page index and footer/page info immediately without slide.",
-                defaultDurationMs = 160L
-            )
-        )
-
-        // ---- P0：Motion interrupt 三态 ----
-        put(
-            "motion.interrupt.cancel",
-            MotionContract(
-                motionId = "motion.interrupt.cancel",
-                from = listOf("motionRunning", "pressed", "dragging", "entering"),
-                to = listOf("latestCommittedState"),
-                interrupt = listOf("newInterrupt", "destroy"),
-                finalState = "transientMotionCleared",
-                reducedMotion = "Clear transient motion flags immediately.",
-                defaultDurationMs = ReaderMotionTokens.DurationInterruptSettle.inWholeMilliseconds
-            )
-        )
-        put(
-            "motion.interrupt.redirect",
-            MotionContract(
-                motionId = "motion.interrupt.redirect",
-                from = listOf("motionRunningTowardOldTarget"),
-                to = listOf("motionRunningTowardNewTarget"),
-                interrupt = listOf("newTarget", "routeChange", "destroy"),
-                finalState = "newTargetOwnsMotion",
-                reducedMotion = "Cancel old target and commit new target without interpolation.",
-                defaultDurationMs = ReaderMotionTokens.DurationInterruptSettle.inWholeMilliseconds
-            )
-        )
-        put(
-            "motion.interrupt.completeThenReplace",
-            MotionContract(
-                motionId = "motion.interrupt.completeThenReplace",
-                from = listOf("requiredStateMotion", "loadingMinimumVisible"),
-                to = listOf("replacementState"),
-                interrupt = listOf("userBack", "routeChange", "newerAsyncResult"),
-                finalState = "replacementVisibleOnlyIfStillCurrent",
-                reducedMotion = "Replace with the latest valid state immediately.",
-                defaultDurationMs = ReaderMotionTokens.DurationInterruptSettle.inWholeMilliseconds
-            )
-        )
-
-        // ---- P0：Viewport orientation ----
-        put(
-            "viewport.orientation.prepare",
-            MotionContract(
-                motionId = "viewport.orientation.prepare",
-                from = listOf("viewportStable"),
-                to = listOf("viewportFrozen"),
-                interrupt = listOf("routeChange", "newMetricsBeforeFreeze"),
-                finalState = "routeReaderSessionOverlayFocusFrozen",
-                reducedMotion = "Freeze motion state immediately.",
-                defaultDurationMs = ReaderMotionTokens.DurationOrientationFreeze.inWholeMilliseconds
-            )
-        )
-        put(
-            "viewport.orientation.reshape",
-            MotionContract(
-                motionId = "viewport.orientation.reshape",
-                from = listOf("viewportFrozen", "viewportStable"),
-                to = listOf("viewportReshaped"),
-                interrupt = listOf("newMetrics", "foldChange", "routeChange"),
-                finalState = "readerOverlayCapsuleDockReanchored",
-                reducedMotion = "Recompute layout, pagination anchor, overlay, capsule, and dock bounds without interpolation.",
-                defaultDurationMs = ReaderMotionTokens.DurationViewportReshape.inWholeMilliseconds
-            )
-        )
-        put(
-            "viewport.orientation.settle",
-            MotionContract(
-                motionId = "viewport.orientation.settle",
-                from = listOf("viewportReshaped"),
-                to = listOf("viewportStable"),
-                interrupt = listOf("newMetrics", "routeChange"),
-                finalState = "focusPointerSessionMicroMotionRestored",
-                reducedMotion = "Restore focus, pointer, and session semantics without settle animation.",
-                defaultDurationMs = ReaderMotionTokens.DurationOrientationSettle.inWholeMilliseconds
-            )
-        )
+        }
+        // 5 条遗留 Motion ID（无 MotionId 枚举对应，仅存在于 motion-controller.js）
+        MOTION_CONTROLLER_JS_SPECS.forEach { (serialName, jsSpec) ->
+            if (!containsKey(serialName)) {
+                put(
+                    serialName,
+                    MotionContract(
+                        motionId = serialName,
+                        from = jsSpec.from,
+                        to = jsSpec.to,
+                        interrupt = jsSpec.interrupt,
+                        finalState = jsSpec.finalState,
+                        reducedMotion = "reducedMotion",
+                        defaultDurationMs = 0L
+                    )
+                )
+            }
+        }
+        // 别名："tab.item.switch" 是 "tab.switch" 的旧 wire string（MotionIdConstants.TAB_ITEM_SWITCH），
+        // 需复制 "tab.switch" 的完整契约（含 durationMs=160）。
+        this["tab.switch"]?.let { tabSwitchContract ->
+            put("tab.item.switch", tabSwitchContract.copy(motionId = "tab.item.switch"))
+        }
     }
 }
 
@@ -1121,6 +974,13 @@ object MotionIdConstants {
     const val DROPDOWN_OPTION_PRESS = "dropdown.option.press"
     val DROPDOWN_OPTION_SELECT: String get() = MotionId.DropdownOptionSelect.serialName
 
+    // Overlay (keyboard / sheet / dialog)
+    val OVERLAY_KEYBOARD_ENTER_EXIT: String get() = MotionId.OverlayKeyboardEnterExit.serialName
+    val OVERLAY_SHEET_ENTER: String get() = MotionId.OverlaySheetEnter.serialName
+    val OVERLAY_SHEET_EXIT: String get() = MotionId.OverlaySheetExit.serialName
+    val OVERLAY_DIALOG_ENTER: String get() = MotionId.OverlayDialogEnter.serialName
+    val OVERLAY_DIALOG_EXIT: String get() = MotionId.OverlayDialogExit.serialName
+
     // Button / toggle
     val BUTTON_ACTIVATE: String get() = MotionId.ButtonActivate.serialName
     val TOGGLE_SWITCH: String get() = MotionId.ToggleSwitch.serialName
@@ -1142,7 +1002,7 @@ object MotionIdConstants {
     val READER_SESSION_TTS_START: String get() = MotionId.ReaderSessionTtsStart.serialName
     val READER_SESSION_CAPSULE_ENTER: String get() = MotionId.ReaderSessionCapsuleEnter.serialName
     val READER_SESSION_CAPSULE_UPDATE: String get() = MotionId.ReaderSessionCapsuleUpdate.serialName
-    const val READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE = "reader.session.capsule.control.press/toggle"
+    val READER_SESSION_CAPSULE_CONTROL_PRESS_TOGGLE: String get() = MotionId.ReaderSessionCapsuleControlPressToggle.serialName
     val READER_SESSION_CAPSULE_COUNTDOWN_TICK: String get() = MotionId.ReaderSessionCapsuleCountdownTick.serialName
     val READER_SESSION_CAPSULE_VOICE_ICON_ACTIVE: String get() = MotionId.ReaderSessionCapsuleVoiceIconActive.serialName
     val READER_SESSION_CAPSULE_SWITCH: String get() = MotionId.ReaderSessionCapsuleSwitch.serialName
@@ -1153,7 +1013,7 @@ object MotionIdConstants {
 
     // Reader module / page
     val READER_MODULE_SWITCH: String get() = MotionId.ReaderModuleSwitch.serialName
-    const val READER_PAGE_TURN_NEXT_PREV = "reader.page.turn.next/prev"
+    val READER_PAGE_TURN_NEXT_PREV: String get() = MotionId.ReaderPageTurnNextPrev.serialName
 
     // Motion interrupt 三态
     val MOTION_INTERRUPT_CANCEL: String get() = MotionId.MotionInterruptCancel.serialName
@@ -1164,4 +1024,9 @@ object MotionIdConstants {
     val VIEWPORT_ORIENTATION_PREPARE: String get() = MotionId.ViewportOrientationPrepare.serialName
     val VIEWPORT_ORIENTATION_RESHAPE: String get() = MotionId.ViewportOrientationReshape.serialName
     val VIEWPORT_ORIENTATION_SETTLE: String get() = MotionId.ViewportOrientationSettle.serialName
+
+    // Selection / slider
+    val SELECTION_RANGE_SHOW: String get() = MotionId.SelectionRangeShow.serialName
+    val SLIDER_DRAG_START: String get() = MotionId.SliderDragStart.serialName
+    val SLIDER_DRAG_RELEASE: String get() = MotionId.SliderDragRelease.serialName
 }

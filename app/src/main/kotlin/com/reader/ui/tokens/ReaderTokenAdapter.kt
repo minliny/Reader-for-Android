@@ -1,5 +1,7 @@
 package com.reader.ui.tokens
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -18,6 +20,10 @@ import io.reader.ui.contract.TokenRegistry
  * primitives. Raw values are allowed here because this file is the adapter; contract-owned
  * components should depend on these semantic accessors instead of declaring ad hoc colors,
  * spacing, radii, sizes, or durations in screen code.
+ *
+ * Contract token names use the `--fd-ds-*` prefix (matching `tokens.css` and the generated
+ * `TokenRegistry`). Dark-mode Color values for the 18 base color tokens are sourced from
+ * `00-foundation.css` night overrides (which differ from the contract's 5 `*-night` tokens).
  */
 object ReaderTokenAdapter {
     fun color(token: ReaderColorToken, mode: ReaderTokenMode = ReaderTokenMode.LIGHT): Color =
@@ -35,6 +41,8 @@ object ReaderTokenAdapter {
     fun type(token: ReaderTypeToken): TextUnit = token.value
 
     fun zIndex(token: ReaderZIndexToken): Float = token.value.toFloat()
+
+    fun easing(token: ReaderEasingToken): Easing = token.easing
 
     fun durationMillis(token: ReaderDurationToken, reducedMotion: Boolean = false): Int =
         durationMillis(token.toGeneratedToken(), reducedMotion)
@@ -85,87 +93,167 @@ enum class ReaderTokenMode {
     DARK
 }
 
+// ── Color tokens (23: 18 base + 5 night) ──────────────────────────────────────
+// Source: Token.kt --fd-ds-color-* (contract) + 00-foundation.css night overrides
+// Dark values for base tokens come from 00-foundation.css [data-app-theme-scheme="night"]
+// Night-specific tokens (paper-night etc.) use contract values for both modes.
 enum class ReaderColorToken(
     val contractName: String,
     internal val light: Color,
     internal val dark: Color
 ) {
-    PAPER("--reader-ds-color-paper", Color(0xFFFFF8F4), Color(0xFF24211E)),
-    PAPER_BRIGHT("--reader-ds-color-paper-bright", Color(0xFFFFF8F1), Color(0xFF2C2824)),
-    INK("--reader-ds-color-ink", Color(0xFF1F1B17), Color(0xFFEADFCE)),
-    CONTROL_INK("--reader-ds-color-control-ink", Color(0xFF41484C), Color(0xFFEADFCE)),
-    SURFACE("--reader-ds-color-surface", Color(0xFAFFFCF8), Color(0xF52A2622)),
-    SURFACE_SOFT("--reader-ds-color-surface-soft", Color(0xB8FFFCF8), Color(0xB82A2622)),
-    BORDER("--reader-ds-color-border", Color(0xFFC1C7CD), Color(0x33E2D1B9)),
-    MUTED("--reader-ds-color-muted", Color(0xFF756F69), Color(0xFFBAAD9C)),
-    PRIMARY("--reader-ds-color-primary", Color(0xFF366179), Color(0xFFD2BD96)),
-    PRIMARY_DARK("--reader-ds-color-primary-dark", Color(0xFF274F66), Color(0xFF7A684F)),
-    ACCENT("--reader-ds-color-accent", Color(0xFFF48B13), Color(0xFFD69B5F)),
-    BOTTOM_BAR_BG("--reader-ds-color-bottom-bar-bg", Color(0xFFFBF2EB), Color(0xF52A2622)),
-    FLOATING_CONTROL_BG("--reader-ds-color-floating-control-bg", Color(0xFFFBF2EB), Color(0xF52A2622)),
-    FLOATING_CONTROL_BG_ALT("--reader-ds-color-floating-control-bg-alt", Color(0xFFEAE1DA), Color(0xF52A2622)),
-    META_BG("--reader-ds-color-meta-bg", Color(0xFFEEE8DF), Color(0xF52A2622)),
-    RSS_UNREAD("--reader-ds-color-rss-unread", Color(0xFFF48B13), Color(0xFFD69B5F))
+    PAPER("--fd-ds-color-paper", Color(0xFFFFF8F4), Color(0xFF24211E)),
+    PAPER_BRIGHT("--fd-ds-color-paper-bright", Color(0xFFFFF8F1), Color(0xFF2C2824)),
+    SURFACE("--fd-ds-color-surface", Color(0xE0FFFFFF), Color(0xE62A2622)),
+    SURFACE_SOFT("--fd-ds-color-surface-soft", Color(0xB8FFFCF8), Color(0xB82A2622)),
+    INK("--fd-ds-color-ink", Color(0xFF1F1B17), Color(0xFFEADFCE)),
+    CONTROL_INK("--fd-ds-color-control-ink", Color(0xFF41484C), Color(0xFFEADFCE)),
+    MUTED("--fd-ds-color-muted", Color(0xFF756F69), Color(0xFFBAAD9C)),
+    BORDER("--fd-ds-color-border", Color(0xFFC1C7CD), Color(0x33E2D1B9)),
+    PRIMARY("--fd-ds-color-primary", Color(0xFF2D4A3E), Color(0xFFD2BD96)),
+    PRIMARY_DARK("--fd-ds-color-primary-dark", Color(0xFF1F3528), Color(0xFF7A684F)),
+    ACCENT("--fd-ds-color-accent", Color(0xFFF48B13), Color(0xFFD69B5F)),
+    BOTTOM_BAR_BG("--fd-ds-color-bottom-bar-bg", Color(0xFFFBF2EB), Color(0xF52A2622)),
+    FLOATING_CONTROL_BG("--fd-ds-color-floating-control-bg", Color(0xFFFBF2EB), Color(0xF52A2622)),
+    FLOATING_CONTROL_BG_ALT("--fd-ds-color-floating-control-bg-alt", Color(0xFFEAE1DA), Color(0xF52A2622)),
+    META_BG("--fd-ds-color-meta-bg", Color(0xFFF5ECE6), Color(0xF52A2622)),
+    RSS_UNREAD("--fd-ds-color-rss-unread", Color(0xFF2F6F93), Color(0xFF8FB6CA)),
+    STATUS_GOOD("--fd-ds-color-status-good", Color(0xFF338144), Color(0xFF5BAE6E)),
+    STATUS_WARN("--fd-ds-color-status-warn", Color(0xFFD7473E), Color(0xFFE56B62)),
+    // Night-specific tokens (contract values, same for both modes)
+    PAPER_NIGHT("--fd-ds-color-paper-night", Color(0xFF181F22), Color(0xFF181F22)),
+    INK_NIGHT("--fd-ds-color-ink-night", Color(0xFFD8CCC4), Color(0xFFD8CCC4)),
+    CONTROL_INK_NIGHT("--fd-ds-color-control-ink-night", Color(0xFFD7E1E5), Color(0xFFD7E1E5)),
+    PRIMARY_NIGHT("--fd-ds-color-primary-night", Color(0xFF8FB6CA), Color(0xFF8FB6CA)),
+    FLOATING_CONTROL_BG_ALT_NIGHT("--fd-ds-color-floating-control-bg-alt-night", Color(0xFF2B3B43), Color(0xFF2B3B43))
 }
 
+// ── Spacing tokens (11) ───────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-space-* + --fd-ds-safe-area-*
 enum class ReaderSpacingToken(val contractName: String, internal val value: Dp) {
-    SCREEN_PADDING("--reader-ds-space-screen-padding", 16.dp),
-    CARD_PADDING("--reader-ds-space-card-padding", 14.dp),
-    SAFE_AREA_TOP("--reader-ds-space-safe-area-top", 24.dp),
-    SAFE_AREA_BOTTOM("--reader-ds-space-safe-area-bottom", 14.dp),
-    SAFE_AREA_HORIZONTAL("--reader-ds-space-safe-area-horizontal", 16.dp),
-    KEYBOARD_GAP("--reader-ds-space-keyboard-gap", 12.dp),
-    MD("--reader-ds-space-md", 16.dp)
+    XS("--fd-ds-space-xs", 8.dp),
+    SM("--fd-ds-space-sm", 12.dp),
+    MD("--fd-ds-space-md", 16.dp),
+    LG("--fd-ds-space-lg", 24.dp),
+    XL("--fd-ds-space-xl", 48.dp),
+    SCREEN_PADDING("--fd-ds-space-screen-padding", 16.dp),
+    CARD_PADDING("--fd-ds-space-card-padding", 14.dp),
+    SAFE_AREA_TOP("--fd-ds-safe-area-top", 24.dp),
+    SAFE_AREA_BOTTOM("--fd-ds-safe-area-bottom", 14.dp),
+    SAFE_AREA_HORIZONTAL("--fd-ds-safe-area-horizontal", 16.dp),
+    KEYBOARD_GAP("--fd-ds-space-keyboard-gap", 12.dp)
 }
 
+// ── Size tokens (11) ──────────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-size-*
 enum class ReaderSizeToken(val contractName: String, internal val value: Dp) {
-    BOTTOM_BAR_HEIGHT("--reader-ds-size-bottom-bar-height", 68.dp),
-    MAIN_NAV_HEIGHT("--reader-ds-size-main-nav-height", 68.dp),
-    READER_BOTTOM_SHEET_MIN_HEIGHT("--reader-ds-size-reader-bottom-sheet-min-height", 240.dp),
-    READER_MODULE_NAV_HEIGHT("--reader-ds-size-reader-module-nav-height", 54.dp)
+    PHONE_WIDTH("--fd-ds-size-phone-width", 390.dp),
+    PHONE_HEIGHT("--fd-ds-size-phone-height", 844.dp),
+    STACK_PHONE_HEIGHT("--fd-ds-size-stack-phone-height", 878.dp),
+    FLOW_WIDTH("--fd-ds-size-flow-width", 1284.dp),
+    FLOW_MIN_HEIGHT("--fd-ds-size-flow-min-height", 520.dp),
+    TOP_BAR_HEIGHT("--fd-ds-size-top-bar-height", 58.dp),
+    BOTTOM_BAR_HEIGHT("--fd-ds-size-bottom-bar-height", 68.dp),
+    MAIN_NAV_HEIGHT("--fd-ds-size-main-nav-height", 68.dp),
+    READER_BOTTOM_SHEET_MIN_HEIGHT("--fd-ds-size-reader-bottom-sheet-min-height", 284.dp),
+    READER_MODULE_NAV_HEIGHT("--fd-ds-size-reader-module-nav-height", 82.dp),
+    KEYBOARD_HEIGHT("--fd-ds-size-keyboard-height", 320.dp)
 }
 
+// ── Radius tokens (7) ─────────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-radius-*
 enum class ReaderRadiusToken(val contractName: String, internal val value: Dp) {
-    CARD("--reader-ds-radius-card", 8.dp),
-    CONTROL("--reader-ds-radius-control", 24.dp),
-    BOTTOM_SHEET("--reader-ds-radius-bottom-sheet", 24.dp)
+    SMALL("--fd-ds-radius-small", 4.dp),
+    MEDIUM("--fd-ds-radius-medium", 6.dp),
+    LARGE("--fd-ds-radius-large", 8.dp),
+    CARD("--fd-ds-radius-card", 4.dp),
+    CHIP("--fd-ds-radius-chip", 2.dp),
+    BOTTOM_SHEET("--fd-ds-radius-bottom-sheet", 8.dp),
+    CONTROL("--fd-ds-radius-control", 999.dp)
 }
 
+// ── Type tokens (7) ───────────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-type-*-size
 enum class ReaderTypeToken(val contractName: String, internal val value: TextUnit) {
-    APP_TITLE("--reader-ds-type-app-title-size", 20.sp),
-    PAGE_TITLE("--reader-ds-type-page-title-size", 20.sp),
-    SECTION_TITLE("--reader-ds-type-section-title-size", 15.sp),
-    BOOK_TITLE("--reader-ds-type-book-title-size", 14.sp),
-    BOOK_META("--reader-ds-type-book-meta-size", 12.sp),
-    READER_BODY("--reader-ds-type-reader-body-size", 18.sp),
-    READER_CONTROL_LABEL("--reader-ds-type-reader-control-label-size", 12.sp)
+    APP_TITLE("--fd-ds-type-app-title-size", 20.sp),
+    PAGE_TITLE("--fd-ds-type-page-title-size", 20.sp),
+    SECTION_TITLE("--fd-ds-type-section-title-size", 15.sp),
+    BOOK_TITLE("--fd-ds-type-book-title-size", 14.sp),
+    BOOK_META("--fd-ds-type-book-meta-size", 12.sp),
+    READER_BODY("--fd-ds-type-reader-body-size", 18.sp),
+    READER_CONTROL_LABEL("--fd-ds-type-reader-control-label-size", 12.sp)
 }
 
+// ── z-index tokens (12) ───────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-z-* (values match tokens.css exactly)
+// z-index唯一来源：通过 ReaderTokenAdapter.zIndex() 消费，不在 ReaderSizes 中重复定义。
 enum class ReaderZIndexToken(val contractName: String, internal val value: Int) {
-    MAIN_NAV("--reader-ds-z-main-nav", 20),
-    OVERLAY("--reader-ds-z-overlay", 30),
-    BOTTOM_SHEET("--reader-ds-z-bottom-sheet", 40),
-    READER_MODULE_NAV("--reader-ds-z-reader-module-nav", 45),
-    DIALOG("--reader-ds-z-dialog", 50)
+    CONTENT("--fd-ds-z-content", 0),
+    OVERLAY("--fd-ds-z-overlay", 10),
+    MAIN_NAV("--fd-ds-z-main-nav", 20),
+    BOTTOM_SHEET("--fd-ds-z-bottom-sheet", 30),
+    FLOW_WINDOW("--fd-ds-z-flow-window", 36),
+    READER_MODULE_NAV("--fd-ds-z-reader-module-nav", 40),
+    SETTINGS_DROPDOWN("--fd-ds-z-settings-dropdown", 42),
+    DIALOG("--fd-ds-z-dialog", 60),
+    KEYBOARD("--fd-ds-z-keyboard", 70),
+    DEV_OVERLAY("--fd-ds-z-dev-overlay", 95),
+    DEV_REGION("--fd-ds-z-dev-region", 96),
+    DEMO_SWITCH("--fd-ds-z-demo-switch", 100)
 }
 
+// ── Easing tokens (4) ─────────────────────────────────────────────────────────
+// Source: Token.kt --fd-ds-motion-easing-*
+enum class ReaderEasingToken(val contractName: String, internal val easing: Easing) {
+    STANDARD("--fd-ds-motion-easing-standard", Easing { t -> t }),                    // ease
+    ENTER("--fd-ds-motion-easing-enter", CubicBezierEasing(0.0f, 0.0f, 0.58f, 1.0f)), // ease-out
+    EXIT("--fd-ds-motion-easing-exit", CubicBezierEasing(0.42f, 0.0f, 1.0f, 1.0f)),   // ease-in
+    RESHAPE("--fd-ds-motion-easing-reshape", CubicBezierEasing(0.42f, 0.0f, 0.58f, 1.0f)) // ease-in-out
+}
+
+// ── Motion duration tokens (40) ──────────────────────────────────────────────
+// Source: Token.kt --fd-ds-motion-duration-*
 enum class ReaderDurationToken(val contractName: String, internal val millis: Int) {
-    FIRST_OPEN("--reader-ds-motion-duration-firstOpen", 280),
-    TAB_PRESS("--reader-ds-motion-duration-tabPress", 80),
-    TAB_SELECT("--reader-ds-motion-duration-tabSelect", 120),
-    TAB_SWITCH("--reader-ds-motion-duration-tabSwitch", 160),
-    BUTTON_PRESS("--reader-ds-motion-duration-buttonPress", 80),
-    BUTTON_ACTIVATE("--reader-ds-motion-duration-buttonActivate", 80),
-    TOGGLE_SWITCH("--reader-ds-motion-duration-toggleSwitch", 120),
-    PANEL("--reader-ds-motion-duration-panel", 200),
-    STATE_REPLACE("--reader-ds-motion-duration-stateReplace", 160),
-    READER_ENTRY("--reader-ds-motion-duration-readerEntry", 240),
-    PAGE_TURN("--reader-ds-motion-duration-pageTurn", 220),
-    OVERLAY("--reader-ds-motion-duration-overlay", 240),
-    INTERRUPT_SETTLE("--reader-ds-motion-duration-interruptSettle", 80),
-    VIEWPORT_RESHAPE("--reader-ds-motion-duration-viewportReshape", 240),
-    LOADING_SPIN("--reader-ds-motion-duration-loadingSpin", 800),
-    FEEDBACK_TOAST("--reader-ds-motion-duration-feedbackToast", 180)
+    FIRST_OPEN("--fd-ds-motion-duration-firstOpen", 280),
+    TAB_PRESS("--fd-ds-motion-duration-tabPress", 80),
+    TAB_SELECT("--fd-ds-motion-duration-tabSelect", 120),
+    TAB_SWITCH("--fd-ds-motion-duration-tabSwitch", 160),
+    BUTTON_PRESS("--fd-ds-motion-duration-buttonPress", 80),
+    BUTTON_ACTIVATE("--fd-ds-motion-duration-buttonActivate", 120),
+    TOGGLE_SWITCH("--fd-ds-motion-duration-toggleSwitch", 140),
+    CHIP_SELECT("--fd-ds-motion-duration-chipSelect", 120),
+    FILTER_COMMIT("--fd-ds-motion-duration-filterCommit", 160),
+    NUMERIC_COMMIT("--fd-ds-motion-duration-numericCommit", 120),
+    INPUT_FOCUS("--fd-ds-motion-duration-inputFocus", 120),
+    SEARCH_STATE("--fd-ds-motion-duration-searchState", 160),
+    FEEDBACK_TOAST("--fd-ds-motion-duration-feedbackToast", 180),
+    STATE_REPLACE("--fd-ds-motion-duration-stateReplace", 160),
+    SELECTION_TOOLBAR("--fd-ds-motion-duration-selectionToolbar", 160),
+    DROPDOWN_PRESS("--fd-ds-motion-duration-dropdownPress", 80),
+    DROPDOWN_EXPAND("--fd-ds-motion-duration-dropdownExpand", 160),
+    DROPDOWN_COLLAPSE("--fd-ds-motion-duration-dropdownCollapse", 120),
+    DROPDOWN_SELECT("--fd-ds-motion-duration-dropdownSelect", 120),
+    READER_INSTANT("--fd-ds-motion-duration-readerInstant", 0),
+    READER_MICRO("--fd-ds-motion-duration-readerMicro", 80),
+    READER_FAST("--fd-ds-motion-duration-readerFast", 120),
+    READER_BASE("--fd-ds-motion-duration-readerBase", 160),
+    HANDLE_LONG_PRESS("--fd-ds-motion-duration-handleLongPress", 320),
+    HANDLE_SNAP("--fd-ds-motion-duration-handleSnap", 120),
+    PANEL("--fd-ds-motion-duration-panel", 200),
+    PAGE_TURN("--fd-ds-motion-duration-pageTurn", 220),
+    READER_ENTRY("--fd-ds-motion-duration-readerEntry", 240),
+    SESSION_RETURN("--fd-ds-motion-duration-sessionReturn", 200),
+    RUNNING_SPACE("--fd-ds-motion-duration-runningSpace", 180),
+    CAPSULE_ENTER("--fd-ds-motion-duration-capsuleEnter", 160),
+    CAPSULE_CONTROL("--fd-ds-motion-duration-capsuleControl", 120),
+    CAPSULE_TICK("--fd-ds-motion-duration-capsuleTick", 120),
+    VOICE_PULSE("--fd-ds-motion-duration-voicePulse", 960),
+    OVERLAY("--fd-ds-motion-duration-overlay", 240),
+    LOADING_SPIN("--fd-ds-motion-duration-loadingSpin", 800),
+    INTERRUPT_SETTLE("--fd-ds-motion-duration-interruptSettle", 80),
+    VIEWPORT_RESHAPE("--fd-ds-motion-duration-viewportReshape", 240),
+    ORIENTATION_FREEZE("--fd-ds-motion-duration-orientationFreeze", 80),
+    ORIENTATION_SETTLE("--fd-ds-motion-duration-orientationSettle", 240)
 }
 
 internal fun ReaderDurationToken.toGeneratedToken(): Token =
@@ -179,10 +267,11 @@ internal fun ReaderDurationToken.toGeneratedToken(): Token =
 private fun String.toRegistryTokenName(): String {
     val alias = readerEasingAlias
     return when {
-        startsWith("--reader-ds-") -> this
-        startsWith("app.motion.duration.") -> "--reader-ds-motion-duration-${substringAfterLast('.')}"
-        startsWith("reader.motion.duration.") -> "--reader-ds-motion-duration-${substringAfterLast('.')}"
-        startsWith("app.motion.easing.") -> "--reader-ds-motion-easing-${substringAfterLast('.')}"
+        startsWith("--fd-ds-") -> this
+        startsWith("--reader-ds-") -> "--fd-ds-${substringAfter("--reader-ds-")}"
+        startsWith("app.motion.duration.") -> "--fd-ds-motion-duration-${substringAfterLast('.')}"
+        startsWith("reader.motion.duration.") -> "--fd-ds-motion-duration-${substringAfterLast('.')}"
+        startsWith("app.motion.easing.") -> "--fd-ds-motion-easing-${substringAfterLast('.')}"
         alias != null -> alias
         else -> this
     }
@@ -190,7 +279,7 @@ private fun String.toRegistryTokenName(): String {
 
 private val String.readerEasingAlias: String?
     get() = if (startsWith("reader.motion.easing.")) {
-        "--reader-ds-motion-easing-${substringAfterLast('.')}"
+        "--fd-ds-motion-easing-${substringAfterLast('.')}"
     } else {
         null
     }

@@ -566,14 +566,8 @@ object ReaderSizes {
     val radiusControl = 999.dp      // --reader-ds-radius-control (pill)
     val radiusPanel = 8.dp          // --reader-ds-radius-panel
 
-    // z-index (demo z values → Int)
-    val zContent = 0                // --reader-ds-z-content
-    val zOverlay = 10               // --reader-ds-z-overlay
-    val zMainNav = 20               // --reader-ds-z-main-nav
-    val zBottomSheet = 30           // --reader-ds-z-bottom-sheet
-    val zReaderModuleNav = 40       // --reader-ds-z-reader-module-nav
-    val zDialog = 60                // --reader-ds-z-dialog
-    val zKeyboard = 70              // --reader-ds-z-keyboard
+    // z-index 唯一来源：ReaderTokenAdapter.zIndex(ReaderZIndexToken.*)
+    // 不要在此处重新定义 z-index 值，所有消费方应通过 ReaderTokenAdapter 消费。
 }
 
 private val MaterialShapes = Shapes(

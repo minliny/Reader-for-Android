@@ -15,7 +15,7 @@ class ReaderTokenAdapterTest {
     fun `slice one tab tokens resolve through adapter`() {
         assertEquals(68.dp, ReaderTokenAdapter.size(ReaderSizeToken.BOTTOM_BAR_HEIGHT))
         assertEquals(68.dp, ReaderTokenAdapter.size(ReaderSizeToken.MAIN_NAV_HEIGHT))
-        assertEquals(24.dp, ReaderTokenAdapter.radius(ReaderRadiusToken.CONTROL))
+        assertEquals(999.dp, ReaderTokenAdapter.radius(ReaderRadiusToken.CONTROL))
         assertEquals(20f, ReaderTokenAdapter.zIndex(ReaderZIndexToken.MAIN_NAV), 0.0f)
         assertEquals(160, ReaderTokenAdapter.durationMillis(ReaderDurationToken.TAB_SWITCH))
     }
@@ -28,7 +28,7 @@ class ReaderTokenAdapterTest {
 
     @Test
     fun `generated motion duration token resolves through adapter`() {
-        val token = TokenRegistry.token("--reader-ds-motion-duration-tabSwitch")
+        val token = TokenRegistry.token("--fd-ds-motion-duration-tabSwitch")
 
         assertNotNull(token)
         token!!
@@ -53,6 +53,6 @@ class ReaderTokenAdapterTest {
     fun `light and dark colors are semantic contract values`() {
         assertEquals(Color(0xFFFFF8F4), ReaderTokenAdapter.color(ReaderColorToken.PAPER))
         assertEquals(Color(0xFF24211E), ReaderTokenAdapter.color(ReaderColorToken.PAPER, ReaderTokenMode.DARK))
-        assertTrue(ReaderColorToken.entries.all { it.contractName.startsWith("--reader-ds-color-") })
+        assertTrue(ReaderColorToken.entries.all { it.contractName.startsWith("--fd-ds-color-") })
     }
 }

@@ -14,7 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.reader.ui.theme.ReaderSizes
+import com.reader.ui.tokens.ReaderTokenAdapter
+import com.reader.ui.tokens.ReaderZIndexToken
 
 /**
  * 帧率监控
@@ -106,7 +107,7 @@ fun FpsOverlay(
 
     Box(
         modifier = modifier
-            .zIndex(ReaderSizes.zOverlay.toFloat())
+            .zIndex(ReaderTokenAdapter.zIndex(ReaderZIndexToken.OVERLAY))
             .background(color, RoundedCornerShape(4.dp))
             .padding(4.dp)
     ) {

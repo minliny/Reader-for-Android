@@ -20,7 +20,11 @@ import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
 import androidx.window.layout.WindowMetricsCalculator
 import com.reader.ui.shell.InterruptKind
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -55,7 +59,9 @@ data class ViewportState(
     val dockOffset: Map<ViewportClass, Dp> = emptyMap()  // 宽屏 dock offset 按 viewport class 保存
 )
 
-class ViewportClassAdapter {
+class ViewportClassAdapter(
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+) {
 
     private val _state = MutableStateFlow(ViewportState())
     val state: StateFlow<ViewportState> = _state
@@ -137,11 +143,44 @@ class ViewportClassAdapter {
             durationMs = ReaderMotionTokens.DurationOrientationFreeze.inWholeMilliseconds,
             reducedMotion = MotionController.reducedFrom(null)
         )
+        freezeAnimations()  // G13：激活 freezeAnimations 调用
 
-        // 阶段 2：reshape（240ms 重排）
-        // 阶段 3：settle（240ms 锚定）
-        // 用 coroutine 序列执行
-        // ... 实现完整三段式
+        orientationJob = scope.launch {
+            delay(ReaderMotionTokens.DurationOrientationFreeze.inWholeMilliseconds)
+
+            // 阶段 2：reshape（240ms 重排）
+            _state.value = _state.value.copy(orientationPhase = OrientationPhase.RESHAPING)
+            MotionController.start(
+                motionId = MotionIds.VIEWPORT_ORIENTATION_RESHAPE,
+                from = "viewportFrozen",
+                to = "viewportReshaped",
+                durationMs = ReaderMotionTokens.DurationViewportReshape.inWholeMilliseconds,
+                reducedMotion = MotionController.reducedFrom(null)
+            )
+            repositionDropdowns()  // G13：激活 repositionDropdowns 调用
+            clampDockOffset(newClass, maxOffset = 200.dp)  // G13：clamp dock offset 到新可移动空间
+
+            delay(ReaderMotionTokens.DurationViewportReshape.inWholeMilliseconds)
+
+            // 阶段 3：settle（240ms 锚定）
+            _state.value = _state.value.copy(orientationPhase = OrientationPhase.SETTLING)
+            MotionController.start(
+                motionId = MotionIds.VIEWPORT_ORIENTATION_SETTLE,
+                from = "viewportReshaped",
+                to = "viewportStable",
+                durationMs = ReaderMotionTokens.DurationOrientationSettle.inWholeMilliseconds,
+                reducedMotion = MotionController.reducedFrom(null)
+            )
+
+            delay(ReaderMotionTokens.DurationOrientationSettle.inWholeMilliseconds)
+            _state.value = _state.value.copy(
+                viewportClass = newClass,
+                orientationPhase = OrientationPhase.STABLE,
+                foldFeature = foldFeature,
+                widthDp = widthDp,
+                heightDp = heightDp
+            )
+        }
     }
 
     /**
@@ -216,6 +255,13 @@ fun rememberViewportState(): State<ViewportState> {
         val adapter = ViewportClassAdapter()
         val scope = kotlinx.coroutines.MainScope()
 
+        // 收集 adapter.state StateFlow，更新到 Compose state（修复：原实现从未收集）
+        val collectionJob = scope.launch {
+            adapter.state.collect { viewportState ->
+                state.value = viewportState
+            }
+        }
+
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 scope.launch {
@@ -226,10 +272,20 @@ fun rememberViewportState(): State<ViewportState> {
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
+            collectionJob.cancel()
             lifecycleOwner.lifecycle.removeObserver(observer)
             scope.cancel()
         }
     }
 
     return state
+}
+
+/**
+ * 便捷函数：仅返回当前 ViewportClass，供 Shell 组件做自适应判断。
+ */
+@Composable
+fun rememberViewportClass(): ViewportClass {
+    val viewportState = rememberViewportState()
+    return viewportState.value.viewportClass
 }
