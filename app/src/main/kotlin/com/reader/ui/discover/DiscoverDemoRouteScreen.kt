@@ -52,6 +52,7 @@ import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.shell.LibraryShellStatusBarSlot
 import com.reader.ui.shell.LibrarySheetHostSlot
 import com.reader.ui.shell.LibraryStateHostSlot
+import com.reader.ui.shell.OverlayState
 import com.reader.ui.shell.SettingsDialogHostSlot
 import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.shell.SettingsShellStatusBarSlot
@@ -75,7 +76,8 @@ fun DiscoverDemoRouteScreen(
     shell: DiscoverDemoRouteShell = DiscoverDemoRouteShell.Auto,
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
-    onOpenBook: (sourceId: String, bookUrl: String, bookName: String) -> Unit
+    onOpenBook: (sourceId: String, bookUrl: String, bookName: String) -> Unit,
+    overlayState: OverlayState = OverlayState.None
 ) {
     val state = remember(routeId) {
         discoverDemoRouteState(routeId) ?: discoverDemoRouteState(DiscoverDemoRouteIds.CONTROL)!!
@@ -90,19 +92,22 @@ fun DiscoverDemoRouteScreen(
             state = state,
             shell = shell,
             onBack = onBack,
-            onNavigate = onNavigate
+            onNavigate = onNavigate,
+            overlayState = overlayState
         )
         DiscoverDemoPage.RuleTest -> DiscoverRuleTestRouteScreen(
             state = state,
             shell = shell,
             onBack = onBack,
-            onNavigate = onNavigate
+            onNavigate = onNavigate,
+            overlayState = overlayState
         )
         DiscoverDemoPage.SourceBulk -> DiscoverSourceBulkRouteScreen(
             state = state,
             shell = shell,
             onBack = onBack,
-            onNavigate = onNavigate
+            onNavigate = onNavigate,
+            overlayState = overlayState
         )
     }
 }
@@ -979,7 +984,8 @@ private fun DiscoverSourceLoginRouteScreen(
     state: DiscoverDemoRouteState,
     shell: DiscoverDemoRouteShell,
     onBack: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None
 ) {
     DiscoverSubpageScaffold(
         shell = shell.takeIf { it != DiscoverDemoRouteShell.Auto } ?: DiscoverDemoRouteShell.Library,
@@ -988,7 +994,8 @@ private fun DiscoverSourceLoginRouteScreen(
         trailingLabel = "完成",
         onTrailing = { onNavigate(DiscoverDemoRouteIds.CONTROL) },
         bottomActions = state.bottomActions,
-        onNavigate = onNavigate
+        onNavigate = onNavigate,
+        overlayState = overlayState
     ) {
         item {
             DiscoverSubpageHeader(
@@ -1023,7 +1030,8 @@ private fun DiscoverRuleTestRouteScreen(
     state: DiscoverDemoRouteState,
     shell: DiscoverDemoRouteShell,
     onBack: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None
 ) {
     DiscoverSubpageScaffold(
         shell = shell.takeIf { it != DiscoverDemoRouteShell.Auto } ?: DiscoverDemoRouteShell.Settings,
@@ -1032,7 +1040,8 @@ private fun DiscoverRuleTestRouteScreen(
         trailingLabel = "完成",
         onTrailing = { onNavigate(DiscoverDemoRouteIds.CONTROL) },
         bottomActions = state.bottomActions,
-        onNavigate = onNavigate
+        onNavigate = onNavigate,
+        overlayState = overlayState
     ) {
         item {
             DiscoverSubpageHeader(
@@ -1092,7 +1101,8 @@ private fun DiscoverSourceBulkRouteScreen(
     state: DiscoverDemoRouteState,
     shell: DiscoverDemoRouteShell,
     onBack: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None
 ) {
     DiscoverSubpageScaffold(
         shell = shell.takeIf { it != DiscoverDemoRouteShell.Auto } ?: DiscoverDemoRouteShell.Settings,
@@ -1101,7 +1111,8 @@ private fun DiscoverSourceBulkRouteScreen(
         trailingLabel = "完成",
         onTrailing = { onNavigate(DiscoverDemoRouteIds.CONTROL) },
         bottomActions = state.bottomActions,
-        onNavigate = onNavigate
+        onNavigate = onNavigate,
+        overlayState = overlayState
     ) {
         item {
             DiscoverSubpageHeader(
@@ -1187,6 +1198,7 @@ private fun DiscoverSubpageScaffold(
     onTrailing: () -> Unit,
     bottomActions: List<DiscoverDemoAction>,
     onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     when (shell) {
@@ -1197,6 +1209,7 @@ private fun DiscoverSubpageScaffold(
             onTrailing = onTrailing,
             bottomActions = bottomActions,
             onNavigate = onNavigate,
+            overlayState = overlayState,
             content = content
         )
         DiscoverDemoRouteShell.Settings -> DiscoverSettingsShell(
@@ -1206,6 +1219,7 @@ private fun DiscoverSubpageScaffold(
             onTrailing = onTrailing,
             bottomActions = bottomActions,
             onNavigate = onNavigate,
+            overlayState = overlayState,
             content = content
         )
         DiscoverDemoRouteShell.Auto -> DiscoverLibraryShell(
@@ -1215,6 +1229,7 @@ private fun DiscoverSubpageScaffold(
             onTrailing = onTrailing,
             bottomActions = bottomActions,
             onNavigate = onNavigate,
+            overlayState = overlayState,
             content = content
         )
     }
@@ -1228,6 +1243,7 @@ private fun DiscoverLibraryShell(
     onTrailing: () -> Unit,
     bottomActions: List<DiscoverDemoAction>,
     onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     // LibraryShell skeleton (per demo shared-shell-kit/kit.js renderLibraryShell):
@@ -1253,8 +1269,8 @@ private fun DiscoverLibraryShell(
         bottomActionHost = {
             LibraryBottomActionHostSlot(actions = bottomActions, onNavigate = onNavigate)
         },
-        sheetHost = { LibrarySheetHostSlot() },
-        dialogHost = { LibraryDialogHostSlot() },
+        sheetHost = { LibrarySheetHostSlot(overlayState) },
+        dialogHost = { LibraryDialogHostSlot(overlayState) },
         stateHost = { LibraryStateHostSlot() }
     )
 }
@@ -1267,6 +1283,7 @@ private fun DiscoverSettingsShell(
     onTrailing: () -> Unit,
     bottomActions: List<DiscoverDemoAction>,
     onNavigate: (String) -> Unit,
+    overlayState: OverlayState = OverlayState.None,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     // SettingsShell skeleton (per demo shared-shell-kit/kit.js renderSettingsShell):
@@ -1292,9 +1309,9 @@ private fun DiscoverSettingsShell(
         bottomActionHost = {
             SettingsBottomActionHostSlot(actions = bottomActions, onNavigate = onNavigate)
         },
-        sheetHost = { SettingsSheetHostSlot() },
+        sheetHost = { SettingsSheetHostSlot(overlayState) },
         toastHost = { SettingsToastHostSlot() },
-        dialogHost = { SettingsDialogHostSlot() },
+        dialogHost = { SettingsDialogHostSlot(overlayState) },
         settingsStateHost = { SettingsStateHostSlot() }
     )
 }
