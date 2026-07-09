@@ -57,6 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
+import com.reader.ui.shell.SourceSwitchState
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
 import com.reader.ui.theme.ReaderElevations
@@ -397,7 +398,10 @@ fun ReaderControlScreen(
 fun FlowShellScreen(
     route: ReaderRoute.SourceSwitchFlow,
     onBack: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    sourceSwitch: SourceSwitchState = SourceSwitchState.Idle,
+    onSelectSource: (String) -> Unit = {},
+    onClose: () -> Unit = {}
 ) {
     val context = route.context
     val title = context?.bookName?.takeIf { it.isNotBlank() } ?: "长夜余火"
@@ -412,9 +416,11 @@ fun FlowShellScreen(
         )
         // comparisonRegion: source switch window (positioned overlay, drawn above step).
         // Demo .fd-source-window-slot: position absolute, left:12, right:12, top:92, bottom:360.
+        // 接入 SourceSwitchState：Loading 显示加载态，Results 显示结果列表并高亮选中源。
         FlowShellComparisonRegion(
-            onClose = { onNavigate(RouteIds.READER_CONTROL) },
-            onSelect = { onNavigate(RouteIds.READER_CONTROL) },
+            sourceSwitch = sourceSwitch,
+            onSelectSource = onSelectSource,
+            onClose = onClose,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxSize()
@@ -493,13 +499,15 @@ private fun FlowShellStepRegion(
 
 @Composable
 private fun FlowShellComparisonRegion(
+    sourceSwitch: SourceSwitchState,
+    onSelectSource: (String) -> Unit,
     onClose: () -> Unit,
-    onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ReaderSourceSwitchWindow(
+        sourceSwitch = sourceSwitch,
+        onSelectSource = onSelectSource,
         onClose = onClose,
-        onSelect = onSelect,
         modifier = modifier
     )
 }
@@ -1163,6 +1171,8 @@ private fun ReaderFullTtsContent(
 private fun ReaderFullAppearanceContent(onNavigate: (String) -> Unit) {
     ReaderFullSettingBlock(title = "阅读主题") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // 主题选择器色板：展示 paper/paperBright/ink/surface-soft 四种主题变体色值
+            // （非当前语义 token，而是供用户挑选的主题预览色）。
             listOf(Color(0xFFFFF7EC), Color(0xFFF2E7D5), Color(0xFF1F1B17), Color(0xFFEAF0E2)).forEach { color ->
                 Box(
                     modifier = Modifier
@@ -2049,6 +2059,8 @@ private fun ReaderTtsPanel(
 private fun ReaderAppearancePanel(onNavigate: (String) -> Unit) {
     ReaderPanelTitle("界面")
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+        // 主题选择器色板：展示 paper/paperBright/ink/surface-soft 四种主题变体色值
+        // （非当前语义 token，而是供用户挑选的主题预览色）。
         listOf(Color(0xFFFFF7EC), Color(0xFFF2E7D5), Color(0xFF1F1B17), Color(0xFFEAF0E2)).forEach { color ->
             Box(
                 modifier = Modifier
@@ -2255,17 +2267,21 @@ private fun ReaderIconOnlyAction(
 }
 
 @Composable
-private fun ReaderSourceSwitchWindow(
+// internal: 供 androidTest smoke 测试直接渲染换源窗口（FlowShell comparisonRegion 核心 surface）
+internal fun ReaderSourceSwitchWindow(
+    sourceSwitch: SourceSwitchState,
+    onSelectSource: (String) -> Unit,
     onClose: () -> Unit,
-    onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Demo .fd-source-phone-flow .fd-source-switch-window: padding 7 9, border 1px
     // rgba(155,132,102,0.24), radius xl, bg #fffcf8, no shadow, overflow auto, gap 0, height 100%.
-    val windowBg = Color(0xFFFFFCF8)
-    val windowBorder = Color(0xFF9B8466).copy(alpha = 0.24f)
-    val headerBorder = Color(0xFF9B8466).copy(alpha = 0.18f)
-    val headerColor = Color(0xFF332C25)
+    // 颜色走 readerExtraColors() 语义层（--fd-ds-color-* token 族），不使用 raw rgba。
+    val extras = readerExtraColors()
+    val windowBg = extras.paperBright
+    val windowBorder = extras.controlLine
+    val headerBorder = extras.hairline
+    val headerColor = extras.readerInk
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -2330,7 +2346,7 @@ private fun ReaderSourceSwitchWindow(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(ReaderShapes.md)
-                    .background(Color(0xFFF0E9E2))
+                    .background(extras.floatingControlBackgroundAlt)
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
@@ -2343,22 +2359,62 @@ private fun ReaderSourceSwitchWindow(
             }
         }
         // .fd-source-candidate-list: grid, gap 0.
+        // 接入 SourceSwitchState：Loading 展示加载占位行；Results 展示真实结果；
+        // Idle（未进入换源流程）回退到 demo fixtures 以保留视觉占位。
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            sourceSwitchCandidates.forEachIndexed { index, candidate ->
-                val isCurrent = candidate.state == "当前"
-                val isSwitchable = !isCurrent && candidate.state != "落后" && candidate.state != "失效"
-                SourceSwitchCandidateRow(
-                    candidate = candidate,
-                    isCurrent = isCurrent,
-                    isSwitchable = isSwitchable,
-                    showTopDivider = index > 0,
-                    onClick = onSelect
-                )
+            when (sourceSwitch) {
+                is SourceSwitchState.Loading -> {
+                    // 加载态：展示 3 行占位骨架
+                    repeat(3) { index ->
+                        SourceSwitchCandidateRow(
+                            candidate = SourceSwitchCandidate(
+                                source = "加载中…",
+                                state = "",
+                                speed = "",
+                                latestChapter = ""
+                            ),
+                            isCurrent = false,
+                            isSwitchable = false,
+                            showTopDivider = index > 0,
+                            onClick = {}
+                        )
+                    }
+                }
+                is SourceSwitchState.Results -> {
+                    sourceSwitch.results.forEachIndexed { index, result ->
+                        SourceSwitchCandidateRow(
+                            candidate = SourceSwitchCandidate(
+                                source = result.sourceName,
+                                state = if (result.sourceId == sourceSwitch.selectedSourceId) "当前" else "可切换",
+                                speed = "${result.speedLevel * 100} ms",
+                                latestChapter = result.latestChapter
+                            ),
+                            isCurrent = result.sourceId == sourceSwitch.selectedSourceId,
+                            isSwitchable = result.sourceId != sourceSwitch.selectedSourceId,
+                            showTopDivider = index > 0,
+                            onClick = { onSelectSource(result.sourceId) }
+                        )
+                    }
+                }
+                is SourceSwitchState.Idle -> {
+                    // 回退到 demo fixtures（保留视觉占位，生产路径不会进入此分支）
+                    sourceSwitchCandidates.forEachIndexed { index, candidate ->
+                        val isCurrent = candidate.state == "当前"
+                        val isSwitchable = !isCurrent && candidate.state != "落后" && candidate.state != "失效"
+                        SourceSwitchCandidateRow(
+                            candidate = candidate,
+                            isCurrent = isCurrent,
+                            isSwitchable = isSwitchable,
+                            showTopDivider = index > 0,
+                            onClick = { /* demo fixture: 无真实 sourceId */ }
+                        )
+                    }
+                }
             }
         }
     }
@@ -2403,11 +2459,13 @@ private fun SourceSwitchCandidateRow(
     showTopDivider: Boolean,
     onClick: () -> Unit
 ) {
-    val rowBorderColor = Color(0xFF9B8466).copy(alpha = 0.18f)
-    val selectedBg = Color(0xFF2F6373).copy(alpha = 0.08f)
-    val bColor = Color(0xFF2B241D)
-    val emColor = Color(0xFF8D8378)
-    val strongColor = Color(0xFF332C25)
+    // 颜色走 readerExtraColors() 语义层（--fd-ds-color-* token 族），不使用 raw rgba。
+    val extras = readerExtraColors()
+    val rowBorderColor = extras.hairline
+    val selectedBg = extras.controlActiveSoft
+    val bColor = extras.readerInk
+    val emColor = extras.muted
+    val strongColor = extras.readerInk
     Row(
         modifier = Modifier
             .fillMaxWidth()
