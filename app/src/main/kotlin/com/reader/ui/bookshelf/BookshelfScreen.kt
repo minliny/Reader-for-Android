@@ -984,7 +984,8 @@ private fun BookFocusLayer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x572B251F))
+                // 模态遮罩：映射到 ink 语义 token（onBackground）的半透明 scrim
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.34f))
                 .clickable(onClick = onDismiss)
         )
         Column(
@@ -1092,7 +1093,8 @@ private fun BookshelfMoreLayer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x2E1F1B17))
+                // 模态遮罩：映射到 ink 语义 token（onBackground）的半透明 scrim
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f))
                 .clickable(onClick = onDismiss)
         )
         Column(

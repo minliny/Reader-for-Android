@@ -229,7 +229,7 @@ private fun SettingsIconBox(@DrawableRes iconRes: Int) {
     Box(
         modifier = Modifier
             .size(28.dp)
-            .background(Color(0xFF2379A4).copy(alpha = 0.09f), ReaderShapes.pill),
+            .background(colors.primary.copy(alpha = 0.09f), ReaderShapes.pill),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -289,7 +289,7 @@ private fun SettingsSwitch(enabled: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     // Demo .fd-settings-switch: 38x22, padding 2, radius pill, bg rgba(140,130,118,0.26) off / --fd-primary on, NO border.
     // Thumb .fd-settings-switch i: 18x18, radius circle, bg #fff, box-shadow 0 2px 4px rgba(31,27,23,0.16).
-    val trackColor = if (enabled) colors.primary else Color(0xFF8C8276).copy(alpha = 0.26f)
+    val trackColor = if (enabled) colors.primary else readerExtraColors().muted.copy(alpha = 0.26f)
     Box(
         modifier = Modifier
             .size(width = 38.dp, height = 22.dp)

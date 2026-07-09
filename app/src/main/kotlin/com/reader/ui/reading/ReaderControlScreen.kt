@@ -1177,9 +1177,9 @@ private fun ReaderFullTtsContent(
 private fun ReaderFullAppearanceContent(onNavigate: (String) -> Unit) {
     ReaderFullSettingBlock(title = "阅读主题") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            // 主题选择器色板：展示 paper/paperBright/ink/surface-soft 四种主题变体色值
-            // （非当前语义 token，而是供用户挑选的主题预览色）。
-            listOf(Color(0xFFFFF7EC), Color(0xFFF2E7D5), Color(0xFF1F1B17), Color(0xFFEAF0E2)).forEach { color ->
+            // 主题选择器色板：映射到 paper/paperBright/ink/surface-soft 语义 token
+            // （随主题切换自动适配明暗模式）。
+            listOf(readerExtraColors().readerPaper, readerExtraColors().paperBright, MaterialTheme.colorScheme.onBackground, readerExtraColors().surfaceSoft).forEach { color ->
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -2065,9 +2065,9 @@ private fun ReaderTtsPanel(
 private fun ReaderAppearancePanel(onNavigate: (String) -> Unit) {
     ReaderPanelTitle("界面")
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-        // 主题选择器色板：展示 paper/paperBright/ink/surface-soft 四种主题变体色值
-        // （非当前语义 token，而是供用户挑选的主题预览色）。
-        listOf(Color(0xFFFFF7EC), Color(0xFFF2E7D5), Color(0xFF1F1B17), Color(0xFFEAF0E2)).forEach { color ->
+        // 主题选择器色板：映射到 paper/paperBright/ink/surface-soft 语义 token
+        // （随主题切换自动适配明暗模式）。
+        listOf(readerExtraColors().readerPaper, readerExtraColors().paperBright, MaterialTheme.colorScheme.onBackground, readerExtraColors().surfaceSoft).forEach { color ->
             Box(
                 modifier = Modifier
                     .width(22.dp)
