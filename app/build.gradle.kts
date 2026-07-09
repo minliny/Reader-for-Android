@@ -69,7 +69,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDir("src/main/reader-ui-contract/kotlin")
+            // reader-ui-contract is now consumed via composite build (see settings.gradle.kts).
             jniLibs.srcDirs("src/main/libs")
         }
     }
@@ -84,6 +84,10 @@ dependencies {
 
     // Reader UI generated Kotlin contracts use kotlinx.serialization annotations.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Reader UI contract (composite build from /Users/minliny/Documents/Reader UI).
+    // Provides RouteId, MotionSpecRegistry, TokenRegistry, MotionPolicyRegistry, etc.
+    implementation("io.reader.ui:reader-ui-contract")
 
     // DataStore Preferences (for theme, reading settings)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
