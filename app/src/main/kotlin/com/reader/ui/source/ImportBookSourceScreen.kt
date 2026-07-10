@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
@@ -160,7 +161,7 @@ fun ImportBookSourceScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = TextStyle(
                             fontFamily = FontFamily.Default,
-                            fontSize = 14.sp,
+                            fontSize = ReaderTypeToken.BOOK_TITLE.value,
                             lineHeight = 20.sp
                         )
                     )
@@ -171,7 +172,7 @@ fun ImportBookSourceScreen(
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = TextStyle(
                         fontFamily = FontFamily.Default,
-                        fontSize = 14.sp,
+                        fontSize = ReaderTypeToken.BOOK_TITLE.value,
                         lineHeight = 20.sp,
                         color = MaterialTheme.colorScheme.onBackground
                     ),
@@ -324,7 +325,7 @@ private fun SourceSectionTitle(title: String) {
         text = title,
         style = TextStyle(
             fontFamily = FontFamily.Default,
-            fontSize = 13.sp,
+            fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
             lineHeight = 16.sp,
             fontWeight = FontWeight(900)
         ),
@@ -601,7 +602,7 @@ private fun SourceStatusPill(label: String, tone: SourceTone) {
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 10.sp,
+                fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
                 lineHeight = 12.sp,
                 fontWeight = FontWeight(800),
                 textAlign = TextAlign.Center
@@ -644,21 +645,21 @@ private fun toneColor(tone: SourceTone): Color {
 
 private fun sourceTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun sourceMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun sourceActionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(900),
     textAlign = TextAlign.Center

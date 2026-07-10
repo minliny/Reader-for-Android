@@ -44,10 +44,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
+import com.reader.ui.theme.ReaderThemeResolver
 import com.reader.ui.theme.readerExtraColors
+import com.reader.ui.motion.MotionController
 import com.reader.ui.tokens.ReaderColorToken
 import com.reader.ui.tokens.ReaderTokenAdapter
 import io.reader.ui.contract.RouteShell
@@ -1075,16 +1078,28 @@ private fun ReaderTtsPanel(full: Boolean, onNavigate: (String) -> Unit, onDispat
 @Composable
 private fun ReaderAppearancePanel(full: Boolean, onNavigate: (String) -> Unit, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoSectionLabel("主题")
-    // 读者主题色板：使用语义 token（paper / metaBackground / PAPER_NIGHT / STATUS_GOOD）
+    // 读者主题色板：使用 ReaderThemeResolver.DAY_SWATCHES 的真实日间 swatch 颜色
+    // （paper=#F5EAD8 / warm=#FBF0DF / green=#E7F0E2 / blue=#E9F1F4）。
     val extra = readerExtraColors()
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        listOf(
-            extra.paper to "paper",
-            extra.metaBackground to "warm",
-            ReaderTokenAdapter.color(ReaderColorToken.PAPER_NIGHT) to "paper-night",
-            ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD).copy(alpha = 0.12f) to "green"
-        ).forEach { (color, themeId) ->
-            Box(Modifier.size(if (full) 34.dp else 24.dp).background(color, ReaderShapes.sm).border(1.dp, extra.hairline, ReaderShapes.sm).clickable { onDispatch(ReaderUiIntent.UpdateReaderTheme(themeId = themeId)) })
+        ReaderThemeResolver.DAY_SWATCHES.forEach { swatch ->
+            Box(
+                Modifier
+                    .size(if (full) 34.dp else 24.dp)
+                    .background(swatch.color, ReaderShapes.sm)
+                    .border(1.dp, extra.hairline, ReaderShapes.sm)
+                    .clickable {
+                        onDispatch(ReaderUiIntent.UpdateReaderTheme(themeId = swatch.id))
+                        // 绑定 segment.item.switch 动效。
+                        MotionController.start(
+                            motionId = "segment.item.switch",
+                            from = "segment.previous",
+                            to = "segment.next",
+                            durationMs = 120L,
+                            reducedMotion = MotionController.reducedFrom(null)
+                        )
+                    }
+            )
         }
     }
     DemoRow(R.drawable.reader_ic_settings, "字号", "18", "+")
@@ -1676,7 +1691,7 @@ private fun DemoCover(title: String, width: Dp) {
     ) {
         Text(
             text = title.take(4),
-            style = TextStyle(fontFamily = FontFamily.Serif, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight(700)),
+            style = TextStyle(fontFamily = FontFamily.Serif, fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 18.sp, fontWeight = FontWeight(700)),
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center
         )
@@ -1706,35 +1721,35 @@ private fun DemoSkeletonRow() {
 
 private fun denseTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     lineHeight = 19.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun denseButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 17.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun denseMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(550)
 )
 
 private fun denseBodyStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 20.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun tinyStrongStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(800)
 )

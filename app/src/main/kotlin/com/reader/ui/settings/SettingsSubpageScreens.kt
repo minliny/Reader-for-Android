@@ -30,7 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,42 +41,74 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.AppProvider
 import com.reader.android.R
 import com.reader.android.data.adapter.AuthMethod
 import com.reader.android.data.adapter.WebDavCredential
-import com.reader.api.ReaderCoreClient
-import com.reader.host.HostReply
-import com.reader.host.HostRequest
+import com.reader.ui.shell.PermissionStatus
 import com.reader.ui.shell.SettingsShellFrame
+import com.reader.ui.shell.WebDavTestStatus
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
-import kotlinx.coroutines.launch
-import org.json.JSONObject
+import com.reader.ui.motion.MotionController
 
 @Composable
 fun SettingsGeneralScreen(
     reducedMotion: Boolean,
     onReducedMotionChange: (Boolean) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** App 主题模式（system/light/dark），来自 ReaderUiState.appThemeMode。 */
+    appThemeMode: String = "system",
+    /** 派发主题模式变更到 reducer（UpdateAppThemeMode）。 */
+    onAppThemeModeChange: (String) -> Unit = {},
+    /** 行为开关：自动检查更新。 */
+    autoUpdate: Boolean = true,
+    onAutoUpdateChange: (Boolean) -> Unit = {},
+    /** 行为开关：点击底栏回顶部。 */
+    backToTop: Boolean = true,
+    onBackToTopChange: (Boolean) -> Unit = {},
+    /** 行为开关：崩溃日志。 */
+    crashLog: Boolean = true,
+    onCrashLogChange: (Boolean) -> Unit = {},
+    /** 缓存清理回调。 */
+    onClearCache: () -> Unit = {},
+    /** 恢复默认回调。 */
+    onRestoreDefault: () -> Unit = {},
+    /** 打开系统权限设置页。 */
+    onOpenPermissionSettings: () -> Unit = {},
+    /** 权限状态。 */
+    permissionFileAccess: PermissionStatus = PermissionStatus.UNKNOWN,
+    permissionNotifications: PermissionStatus = PermissionStatus.UNKNOWN,
+    permissionBattery: PermissionStatus = PermissionStatus.UNKNOWN
 ) {
-    var theme by remember { mutableStateOf("跟随系统") }
-    var autoUpdate by remember { mutableStateOf(true) }
-    var backToTop by remember { mutableStateOf(true) }
-    var crashLog by remember { mutableStateOf(true) }
+    // 主题模式 ↔ 段控件标签映射：system→跟随系统 / light→浅色 / dark→深色。
+    val themeLabel = when (appThemeMode) {
+        "light" -> "浅色"
+        "dark" -> "深色"
+        else -> "跟随系统"
+    }
 
     SettingsSubpageScaffold(title = "通用设置", onBack = onBack) {
         item {
             SettingsSubSection(title = "基础偏好") {
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_settings,
+                    iconRes = R.drawable.reader_ic_palette,
                     title = "App主题",
                     side = {
                         SettingsSubSegment(
                             options = listOf("跟随系统", "浅色", "深色"),
-                            selected = theme,
-                            onSelected = { theme = it }
+                            selected = themeLabel,
+                            onSelected = { label ->
+                                val mode = when (label) {
+                                    "浅色" -> "light"
+                                    "深色" -> "dark"
+                                    else -> "system"
+                                }
+                                onAppThemeModeChange(mode)
+                            },
+                            reducedMotion = reducedMotion
                         )
                     }
                 )
@@ -89,7 +120,7 @@ fun SettingsGeneralScreen(
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_bookshelf,
+                    iconRes = R.drawable.reader_ic_home,
                     title = "启动时打开",
                     side = { SettingsSubValue("书架", chevron = true) }
                 )
@@ -100,17 +131,17 @@ fun SettingsGeneralScreen(
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_refresh,
                     title = "自动检查更新",
-                    side = { SettingsSubSwitch(autoUpdate) { autoUpdate = !autoUpdate } }
+                    side = { SettingsSubSwitch(autoUpdate) { onAutoUpdateChange(!autoUpdate) } }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_top,
                     title = "点击当前底栏回顶部",
-                    side = { SettingsSubSwitch(backToTop) { backToTop = !backToTop } }
+                    side = { SettingsSubSwitch(backToTop) { onBackToTopChange(!backToTop) } }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_more,
+                    iconRes = R.drawable.reader_ic_motion,
                     title = "减少动态效果",
                     side = { SettingsSubSwitch(reducedMotion) { onReducedMotionChange(!reducedMotion) } }
                 )
@@ -120,14 +151,14 @@ fun SettingsGeneralScreen(
                     title = "崩溃日志",
                     side = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SettingsSubBadge("已开启", SettingsSubTone.Good)
-                            SettingsSubSwitch(crashLog) { crashLog = !crashLog }
+                            SettingsSubBadge(if (crashLog) "已开启" else "已关闭", if (crashLog) SettingsSubTone.Good else SettingsSubTone.Muted)
+                            SettingsSubSwitch(crashLog) { onCrashLogChange(!crashLog) }
                         }
                     }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_refresh,
+                    iconRes = R.drawable.reader_ic_play,
                     title = "动画效果",
                     side = { SettingsSubValue("标准", chevron = true) }
                 )
@@ -135,6 +166,7 @@ fun SettingsGeneralScreen(
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_trash,
                     title = "缓存清理",
+                    onClick = onClearCache,
                     side = { SettingsSubActionLabel("清理缓存") }
                 )
             }
@@ -146,8 +178,8 @@ fun SettingsGeneralScreen(
                     title = "文件访问",
                     side = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SettingsSubBadge("已授权", SettingsSubTone.Good)
-                            SettingsSubActionLabel("去设置")
+                            SettingsSubBadge(permissionLabel(permissionFileAccess), permissionTone(permissionFileAccess))
+                            SettingsSubActionLabel("去设置", onClick = onOpenPermissionSettings)
                         }
                     }
                 )
@@ -157,19 +189,19 @@ fun SettingsGeneralScreen(
                     title = "通知权限",
                     side = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SettingsSubBadge("未授权", SettingsSubTone.Warn)
-                            SettingsSubActionLabel("去设置")
+                            SettingsSubBadge(permissionLabel(permissionNotifications), permissionTone(permissionNotifications))
+                            SettingsSubActionLabel("去设置", onClick = onOpenPermissionSettings)
                         }
                     }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_gear,
+                    iconRes = R.drawable.reader_ic_battery,
                     title = "电池优化",
                     side = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SettingsSubBadge("受系统管理", SettingsSubTone.Info)
-                            SettingsSubActionLabel("去设置")
+                            SettingsSubBadge(permissionLabel(permissionBattery), permissionTone(permissionBattery))
+                            SettingsSubActionLabel("去设置", onClick = onOpenPermissionSettings)
                         }
                     }
                 )
@@ -179,38 +211,63 @@ fun SettingsGeneralScreen(
             SettingsSubDangerAction(
                 iconRes = R.drawable.reader_ic_refresh,
                 title = "恢复默认",
-                meta = "恢复后将重置 App 主题、语言、启动页面和行为偏好。"
+                meta = "恢复后将重置 App 主题、语言、启动页面和行为偏好。",
+                onClick = onRestoreDefault
             )
         }
     }
 }
 
+/** 权限状态 → 中文标签。 */
+private fun permissionLabel(status: PermissionStatus): String = when (status) {
+    PermissionStatus.GRANTED -> "已授权"
+    PermissionStatus.DENIED -> "未授权"
+    PermissionStatus.UNKNOWN -> "未确定"
+}
+
+/** 权限状态 → Badge tone。 */
+private fun permissionTone(status: PermissionStatus): SettingsSubTone = when (status) {
+    PermissionStatus.GRANTED -> SettingsSubTone.Good
+    PermissionStatus.DENIED -> SettingsSubTone.Warn
+    PermissionStatus.UNKNOWN -> SettingsSubTone.Muted
+}
+
 @Composable
-fun AboutFeedbackScreen(onBack: () -> Unit) {
+fun AboutFeedbackScreen(
+    onBack: () -> Unit,
+    onCheckUpdate: () -> Unit = {},
+    onOpenRepo: () -> Unit = {},
+    onOpenLicense: () -> Unit = {},
+    onContribute: () -> Unit = {}
+) {
     SettingsSubpageScaffold(title = "关于与反馈", onBack = onBack) {
         item {
             SettingsSubSection(title = "项目信息") {
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_refresh,
                     title = "检查更新",
+                    onClick = onCheckUpdate,
                     side = { SettingsSubValue("已是最新") }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_code,
                     title = "源码仓库",
+                    onClick = onOpenRepo,
                     side = { SettingsSubChevron() }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_link,
                     title = "开源许可",
+                    onClick = onOpenLicense,
                     side = { SettingsSubChevron() }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_people,
+                    iconRes = R.drawable.reader_ic_mail,
                     title = "参与贡献",
+                    onClick = onContribute,
                     side = { SettingsSubChevron() }
                 )
             }
@@ -221,12 +278,15 @@ fun AboutFeedbackScreen(onBack: () -> Unit) {
 @Composable
 fun SyncBackupScreen(
     onBack: () -> Unit,
-    onWebDavConfig: () -> Unit
+    /** P3.1: 保存 WebDAV 配置回调（dispatch SaveWebDavConfig）。 */
+    onSaveConfig: () -> Unit,
+    /** P3.2: 测试 WebDAV 连接回调（dispatch TestWebDavConnection）。 */
+    onTestConnection: () -> Unit,
+    /** P3.2: 测试状态（从 vm.state.webDavConfig.testStatus 读取）。 */
+    testStatus: WebDavTestStatus = WebDavTestStatus.Idle
 ) {
     val backups = remember { settingsBackupItems() }
     var webDavCredential by remember { mutableStateOf<WebDavCredential?>(null) }
-    var connectStatus by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     // P1-6: Load the real WebDAV credential (if any) from the keystore-backed
     // store. The identifier "webdav.default" matches the one used by
@@ -264,48 +324,33 @@ fun SyncBackupScreen(
         item {
             SettingsSectionActions(
                 actions = listOf(
-                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性", onClick = {
-                        val url = webDavCredential?.serverUrl
-                        if (url.isNullOrEmpty()) {
-                            connectStatus = "请先配置 WebDAV 服务器地址"
-                            return@SettingsSubAction
-                        }
-                        connectStatus = "测试中..."
-                        scope.launch {
-                            runCatching {
-                                val params = JSONObject().put("url", url)
-                                val request = HostRequest(1L, 1L, "webdav.connect", params.toString())
-                                val reply = ReaderCoreClient.get().hostAdapter().dispatch(request)
-                                when {
-                                    reply?.isComplete() == true -> {
-                                        val result = JSONObject((reply as HostReply.Complete).resultJson())
-                                        connectStatus = if (result.getBoolean("connected")) {
-                                            "连接成功 (HTTP ${result.getInt("statusCode")})"
-                                        } else {
-                                            "连接失败: ${result.optString("message", "HTTP ${result.getInt("statusCode")}")}"
-                                        }
-                                    }
-                                    reply?.isError() == true -> {
-                                        val error = reply as HostReply.Error
-                                        connectStatus = "错误: ${error.message()}"
-                                    }
-                                    else -> {
-                                        connectStatus = "未知响应"
-                                    }
-                                }
-                            }.onFailure {
-                                connectStatus = "错误: ${it.message}"
-                            }
-                        }
-                    }),
-                    SettingsSubAction(R.drawable.reader_ic_check, "保存配置", onWebDavConfig)
+                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性", onClick = onTestConnection),
+                    SettingsSubAction(R.drawable.reader_ic_check, "保存配置", onClick = onSaveConfig)
                 )
             )
         }
-        if (connectStatus != null) {
-            item {
-                SettingsSubSection(title = "连通性测试") {
-                    SettingsInputRow(R.drawable.reader_ic_link, "结果", connectStatus!!)
+        // P3.2: 连通性测试结果区从 testStatus 渲染。
+        when (testStatus) {
+            is WebDavTestStatus.Idle -> { /* 不渲染 */ }
+            is WebDavTestStatus.Testing -> {
+                item {
+                    SettingsSubSection(title = "连通性测试") {
+                        SettingsInputRow(R.drawable.reader_ic_link, "结果", "测试中...")
+                    }
+                }
+            }
+            is WebDavTestStatus.Success -> {
+                item {
+                    SettingsSubSection(title = "连通性测试") {
+                        SettingsInputRow(R.drawable.reader_ic_link, "结果", "连接成功 (${testStatus.latencyMs}ms)")
+                    }
+                }
+            }
+            is WebDavTestStatus.Error -> {
+                item {
+                    SettingsSubSection(title = "连通性测试") {
+                        SettingsInputRow(R.drawable.reader_ic_link, "结果", "连接失败: ${testStatus.message}")
+                    }
                 }
             }
         }
@@ -316,24 +361,39 @@ fun SyncBackupScreen(
 }
 
 @Composable
-fun WebDavConfigScreen(onBack: () -> Unit) {
+fun WebDavConfigScreen(
+    onBack: () -> Unit,
+    /** P3.6: 表单字段（从 vm.state.webDavConfig 读取）。 */
+    serverUrl: String = "",
+    username: String = "",
+    password: String = "",
+    syncDir: String = "/ReaderBackup/ReaderAndroid",
+    /** P3.6: 字段变更回调（dispatch UpdateWebDavServer / UpdateWebDavCredentials）。 */
+    onServerUrlChange: (String) -> Unit = {},
+    onUsernameChange: (String) -> Unit = {},
+    onPasswordChange: (String) -> Unit = {},
+    onSyncDirChange: (String) -> Unit = {},
+    /** P3.6: 测试 / 保存回调。 */
+    onTestConnection: () -> Unit = {},
+    onSaveConfig: () -> Unit = {}
+) {
     SettingsSubpageScaffold(title = "WebDAV 配置", onBack = onBack) {
         item {
             SettingsSubSection(title = "连接信息") {
-                SettingsInputRow(R.drawable.reader_ic_link, "服务器地址", "https://dav.example.com/reader/backup")
+                SettingsInputRow(R.drawable.reader_ic_link, "服务器地址", serverUrl.ifEmpty { "https://dav.example.com/reader/backup" })
                 SettingsSubDivider()
-                SettingsInputRow(R.drawable.reader_ic_people, "账号", "reader@example.com")
+                SettingsInputRow(R.drawable.reader_ic_people, "账号", username.ifEmpty { "未配置" })
                 SettingsSubDivider()
-                SettingsInputRow(R.drawable.reader_ic_shield, "密码", "reader-demo-password")
+                SettingsInputRow(R.drawable.reader_ic_shield, "密码", if (password.isEmpty()) "未配置" else "******")
                 SettingsSubDivider()
-                SettingsInputRow(R.drawable.reader_ic_folder, "同步目录", "/ReaderBackup/ReaderAndroid")
+                SettingsInputRow(R.drawable.reader_ic_folder, "同步目录", syncDir)
             }
         }
         item {
             SettingsSectionActions(
                 actions = listOf(
-                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性"),
-                    SettingsSubAction(R.drawable.reader_ic_check, "保存配置")
+                    SettingsSubAction(R.drawable.reader_ic_refresh, "测试网络连通性", onClick = onTestConnection),
+                    SettingsSubAction(R.drawable.reader_ic_check, "保存配置", onClick = onSaveConfig)
                 )
             )
         }
@@ -343,15 +403,24 @@ fun WebDavConfigScreen(onBack: () -> Unit) {
 @Composable
 fun SourceManagementScreen(
     onBack: () -> Unit,
-    onImportSource: () -> Unit
+    onImportSource: () -> Unit,
+    /** P3.3: 切换单个书源启用的回调。 */
+    onToggleSource: (String, Boolean) -> Unit = { _, _ -> },
+    /** P3.7: 批量操作回调。 */
+    onDetectAll: () -> Unit = {},
+    onViewSourceDetail: () -> Unit = {},
+    onEditSource: () -> Unit = {},
+    onViewSourceLogs: () -> Unit = {},
+    /** P3.7: 批量启用开关状态（暂从 vm state 读取，无则默认 true）。 */
+    batchEnabled: Boolean = true,
+    onBatchEnabledChange: (Boolean) -> Unit = {}
 ) {
-    var enabled by remember { mutableStateOf(true) }
     val sources = remember { settingsSourceItems() }
     SettingsSubpageScaffold(title = "书源管理", onBack = onBack) {
         item {
             SettingsMetricGrid(
                 metrics = listOf(
-                    SettingsMetric(R.drawable.reader_ic_source_stack, "个书源", "12"),
+                    SettingsMetric(R.drawable.reader_ic_source, "个书源", "12"),
                     SettingsMetric(R.drawable.reader_ic_check, "个启用", "8"),
                     SettingsMetric(R.drawable.reader_ic_warning, "个异常", "4"),
                     SettingsMetric(R.drawable.reader_ic_clock, "刚刚检测", "10:30")
@@ -370,35 +439,39 @@ fun SourceManagementScreen(
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_refresh,
                     title = "检测",
+                    onClick = onDetectAll,
                     side = { SettingsSubActionLabel("开始检测") }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_link,
+                    iconRes = R.drawable.reader_ic_info,
                     title = "详情",
+                    onClick = onViewSourceDetail,
                     side = { SettingsSubActionLabel("查看") }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_edit,
                     title = "编辑",
+                    onClick = onEditSource,
                     side = { SettingsSubActionLabel("编辑") }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_bug,
+                    iconRes = R.drawable.reader_ic_log,
                     title = "错误日志",
+                    onClick = onViewSourceLogs,
                     side = { SettingsSubActionLabel("查看") }
                 )
                 SettingsSubDivider()
                 SettingsSubRow(
-                    iconRes = R.drawable.reader_ic_source_stack,
+                    iconRes = R.drawable.reader_ic_source,
                     title = "启用开关",
-                    side = { SettingsSubSwitch(enabled) { enabled = !enabled } }
+                    side = { SettingsSubSwitch(batchEnabled) { onBatchEnabledChange(!batchEnabled) } }
                 )
             }
         }
-        item { SettingsSourceList(sources = sources) }
+        item { SettingsSourceList(sources = sources, onToggleSource = onToggleSource) }
         item {
             SettingsSubFloatingAction(
                 iconRes = R.drawable.reader_ic_add,
@@ -485,6 +558,7 @@ private fun SettingsSubRow(
     @DrawableRes iconRes: Int,
     title: String,
     meta: String? = null,
+    onClick: (() -> Unit)? = null,
     side: @Composable () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -493,6 +567,7 @@ private fun SettingsSubRow(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 58.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -542,7 +617,8 @@ private fun SettingsInputRow(@DrawableRes iconRes: Int, title: String, value: St
 private fun SettingsSubSegment(
     options: List<String>,
     selected: String,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    reducedMotion: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -559,7 +635,17 @@ private fun SettingsSubSegment(
                         if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
                         ReaderShapes.pill
                     )
-                    .clickable { onSelected(option) }
+                    .clickable {
+                        onSelected(option)
+                        // 绑定 segment.item.switch 动效。
+                        MotionController.start(
+                            motionId = "segment.item.switch",
+                            from = "segment.previous",
+                            to = "segment.next",
+                            durationMs = 120L,
+                            reducedMotion = reducedMotion
+                        )
+                    }
                     .padding(horizontal = 7.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -599,10 +685,11 @@ private fun SettingsSubChevron() {
 }
 
 @Composable
-private fun SettingsSubActionLabel(label: String) {
+private fun SettingsSubActionLabel(label: String, onClick: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .defaultMinSize(minHeight = 28.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), ReaderShapes.pill)
             .padding(horizontal = 8.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
@@ -668,13 +755,15 @@ private fun SettingsSubBadge(label: String, tone: SettingsSubTone) {
 private fun SettingsSubDangerAction(
     @DrawableRes iconRes: Int,
     title: String,
-    meta: String
+    meta: String,
+    onClick: (() -> Unit)? = null
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 50.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(colors.error.copy(alpha = 0.08f), ReaderShapes.md)
             .border(1.dp, colors.error.copy(alpha = 0.20f), ReaderShapes.md)
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -805,7 +894,10 @@ private fun SettingsChipRow(items: List<String>, active: String) {
 }
 
 @Composable
-private fun SettingsSourceList(sources: List<SettingsSourceItem>) {
+private fun SettingsSourceList(
+    sources: List<SettingsSourceItem>,
+    onToggleSource: (String, Boolean) -> Unit = { _, _ -> }
+) {
     SettingsSubSection(title = "书源列表") {
         sources.forEachIndexed { index, source ->
             if (index > 0) SettingsSubDivider()
@@ -816,7 +908,7 @@ private fun SettingsSourceList(sources: List<SettingsSourceItem>) {
                 side = {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         SettingsSubBadge(source.status, source.tone)
-                        SettingsSubSwitch(source.enabled) {}
+                        SettingsSubSwitch(source.enabled) { onToggleSource(source.id, !source.enabled) }
                     }
                 }
             )
@@ -897,6 +989,7 @@ private data class SettingsMetric(
 )
 
 private data class SettingsSourceItem(
+    val id: String = "",
     val title: String,
     val meta: String,
     val status: String,
@@ -914,43 +1007,43 @@ private fun settingsBackupItems() = listOf(
 )
 
 private fun settingsSourceItems() = listOf(
-    SettingsSourceItem("起点中文网", "qidian.com · 起点导入", "可用", SettingsSubTone.Good, enabled = true),
-    SettingsSourceItem("笔趣阁", "biquge.example · 玄幻书源", "异常", SettingsSubTone.Warn, enabled = true),
-    SettingsSourceItem("本地导入源", "本地文件导入 · 自定义", "未检测", SettingsSubTone.Muted, enabled = false),
-    SettingsSourceItem("测试书源", "test.example · 测试书源", "可用", SettingsSubTone.Good, enabled = true)
+    SettingsSourceItem(id = "src-1", title = "起点中文网", meta = "qidian.com · 起点导入", status = "可用", tone = SettingsSubTone.Good, enabled = true),
+    SettingsSourceItem(id = "src-2", title = "笔趣阁", meta = "biquge.example · 玄幻书源", status = "异常", tone = SettingsSubTone.Warn, enabled = true),
+    SettingsSourceItem(id = "src-3", title = "本地导入源", meta = "本地文件导入 · 自定义", status = "未检测", tone = SettingsSubTone.Muted, enabled = false),
+    SettingsSourceItem(id = "src-4", title = "测试书源", meta = "test.example · 测试书源", status = "可用", tone = SettingsSubTone.Good, enabled = true)
 )
 
 private fun settingsSubSectionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun settingsSubTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun settingsSubMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun settingsSubControlStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun settingsSubBadgeStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 12.sp,
     fontWeight = FontWeight(850)
 )

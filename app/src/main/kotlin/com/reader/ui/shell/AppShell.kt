@@ -7,6 +7,8 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,7 +52,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import android.content.Intent
+import android.net.Uri
 import com.reader.android.R
+import com.reader.android.data.adapter.AuthMethod
+import com.reader.android.data.adapter.WebDavCredential
+import com.reader.host.HostReply
+import com.reader.host.HostRequest
+import com.reader.ui.shell.WebDavSaveStatus
+import com.reader.ui.shell.WebDavTestStatus
+import org.json.JSONObject
 import com.reader.api.Book
 import com.reader.api.ReaderCoreClient
 import com.reader.ui.book.BookDetailScreen
@@ -85,6 +97,15 @@ import com.reader.ui.motion.ViewportClass
 import com.reader.ui.motion.effectiveDuration
 import com.reader.ui.motion.rememberViewportClass
 import com.reader.ui.reading.FlowShellScreen
+import com.reader.ui.reading.ReaderFontSettingsScreen
+import com.reader.ui.reading.ReaderThemeSettingsScreen
+import com.reader.ui.reading.ReaderThemeEditScreen
+import com.reader.ui.reading.ReaderLayoutSettingsScreen
+import com.reader.ui.reading.ReaderPageTurnSettingsScreen
+import com.reader.ui.reading.ReaderReplaceRuleScreen
+import com.reader.ui.source.SourceDetailScreen
+import com.reader.ui.source.SourceEditScreen
+import com.reader.ui.reading.ReaderSettingsScreen
 import com.reader.ui.reading.ReaderShellScreen
 import com.reader.ui.rss.RssReadRecordScreen
 import com.reader.ui.rss.RssArticleHubScreen
@@ -257,6 +278,30 @@ fun AppShell(
         }
     }
 
+    // 按路由分派专用 Close intent（重置对应状态切片），避免通用 PopRoute 造成状态泄漏。
+    val handleBack: () -> Unit = {
+        when (val route = state.backStack.lastOrNull()) {
+            is ReaderRoute.SourceSwitchFlow -> vm.dispatch(ReaderUiIntent.SourceSwitchClose)
+            is ReaderRoute.BookState -> {
+                if (route.id == "book-detail") vm.dispatch(ReaderUiIntent.BookDetailClose)
+                else vm.dispatch(ReaderUiIntent.PopRoute)
+            }
+            ReaderRoute.SettingsGeneral,
+            ReaderRoute.SyncBackup,
+            ReaderRoute.AboutFeedback,
+            ReaderRoute.WebDavConfig,
+            ReaderRoute.SourceManagement -> vm.dispatch(ReaderUiIntent.SettingsClose)
+            ReaderRoute.SourceDetail -> vm.dispatch(ReaderUiIntent.SourceDetailClose)
+            ReaderRoute.SourceEdit -> vm.dispatch(ReaderUiIntent.SourceEditCancel)
+            ReaderRoute.ReaderFullFont,
+            ReaderRoute.ReaderFullTheme,
+            ReaderRoute.ReaderFullThemeEdit,
+            ReaderRoute.ReaderFullLayout,
+            ReaderRoute.ReaderFullPageTurn -> vm.dispatch(ReaderUiIntent.PopRoute)
+            else -> vm.dispatch(ReaderUiIntent.PopRoute)
+        }
+    }
+
     // System back follows the overlay-first rule (MOTION_CONTRACT.md / FRONTEND_DEVELOPMENT_SLICE_MATRIX.md
     // Slice 4): Back closes the topmost overlay (Keyboard / Sheet / Dialog / MoreMenu / ReaderControl)
     // before popping the route. Hidden overlays have no hit area and don't intercept Back.
@@ -266,7 +311,7 @@ fun AppShell(
             state.overlayState is OverlayState.Sheet -> vm.dispatch(ReaderUiIntent.CloseSheet)
             state.overlayState is OverlayState.Dialog -> vm.dispatch(ReaderUiIntent.CloseDialog)
             state.moreMenu.open -> vm.dispatch(ReaderUiIntent.CloseMoreMenu)
-            else -> vm.dispatch(ReaderUiIntent.PopRoute)
+            else -> handleBack()
         }
     }
 
@@ -350,15 +395,127 @@ fun AppShell(
         }
     }
 
+    // ── P3.1: WebDAV save effect collector ────────────────────────────────
+    // Observes `webDavConfig.saveStatus == Saving` from the reducer (pure) and
+    // actually persists the credential through the keystore-backed
+    // [com.reader.android.AppProvider.webDavCredentialStore]. On completion,
+    // dispatches [ReaderUiIntent.WebDavSaveResult] so the reducer transitions
+    // to Saved / Error.
+    val webDavSaveStatus = state.webDavConfig.saveStatus
+    LaunchedEffect(webDavSaveStatus) {
+        if (webDavSaveStatus != WebDavSaveStatus.Saving) return@LaunchedEffect
+        val config = vm.state.value.webDavConfig
+        runCatching {
+            if (com.reader.android.AppProvider.isInitialized) {
+                val credential = WebDavCredential(
+                    serverUrl = config.serverUrl,
+                    auth = AuthMethod.Basic(config.username, config.password)
+                )
+                com.reader.android.AppProvider.webDavCredentialStore.save("webdav.default", credential)
+            }
+        }.onSuccess {
+            vm.dispatch(
+                ReaderUiIntent.WebDavSaveResult(
+                    success = true,
+                    savedIdentifier = "webdav.default"
+                )
+            )
+        }.onFailure { e ->
+            vm.dispatch(
+                ReaderUiIntent.WebDavSaveResult(
+                    success = false,
+                    message = e.message ?: "保存失败"
+                )
+            )
+        }
+    }
+
+    // ── P3.2: WebDAV test effect collector ────────────────────────────────
+    // Observes `webDavConfig.testStatus == Testing` from the reducer (pure)
+    // and actually dispatches a `webdav.connect` HostRequest through the Core
+    // bridge. On completion, dispatches [ReaderUiIntent.WebDavTestResult] so
+    // the reducer transitions to Success / Error.
+    val webDavTestStatus = state.webDavConfig.testStatus
+    LaunchedEffect(webDavTestStatus) {
+        if (webDavTestStatus != WebDavTestStatus.Testing) return@LaunchedEffect
+        val config = vm.state.value.webDavConfig
+        val url = config.serverUrl
+        if (url.isEmpty()) {
+            vm.dispatch(
+                ReaderUiIntent.WebDavTestResult(
+                    success = false,
+                    message = "请先配置 WebDAV 服务器地址"
+                )
+            )
+            return@LaunchedEffect
+        }
+        val startMs = System.currentTimeMillis()
+        runCatching {
+            val params = JSONObject().put("url", url)
+            val request = HostRequest(1L, 1L, "webdav.connect", params.toString())
+            val reply = ReaderCoreClient.get().hostAdapter().dispatch(request)
+            when {
+                reply?.isComplete() == true -> {
+                    val result = JSONObject((reply as HostReply.Complete).resultJson())
+                    val connected = result.getBoolean("connected")
+                    if (connected) {
+                        val latency = System.currentTimeMillis() - startMs
+                        vm.dispatch(
+                            ReaderUiIntent.WebDavTestResult(
+                                success = true,
+                                message = "",
+                                latencyMs = latency
+                            )
+                        )
+                    } else {
+                        vm.dispatch(
+                            ReaderUiIntent.WebDavTestResult(
+                                success = false,
+                                message = result.optString("message", "连接失败")
+                            )
+                        )
+                    }
+                }
+                reply?.isError() == true -> {
+                    val error = reply as HostReply.Error
+                    vm.dispatch(
+                        ReaderUiIntent.WebDavTestResult(
+                            success = false,
+                            message = error.message()
+                        )
+                    )
+                }
+                else -> {
+                    vm.dispatch(
+                        ReaderUiIntent.WebDavTestResult(
+                            success = false,
+                            message = "未知响应"
+                        )
+                    )
+                }
+            }
+        }.onFailure { e ->
+            vm.dispatch(
+                ReaderUiIntent.WebDavTestResult(
+                    success = false,
+                    message = "错误: ${e.message}"
+                )
+            )
+        }
+    }
+
     val currentRoute = state.currentRoute
     if (currentRoute is ReaderRoute.SourceSwitchFlow) {
         FlowShellScreen(
             route = currentRoute,
-            onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+            onBack = handleBack,
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             sourceSwitch = state.sourceSwitch,
-            onSelectSource = { sourceId -> vm.dispatch(ReaderUiIntent.SourceSwitchSelect(sourceId)) },
-            onClose = { vm.dispatch(ReaderUiIntent.SourceSwitchClose) }
+            onSelectSource = { sourceId ->
+                vm.dispatch(ReaderUiIntent.SourceSwitchSelect(sourceId))
+                vm.dispatch(ReaderUiIntent.SourceSwitchConfirm(sourceId))
+            },
+            onClose = { vm.dispatch(ReaderUiIntent.SourceSwitchCancel) }
         )
     } else if (currentRoute is ReaderRoute.ImmersiveReading ||
         currentRoute is ReaderRoute.ReaderControl
@@ -367,10 +524,11 @@ fun AppShell(
             route = currentRoute,
             fallbackContext = state.readerContext,
             activeSession = state.activeSession,
-            onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+            onBack = handleBack,
             onNavigate = { targetRoute -> navigateFromReaderShell(currentRoute, targetRoute) },
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
             onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
+            moreMenuOpen = state.moreMenu.open && state.moreMenu.triggerId == "reader-control-more",
             dispatch = vm::dispatch,
             onStartTts = { text ->
                 val ctx = state.readerContext
@@ -409,10 +567,41 @@ fun AppShell(
                 }
             }
         )
-    } else when (val route = currentRoute) {
+    } else {
+        // P0-Fix8: route transition (AnimatedContent wrapping when(route))
+        var prevStackSize by remember { mutableStateOf(state.backStack.size) }
+        val routeDirection = when {
+            state.backStack.size > prevStackSize -> RouteTransitionDirection.PUSH_FORWARD
+            state.backStack.size < prevStackSize -> RouteTransitionDirection.POP_BACKWARD
+            else -> RouteTransitionDirection.REPLACE
+        }
+        SideEffect { prevStackSize = state.backStack.size }
+        val routeTransitionDuration = if (state.reducedMotion) 0 else 160
+        AnimatedContent(
+            targetState = currentRoute,
+            transitionSpec = {
+                if (initialState is ReaderRoute.TabShell && targetState is ReaderRoute.TabShell) {
+                    fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                } else {
+                    when (routeDirection) {
+                        RouteTransitionDirection.PUSH_FORWARD ->
+                            (slideInHorizontally(tween(routeTransitionDuration)) { it / 8 } + fadeIn(tween(routeTransitionDuration))) togetherWith
+                                (slideOutHorizontally(tween(routeTransitionDuration)) { -it / 8 } + fadeOut(tween(routeTransitionDuration)))
+                        RouteTransitionDirection.POP_BACKWARD ->
+                            (slideInHorizontally(tween(routeTransitionDuration)) { -it / 8 } + fadeIn(tween(routeTransitionDuration))) togetherWith
+                                (slideOutHorizontally(tween(routeTransitionDuration)) { it / 8 } + fadeOut(tween(routeTransitionDuration)))
+                        RouteTransitionDirection.REPLACE ->
+                            fadeIn(tween(routeTransitionDuration)) togetherWith fadeOut(tween(routeTransitionDuration))
+                    }
+                }
+            },
+            label = "route-transition",
+            modifier = Modifier.fillMaxSize()
+        ) { route ->
+        when (route) {
         is ReaderRoute.Search -> {
             SearchScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onBookClick = { book ->
                     vm.dispatch(
                         ReaderUiIntent.EnterReaderFromAction(
@@ -429,34 +618,34 @@ fun AppShell(
             ImportBookSourceScreen(
                 state = state.sourceImport,
                 dispatch = vm::dispatch,
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+                onBack = handleBack
             )
         }
 
         ReaderRoute.BookBatchManagement -> {
             BookBatchManagementScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onMoveGroup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) }
             )
         }
 
         ReaderRoute.GroupManagement -> {
             GroupManagementScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onDone = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
         }
 
         ReaderRoute.LocalImport -> {
             LocalImportScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onDone = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
         }
 
         ReaderRoute.BookshelfSearchSettings -> {
             BookshelfSearchSettingsScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+                onBack = handleBack
             )
         }
 
@@ -464,35 +653,79 @@ fun AppShell(
             SettingsGeneralScreen(
                 reducedMotion = state.reducedMotion,
                 onReducedMotionChange = { vm.dispatch(ReaderUiIntent.SetReducedMotion(it)) },
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) }
+                onBack = handleBack,
+                appThemeMode = state.appThemeMode,
+                onAppThemeModeChange = { mode -> vm.dispatch(ReaderUiIntent.UpdateAppThemeMode(mode = mode)) },
+                autoUpdate = state.settings.autoCheckUpdate,
+                onAutoUpdateChange = { vm.dispatch(ReaderUiIntent.SetReaderBehaviorToggle("autoCheckUpdate", it)) },
+                backToTop = state.settings.tapBottomBarToTop,
+                onBackToTopChange = { vm.dispatch(ReaderUiIntent.SetReaderBehaviorToggle("tapBottomBarToTop", it)) },
+                crashLog = state.settings.crashLogEnabled,
+                onCrashLogChange = { vm.dispatch(ReaderUiIntent.SetReaderBehaviorToggle("crashLogEnabled", it)) },
+                onClearCache = { vm.dispatch(ReaderUiIntent.ClearCache) },
+                onRestoreDefault = { vm.dispatch(ReaderUiIntent.RestoreDefaultSettings) },
+                onOpenPermissionSettings = { vm.dispatch(ReaderUiIntent.OpenSystemPermissionSettings) },
+                permissionFileAccess = state.permissions.fileAccess,
+                permissionNotifications = state.permissions.notifications,
+                permissionBattery = state.permissions.batteryOptimization
             )
         }
 
         ReaderRoute.AboutFeedback -> {
-            AboutFeedbackScreen(onBack = { vm.dispatch(ReaderUiIntent.PopRoute) })
+            val aboutContext = LocalContext.current
+            AboutFeedbackScreen(
+                onBack = handleBack,
+                onCheckUpdate = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.AboutFeedback)) },
+                onOpenRepo = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/reader/reader"))
+                    aboutContext.startActivity(intent)
+                },
+                onOpenLicense = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.AboutFeedback)) },
+                onContribute = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/reader/reader/contribute"))
+                    aboutContext.startActivity(intent)
+                }
+            )
         }
 
         ReaderRoute.SyncBackup -> {
             SyncBackupScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
-                onWebDavConfig = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.WebDavConfig)) }
+                onBack = handleBack,
+                onSaveConfig = { vm.dispatch(ReaderUiIntent.SaveWebDavConfig) },
+                onTestConnection = { vm.dispatch(ReaderUiIntent.TestWebDavConnection) },
+                testStatus = state.webDavConfig.testStatus
             )
         }
 
         ReaderRoute.WebDavConfig -> {
-            WebDavConfigScreen(onBack = { vm.dispatch(ReaderUiIntent.PopRoute) })
+            val webDavConfig = state.webDavConfig
+            WebDavConfigScreen(
+                onBack = handleBack,
+                serverUrl = webDavConfig.serverUrl,
+                username = webDavConfig.username,
+                password = webDavConfig.password,
+                syncDir = webDavConfig.syncDir,
+                onServerUrlChange = { vm.dispatch(ReaderUiIntent.UpdateWebDavServer(it)) },
+                onUsernameChange = { vm.dispatch(ReaderUiIntent.UpdateWebDavCredentials(it, webDavConfig.password)) },
+                onPasswordChange = { vm.dispatch(ReaderUiIntent.UpdateWebDavCredentials(webDavConfig.username, it)) },
+                onTestConnection = { vm.dispatch(ReaderUiIntent.TestWebDavConnection) },
+                onSaveConfig = { vm.dispatch(ReaderUiIntent.SaveWebDavConfig) }
+            )
         }
 
         ReaderRoute.SourceManagement -> {
             SourceManagementScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
-                onImportSource = { navigateToRouteId("source-import-options") }
+                onBack = handleBack,
+                onImportSource = { navigateToRouteId("source-import-options") },
+                onToggleSource = { sourceId, enabled ->
+                    vm.dispatch(ReaderUiIntent.SetSourceEnabled(sourceId, enabled))
+                }
             )
         }
 
         ReaderRoute.RssSearch -> {
             RssSearchScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) },
                 onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) }
             )
@@ -502,7 +735,7 @@ fun AppShell(
             RssArticleHubScreen(
                 title = "全部条目",
                 activeMode = "全部",
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
                 onOpenSourceList = { vm.dispatch(ReaderUiIntent.PopRoute) },
                 onOpenAll = {},
@@ -517,7 +750,7 @@ fun AppShell(
             RssArticleHubScreen(
                 title = "收藏",
                 activeMode = "收藏",
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSearch)) },
                 onOpenSourceList = { vm.dispatch(ReaderUiIntent.PopRoute) },
                 onOpenAll = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssAll)) },
@@ -530,7 +763,7 @@ fun AppShell(
 
         ReaderRoute.RssRefreshing -> {
             RssRefreshingScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onOpenArticle = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
                 onManageSources = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
             )
@@ -538,7 +771,7 @@ fun AppShell(
 
         ReaderRoute.RssSubscriptionManagement -> {
             RssSubscriptionManagementScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onCreateSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
                 onImportSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImport)) },
                 onRuleSubscription = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscription)) },
@@ -551,7 +784,7 @@ fun AppShell(
 
         ReaderRoute.RssDetail -> {
             RssDetailScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onBackToList = { vm.dispatch(ReaderUiIntent.PopRoute) },
                 onOpenOriginal = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssOriginal)) },
                 onManageSource = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSubscriptionManagement)) }
@@ -560,7 +793,7 @@ fun AppShell(
 
         ReaderRoute.RssOriginal -> {
             RssOriginalScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onBackToDetail = { popBackTo(ReaderRoute.RssDetail) },
                 onOpenBrowser = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssOriginalBrowser)) }
             )
@@ -581,7 +814,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceEdit -> {
             RssSourceEditScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
                 onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
@@ -589,7 +822,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceImport -> {
             RssSourceImportScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImportDetail)) },
                 onImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImportResult)) }
             )
@@ -597,14 +830,14 @@ fun AppShell(
 
         ReaderRoute.RssSourceImportDetail -> {
             RssSourceImportDetailScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onJoinImport = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
         }
 
         ReaderRoute.RssSourceImportResult -> {
             RssSourceImportResultScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onContinueImport = { vm.dispatch(ReaderUiIntent.PopRoute) },
                 onDone = {
                     vm.dispatch(ReaderUiIntent.PopRoute)
@@ -615,7 +848,7 @@ fun AppShell(
 
         ReaderRoute.RssRuleSubscription -> {
             RssRuleSubscriptionScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionDetail)) },
                 onCreate = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionEdit)) }
             )
@@ -623,7 +856,7 @@ fun AppShell(
 
         ReaderRoute.RssRuleSubscriptionDetail -> {
             RssRuleSubscriptionDetailScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionEdit)) },
                 onApply = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionApply)) }
             )
@@ -631,7 +864,7 @@ fun AppShell(
 
         ReaderRoute.RssRuleSubscriptionEdit -> {
             RssRuleSubscriptionEditScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onTest = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionTest)) },
                 onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
@@ -639,14 +872,14 @@ fun AppShell(
 
         ReaderRoute.RssRuleSubscriptionTest -> {
             RssRuleSubscriptionTestScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onViewResult = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRuleSubscriptionDetail)) }
             )
         }
 
         ReaderRoute.RssRuleSubscriptionApply -> {
             RssRuleSubscriptionApplyScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onCancel = { vm.dispatch(ReaderUiIntent.PopRoute) },
                 onConfirm = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceImport)) }
             )
@@ -654,7 +887,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceGroups -> {
             RssSourceGroupsScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onEditGroup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceGroupEdit)) },
                 onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
@@ -662,14 +895,14 @@ fun AppShell(
 
         ReaderRoute.RssSourceGroupEdit -> {
             RssSourceGroupEditScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onSave = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
         }
 
         ReaderRoute.RssSourceActions -> {
             RssSourceActionsScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onRefresh = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRefreshing)) },
                 onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
                 onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
@@ -684,7 +917,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceBatch -> {
             RssSourceBatchScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExport)) },
                 onDisable = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceBatchDisable)) },
                 onDone = { popBackTo(ReaderRoute.RssSubscriptionManagement) }
@@ -693,7 +926,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceExport -> {
             RssSourceExportScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onPreview = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportDetail)) },
                 onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportResult)) }
             )
@@ -701,7 +934,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceExportDetail -> {
             RssSourceExportDetailScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onExport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceExportResult)) }
             )
         }
@@ -735,7 +968,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceDebug -> {
             RssSourceDebugScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onEdit = {
                     if (state.backStack.dropLast(1).lastOrNull() == ReaderRoute.RssSourceEdit) {
                         vm.dispatch(ReaderUiIntent.PopRoute)
@@ -755,7 +988,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceVars -> {
             RssSourceVarsScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onEdit = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceEdit)) },
                 onDebug = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
                 onDone = { popBackTo(ReaderRoute.RssSourceActions) }
@@ -764,7 +997,7 @@ fun AppShell(
 
         ReaderRoute.RssSourceLogin -> {
             RssSourceLoginScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onWebLogin = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginWeb)) },
                 onCookie = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginCookie)) },
                 onTest = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceDebug)) },
@@ -775,14 +1008,14 @@ fun AppShell(
 
         ReaderRoute.RssSourceLoginWeb -> {
             RssSourceLoginWebScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onDone = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssSourceLoginCookie)) }
             )
         }
 
         ReaderRoute.RssSourceLoginCookie -> {
             RssSourceLoginCookieScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onSave = { popBackTo(ReaderRoute.RssSourceActions) }
             )
         }
@@ -830,7 +1063,7 @@ fun AppShell(
 
         ReaderRoute.RssReadRecord -> {
             RssReadRecordScreen(
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onBackToList = { vm.dispatch(ReaderUiIntent.SelectTab(MainTab.RSS)) },
                 onOpenDetail = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssDetail)) },
                 onClear = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.RssRecordClear)) }
@@ -858,7 +1091,7 @@ fun AppShell(
                     }
                     BookDetailScreen(
                         state = bookState,
-                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onBack = handleBack,
                         onContinueReading = { enterReaderFromBook(bookState.book) },
                         onBookDirectory = { navigateTo(ReaderRoute.BookState("book-directory", route.book)) },
                         onSourceSwitch = {
@@ -879,7 +1112,7 @@ fun AppShell(
                     }
                     BookDirectoryScreen(
                         state = directoryState,
-                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onBack = handleBack,
                         onOpenChapter = { enterReaderFromBook(directoryState.book) }
                     )
                 }
@@ -917,7 +1150,7 @@ fun AppShell(
                 else -> {
                     DemoRouteScreen(
                         routeId = route.id,
-                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onBack = handleBack,
                         onNavigate = { navigateToRouteId(it) },
                         onDispatch = vm::dispatch,
                         overlayState = state.overlayState
@@ -929,7 +1162,7 @@ fun AppShell(
         is ReaderRoute.RssState -> {
             RssRemainingDemoRouteScreen(
                 routeId = route.id,
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onNavigate = { navigateToRouteId(it) }
             )
         }
@@ -945,7 +1178,7 @@ fun AppShell(
             RestoreScreen(
                 state = restoreUiState,
                 routeId = route.id,
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onNavigate = ::navigateRestoreTarget,
                 onScopeToggle = { restoreUiState = restoreUiState.toggleScope(it) },
                 onConflictChoice = { conflictId, choice ->
@@ -964,7 +1197,7 @@ fun AppShell(
                 ) {
                     DiscoverDemoRouteScreen(
                         routeId = route.id,
-                        onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                        onBack = handleBack,
                         onNavigate = { navigateToRouteId(it) },
                         onOpenBook = { sourceId, bookUrl, bookName ->
                             vm.dispatch(
@@ -982,7 +1215,7 @@ fun AppShell(
                 DiscoverDemoRouteScreen(
                     routeId = route.id,
                     shell = discoverShellForRoute(route.id),
-                    onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                    onBack = handleBack,
                     onNavigate = { navigateToRouteId(it) },
                     onOpenBook = { sourceId, bookUrl, bookName ->
                         vm.dispatch(
@@ -1001,7 +1234,74 @@ fun AppShell(
         is ReaderRoute.SourceState -> {
             SourceDemoRouteScreen(
                 routeId = route.id,
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
+                onNavigate = { navigateToRouteId(it) }
+            )
+        }
+
+        ReaderRoute.ReaderFullFont -> {
+            ReaderFontSettingsScreen(
+                onBack = handleBack,
+                context = state.readerContext,
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.ReaderFullTheme -> {
+            ReaderThemeSettingsScreen(
+                onBack = handleBack,
+                context = state.readerContext,
+                dispatch = vm::dispatch,
+                onNavigate = { navigateToRouteId(it) }
+            )
+        }
+
+        ReaderRoute.ReaderFullThemeEdit -> {
+            ReaderThemeEditScreen(
+                onBack = handleBack,
+                context = state.readerContext,
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.ReaderFullLayout -> {
+            ReaderLayoutSettingsScreen(
+                onBack = handleBack,
+                context = state.readerContext,
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.ReaderFullPageTurn -> {
+            ReaderPageTurnSettingsScreen(
+                onBack = handleBack,
+                context = state.readerContext,
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.SourceDetail -> {
+            SourceDetailScreen(
+                onBack = handleBack,
+                onEdit = { vm.dispatch(ReaderUiIntent.SourceEditOpen(sourceId = "", name = "", url = "")) },
+                onDebug = { navigateToRouteId("source-debug") },
+                onDelete = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.SourceEdit -> {
+            SourceEditScreen(
+                onBack = handleBack,
+                state = state.sourceEdit,
+                dispatch = vm::dispatch
+            )
+        }
+
+        ReaderRoute.ReaderSettings -> {
+            ReaderSettingsScreen(
+                onBack = handleBack,
+                context = state.readerContext,
                 onNavigate = { navigateToRouteId(it) }
             )
         }
@@ -1009,7 +1309,7 @@ fun AppShell(
         is ReaderRoute.Demo -> {
             DemoRouteScreen(
                 routeId = route.id,
-                onBack = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                onBack = handleBack,
                 onNavigate = { navigateToRouteId(it) },
                 onDispatch = vm::dispatch,
                 overlayState = state.overlayState
@@ -1034,7 +1334,10 @@ fun AppShell(
                 appTopBar = {
                     when (state.activeTab) {
                         MainTab.BOOKSHELF -> BookshelfTabTopBar(
-                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) }
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onOpenMoreMenu = {
+                                vm.dispatch(ReaderUiIntent.OpenMoreMenu(triggerId = "bookshelf-more"))
+                            }
                         )
                         MainTab.DISCOVER -> DiscoverTabTopBar(state = discoverState)
                         MainTab.RSS -> RssTabTopBar(
@@ -1060,7 +1363,9 @@ fun AppShell(
                             },
                             onBookDetail = { book ->
                                 vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookState("book-detail", book)))
-                            }
+                            },
+                            moreMenuOpen = state.moreMenu.open && state.moreMenu.triggerId == "bookshelf-more",
+                            onCloseMoreMenu = { vm.dispatch(ReaderUiIntent.CloseMoreMenu) }
                         )
                         else -> Box(modifier = Modifier.size(0.dp))
                     }
@@ -1077,6 +1382,8 @@ fun AppShell(
             }
         }
         else -> Unit
+        }
+        }
     }
 }
 
@@ -1243,7 +1550,7 @@ private fun TabContent(
     }
 }
 
-private fun appShellViewModelFactory(
+internal fun appShellViewModelFactory(
     reducedMotionResolver: ReducedMotionResolver?,
     ttsProgressFlow: kotlinx.coroutines.flow.Flow<com.reader.android.data.adapter.TtsProgressUpdate?>? = null
 ) = viewModelFactory {

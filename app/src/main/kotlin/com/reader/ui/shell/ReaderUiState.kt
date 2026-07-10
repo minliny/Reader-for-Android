@@ -445,6 +445,46 @@ sealed class ReaderRoute {
         val routeId: String get() = id
     }
 
+    /** `source-detail` — native Compose source detail screen (W3). */
+    object SourceDetail : ReaderRoute() {
+        const val routeId: String = RouteIds.SOURCE_DETAIL
+    }
+
+    /** `source-edit` — native Compose source edit screen (W3). */
+    object SourceEdit : ReaderRoute() {
+        const val routeId: String = RouteIds.SOURCE_EDIT
+    }
+
+    /** `reader-full-font` — full-screen font settings page (W4). */
+    object ReaderFullFont : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_FULL_FONT
+    }
+
+    /** `reader-full-theme` — full-screen theme settings page (W4). */
+    object ReaderFullTheme : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_FULL_THEME
+    }
+
+    /** `reader-full-theme-edit` — full-screen theme edit page (W4). */
+    object ReaderFullThemeEdit : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_FULL_THEME_EDIT
+    }
+
+    /** `reader-full-layout` — full-screen layout settings page (W4). */
+    object ReaderFullLayout : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_FULL_LAYOUT
+    }
+
+    /** `reader-full-page-turn` — full-screen page-turn settings page (W4). */
+    object ReaderFullPageTurn : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_FULL_PAGE_TURN
+    }
+
+    /** P0-Fix7: `reader-settings` — native Compose settings screen (not Demo placeholder). */
+    object ReaderSettings : ReaderRoute() {
+        const val routeId: String = RouteIds.READER_SETTINGS
+    }
+
     /** Native fallback for demo-authored routes that do not yet have bespoke Compose screens. */
     data class Demo(val id: String) : ReaderRoute() {
         val routeId: String get() = id
@@ -466,9 +506,17 @@ object RouteIds {
     const val READER_FULL_TTS = "reader-full-tts"
     const val READER_FULL_APPEARANCE = "reader-full-appearance"
     const val READER_FULL_SETTINGS = "reader-full-settings"
+    const val READER_FULL_FONT = "reader-full-font"
+    const val READER_FULL_THEME = "reader-full-theme"
+    const val READER_FULL_THEME_EDIT = "reader-full-theme-edit"
+    const val READER_FULL_LAYOUT = "reader-full-layout"
+    const val READER_FULL_PAGE_TURN = "reader-full-page-turn"
     const val READER_BOOK_CACHE = "reader-book-cache"
     const val READER_DEBUG_INFO = "reader-debug-info"
     const val SOURCE_SWITCH = "source-switch"
+    const val SOURCE_SWITCH_RESULTS = "source-switch-results"
+    const val SOURCE_DETAIL = "source-detail"
+    const val SOURCE_EDIT = "source-edit"
     const val BOOK_SEARCH = "book-search"
     const val SOURCE_IMPORT_PREVIEW = "source-import-preview"
     const val BOOK_BATCH_MANAGEMENT = "book-batch-management"
@@ -574,6 +622,14 @@ val ReaderRoute.routeId: String
         is ReaderRoute.RestoreState -> routeId
         is ReaderRoute.DiscoverState -> routeId
         is ReaderRoute.SourceState -> routeId
+        ReaderRoute.SourceDetail -> ReaderRoute.SourceDetail.routeId
+        ReaderRoute.SourceEdit -> ReaderRoute.SourceEdit.routeId
+        ReaderRoute.ReaderFullFont -> ReaderRoute.ReaderFullFont.routeId
+        ReaderRoute.ReaderFullTheme -> ReaderRoute.ReaderFullTheme.routeId
+        ReaderRoute.ReaderFullThemeEdit -> ReaderRoute.ReaderFullThemeEdit.routeId
+        ReaderRoute.ReaderFullLayout -> ReaderRoute.ReaderFullLayout.routeId
+        ReaderRoute.ReaderFullPageTurn -> ReaderRoute.ReaderFullPageTurn.routeId
+        ReaderRoute.ReaderSettings -> ReaderRoute.ReaderSettings.routeId
         is ReaderRoute.Demo -> routeId
     }
 
@@ -642,6 +698,14 @@ fun ReaderRoute.shell(): RouteShell = when (this) {
     is ReaderRoute.RestoreState -> RouteShell.SettingsShell
     is ReaderRoute.DiscoverState -> RouteShell.MainTabShell
     is ReaderRoute.SourceState -> RouteShell.SettingsShell
+    ReaderRoute.SourceDetail -> RouteShell.SettingsShell
+    ReaderRoute.SourceEdit -> RouteShell.SettingsShell
+    ReaderRoute.ReaderFullFont -> RouteShell.ReaderShell
+    ReaderRoute.ReaderFullTheme -> RouteShell.ReaderShell
+    ReaderRoute.ReaderFullThemeEdit -> RouteShell.ReaderShell
+    ReaderRoute.ReaderFullLayout -> RouteShell.ReaderShell
+    ReaderRoute.ReaderFullPageTurn -> RouteShell.ReaderShell
+    ReaderRoute.ReaderSettings -> RouteShell.ReaderShell
     is ReaderRoute.Demo -> RouteShell.LibraryShell
 }
 
@@ -837,7 +901,15 @@ enum class SettingsOverlay {
  */
 data class SettingsState(
     val activeTab: SettingsTab = SettingsTab.GENERAL,
-    val overlay: SettingsOverlay = SettingsOverlay.NONE
+    val overlay: SettingsOverlay = SettingsOverlay.NONE,
+    /** P3.4: App 主题模式（system/light/dark）。 */
+    val appThemeMode: String = "system",
+    /** P3.4: 自动检查更新。 */
+    val autoCheckUpdate: Boolean = true,
+    /** P3.4: 点击底栏回顶部。 */
+    val tapBottomBarToTop: Boolean = true,
+    /** P3.4: 崩溃日志开关。 */
+    val crashLogEnabled: Boolean = true
 )
 
 /**
@@ -932,6 +1004,39 @@ enum class PermissionKind {
 }
 
 /**
+ * W3: 书源编辑状态切片。
+ *
+ * 跟踪 source-edit 页面的表单字段与保存状态。
+ * 状态流转：Idle -> Editing(sourceId, fields) -> Saving -> Saved | Error -> Idle
+ */
+sealed class SourceEditState {
+    object Idle : SourceEditState()
+    data class Editing(
+        val sourceId: String = "",
+        val name: String = "",
+        val url: String = "",
+        val group: String = "",
+        val enabled: Boolean = true,
+        val comment: String = ""
+    ) : SourceEditState()
+    object Saving : SourceEditState()
+    object Saved : SourceEditState()
+    data class Error(val message: String) : SourceEditState()
+}
+
+/**
+ * W5: 内容替换规则数据模型。
+ */
+data class ReplaceRule(
+    val id: String,
+    val name: String,
+    val pattern: String,
+    val replacement: String = "",
+    val enabled: Boolean = true,
+    val scope: String = "all"
+)
+
+/**
  * The single UI state. Every field the contract requires is present:
  * `activeTab`, `currentRoute`, `backStack`, `ReaderContext`, `activeSession`,
  * `overlayState`, `motionInterrupt` (UI_PLATFORM_EVIDENCE_REQUESTS.md).
@@ -983,7 +1088,13 @@ data class ReaderUiState(
     /** 阅读行为开关集合（自动翻页/音量键/横屏/常亮/页脚/触摸/缓存等），key 为 toggle 标识。 */
     val readerBehaviorToggles: Map<String, Boolean> = emptyMap(),
     /** 阅读设置单选集合（点击翻页方式/翻页动画/语速/音色/朗读范围/定时关闭等），key=block 标识, value=选中项。 */
-    val readerChoices: Map<String, String> = emptyMap()
+    val readerChoices: Map<String, String> = emptyMap(),
+    /** App 主题模式：system（跟随系统）/ light / dark。驱动 ReaderTheme 的 isNight 解析。 */
+    val appThemeMode: String = "system",
+    /** W3: 书源编辑状态（Idle/Editing/Saving/Saved/Error）。 */
+    val sourceEdit: SourceEditState = SourceEditState.Idle,
+    /** W5: 内容替换规则列表。 */
+    val replaceRules: List<ReplaceRule> = emptyList()
 ) {
     /** True when the rendered route is the immersive reading surface (no control layer). */
     val isImmersiveReading: Boolean

@@ -9,7 +9,6 @@ class BookshelfChromeStateTest {
         val state = BookshelfChromeState()
 
         assertEquals(BookshelfViewMode.COVER, state.viewMode)
-        assertEquals(false, state.isMoreMenuOpen)
         assertEquals(false, state.filter.isActive)
     }
 

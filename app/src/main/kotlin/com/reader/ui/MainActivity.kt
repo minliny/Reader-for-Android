@@ -8,10 +8,15 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.api.ReaderCoreClient
 import com.reader.ui.motion.SystemAnimationScaleReducedMotionResolver
+import com.reader.ui.shell.AppShellViewModel
+import com.reader.ui.shell.appShellViewModelFactory
 import com.reader.ui.theme.ReaderTheme
 
 class MainActivity : ComponentActivity() {
@@ -47,7 +52,21 @@ class MainActivity : ComponentActivity() {
             val reducedMotionResolver = remember {
                 SystemAnimationScaleReducedMotionResolver(this@MainActivity)
             }
-            ReaderTheme {
+            // 在 MainActivity 持有 AppShellViewModel（Activity 作用域单例），读取 store 中的
+            // readerContext.themeId 与 appThemeMode 驱动 ReaderTheme（对齐 HarmonyOS 修复）。
+            val vm: AppShellViewModel = viewModel(
+                factory = appShellViewModelFactory(
+                    reducedMotionResolver,
+                    if (com.reader.android.AppProvider.isInitialized) {
+                        com.reader.android.AppProvider.ttsSessionController.progressFlow
+                    } else null
+                )
+            )
+            val state by vm.state.collectAsStateWithLifecycle()
+            ReaderTheme(
+                themeId = state.readerContext?.themeId ?: "paper",
+                appThemeMode = state.appThemeMode
+            ) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     ReaderApp(reducedMotionResolver = reducedMotionResolver)
                 }

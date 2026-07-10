@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -1274,28 +1275,28 @@ private fun sourceDemoIconRes(icon: SourceDemoIcon): Int = when (icon) {
 
 private fun sourceTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun sourceSectionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     lineHeight = 18.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun sourceMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun sourceActionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(900),
     textAlign = TextAlign.Center
@@ -1303,7 +1304,7 @@ private fun sourceActionStyle() = TextStyle(
 
 private fun sourceBadgeStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 12.sp,
     fontWeight = FontWeight(800),
     textAlign = TextAlign.Center
@@ -1311,14 +1312,14 @@ private fun sourceBadgeStyle() = TextStyle(
 
 private fun sourceDialogTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 18.sp,
+    fontSize = ReaderTypeToken.READER_BODY.value,
     lineHeight = 22.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun sourceCodeStyle() = TextStyle(
     fontFamily = FontFamily.Monospace,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 15.sp,
     fontWeight = FontWeight(500)
 )

@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -568,7 +569,7 @@ private fun RssRuleApplyCard() {
             text = "将新增 2 个源、更新 1 个规则，并跳过 1 个本地冲突。登录凭据不会被覆盖。",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight(500)
             ),
@@ -640,7 +641,7 @@ private fun RssRuleBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -698,7 +699,7 @@ private fun RssRuleChip(text: String, active: Boolean) {
     ) {
         Text(
             text = text,
-            style = rssRuleButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
+            style = rssRuleButtonStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 14.sp),
             color = if (active) colors.onPrimary else extra.navInactive,
             maxLines = 1
         )
@@ -735,7 +736,7 @@ private fun RssRuleBadge(label: String) {
     ) {
         Text(
             text = label,
-            style = rssRuleMetaStyle().copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight(850)),
+            style = rssRuleMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, lineHeight = 12.sp, fontWeight = FontWeight(850)),
             color = readerExtraColors().primaryDark,
             maxLines = 1
         )
@@ -760,7 +761,7 @@ private fun RssRuleStatusBadge(label: String, tone: RssRuleTone) {
     ) {
         Text(
             text = label,
-            style = rssRuleMetaStyle().copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight(850)),
+            style = rssRuleMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, lineHeight = 12.sp, fontWeight = FontWeight(850)),
             color = color,
             maxLines = 1
         )
@@ -830,21 +831,21 @@ private fun rssRuleEditFields() = listOf(
 
 private fun rssRuleTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssRuleMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssRuleButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

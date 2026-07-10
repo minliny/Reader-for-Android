@@ -85,6 +85,12 @@ sealed class ReaderUiIntent {
         override val requestId: String = generateRequestId()
     ) : ReaderUiIntent()
 
+    /** 更新 App 主题模式（system/light/dark），驱动 ReaderTheme 的 isNight 解析。 */
+    data class UpdateAppThemeMode(
+        val mode: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
     /** 更新亮度与自动亮度开关。 */
     data class UpdateReaderBrightness(
         val brightness: Float,
@@ -413,6 +419,27 @@ sealed class ReaderUiIntent {
         override val requestId: String = generateRequestId()
     }
 
+    // ── P3: 书源管理 ──────────────────────────────────────────────────────────
+
+    /** P3.3: 切换书源启用状态（dispatch source.enable/disable）。 */
+    data class SetSourceEnabled(
+        val sourceId: String,
+        val enabled: Boolean,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    // ── P3: 通用设置 action ───────────────────────────────────────────────────
+
+    /** P3.4: 清理缓存（→ effect 调 Core cache.clear 命令）。 */
+    object ClearCache : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** P3.4: 恢复默认设置（重置 App 主题/语言/启动页/行为偏好）。 */
+    object RestoreDefaultSettings : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
     // ── P3: Permission ────────────────────────────────────────────────────────
 
     /** P3: 请求权限（触发系统 dialog）。 */
@@ -535,6 +562,17 @@ sealed class ReaderUiIntent {
         override val requestId: String = generateRequestId()
     ) : ReaderUiIntent()
 
+    /** P0: 确认切换到选中源（pop route + 重置 sourceSwitch = Idle）。 */
+    data class SourceSwitchConfirm(
+        val sourceId: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** P0: 取消换源（pop route + 重置 sourceSwitch = Idle）。 */
+    object SourceSwitchCancel : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
     /** P0: 换源结果已就绪（→ Results）。 */
     data class SourceSwitchResultsLoaded(
         val results: List<SourceSwitchResult>,
@@ -619,6 +657,93 @@ sealed class ReaderUiIntent {
     data class SetReaderChoice(
         val key: String,
         val value: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    // ── W3: 书源编辑（source-edit）专用 intents ──────────────────────────────
+
+    /** W3: 打开书源编辑页（push SourceEdit route + 进入 Editing 状态）。 */
+    data class SourceEditOpen(
+        val sourceId: String = "",
+        val name: String = "",
+        val url: String = "",
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W3: 更新书源编辑表单字段。 */
+    data class SourceEditUpdateField(
+        val name: String? = null,
+        val url: String? = null,
+        val group: String? = null,
+        val enabled: Boolean? = null,
+        val comment: String? = null,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W3: 保存书源（-> Saving）。 */
+    object SourceEditSave : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** W3: 取消书源编辑（pop route + 重置 sourceEdit = Idle）。 */
+    object SourceEditCancel : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    /** W3: 书源保存完成（-> Saved 或 Error）。 */
+    data class SourceEditResult(
+        val success: Boolean,
+        val message: String = "",
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W3: 打开书源详情页（push SourceDetail route）。 */
+    data class SourceDetailOpen(
+        val sourceId: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W3: 关闭书源详情页（pop route）。 */
+    object SourceDetailClose : ReaderUiIntent() {
+        override val requestId: String = generateRequestId()
+    }
+
+    // ── W5: 内容替换规则 CRUD intents ────────────────────────────────────────
+
+    /** W5: 添加替换规则。 */
+    data class ReplaceRuleAdd(
+        val name: String,
+        val pattern: String,
+        val replacement: String = "",
+        val scope: String = "all",
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W5: 更新替换规则。 */
+    data class ReplaceRuleUpdate(
+        val id: String,
+        val name: String? = null,
+        val pattern: String? = null,
+        val replacement: String? = null,
+        val scope: String? = null,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W5: 删除替换规则。 */
+    data class ReplaceRuleDelete(
+        val id: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W5: 切换替换规则启用状态。 */
+    data class ReplaceRuleToggle(
+        val id: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** W5: 加载替换规则列表（从 Core 拉取后回填）。 */
+    data class ReplaceRulesLoaded(
+        val rules: List<ReplaceRule>,
         override val requestId: String = generateRequestId()
     ) : ReaderUiIntent()
 }

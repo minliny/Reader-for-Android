@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -201,7 +202,7 @@ private fun RssOriginalWebPreview() {
             text = "Reader UI 前端输入件更新说明",
             style = TextStyle(
                 fontFamily = FontFamily.Serif,
-                fontSize = 19.sp,
+                fontSize = ReaderTypeToken.EMPTY_HEADING.value,
                 lineHeight = 24.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -211,7 +212,7 @@ private fun RssOriginalWebPreview() {
             text = "这里展示原文网页入口的预览状态。实际 APP 中应打开内置 WebView，并保留返回 RSS 阅读页、复制链接、分享和用浏览器打开。",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight(500)
             ),
@@ -298,7 +299,7 @@ private fun RssOriginalBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -311,21 +312,21 @@ private fun RssOriginalBottomButton(
 
 private fun rssOriginalTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssOriginalMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssOriginalButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 
 /**
  * Theme tokens for Reader for Android, mapped 1:1 (px→dp at mdpi) from the canonical demo
@@ -246,7 +247,7 @@ val LocalReaderExtraColors = staticCompositionLocalOf {
     )
 }
 
-private val LightExtra = ReaderExtraColors(
+internal val LightExtra = ReaderExtraColors(
     paper = Paper,
     readerPaper = ReaderPaper,
     paperBright = PaperBright,
@@ -300,7 +301,7 @@ private val LightExtra = ReaderExtraColors(
     paperEnd = PaperEnd
 )
 
-private val DarkExtra = ReaderExtraColors(
+internal val DarkExtra = ReaderExtraColors(
     paper = PaperDark,
     readerPaper = ReaderPaperDark,
     paperBright = PaperBrightDark,
@@ -408,17 +409,19 @@ private val DarkColors = darkColorScheme(
  */
 object ReaderTypography {
     // ── Font families ──
-    val Sans = FontFamily.Default       // demo --reader-ds-font-sans (Roboto + Noto Sans CJK fallback)
-    val Serif = FontFamily.Serif        // demo --reader-ds-font-serif (Noto Serif CJK fallback)
+    // Values mirror `platforms.kotlin` in the contract for `--fd-ds-font-sans` / `--fd-ds-font-serif`.
+    // Keep in sync with `ReaderTokenAdapter.font(Token)` — Android system resolver supplies CJK fallback.
+    val Sans = FontFamily.Default       // --fd-ds-font-sans (platforms.kotlin = "FontFamily.Default")
+    val Serif = FontFamily.Serif        // --fd-ds-font-serif (platforms.kotlin = "FontFamily.Serif")
 
     // ── Font size tokens (tokens.css:50-56) ──
-    val appTitleSize = 20.sp            // --reader-ds-type-app-title-size
-    val pageTitleSize = 20.sp           // --reader-ds-type-page-title-size
-    val sectionTitleSize = 15.sp        // --reader-ds-type-section-title-size
-    val bookTitleSize = 14.sp           // --reader-ds-type-book-title-size
-    val bookMetaSize = 12.sp            // --reader-ds-type-book-meta-size
-    val readerBodySize = 18.sp          // --reader-ds-type-reader-body-size
-    val readerControlLabelSize = 12.sp  // --reader-ds-type-reader-control-label-size
+    val appTitleSize = ReaderTypeToken.APP_TITLE.value            // --fd-ds-type-app-title-size
+    val pageTitleSize = ReaderTypeToken.PAGE_TITLE.value          // --fd-ds-type-page-title-size
+    val sectionTitleSize = ReaderTypeToken.SECTION_TITLE.value    // --fd-ds-type-section-title-size
+    val bookTitleSize = ReaderTypeToken.BOOK_TITLE.value          // --fd-ds-type-book-title-size
+    val bookMetaSize = ReaderTypeToken.BOOK_META.value            // --fd-ds-type-book-meta-size
+    val readerBodySize = ReaderTypeToken.READER_BODY.value        // --fd-ds-type-reader-body-size
+    val readerControlLabelSize = ReaderTypeToken.READER_CONTROL_LABEL.value  // --fd-ds-type-reader-control-label-size
 
     // ── Font weight tokens (04-settings-source.css) ──
     val weightMedium = FontWeight(500)     // --reader-ds-weight-medium
@@ -438,52 +441,52 @@ private val Serif = ReaderTypography.Serif
 
 object ReaderTextStyles {
     // Top bar title — .fd-top-bar h1: 29px serif 700
-    val appBarTitle = TextStyle(fontFamily = Serif, fontSize = 29.sp, fontWeight = FontWeight(700))
+    val appBarTitle = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.APP_BAR_TITLE.value, fontWeight = FontWeight(700))
 
     // Back bar title — .fd-back-bar h1: 29px serif 700 (same as .fd-top-bar h1)
-    val backBarTitle = TextStyle(fontFamily = Serif, fontSize = 29.sp, fontWeight = FontWeight(700))
+    val backBarTitle = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.BACK_BAR_TITLE.value, fontWeight = FontWeight(700))
 
     // Book card title — .fd-book-card strong: 15px serif weight 700, line-height 1.22, 2 lines
-    val bookTitle = TextStyle(fontFamily = Serif, fontSize = 15.sp, lineHeight = (15 * 1.22f).sp, fontWeight = FontWeight(700))
+    val bookTitle = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = (15 * 1.22f).sp, fontWeight = FontWeight(700))
 
     // Book card author — .fd-book-card span: 12px, line-height 1.25, 1 line
-    val bookAuthor = TextStyle(fontFamily = Sans, fontSize = 12.sp, lineHeight = (12 * 1.25f).sp)
+    val bookAuthor = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = (12 * 1.25f).sp)
 
     // Tab label — .fd-main-nav-item: 11px weight 800, line-height 18px
-    val tabLabel = TextStyle(fontFamily = Sans, fontSize = 11.sp, lineHeight = 18.sp, fontWeight = FontWeight(800))
+    val tabLabel = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.ACTION_LABEL.value, lineHeight = 18.sp, fontWeight = FontWeight(800))
 
     // Continue-reading label — .fd-continue-card h2: 13px weight 900, color primary
-    val continueLabel = TextStyle(fontFamily = Sans, fontSize = 13.sp, fontWeight = FontWeight(900))
+    val continueLabel = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(900))
 
     // Continue-reading title — .fd-continue-card strong: 20px serif weight 700, 2 lines
-    val continueTitle = TextStyle(fontFamily = Serif, fontSize = 20.sp, lineHeight = (20 * 1.2f).sp, fontWeight = FontWeight(700))
+    val continueTitle = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.PAGE_TITLE.value, lineHeight = (20 * 1.2f).sp, fontWeight = FontWeight(700))
 
     // Continue-reading author — .fd-continue-author: 14px, 2 lines
-    val continueAuthor = TextStyle(fontFamily = Sans, fontSize = 14.sp, lineHeight = (14 * 1.2f).sp)
+    val continueAuthor = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.BOOK_TITLE.value, lineHeight = (14 * 1.2f).sp)
 
     // Continue-reading action button — 13px weight 800
-    val continueAction = TextStyle(fontFamily = Sans, fontSize = 13.sp, fontWeight = FontWeight(800))
+    val continueAction = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(800))
 
     // Empty-state heading — .fd-bookshelf-empty-state h2: 19px weight 900
-    val emptyHeading = TextStyle(fontFamily = Sans, fontSize = 19.sp, lineHeight = (19 * 1.25f).sp, fontWeight = FontWeight(900))
+    val emptyHeading = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.EMPTY_HEADING.value, lineHeight = (19 * 1.25f).sp, fontWeight = FontWeight(900))
 
     // Empty-state body — .fd-bookshelf-empty-state p: 13px line-height 1.55
-    val emptyBody = TextStyle(fontFamily = Sans, fontSize = 13.sp, lineHeight = (13 * 1.55f).sp)
+    val emptyBody = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.CHAPTER_TITLE.value, lineHeight = (13 * 1.55f).sp)
 
     // Immersive chapter title — .fd-ir-reading-layer h1: 23px serif, line-height 1.25, center, margin-bottom 24
-    val readerChapterTitle = TextStyle(fontFamily = Serif, fontSize = 23.sp, lineHeight = (23 * 1.25f).sp, textAlign = TextAlign.Center)
+    val readerChapterTitle = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.READER_CHAPTER_TITLE.value, lineHeight = (23 * 1.25f).sp, textAlign = TextAlign.Center)
 
     // Immersive body — .fd-ir-reading-layer p: 18px serif, line-height 1.96
-    val readerBody = TextStyle(fontFamily = Serif, fontSize = 18.sp, lineHeight = (18 * 1.96f).sp)
+    val readerBody = TextStyle(fontFamily = Serif, fontSize = ReaderTypeToken.READER_BODY.value, lineHeight = (18 * 1.96f).sp)
 
     // Info layer — .fd-ir-info-layer: 12px
-    val infoLayer = TextStyle(fontFamily = Sans, fontSize = 12.sp, lineHeight = (12 * 1.2f).sp)
+    val infoLayer = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = (12 * 1.2f).sp)
 
     // Section head — .fd-section-head h2: 15px weight 700 (h2 default)
-    val sectionTitle = TextStyle(fontFamily = Sans, fontSize = 15.sp, fontWeight = FontWeight(700))
+    val sectionTitle = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.SECTION_TITLE.value, fontWeight = FontWeight(700))
 
     // Reader top title — .fd-reader-top strong: 16px
-    val readerTopTitle = TextStyle(fontFamily = Sans, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+    val readerTopTitle = TextStyle(fontFamily = Sans, fontSize = ReaderTypeToken.TOP_BAR_TITLE.value, fontWeight = FontWeight.Normal)
 }
 
 // ── Shapes ──────────────────────────────────────────────────────────────────────
@@ -580,11 +583,21 @@ private val MaterialShapes = Shapes(
 
 @Composable
 fun ReaderTheme(
-    darkTheme: Boolean = androidx.compose.foundation.isSystemInDarkTheme(),
+    themeId: String = "paper",
+    appThemeMode: String = "system",
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
-    val extra = if (darkTheme) DarkExtra else LightExtra
+    // 由 appThemeMode (system/light/dark) + 主题自身的 -night 后缀共同决定 isNight，
+    // 再用 ReaderThemeResolver.palette(themeId, isNight) 产出上下文化的 ReaderExtraColors，
+    // 取代静态 LightExtra/DarkExtra 切换（对齐 HarmonyOS 修复）。
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isNight = ReaderThemeResolver.isNightTheme(themeId) || when (appThemeMode) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
+    }
+    val colors = if (isNight) DarkColors else LightColors
+    val extra = ReaderThemeResolver.palette(themeId, isNight)
     CompositionLocalProvider(LocalReaderExtraColors provides extra) {
         MaterialTheme(
             colorScheme = colors,

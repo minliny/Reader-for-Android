@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -753,70 +754,70 @@ private fun restoreStageIcon(stage: RestoreStageItem): Int = when {
 
 private fun restoreCardTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 16.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_TITLE.value,
     lineHeight = 19.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun restoreRowTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun restoreBodyStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 17.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun restoreTinyMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun restoreMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 15.sp,
     fontWeight = FontWeight(700)
 )
 
 private fun restoreCaptionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun restoreValueStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 15.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun restoreProgressValueStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun restoreActionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 15.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun restoreBadgeStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(900)
 )

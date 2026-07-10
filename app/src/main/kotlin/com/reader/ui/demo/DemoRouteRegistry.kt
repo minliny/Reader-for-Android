@@ -291,7 +291,6 @@ object DemoRouteRegistry {
         "source-import-options",
         "source-batch",
         "source-groups",
-        "source-detail",
         "source-detect",
         "source-rule-edit",
         "source-debug",
@@ -321,13 +320,18 @@ object DemoRouteRegistry {
         RouteIds.READER_AUTO_PAGE,
         RouteIds.READER_CONTENT_SEARCH,
         RouteIds.READER_CONTENT_REPLACEMENT,
-        RouteIds.READER_SETTINGS,
         RouteIds.READER_FULL_DIRECTORY,
         RouteIds.READER_FULL_TTS,
         RouteIds.READER_FULL_APPEARANCE,
         RouteIds.READER_FULL_SETTINGS,
         RouteIds.READER_BOOK_CACHE,
         RouteIds.READER_DEBUG_INFO -> ReaderRoute.ReaderControl(routeId)
+        RouteIds.READER_FULL_FONT -> ReaderRoute.ReaderFullFont
+        RouteIds.READER_FULL_THEME -> ReaderRoute.ReaderFullTheme
+        RouteIds.READER_FULL_THEME_EDIT -> ReaderRoute.ReaderFullThemeEdit
+        RouteIds.READER_FULL_LAYOUT -> ReaderRoute.ReaderFullLayout
+        RouteIds.READER_FULL_PAGE_TURN -> ReaderRoute.ReaderFullPageTurn
+        RouteIds.READER_SETTINGS -> ReaderRoute.ReaderSettings
         RouteIds.SOURCE_SWITCH -> ReaderRoute.SourceSwitchFlow()
         RouteIds.BOOK_SEARCH -> ReaderRoute.Search
         RouteIds.SOURCE_IMPORT_PREVIEW -> ReaderRoute.ImportSource
@@ -340,6 +344,9 @@ object DemoRouteRegistry {
         RouteIds.SYNC_BACKUP -> ReaderRoute.SyncBackup
         RouteIds.WEBDAV_CONFIG -> ReaderRoute.WebDavConfig
         RouteIds.SOURCE_MANAGEMENT -> ReaderRoute.SourceManagement
+        RouteIds.SOURCE_DETAIL -> ReaderRoute.SourceDetail
+        RouteIds.SOURCE_EDIT -> ReaderRoute.SourceEdit
+        RouteIds.SOURCE_SWITCH_RESULTS -> ReaderRoute.SourceSwitchFlow()
         RouteIds.RSS_SEARCH -> ReaderRoute.RssSearch
         RouteIds.RSS_ALL -> ReaderRoute.RssAll
         RouteIds.RSS_STARRED -> ReaderRoute.RssStarred

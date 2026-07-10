@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.shell.SettingsShellFrame
@@ -372,7 +373,7 @@ private fun BookshelfBatchSummary(selectedCount: Int, onSelectAll: () -> Unit) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
                 text = "已选 ${selectedCount} 本",
-                style = bookshelfManagementTitleStyle().copy(fontSize = 15.sp, lineHeight = 18.sp),
+                style = bookshelfManagementTitleStyle().copy(fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 18.sp),
                 color = colors.onBackground,
                 maxLines = 1
             )
@@ -850,7 +851,7 @@ private fun BookshelfBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -1063,28 +1064,28 @@ private fun localImportItems() = listOf(
 
 private fun bookshelfSectionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun bookshelfManagementTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun bookshelfManagementMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun bookshelfControlStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

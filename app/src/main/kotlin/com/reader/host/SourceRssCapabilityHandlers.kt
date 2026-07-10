@@ -10,6 +10,7 @@ import com.reader.android.data.network.RssSubscription
 import com.reader.android.data.network.SubscriptionRepository
 import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
+import com.reader.api.ReaderCoreClient
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -23,6 +24,16 @@ import org.json.JSONObject
 // debug + import/export + RSS fetch operations through the same
 // `HostRequest → HostAdapter.dispatch → HostReply` round-trip used by TTS,
 // permission, notification, etc.
+//
+// Core has landed `rss.list` and `rss.item.read` protocol methods (backed by
+// reader-storage). `RssListHandler` / `RssItemReadHandler` now delegate to
+// Core via [ReaderCoreClient.sendAndAwait] first; the Room-backed
+// [RssItemRepository] cache stays as the fallback path used when the Core
+// bridge is unavailable (e.g. JVM unit tests where [ReaderCoreClient] is not
+// initialized) or the Core call fails. Note: `rss.list` only delegates to
+// Core when the request carries a `xml` param — Core's `rss.list` parses a
+// feed XML and returns items, it is not a "list cached articles" operation,
+// so requests without `xml` always go to the Room cache.
 //
 // All handlers are pure-JVM (no Android Context required) so they can be
 // exercised in JVM unit tests with FakeBookSourceRepository /
@@ -270,9 +281,25 @@ class SourceDebugDetectHandler(private val ctx: SourceRssContext) : CapabilityHa
  * `rss.subscription.list` — returns all RSS subscriptions as a JSON array.
  * Used by the RSS tab + subscription management screen to render the real
  * list instead of `rssDemoSources()` / `rssManagedSources()`.
+ *
+ * Core has landed `rss.subscription.list` (reader-storage). Delegates to Core
+ * first; falls back to the local [SubscriptionRepository] when the Core bridge
+ * is unavailable (e.g. JVM unit tests where [ReaderCoreClient] is not
+ * initialized) or the Core call fails.
  */
 class RssSubscriptionListHandler(private val ctx: SourceRssContext) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            JSONObject()
+        }
+        try {
+            val coreResult = runBlocking {
+                ReaderCoreClient.get().sendAndAwait(CAPABILITY, params, CORE_TIMEOUT_MILLIS)
+            }
+            return HostReply.complete(coreResult.toString())
+        } catch (e: Exception) {
+            // Core bridge unavailable — fall back to local store below.
+        }
         val subs = runBlocking { ctx.subscriptionRepository.getAll() }
         val arr = JSONArray()
         subs.forEach { sub ->
@@ -285,7 +312,10 @@ class RssSubscriptionListHandler(private val ctx: SourceRssContext) : Capability
         return HostReply.complete(JSONObject().put("subscriptions", arr).toString())
     }
 
-    companion object { const val CAPABILITY = "rss.subscription.list" }
+    companion object {
+        const val CAPABILITY = "rss.subscription.list"
+        private const val CORE_TIMEOUT_MILLIS = 30_000L
+    }
 }
 
 // ── rss.subscription.add ──────────────────────────────────────────────────────
@@ -294,6 +324,10 @@ class RssSubscriptionListHandler(private val ctx: SourceRssContext) : Capability
  * `rss.subscription.add` — adds an RSS subscription by feed URL. The title
  * is left blank pending the first successful feed parse (see
  * `rss.refresh`).
+ *
+ * Core has landed `rss.subscription.add` (reader-storage). Delegates to Core
+ * first; falls back to the local [SubscriptionRepository] when the Core bridge
+ * is unavailable or the Core call fails.
  */
 class RssSubscriptionAddHandler(private val ctx: SourceRssContext) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
@@ -303,19 +337,35 @@ class RssSubscriptionAddHandler(private val ctx: SourceRssContext) : CapabilityH
         val feedUrl = params.optString("feedUrl", "")
         if (feedUrl.isEmpty()) return HostReply.error(INTERNAL, "feedUrl required", false)
         val title = params.optString("title", "")
+        try {
+            val coreResult = runBlocking {
+                ReaderCoreClient.get().sendAndAwait(CAPABILITY, params, CORE_TIMEOUT_MILLIS)
+            }
+            return HostReply.complete(coreResult.toString())
+        } catch (e: Exception) {
+            // Core bridge unavailable — fall back to local store below.
+        }
         runBlocking {
             ctx.subscriptionRepository.add(RssSubscription(feedUrl = feedUrl, title = title))
         }
         return HostReply.complete(JSONObject().put("added", true).put("feedUrl", feedUrl).toString())
     }
 
-    companion object { const val CAPABILITY = "rss.subscription.add"; private const val INTERNAL = "INTERNAL" }
+    companion object {
+        const val CAPABILITY = "rss.subscription.add"
+        private const val INTERNAL = "INTERNAL"
+        private const val CORE_TIMEOUT_MILLIS = 30_000L
+    }
 }
 
 // ── rss.subscription.delete ───────────────────────────────────────────────────
 
 /**
  * `rss.subscription.delete` — removes an RSS subscription by feed URL.
+ *
+ * Core has landed `rss.subscription.delete` (reader-storage). Delegates to Core
+ * first; falls back to the local [SubscriptionRepository] when the Core bridge
+ * is unavailable or the Core call fails.
  */
 class RssSubscriptionDeleteHandler(private val ctx: SourceRssContext) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
@@ -324,11 +374,23 @@ class RssSubscriptionDeleteHandler(private val ctx: SourceRssContext) : Capabili
         }
         val feedUrl = params.optString("feedUrl", "")
         if (feedUrl.isEmpty()) return HostReply.error(INTERNAL, "feedUrl required", false)
+        try {
+            val coreResult = runBlocking {
+                ReaderCoreClient.get().sendAndAwait(CAPABILITY, params, CORE_TIMEOUT_MILLIS)
+            }
+            return HostReply.complete(coreResult.toString())
+        } catch (e: Exception) {
+            // Core bridge unavailable — fall back to local store below.
+        }
         runBlocking { ctx.subscriptionRepository.remove(feedUrl) }
         return HostReply.complete(JSONObject().put("removed", true).put("feedUrl", feedUrl).toString())
     }
 
-    companion object { const val CAPABILITY = "rss.subscription.delete"; private const val INTERNAL = "INTERNAL" }
+    companion object {
+        const val CAPABILITY = "rss.subscription.delete"
+        private const val INTERNAL = "INTERNAL"
+        private const val CORE_TIMEOUT_MILLIS = 30_000L
+    }
 }
 
 // ── rss.refresh ───────────────────────────────────────────────────────────────
@@ -382,11 +444,19 @@ class RssRefreshHandler(private val ctx: SourceRssContext) : CapabilityHandler {
 
 /**
  * `rss.list` — returns cached RSS articles as a JSON array. Backed by the
- * local [RssItemRepository] cache populated by `rss.refresh`, so the UI can
- * render the article list without waiting for Core to implement this method.
+ * local [RssItemRepository] cache populated by `rss.refresh`.
+ *
+ * Core has landed `rss.list` (parses a feed XML and returns items with
+ * read-state join). Because Core's `rss.list` is a "parse given XML +
+ * return article list" operation (NOT a "list cached articles" operation),
+ * this handler only delegates to Core when the request carries an `xml`
+ * param. Requests without `xml` always go to the Room cache so the UI can
+ * render previously fetched articles without re-parsing.
  *
  * Params:
- *  - `feedUrl` (optional): filter to a single feed.
+ *  - `xml` (optional): raw feed XML. When present, the handler delegates to
+ *    Core `rss.list` to parse + return items with read-state.
+ *  - `feedUrl` (optional): filter to a single feed (Room path only).
  *  - `unreadOnly` (optional, default false): return only unread items.
  *  - `limit` (optional, default 100): cap on items returned (ignored when
  *    `unreadOnly=true` is set, since unread is typically a small set).
@@ -404,6 +474,22 @@ class RssListHandler(private val ctx: SourceRssContext) : CapabilityHandler {
         val unreadOnly = params.optBoolean("unreadOnly", false)
         val limit = params.optInt("limit", 100)
 
+        // Core's rss.list parses a given feed XML and returns items with
+        // read-state join — it is NOT a "list cached articles" operation.
+        // Only delegate to Core when `xml` is provided; otherwise fall
+        // through to the Room cache.
+        val xml = params.optString("xml", "")
+        if (xml.isNotEmpty()) {
+            try {
+                val coreResult = runBlocking {
+                    ReaderCoreClient.get().sendAndAwait(CAPABILITY, params, CORE_TIMEOUT_MILLIS)
+                }
+                return HostReply.complete(coreResult.toString())
+            } catch (e: Exception) {
+                // Core bridge unavailable — fall back to Room cache below.
+            }
+        }
+
         val items: List<RssItem> = runBlocking {
             when {
                 feedUrl.isNotEmpty() -> ctx.rssItemRepository.listByFeed(feedUrl)
@@ -420,7 +506,11 @@ class RssListHandler(private val ctx: SourceRssContext) : CapabilityHandler {
             .toString())
     }
 
-    companion object { const val CAPABILITY = "rss.list"; private const val INTERNAL = "INTERNAL" }
+    companion object {
+        const val CAPABILITY = "rss.list"
+        private const val INTERNAL = "INTERNAL"
+        private const val CORE_TIMEOUT_MILLIS = 30_000L
+    }
 }
 
 // ── rss.item.read ─────────────────────────────────────────────────────────────
@@ -429,6 +519,10 @@ class RssListHandler(private val ctx: SourceRssContext) : CapabilityHandler {
  * `rss.item.read` — marks a cached RSS article as read/unread by GUID.
  * Backed by [RssItemRepository.markRead] so the read-state persists across
  * process death and survives feed re-fetch (items are keyed by GUID).
+ *
+ * Core has landed `rss.item.read` (reader-storage put/delete read record).
+ * Delegates to Core first; falls back to the local Room-backed
+ * [RssItemRepository.markRead] when the Core bridge is unavailable.
  *
  * Params:
  *  - `guid` (required): the item GUID to update.
@@ -445,6 +539,16 @@ class RssItemReadHandler(private val ctx: SourceRssContext) : CapabilityHandler 
         if (guid.isEmpty()) return HostReply.error(INTERNAL, "guid required", false)
         if (!params.has("read")) return HostReply.error(INTERNAL, "read required", false)
         val read = params.getBoolean("read")
+        // Core has landed `rss.item.read` (reader-storage). Try Core first;
+        // fall back to Room on any bridge failure.
+        try {
+            val coreResult = runBlocking {
+                ReaderCoreClient.get().sendAndAwait(CAPABILITY, params, CORE_TIMEOUT_MILLIS)
+            }
+            return HostReply.complete(coreResult.toString())
+        } catch (e: Exception) {
+            // Core bridge unavailable — fall back to Room below.
+        }
         runBlocking { ctx.rssItemRepository.markRead(guid, read) }
         return HostReply.complete(JSONObject()
             .put("marked", true)
@@ -453,7 +557,11 @@ class RssItemReadHandler(private val ctx: SourceRssContext) : CapabilityHandler 
             .toString())
     }
 
-    companion object { const val CAPABILITY = "rss.item.read"; private const val INTERNAL = "INTERNAL" }
+    companion object {
+        const val CAPABILITY = "rss.item.read"
+        private const val INTERNAL = "INTERNAL"
+        private const val CORE_TIMEOUT_MILLIS = 10_000L
+    }
 }
 
 /** Shared JSON shape for an [RssItem] — used by `rss.list` and `rss.refresh`. */

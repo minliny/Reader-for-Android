@@ -139,6 +139,7 @@ fun BookshelfScreen(
 @Composable
 fun BookshelfTabTopBar(
     onSearch: () -> Unit,
+    onOpenMoreMenu: () -> Unit,
     vm: BookshelfViewModel = viewModel()
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
@@ -167,7 +168,7 @@ fun BookshelfTabTopBar(
             TopIconButton(
                 iconRes = R.drawable.reader_ic_more,
                 contentDescription = "更多",
-                onClick = { vm.setMoreMenuOpen(true) }
+                onClick = onOpenMoreMenu
             )
         }
     }
@@ -179,12 +180,14 @@ fun BookshelfTabStateHost(
     onGroupManagement: () -> Unit,
     onLocalImport: () -> Unit,
     onBookDetail: (Book) -> Unit,
+    moreMenuOpen: Boolean,
+    onCloseMoreMenu: () -> Unit,
     vm: BookshelfViewModel = viewModel()
 ) {
     val chrome by vm.chromeState.collectAsStateWithLifecycle()
-    if (chrome.isMoreMenuOpen) {
+    if (moreMenuOpen) {
         BookshelfMoreLayer(
-            onDismiss = { vm.setMoreMenuOpen(false) },
+            onDismiss = onCloseMoreMenu,
             onBookBatchManagement = onBookBatchManagement,
             onGroupManagement = onGroupManagement,
             onLocalImport = onLocalImport

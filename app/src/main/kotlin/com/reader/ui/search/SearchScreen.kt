@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
@@ -244,7 +245,7 @@ private fun SearchInputBox(
             textStyle = TextStyle(
                 color = colors.onBackground,
                 fontFamily = FontFamily.Default,
-                fontSize = 14.sp,
+                fontSize = ReaderTypeToken.BOOK_TITLE.value,
                 lineHeight = 18.sp
             ),
             cursorBrush = SolidColor(colors.primary),
@@ -258,7 +259,7 @@ private fun SearchInputBox(
                             style = TextStyle(
                                 color = extra.muted,
                                 fontFamily = FontFamily.Default,
-                                fontSize = 14.sp,
+                                fontSize = ReaderTypeToken.BOOK_TITLE.value,
                                 lineHeight = 18.sp
                             ),
                             maxLines = 1,
@@ -302,7 +303,7 @@ private fun SearchHomeState(
 private fun SearchSectionTitle(title: String) {
     Text(
         text = title,
-        style = ReaderTextStyles.sectionTitle.copy(fontSize = 16.sp),
+        style = ReaderTextStyles.sectionTitle.copy(fontSize = ReaderTypeToken.TOP_BAR_TITLE.value),
         color = MaterialTheme.colorScheme.onBackground
     )
 }
@@ -315,7 +316,7 @@ private fun SearchHistoryHeader(onClear: () -> Unit) {
     ) {
         Text(
             text = "搜索历史",
-            style = ReaderTextStyles.sectionTitle.copy(fontSize = 16.sp),
+            style = ReaderTextStyles.sectionTitle.copy(fontSize = ReaderTypeToken.TOP_BAR_TITLE.value),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f)
         )
@@ -323,7 +324,7 @@ private fun SearchHistoryHeader(onClear: () -> Unit) {
             text = "清空",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -358,7 +359,7 @@ private fun SearchHistoryRow(title: String, meta: String, onClick: () -> Unit) {
                 text = title,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 13.sp,
+                    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight(700)
                 ),
@@ -370,7 +371,7 @@ private fun SearchHistoryRow(title: String, meta: String, onClick: () -> Unit) {
                 text = meta,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 15.sp
                 ),
                 color = extra.muted,
@@ -382,7 +383,7 @@ private fun SearchHistoryRow(title: String, meta: String, onClick: () -> Unit) {
             text = "填入",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -413,7 +414,7 @@ private fun SearchSuggestionChip(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight(800),
                 textAlign = TextAlign.Center
@@ -447,7 +448,7 @@ private fun SearchBottomButton(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -478,7 +479,7 @@ private fun SearchResultsList(
                     text = "找到 ${results.size} 个结果 · 已标注书架状态",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
-                        fontSize = 12.sp,
+                        fontSize = ReaderTypeToken.BOOK_META.value,
                         lineHeight = 16.sp
                     ),
                     color = readerExtraColors().muted,
@@ -531,7 +532,7 @@ private fun SearchResultRow(
                 text = title,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 14.sp,
+                    fontSize = ReaderTypeToken.BOOK_TITLE.value,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight(700)
                 ),
@@ -543,7 +544,7 @@ private fun SearchResultRow(
                 text = "$author · $origin",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 15.sp
                 ),
                 color = extra.muted,
@@ -555,7 +556,7 @@ private fun SearchResultRow(
                     text = book.lastChapter,
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
-                        fontSize = 11.sp,
+                        fontSize = ReaderTypeToken.ACTION_LABEL.value,
                         lineHeight = 15.sp
                     ),
                     color = extra.infoLayer,
@@ -588,7 +589,7 @@ private fun SearchCoverTile(title: String) {
         Text(
             text = firstGlyph(title),
             style = ReaderTextStyles.bookTitle.copy(
-                fontSize = 18.sp,
+                fontSize = ReaderTypeToken.READER_BODY.value,
                 lineHeight = 22.sp,
                 textAlign = TextAlign.Center
             ),
@@ -613,7 +614,7 @@ private fun SearchStatusPill(text: String) {
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 10.sp,
+                fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
                 lineHeight = 12.sp,
                 fontWeight = FontWeight(800),
                 textAlign = TextAlign.Center
@@ -641,7 +642,7 @@ private fun SearchInlineAction(text: String, onClick: () -> Unit) {
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -667,7 +668,7 @@ private fun SearchPrimaryAction(text: String, onClick: () -> Unit) {
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 11.sp,
+                fontSize = ReaderTypeToken.ACTION_LABEL.value,
                 lineHeight = 13.sp,
                 fontWeight = FontWeight(900)
             ),

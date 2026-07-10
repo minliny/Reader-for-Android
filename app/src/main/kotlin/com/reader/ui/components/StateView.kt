@@ -32,18 +32,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.ui.motion.MotionController
 
 // TODO(ReaderTypography): 待主题层补齐 ReaderTypography（appTitle / sectionTitle）后替换下方硬编码 TextStyle
 private val StateViewAppTitleStyle = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 19.sp,
+    fontSize = ReaderTypeToken.EMPTY_HEADING.value,
     fontWeight = FontWeight(700)
 )
 
 private val StateViewSectionTitleStyle = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     fontWeight = FontWeight(500)
 )
 

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -666,7 +667,7 @@ private fun RssRemainingArticleRow(
             )
             Text(
                 text = article.desc,
-                style = rssRemainingMetaStyle().copy(fontSize = 11.sp, lineHeight = 16.sp),
+                style = rssRemainingMetaStyle().copy(fontSize = ReaderTypeToken.ACTION_LABEL.value, lineHeight = 16.sp),
                 color = extra.controlInk,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -857,7 +858,7 @@ private fun RssStateCard(
             text = state.copy,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight(500)
             ),
@@ -907,7 +908,7 @@ private fun RssStateErrorList(rows: List<RssStateErrorRowState>) {
             ) {
                 Text(
                     text = row.title,
-                    style = rssRemainingTitleStyle().copy(fontSize = 12.sp, lineHeight = 15.sp),
+                    style = rssRemainingTitleStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 15.sp),
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -986,7 +987,7 @@ private fun RssBottomActionButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -1072,7 +1073,7 @@ private fun RssChipButton(text: String, active: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = rssRemainingButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
+            style = rssRemainingButtonStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 14.sp),
             color = if (active) colors.onPrimary else extra.navInactive,
             maxLines = 1
         )
@@ -1102,7 +1103,7 @@ private fun RssMiniAction(
         )
         Text(
             text = label,
-            style = rssRemainingButtonStyle().copy(fontSize = 11.sp, lineHeight = 13.sp),
+            style = rssRemainingButtonStyle().copy(fontSize = ReaderTypeToken.ACTION_LABEL.value, lineHeight = 13.sp),
             color = readerExtraColors().primaryDark,
             maxLines = 1
         )
@@ -1144,7 +1145,7 @@ private fun RssRemainingBadge(label: String, tone: RssRouteTone) {
     ) {
         Text(
             text = label,
-            style = rssRemainingMetaStyle().copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight(850)),
+            style = rssRemainingMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, lineHeight = 12.sp, fontWeight = FontWeight(850)),
             color = color,
             maxLines = 1
         )
@@ -1194,28 +1195,28 @@ private fun rssRemainingArticles() = listOf(
 
 private fun rssRemainingSectionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     lineHeight = 18.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun rssRemainingTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssRemainingMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssRemainingButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

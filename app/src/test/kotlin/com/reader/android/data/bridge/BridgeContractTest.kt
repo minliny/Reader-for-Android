@@ -1,61 +1,10 @@
 package com.reader.android.data.bridge
 
-import com.reader.android.data.model.BookSource
-import com.reader.android.data.model.SearchQuery
-import com.reader.android.data.model.TOCItem
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BridgeContractTest {
-
-    private val fakeBridge = FakeCoreBridge()
-
-    // ── FakeCoreBridge method contract ──
-
-    @Test
-    fun `FakeCoreBridge search returns non-empty results`() = runBlocking {
-        val source = BookSource(sourceUrl = "http://test", sourceName = "test")
-        val results = fakeBridge.search(SearchQuery("test"), source)
-        assertTrue(results.isNotEmpty())
-        results.forEach { item ->
-            assertTrue(item.name.isNotBlank())
-            assertTrue(item.author.isNotBlank())
-            assertEquals("test", item.sourceName)
-        }
-    }
-
-    @Test
-    fun `FakeCoreBridge getBookInfo returns all required fields`() = runBlocking {
-        val source = BookSource(sourceUrl = "http://test", sourceName = "test")
-        val info = fakeBridge.getBookInfo("http://test/detail", source)
-        assertTrue(info.name.isNotBlank())
-        assertTrue(info.author.isNotBlank())
-        assertEquals("test", info.origin)
-    }
-
-    @Test
-    fun `FakeCoreBridge getTOC returns hierarchical chapters`() = runBlocking {
-        val source = BookSource(sourceUrl = "http://test", sourceName = "test")
-        val toc = fakeBridge.getTOC("http://test/toc", source)
-        assertTrue(toc.isNotEmpty())
-        // At least one chapter with URL
-        val chaptersWithUrl = toc.flatMap { collectUrls(it) }
-        assertTrue(chaptersWithUrl.isNotEmpty())
-        chaptersWithUrl.forEach { url ->
-            assertTrue(url.isNotBlank())
-        }
-    }
-
-    @Test
-    fun `FakeCoreBridge getContent returns non-empty content`() = runBlocking {
-        val source = BookSource(sourceUrl = "http://test", sourceName = "test")
-        val page = fakeBridge.getContent("http://test/ch1", source)
-        assertTrue(page.content.isNotBlank())
-        assertTrue(page.title != null)
-    }
 
     // ── BridgeResult sealed class ──
 
@@ -132,11 +81,4 @@ class BridgeContractTest {
         assertEquals(null, error.message)
         assertEquals(null, error.sourceName)
     }
-}
-
-private fun collectUrls(item: TOCItem): List<String> {
-    val urls = mutableListOf<String>()
-    if (item.url.isNotBlank()) urls.add(item.url)
-    item.children.forEach { urls.addAll(collectUrls(it)) }
-    return urls
 }

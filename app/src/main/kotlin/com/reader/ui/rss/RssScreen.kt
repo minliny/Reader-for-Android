@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -359,7 +360,7 @@ private fun RssSearchEntry(onClick: () -> Unit) {
         )
         Text(
             text = "搜索订阅源、文章标题或分组",
-            style = rssMetaStyle().copy(fontWeight = FontWeight(700), fontSize = 12.sp, lineHeight = 15.sp),
+            style = rssMetaStyle().copy(fontWeight = FontWeight(700), fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 15.sp),
             color = extra.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -401,7 +402,7 @@ private fun RssRefreshLine() {
         Spacer(Modifier.width(8.dp))
         Text(
             text = "正在刷新启用订阅源和分类入口",
-            style = rssMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(800)),
+            style = rssMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(800)),
             color = extra.muted
         )
     }
@@ -446,7 +447,7 @@ private fun RssSummaryCard(
                 text = "订阅中心",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 15.sp,
+                    fontSize = ReaderTypeToken.SECTION_TITLE.value,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight(700)
                 ),
@@ -458,7 +459,7 @@ private fun RssSummaryCard(
                 text = "$enabledCount 个启用源 · $unreadCount 条未读 · 最近刷新 $lastRefresh",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 14.sp,
                     fontWeight = FontWeight(400)
                 ),
@@ -487,7 +488,7 @@ private fun RssSummaryCard(
                 text = "刷新",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 13.sp,
                     fontWeight = FontWeight(850)
                 ),
@@ -602,7 +603,7 @@ private fun RssSourceRow(source: RssSource) {
             text = source.unread.toString(),
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 16.sp,
+                fontSize = ReaderTypeToken.TOP_BAR_TITLE.value,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -648,7 +649,7 @@ private fun RssSourceStripItem(source: RssSource, active: Boolean) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = source.name,
-                style = rssMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(700)),
+                style = rssMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(700)),
                 color = colors.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -656,7 +657,7 @@ private fun RssSourceStripItem(source: RssSource, active: Boolean) {
             )
             Text(
                 text = "${source.group} · ${if (source.unread > 0) "${source.unread} 未读" else "无未读"}",
-                style = rssMetaStyle().copy(fontSize = 10.sp, lineHeight = 12.sp),
+                style = rssMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, lineHeight = 12.sp),
                 color = extra.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -758,7 +759,7 @@ private fun RssArticleRow(article: RssArticle, onClick: () -> Unit) {
                 text = article.desc,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 16.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -840,7 +841,7 @@ private fun RssMiniAction(label: String, @DrawableRes iconRes: Int, onClick: () 
         )
         Text(
             text = label,
-            style = rssButtonStyle().copy(fontSize = 11.sp, lineHeight = 13.sp),
+            style = rssButtonStyle().copy(fontSize = ReaderTypeToken.ACTION_LABEL.value, lineHeight = 13.sp),
             color = extra.primaryDark,
             maxLines = 1
         )
@@ -861,7 +862,7 @@ private fun RssChip(text: String, active: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = rssButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
+            style = rssButtonStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 14.sp),
             color = if (active) colors.onPrimary else extra.muted,
             maxLines = 1
         )
@@ -971,28 +972,28 @@ private fun rssRuleSubscriptions() = listOf(
 
 private fun rssSectionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     lineHeight = 18.sp,
     fontWeight = FontWeight(700)
 )
 
 private fun rssTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(700)
 )
 
 private fun rssMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 12.sp,
+    fontSize = ReaderTypeToken.BOOK_META.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(850)
 )

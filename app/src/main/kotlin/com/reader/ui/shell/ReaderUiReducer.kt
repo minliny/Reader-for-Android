@@ -60,6 +60,9 @@ object ReaderUiReducer {
         is ReaderUiIntent.UpdateReaderTheme -> state.copy(
             readerContext = state.readerContext?.copy(themeId = intent.themeId)
         )
+        is ReaderUiIntent.UpdateAppThemeMode -> state.copy(
+            appThemeMode = intent.mode
+        )
         is ReaderUiIntent.UpdateReaderBrightness -> state.copy(
             readerContext = state.readerContext?.copy(
                 brightness = intent.brightness, brightnessAuto = intent.auto
@@ -344,6 +347,17 @@ object ReaderUiReducer {
             webDavConfig = WebDavConfigState()
         )
 
+        // ── P3: 书源管理 ──
+        // TODO: 调 Core source.enable/disable 命令；UiState 暂无书源列表字段，
+        // reducer 记录意图，Core 响应后刷新列表。
+        is ReaderUiIntent.SetSourceEnabled -> state
+
+        // ── P3: 通用设置 action ──
+        // TODO: 调 Core cache.clear 命令；reducer 暂为 no-op。
+        ReaderUiIntent.ClearCache -> state
+        // TODO: 重置 settings 子状态（appThemeMode/行为开关等）。
+        ReaderUiIntent.RestoreDefaultSettings -> state
+
         // ── P3: Permission ──
         is ReaderUiIntent.PermissionGranted -> state.copy(
             permissions = updatePermission(state.permissions, intent.kind, PermissionStatus.GRANTED)
@@ -455,6 +469,28 @@ object ReaderUiReducer {
                 state
             }
         }
+        is ReaderUiIntent.SourceSwitchConfirm -> {
+            // 确认切换：pop route + 重置 sourceSwitch = Idle（成功收尾）
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                sourceSwitch = SourceSwitchState.Idle,
+                motionInterrupt = null
+            )
+        }
+        ReaderUiIntent.SourceSwitchCancel -> {
+            // 取消换源：pop route + 重置 sourceSwitch = Idle
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                sourceSwitch = SourceSwitchState.Idle,
+                motionInterrupt = null
+            )
+        }
         is ReaderUiIntent.SourceSwitchResultsLoaded -> {
             state.copy(
                 sourceSwitch = SourceSwitchState.Results(
@@ -548,6 +584,130 @@ object ReaderUiReducer {
         is ReaderUiIntent.SetReaderChoice -> state.copy(
             readerChoices = state.readerChoices + (intent.key to intent.value)
         )
+
+        // ── W3: 书源编辑 reducer ──────────────────────────────────────────
+        is ReaderUiIntent.SourceEditOpen -> {
+            val route = ReaderRoute.SourceEdit
+            state.copy(
+                backStack = state.backStack + route,
+                currentRoute = route,
+                sourceEdit = SourceEditState.Editing(
+                    sourceId = intent.sourceId,
+                    name = intent.name,
+                    url = intent.url
+                ),
+                motionInterrupt = null
+            )
+        }
+        is ReaderUiIntent.SourceEditUpdateField -> {
+            val current = state.sourceEdit
+            if (current is SourceEditState.Editing) {
+                state.copy(
+                    sourceEdit = current.copy(
+                        name = intent.name ?: current.name,
+                        url = intent.url ?: current.url,
+                        group = intent.group ?: current.group,
+                        enabled = intent.enabled ?: current.enabled,
+                        comment = intent.comment ?: current.comment
+                    )
+                )
+            } else {
+                state
+            }
+        }
+        ReaderUiIntent.SourceEditSave -> {
+            if (state.sourceEdit is SourceEditState.Editing) {
+                state.copy(sourceEdit = SourceEditState.Saving)
+            } else {
+                state
+            }
+        }
+        ReaderUiIntent.SourceEditCancel -> {
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                sourceEdit = SourceEditState.Idle,
+                motionInterrupt = null
+            )
+        }
+        is ReaderUiIntent.SourceEditResult -> {
+            if (intent.success) {
+                val newBackStack = state.backStack.dropLast(1)
+                val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+                state.copy(
+                    backStack = newBackStack,
+                    currentRoute = newRoute,
+                    sourceEdit = SourceEditState.Idle,
+                    motionInterrupt = null
+                )
+            } else {
+                state.copy(sourceEdit = SourceEditState.Error(message = intent.message))
+            }
+        }
+        is ReaderUiIntent.SourceDetailOpen -> {
+            val route = ReaderRoute.SourceDetail
+            state.copy(
+                backStack = state.backStack + route,
+                currentRoute = route,
+                motionInterrupt = null
+            )
+        }
+        ReaderUiIntent.SourceDetailClose -> {
+            val newBackStack = state.backStack.dropLast(1)
+            val newRoute = newBackStack.lastOrNull() ?: ReaderRoute.TabShell(state.activeTab)
+            state.copy(
+                backStack = newBackStack,
+                currentRoute = newRoute,
+                motionInterrupt = null
+            )
+        }
+
+        // ── W5: 内容替换规则 CRUD reducer ──────────────────────────────────
+        is ReaderUiIntent.ReplaceRuleAdd -> {
+            val newRule = ReplaceRule(
+                id = "rule-${state.replaceRules.size + 1}",
+                name = intent.name,
+                pattern = intent.pattern,
+                replacement = intent.replacement,
+                scope = intent.scope
+            )
+            state.copy(replaceRules = state.replaceRules + newRule)
+        }
+        is ReaderUiIntent.ReplaceRuleUpdate -> {
+            state.copy(
+                replaceRules = state.replaceRules.map { rule ->
+                    if (rule.id == intent.id) {
+                        rule.copy(
+                            name = intent.name ?: rule.name,
+                            pattern = intent.pattern ?: rule.pattern,
+                            replacement = intent.replacement ?: rule.replacement,
+                            scope = intent.scope ?: rule.scope
+                        )
+                    } else {
+                        rule
+                    }
+                }
+            )
+        }
+        is ReaderUiIntent.ReplaceRuleDelete -> {
+            state.copy(replaceRules = state.replaceRules.filterNot { it.id == intent.id })
+        }
+        is ReaderUiIntent.ReplaceRuleToggle -> {
+            state.copy(
+                replaceRules = state.replaceRules.map { rule ->
+                    if (rule.id == intent.id) {
+                        rule.copy(enabled = !rule.enabled)
+                    } else {
+                        rule
+                    }
+                }
+            )
+        }
+        is ReaderUiIntent.ReplaceRulesLoaded -> {
+            state.copy(replaceRules = intent.rules)
+        }
     }
 
     /**

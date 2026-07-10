@@ -475,13 +475,15 @@ object DemoFixture {
                 swatch = "#232934", paperStart = "#232934", paperEnd = "#232934", ink = "#dbe2ea"
             )
         ),
+        // fontStack 引用合约 font token：--fd-ds-font-sans/serif/kai/fangsong/mono。
+        // system 选项保留原始 CSS 字体栈（无对应合约 token）。
         fontOptions = listOf(
             FixtureFontOption(label = "系统", value = "system", fontStack = "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"),
             FixtureFontOption(label = "宋体", value = "serif", fontStack = "var(--fd-serif)"),
             FixtureFontOption(label = "黑体", value = "sans", fontStack = "var(--fd-sans)"),
-            FixtureFontOption(label = "楷体", value = "kai", fontStack = "\"Kaiti SC\", \"KaiTi\", serif"),
-            FixtureFontOption(label = "仿宋", value = "fangsong", fontStack = "\"FangSong\", \"STFangsong\", serif"),
-            FixtureFontOption(label = "等宽", value = "mono", fontStack = "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace")
+            FixtureFontOption(label = "楷体", value = "kai", fontStack = "var(--fd-ds-font-kai)"),
+            FixtureFontOption(label = "仿宋", value = "fangsong", fontStack = "var(--fd-ds-font-fangsong)"),
+            FixtureFontOption(label = "等宽", value = "mono", fontStack = "var(--fd-ds-font-mono)")
         ),
         readingText = listOf(
             "雨声在窗外连成一片，像无数细小的针，密密地刺在玻璃上，汇成一层朦胧的水幕，将城市的灯光晕成模糊的光团。",

@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -270,7 +271,7 @@ private fun RssSourceEditBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -294,7 +295,7 @@ private fun RssSourceEditChip(text: String, active: Boolean, onClick: () -> Unit
     ) {
         Text(
             text = text,
-            style = rssSourceEditButtonStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
+            style = rssSourceEditButtonStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 14.sp),
             color = if (active) colors.onPrimary else extra.navInactive,
             maxLines = 1
         )
@@ -324,21 +325,21 @@ private fun rssSourceEditFields() = listOf(
 
 private fun rssSourceEditTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssSourceEditMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssSourceEditButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

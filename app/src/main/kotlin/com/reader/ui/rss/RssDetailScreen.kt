@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -225,7 +226,7 @@ private fun RssReaderTitleCard() {
             text = "Reader UI 前端输入件更新说明",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 20.sp,
+                fontSize = ReaderTypeToken.PAGE_TITLE.value,
                 lineHeight = 26.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -235,7 +236,7 @@ private fun RssReaderTitleCard() {
             text = "本条目汇总最近的阅读体验修复、发现页状态补充和 RSS 页面结构调整。",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 21.sp,
                 fontWeight = FontWeight(500)
             ),
@@ -337,7 +338,7 @@ private fun RssReaderBodyCard() {
                 text = paragraph,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 15.sp,
+                    fontSize = ReaderTypeToken.SECTION_TITLE.value,
                     lineHeight = 28.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -442,7 +443,7 @@ private fun RssBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -496,21 +497,21 @@ private fun RssDetailIconCircle(
 
 private fun rssDetailSmallTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssDetailMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssDetailButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import androidx.compose.ui.zIndex
 import com.reader.android.R
 import com.reader.ui.demo.demoCoverDrawableRes
@@ -301,7 +302,7 @@ private fun DiscoverRouteSourceBar(state: DiscoverDemoRouteState, onNavigate: (S
         ) {
             Text(
                 text = state.source.name,
-                style = discoverRouteTitleStyle().copy(fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight(850)),
+                style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 18.sp, fontWeight = FontWeight(850)),
                 color = colors.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -670,7 +671,7 @@ private fun DiscoverResultHeader(state: DiscoverDemoRouteState) {
     ) {
         Text(
             text = state.activeEntry,
-            style = discoverRouteTitleStyle().copy(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight(900)),
+            style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 19.sp, fontWeight = FontWeight(900)),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f)
         )
@@ -743,7 +744,7 @@ private fun DiscoverBookRow(book: DiscoverDemoBookState, onClick: () -> Unit) {
         ) {
             Text(
                 text = book.title,
-                style = discoverRouteTitleStyle().copy(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight(850)),
+                style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 19.sp, fontWeight = FontWeight(850)),
                 color = colors.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -766,7 +767,7 @@ private fun DiscoverBookRow(book: DiscoverDemoBookState, onClick: () -> Unit) {
                 text = book.intro,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 12.sp,
+                    fontSize = ReaderTypeToken.BOOK_META.value,
                     lineHeight = 17.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -859,7 +860,7 @@ private fun DiscoverRouteStateCard(
         )
         Text(
             text = message.body,
-            style = discoverRouteMetaStyle().copy(fontSize = 12.sp, lineHeight = 18.sp),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 18.sp),
             color = readerExtraColors().muted,
             textAlign = TextAlign.Center
         )
@@ -895,7 +896,7 @@ private fun DiscoverRefreshLine(text: String) {
         Spacer(Modifier.width(8.dp))
         Text(
             text = text,
-            style = discoverRouteMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(800)),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(800)),
             color = readerExtraColors().muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -926,7 +927,7 @@ private fun DiscoverToast(text: String) {
     ) {
         Text(
             text = text,
-            style = discoverRouteMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(850)),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(850)),
             color = Color.White,
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.86f), ReaderShapes.pill)
@@ -965,7 +966,7 @@ private fun DiscoverConfirmDialog(
             )
             Text(
                 text = dialog.body,
-                style = discoverRouteMetaStyle().copy(fontSize = 13.sp, lineHeight = 19.sp),
+                style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.CHAPTER_TITLE.value, lineHeight = 19.sp),
                 color = readerExtraColors().muted
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1020,7 +1021,7 @@ private fun DiscoverSourceLoginRouteScreen(
         item {
             Text(
                 text = "返回发现页后，当前书源和当前入口保持不变，只刷新内容列表。",
-                style = discoverRouteMetaStyle().copy(fontSize = 12.sp, lineHeight = 18.sp),
+                style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 18.sp),
                 color = readerExtraColors().muted,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
@@ -1135,7 +1136,7 @@ private fun DiscoverSourceBulkRouteScreen(
                 DiscoverRoutePillButton("取消", onClick = { onNavigate(DiscoverDemoRouteIds.CONTROL) })
                 Text(
                     text = "已选 3 个",
-                    style = discoverRouteTitleStyle().copy(fontSize = 13.sp, fontWeight = FontWeight(900)),
+                    style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(900)),
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
@@ -1391,7 +1392,7 @@ private fun DiscoverSubpageHeader(
         ) {
             Text(
                 text = title,
-                style = discoverRouteTitleStyle().copy(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight(900)),
+                style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.SECTION_TITLE.value, lineHeight = 19.sp, fontWeight = FontWeight(900)),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1441,14 +1442,14 @@ private fun DiscoverInfoRow(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = title,
-                style = discoverRouteTitleStyle().copy(fontSize = 13.sp, fontWeight = FontWeight(900)),
+                style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(900)),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = meta,
-                style = discoverRouteMetaStyle().copy(fontSize = 10.sp, fontWeight = FontWeight(700)),
+                style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(700)),
                 color = readerExtraColors().muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1473,7 +1474,7 @@ private fun DiscoverFieldRow(field: DiscoverDemoFieldState) {
     ) {
         Text(
             text = field.label,
-            style = discoverRouteMetaStyle().copy(fontSize = 10.sp, fontWeight = FontWeight(700)),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(700)),
             color = readerExtraColors().muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1481,7 +1482,7 @@ private fun DiscoverFieldRow(field: DiscoverDemoFieldState) {
         )
         Text(
             text = field.value,
-            style = discoverRouteTitleStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(820)),
+            style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(820)),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1520,14 +1521,14 @@ private fun DiscoverRuleLine(label: String, value: String) {
     ) {
         Text(
             text = label,
-            style = discoverRouteMetaStyle().copy(fontSize = 10.sp, fontWeight = FontWeight(700)),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(700)),
             color = readerExtraColors().muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = value,
-            style = discoverRouteTitleStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(850)),
+            style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(850)),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1589,14 +1590,14 @@ private fun DiscoverBulkSourceRow(source: DiscoverDemoSourceRowState) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = source.name,
-                style = discoverRouteTitleStyle().copy(fontSize = 13.sp, fontWeight = FontWeight(900)),
+                style = discoverRouteTitleStyle().copy(fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(900)),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = source.meta,
-                style = discoverRouteMetaStyle().copy(fontSize = 10.sp, fontWeight = FontWeight(700)),
+                style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(700)),
                 color = readerExtraColors().muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1628,7 +1629,7 @@ private fun DiscoverInfoDivider() {
 private fun DiscoverToneBadge(text: String, tone: DiscoverDemoTone) {
     Text(
         text = text,
-        style = discoverRouteMetaStyle().copy(fontSize = 10.sp, fontWeight = FontWeight(900)),
+        style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(900)),
         color = discoverToneColor(tone),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -1779,7 +1780,7 @@ private fun DiscoverRouteChip(text: String, active: Boolean, onClick: () -> Unit
     ) {
         Text(
             text = text,
-            style = discoverRouteMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(850)),
+            style = discoverRouteMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(850)),
             color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1869,14 +1870,14 @@ private fun discoverToneColor(tone: DiscoverDemoTone): Color = when (tone) {
 
 private fun discoverRouteTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun discoverRouteMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )

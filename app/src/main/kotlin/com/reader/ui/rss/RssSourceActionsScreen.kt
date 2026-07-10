@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -128,7 +129,7 @@ private fun RssRefreshingSearchEntry() {
         )
         Text(
             text = "搜索订阅源、文章标题或分组",
-            style = rssSourceActionMetaStyle().copy(fontWeight = FontWeight(700), fontSize = 12.sp, lineHeight = 15.sp),
+            style = rssSourceActionMetaStyle().copy(fontWeight = FontWeight(700), fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 15.sp),
             color = extra.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -171,7 +172,7 @@ private fun RssRefreshingLine() {
         Spacer(Modifier.width(8.dp))
         Text(
             text = "正在刷新启用订阅源和分类入口",
-            style = rssSourceActionMetaStyle().copy(fontSize = 12.sp, fontWeight = FontWeight(800)),
+            style = rssSourceActionMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, fontWeight = FontWeight(800)),
             color = extra.muted
         )
     }
@@ -261,7 +262,7 @@ private fun RssRefreshingSourceRow(source: RssRefreshingSource) {
         }
         Text(
             text = source.unread,
-            style = rssSourceActionTitleStyle().copy(fontSize = 16.sp, lineHeight = 20.sp),
+            style = rssSourceActionTitleStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_TITLE.value, lineHeight = 20.sp),
             color = extra.primaryDark,
             modifier = Modifier.defaultMinSize(minWidth = 24.dp),
             maxLines = 1
@@ -743,7 +744,7 @@ private fun RssSourceBatchSummary() {
     ) {
         Text(
             text = "已选 2 个订阅源",
-            style = rssSourceActionTitleStyle().copy(fontSize = 12.sp, lineHeight = 15.sp),
+            style = rssSourceActionTitleStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 15.sp),
             color = colors.onBackground,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -862,7 +863,7 @@ private fun RssSourceExportPanel() {
                 text = "reader-rss-sources-20260626.json",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 12.sp,
+                    fontSize = ReaderTypeToken.BOOK_META.value,
                     lineHeight = 15.sp,
                     fontWeight = FontWeight(650)
                 ),
@@ -1413,7 +1414,7 @@ private fun RssSourceActionWebPreview(
                 text = title,
                 style = TextStyle(
                     fontFamily = FontFamily.Serif,
-                    fontSize = 19.sp,
+                    fontSize = ReaderTypeToken.EMPTY_HEADING.value,
                     lineHeight = 24.sp,
                     fontWeight = FontWeight(900)
                 ),
@@ -1423,7 +1424,7 @@ private fun RssSourceActionWebPreview(
                 text = body,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 13.sp,
+                    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                     lineHeight = 22.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -1487,7 +1488,7 @@ private fun RssSourceActionConfirmCard(
             text = copy,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight(500)
             ),
@@ -1500,7 +1501,7 @@ private fun RssSourceActionConfirmCard(
                 text = detail,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 17.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -1573,7 +1574,7 @@ private fun RssSourceActionBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -1740,28 +1741,28 @@ private fun rssSourceExportEntries() = listOf(
 
 private fun rssSourceActionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssSourceActionMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssSourceActionButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssSourceActionBadgeStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 12.sp,
     fontWeight = FontWeight(850)
 )

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
@@ -220,7 +221,7 @@ private fun RssSourceImportPanel(activeOptions: Set<String>, onToggle: (String) 
             )
             Text(
                 text = "https://example.com/rss-source.json",
-                style = rssSourceImportMetaStyle().copy(fontSize = 12.sp, lineHeight = 14.sp),
+                style = rssSourceImportMetaStyle().copy(fontSize = ReaderTypeToken.BOOK_META.value, lineHeight = 14.sp),
                 color = extra.muted,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -436,7 +437,7 @@ private fun RssSourceImportResultCard() {
             text = "新增源已加入 RSS 订阅管理，冲突源保留本地名称、分组和启用状态。",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight(500),
                 textAlign = TextAlign.Center
@@ -447,7 +448,7 @@ private fun RssSourceImportResultCard() {
         Spacer(Modifier.height(10.dp))
         Text(
             text = "需要登录的源不会自动导入 Cookie。",
-            style = rssSourceImportMetaStyle().copy(fontSize = 11.sp, lineHeight = 17.sp),
+            style = rssSourceImportMetaStyle().copy(fontSize = ReaderTypeToken.ACTION_LABEL.value, lineHeight = 17.sp),
             color = extra.muted,
             textAlign = TextAlign.Center
         )
@@ -516,7 +517,7 @@ private fun RssSourceImportBottomButton(
             text = label,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 13.sp,
+                fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight(850)
             ),
@@ -612,21 +613,21 @@ private fun rssSourceImportDetailRows() = listOf(
 
 private fun rssSourceImportTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(850)
 )
 
 private fun rssSourceImportMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )
 
 private fun rssSourceImportButtonStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(850)
 )

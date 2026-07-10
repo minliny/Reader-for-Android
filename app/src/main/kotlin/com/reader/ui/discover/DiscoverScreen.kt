@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.demo.demoCoverDrawableRes
 import com.reader.ui.demo.demoCoverUrlForTitle
@@ -207,7 +208,7 @@ private fun DiscoverSourceBar(expanded: Boolean, onClick: () -> Unit) {
                 text = "优书网",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 15.sp,
+                    fontSize = ReaderTypeToken.SECTION_TITLE.value,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight(800)
                 ),
@@ -286,7 +287,7 @@ private fun DiscoverFilterControl(
                 text = "筛选",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 11.sp,
+                    fontSize = ReaderTypeToken.ACTION_LABEL.value,
                     lineHeight = 13.sp,
                     fontWeight = FontWeight(900)
                 ),
@@ -331,7 +332,7 @@ private fun DiscoverListHeader(title: String) {
         text = title,
         style = TextStyle(
             fontFamily = FontFamily.Default,
-            fontSize = 15.sp,
+            fontSize = ReaderTypeToken.SECTION_TITLE.value,
             lineHeight = 19.sp,
             fontWeight = FontWeight(700)
         ),
@@ -500,7 +501,7 @@ private fun DiscoverControlSection(title: String, content: @Composable ColumnSco
             text = title,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 11.sp,
+                fontSize = ReaderTypeToken.ACTION_LABEL.value,
                 lineHeight = 13.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -531,7 +532,7 @@ private fun DiscoverSourceOption(
             text = name,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 15.sp,
                 fontWeight = FontWeight(700)
             ),
@@ -543,7 +544,7 @@ private fun DiscoverSourceOption(
             text = meta,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 10.sp,
+                fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
                 lineHeight = 12.sp,
                 fontWeight = FontWeight(700)
             ),
@@ -589,7 +590,7 @@ private fun DiscoverPrimaryAction(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight(900)
             ),
@@ -627,7 +628,7 @@ private fun DiscoverActionButton(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -714,7 +715,7 @@ private fun DiscoverBookRow(
                 text = book.title,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 15.sp,
+                    fontSize = ReaderTypeToken.SECTION_TITLE.value,
                     lineHeight = 19.sp,
                     fontWeight = FontWeight(700)
                 ),
@@ -740,7 +741,7 @@ private fun DiscoverBookRow(
                 text = book.intro,
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
-                    fontSize = 12.sp,
+                    fontSize = ReaderTypeToken.BOOK_META.value,
                     lineHeight = 17.sp,
                     fontWeight = FontWeight(500)
                 ),
@@ -804,7 +805,7 @@ private fun DiscoverChip(text: String, active: Boolean, onClick: () -> Unit) {
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -845,7 +846,7 @@ private fun DiscoverFilterButton(
             text = text,
             style = TextStyle(
                 fontFamily = FontFamily.Default,
-                fontSize = 12.sp,
+                fontSize = ReaderTypeToken.BOOK_META.value,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight(800)
             ),
@@ -900,7 +901,7 @@ private fun discoverDemoBooks(entry: String): List<DiscoverBook> {
 
 private fun discoverMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 14.sp,
     fontWeight = FontWeight(500)
 )

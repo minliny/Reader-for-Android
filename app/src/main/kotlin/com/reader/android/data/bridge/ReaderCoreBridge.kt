@@ -1,13 +1,10 @@
 package com.reader.android.data.bridge
 
-import com.reader.android.data.model.BookInfo
-import com.reader.android.data.model.BookSource
-import com.reader.android.data.model.ContentPage
-import com.reader.android.data.model.SearchQuery
-import com.reader.android.data.model.SearchResultItem
-import com.reader.android.data.model.TOCItem
-
 // ── Error taxonomy matching Reader-Core MappedReaderError ──
+// Types retained (ReaderErrorCode / ReaderFailureStage / ReaderError / BridgeResult)
+// are referenced by TtsErrorMapper / WebRuntimeErrorMapper and BridgeContractTest.
+// The unused ReaderCoreBridge interface was removed; the real Rust Core bridge is
+// com.reader.core.NativeCoreBridge (JNI) consumed via ReaderCoreRuntime.
 
 enum class ReaderErrorCode {
     NETWORK,
@@ -38,28 +35,4 @@ data class ReaderError(
 sealed class BridgeResult<out T> {
     data class Success<T>(val data: T) : BridgeResult<T>()
     data class Failure(val error: ReaderError) : BridgeResult<Nothing>()
-}
-
-// ── ReaderCoreBridge contract ──
-
-interface ReaderCoreBridge {
-    suspend fun search(
-        query: SearchQuery,
-        source: BookSource
-    ): BridgeResult<List<SearchResultItem>>
-
-    suspend fun getBookInfo(
-        detailUrl: String,
-        source: BookSource
-    ): BridgeResult<BookInfo>
-
-    suspend fun getTOC(
-        tocUrl: String,
-        source: BookSource
-    ): BridgeResult<List<TOCItem>>
-
-    suspend fun getContent(
-        contentUrl: String,
-        source: BookSource
-    ): BridgeResult<ContentPage>
 }

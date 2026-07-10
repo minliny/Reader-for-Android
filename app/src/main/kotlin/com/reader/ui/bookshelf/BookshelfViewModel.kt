@@ -49,10 +49,6 @@ class BookshelfViewModel : ViewModel() {
         _chromeState.update { it.copy(viewMode = mode) }
     }
 
-    fun setMoreMenuOpen(open: Boolean) {
-        _chromeState.update { it.copy(isMoreMenuOpen = open) }
-    }
-
     fun setFocusedBook(book: Book?) {
         _chromeState.update { it.copy(focusedBook = book) }
     }
@@ -106,7 +102,7 @@ class BookshelfViewModel : ViewModel() {
     }
 
     /**
-     * P0-2: Add a book to the shelf via Core `bookshelf.book.add` CoreCommand.
+     * P0-2: Add a book to the shelf via Core `bookshelf.add` CoreCommand.
      * Core owns the bookshelf DomainState; Android only fires the command and refreshes.
      * The book object uses the same field names as `bookshelf.list` response (`bookId`,
      * `title`, `author`, `coverUrl`, `intro`, `origin`).
@@ -114,7 +110,7 @@ class BookshelfViewModel : ViewModel() {
     fun addToBookshelf(book: SearchBook) {
         viewModelScope.launch {
             try {
-                core.sendAndAwait("bookshelf.book.add", BookshelfWriteParams.buildAddParams(book))
+                core.sendAndAwait("bookshelf.add", BookshelfWriteParams.buildAddParams(book))
                 loadBooks()
             } catch (e: Exception) {
                 // Core not ready or command failed — shelf stays as-is; no fake fallback.
@@ -123,12 +119,12 @@ class BookshelfViewModel : ViewModel() {
     }
 
     /**
-     * P0-2: Remove a book from the shelf via Core `bookshelf.book.remove` CoreCommand.
+     * P0-2: Remove a book from the shelf via Core `bookshelf.remove` CoreCommand.
      */
     fun removeFromBookshelf(bookUrl: String) {
         viewModelScope.launch {
             try {
-                core.sendAndAwait("bookshelf.book.remove", BookshelfWriteParams.buildRemoveParams(bookUrl))
+                core.sendAndAwait("bookshelf.remove", BookshelfWriteParams.buildRemoveParams(bookUrl))
                 loadBooks()
             } catch (e: Exception) {
                 // Core not ready or command failed — shelf stays as-is.
@@ -163,7 +159,6 @@ enum class BookshelfViewMode { COVER, LIST }
 
 data class BookshelfChromeState(
     val viewMode: BookshelfViewMode = BookshelfViewMode.COVER,
-    val isMoreMenuOpen: Boolean = false,
     val focusedBook: Book? = null,
     val filter: BookshelfFilterState = BookshelfFilterState()
 )
@@ -179,7 +174,7 @@ data class BookshelfFilterState(
 }
 
 /**
- * P0-2: Pure JSON params builders for `bookshelf.book.add` / `bookshelf.book.remove`
+ * P0-2: Pure JSON params builders for `bookshelf.add` / `bookshelf.remove`
  * CoreCommands. Extracted as internal object so JVM tests can verify the Core command
  * contract (field names + structure) without a running Core runtime.
  *

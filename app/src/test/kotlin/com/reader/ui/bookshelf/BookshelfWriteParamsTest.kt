@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * Pure-JVM coverage for [BookshelfWriteParams] — verifies the JSON params contract for
- * `bookshelf.book.add` / `bookshelf.book.remove` CoreCommands without a running Core.
+ * `bookshelf.add` / `bookshelf.remove` CoreCommands without a running Core.
  *
  * Field names mirror the `bookshelf.list` response so the write/read contract is
  * symmetric: `bookId` is the key field, `title`/`author`/`coverUrl`/`intro`/`origin`

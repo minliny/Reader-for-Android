@@ -294,7 +294,7 @@ fun DemoBookCover(
     ) {
         Text(
             text = label.take(4),
-            style = TextStyle(fontFamily = FontFamily.Serif, fontSize = 15.sp, fontWeight = FontWeight(700)),
+            style = TextStyle(fontFamily = FontFamily.Serif, fontSize = ReaderTypeToken.SECTION_TITLE.value, fontWeight = FontWeight(700)),
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center
         )
@@ -364,7 +364,7 @@ fun DemoChipItem(
     val colors = MaterialTheme.colorScheme
     Text(
         text = label,
-        style = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, fontWeight = FontWeight(800)),
+        style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.ACTION_LABEL.value, fontWeight = FontWeight(800)),
         color = if (active) colors.onPrimary else readerExtraColors().controlInk,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -450,13 +450,13 @@ fun DemoListItem(
             DemoIcon(leadingIcon, tint = MaterialTheme.colorScheme.primary)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.SECTION_TITLE.value, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
                 Text(subtitle, style = ReaderTextStyles.bookAuthor, color = readerExtraColors().muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailingText != null) {
-            Text(trailingText, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.primary)
+            Text(trailingText, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.ACTION_LABEL.value, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -477,10 +477,10 @@ fun DemoSourceListItem(
     ) {
         DemoIcon(R.drawable.reader_ic_source_stack, tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(name, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.SECTION_TITLE.value, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(url, style = ReaderTextStyles.bookAuthor, color = readerExtraColors().muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(if (enabled) "启用" else "禁用", style = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, fontWeight = FontWeight(800)), color = if (enabled) ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD) else readerExtraColors().muted)
+        Text(if (enabled) "启用" else "禁用", style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.ACTION_LABEL.value, fontWeight = FontWeight(800)), color = if (enabled) ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD) else readerExtraColors().muted)
     }
 }
 
@@ -502,7 +502,7 @@ fun DemoSettingsRow(
         if (iconRes != null) {
             DemoIcon(iconRes, tint = MaterialTheme.colorScheme.primary)
         }
-        Text(title, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.BOOK_TITLE.value, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (value != null) {
             Text(value, style = ReaderTextStyles.bookAuthor, color = readerExtraColors().muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else if (onClick != null) {
@@ -577,7 +577,7 @@ fun DemoReaderModuleNav(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 DemoIcon(item.iconRes, size = 22.dp, tint = if (active) MaterialTheme.colorScheme.primary else readerExtraColors().muted)
-                Text(item.label, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, fontWeight = FontWeight(800)), color = if (active) MaterialTheme.colorScheme.primary else readerExtraColors().muted, maxLines = 1)
+                Text(item.label, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.ACTION_LABEL.value, fontWeight = FontWeight(800)), color = if (active) MaterialTheme.colorScheme.primary else readerExtraColors().muted, maxLines = 1)
             }
         }
     }
@@ -673,7 +673,7 @@ fun DemoValueStrip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ReaderTokenAdapter.spacing(ReaderSpacingToken.SM))
     ) {
-        Text(label, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
+        Text(label, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.BOOK_TITLE.value, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
         Text(value, style = ReaderTextStyles.bookAuthor, color = readerExtraColors().muted)
         if (onClick != null) {
             DemoIcon(R.drawable.reader_ic_chevron, size = 18.dp, tint = readerExtraColors().muted)
@@ -694,7 +694,7 @@ fun DemoToggleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(title, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
+        Text(title, modifier = Modifier.weight(1f), style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.BOOK_TITLE.value, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -709,7 +709,7 @@ fun DemoSliderRow(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(ReaderTokenAdapter.spacing(ReaderSpacingToken.XS))) {
-        Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
+        Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.BOOK_TITLE.value, fontWeight = FontWeight(500)), color = MaterialTheme.colorScheme.onBackground)
         Slider(value = value, onValueChange = onValueChange, valueRange = range)
     }
 }
@@ -799,7 +799,7 @@ fun DemoSearchBar(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground),
+                textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.BOOK_TITLE.value, color = MaterialTheme.colorScheme.onBackground),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -826,7 +826,7 @@ fun DemoSearchResultItem(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = ReaderTokenAdapter.spacing(ReaderSpacingToken.SM)),
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.SECTION_TITLE.value, fontWeight = FontWeight(800)), color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(subtitle, style = ReaderTextStyles.bookAuthor, color = readerExtraColors().muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (highlight != null) {
             Text(highlight, style = ReaderTextStyles.bookAuthor, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -880,7 +880,7 @@ fun DemoFlowStepComposable(
         if (completed) {
             DemoIcon(R.drawable.reader_ic_check, size = 14.dp, tint = if (active) MaterialTheme.colorScheme.onPrimary else ReaderTokenAdapter.color(ReaderColorToken.STATUS_GOOD))
         }
-        Text(label, style = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, fontWeight = FontWeight(800)), color = if (active) MaterialTheme.colorScheme.onPrimary else readerExtraColors().controlInk, maxLines = 1)
+        Text(label, style = TextStyle(fontFamily = FontFamily.Default, fontSize = ReaderTypeToken.ACTION_LABEL.value, fontWeight = FontWeight(800)), color = if (active) MaterialTheme.colorScheme.onPrimary else readerExtraColors().controlInk, maxLines = 1)
     }
 }
 

@@ -1,8 +1,10 @@
 package com.reader.ui.tokens
 
+import android.content.Context
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -75,15 +77,104 @@ object ReaderTokenAdapter {
         return registryToken.value.parseDurationMillis()
     }
 
+    /**
+     * Resolve a contract [TokenCategory.Font] token to a Compose [FontFamily].
+     *
+     * Mapping follows `platforms.kotlin` in the contract:
+     *  - `--fd-ds-font-sans` / `--fd-ds-font-serif` / `--fd-ds-font-mono` → FontFamily.Default/Serif/Monospace
+     *  - `--fd-ds-font-kai` / `--fd-ds-font-fangsong` → FontFamily.Serif (no native Compose equivalent,
+     *    Android system serif fallback covers CJK glyphs).
+     */
+    fun font(token: Token): FontFamily? = when (token.category) {
+        TokenCategory.Font -> {
+            val registryToken = TokenRegistry.token(token.name.toRegistryTokenName()) ?: return null
+            when (registryToken.name) {
+                "--fd-ds-font-sans" -> FontFamily.Default
+                "--fd-ds-font-serif" -> FontFamily.Serif
+                "--fd-ds-font-kai" -> FontFamily.Serif
+                "--fd-ds-font-fangsong" -> FontFamily.Serif
+                "--fd-ds-font-mono" -> FontFamily.Monospace
+                else -> null
+            }
+        }
+        else -> null
+    }
+
+    /**
+     * Resolve a contract [TokenCategory.Shadow] token to its raw CSS box-shadow expression.
+     * Returns the contract value verbatim (e.g. `"0 8px 26px rgba(89,70,50,0.1)"`); callers
+     * that need a Compose [androidx.compose.ui.graphics.Shadow] should parse it themselves.
+     */
+    fun shadow(token: Token): String? = when (token.category) {
+        TokenCategory.Shadow -> {
+            val registryToken = TokenRegistry.token(token.name.toRegistryTokenName()) ?: return null
+            registryToken.value
+        }
+        else -> null
+    }
+
+    /**
+     * Resolve a contract [TokenCategory.Elevation] token (e.g. `--fd-ds-elevation-card` = `2px`)
+     * to a Compose [Dp] elevation. Mirrors the [size] parsing logic.
+     */
+    fun elevation(token: Token): Dp? = when (token.category) {
+        TokenCategory.Elevation -> {
+            val registryToken = TokenRegistry.token(token.name.toRegistryTokenName()) ?: return null
+            registryToken.value.parseDp()
+        }
+        else -> null
+    }
+
+    /**
+     * Resolve a contract [TokenCategory.TextConstraint] token to its integer constraint.
+     * Supports line-count tokens (`"1"`, `"2"`) and the reader line-length token (`"31ch"`).
+     */
+    fun textConstraint(token: Token): Int? = when (token.category) {
+        TokenCategory.TextConstraint -> {
+            val registryToken = TokenRegistry.token(token.name.toRegistryTokenName()) ?: return null
+            registryToken.value.parseIntOrNull()
+        }
+        else -> null
+    }
+
+    /**
+     * Resolve a contract [TokenCategory.Icon] token to an Android drawable resource id.
+     *
+     * Uses [Context.getResources].getIdentifier to look up `R.drawable.reader_ic_<name>`
+     * dynamically — the 94 contract icons are too many to enumerate by hand and the contract's
+     * `platforms.kotlin` field already encodes the resource-name convention.
+     */
+    fun icon(token: Token, context: Context): Int? = when (token.category) {
+        TokenCategory.Icon -> {
+            val registryToken = TokenRegistry.token(token.name.toRegistryTokenName()) ?: return null
+            // P3.10: handle both kebab-case (reader-module-settings) and camelCase
+            // (eyeOff) token values so they map to the existing snake_case
+            // drawable resources (reader_ic_eye_off.xml etc.).
+            val rawName = registryToken.value
+            val resourceName = "reader_ic_" + rawName
+                .replace("-", "_")
+                .replace(Regex("(?<=[a-z])[A-Z]"), "_$0")
+                .lowercase()
+            val id = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
+            if (id != 0) id else null
+        }
+        else -> null
+    }
+
     fun supports(token: Token): Boolean = when (token.category) {
         TokenCategory.Color,
+        TokenCategory.Font,
         TokenCategory.Spacing,
         TokenCategory.Size,
         TokenCategory.Radius,
         TokenCategory.Type,
+        TokenCategory.Shadow,
+        TokenCategory.Elevation,
         TokenCategory.ZIndex,
+        TokenCategory.TextConstraint,
         TokenCategory.MotionDuration,
-        TokenCategory.MotionEasing -> TokenRegistry.token(token.name.toRegistryTokenName())?.category == token.category
+        TokenCategory.MotionEasing,
+        TokenCategory.Icon -> TokenRegistry.token(token.name.toRegistryTokenName())?.category == token.category
         else -> false
     }
 }
@@ -172,7 +263,7 @@ enum class ReaderRadiusToken(val contractName: String, internal val value: Dp) {
     CONTROL("--fd-ds-radius-control", 999.dp)
 }
 
-// ── Type tokens (7) ───────────────────────────────────────────────────────────
+// ── Type tokens (16) ──────────────────────────────────────────────────────────
 // Source: Token.kt --fd-ds-type-*-size
 enum class ReaderTypeToken(val contractName: String, internal val value: TextUnit) {
     APP_TITLE("--fd-ds-type-app-title-size", 20.sp),
@@ -181,7 +272,16 @@ enum class ReaderTypeToken(val contractName: String, internal val value: TextUni
     BOOK_TITLE("--fd-ds-type-book-title-size", 14.sp),
     BOOK_META("--fd-ds-type-book-meta-size", 12.sp),
     READER_BODY("--fd-ds-type-reader-body-size", 18.sp),
-    READER_CONTROL_LABEL("--fd-ds-type-reader-control-label-size", 12.sp)
+    READER_CONTROL_LABEL("--fd-ds-type-reader-control-label-size", 12.sp),
+    TOP_BAR_TITLE("--fd-ds-type-top-bar-title-size", 16.sp),
+    TOP_BAR_SUBTITLE("--fd-ds-type-top-bar-subtitle-size", 10.sp),
+    ACTION_LABEL("--fd-ds-type-action-label-size", 11.sp),
+    CHAPTER_TITLE("--fd-ds-type-chapter-title-size", 13.sp),
+    READER_TITLE("--fd-ds-type-reader-title-size", 28.sp),
+    APP_BAR_TITLE("--fd-ds-type-app-bar-title-size", 29.sp),
+    BACK_BAR_TITLE("--fd-ds-type-back-bar-title-size", 29.sp),
+    READER_CHAPTER_TITLE("--fd-ds-type-reader-chapter-title-size", 23.sp),
+    EMPTY_HEADING("--fd-ds-type-empty-heading-size", 19.sp)
 }
 
 // ── z-index tokens (12) ───────────────────────────────────────────────────────
@@ -291,4 +391,21 @@ private fun String.parseDurationMillis(): Int {
         trimmed.endsWith("s") -> (trimmed.removeSuffix("s").trim().toDouble() * 1000).toInt()
         else -> trimmed.toInt()
     }
+}
+
+private fun String.parseDp(): Dp? {
+    val trimmed = trim()
+    val numeric = when {
+        trimmed.endsWith("px") -> trimmed.removeSuffix("px").trim()
+        trimmed.endsWith("dp") -> trimmed.removeSuffix("dp").trim()
+        else -> trimmed
+    }
+    return numeric.toFloatOrNull()?.dp
+}
+
+private fun String.parseIntOrNull(): Int? {
+    val trimmed = trim()
+    // Strip unit suffixes like "ch", "px", "lines" to extract the leading integer.
+    val digits = trimmed.takeWhile { it.isDigit() || it == '-' }
+    return digits.toIntOrNull()
 }

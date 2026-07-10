@@ -34,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
 import com.reader.ui.theme.ReaderElevations
 import com.reader.ui.theme.ReaderShapes
@@ -302,7 +302,7 @@ private fun SettingsSwitch(enabled: Boolean, onClick: () -> Unit) {
             modifier = Modifier
                 .size(18.dp)
                 .shadow(elevation = 2.dp, shape = ReaderShapes.pill, clip = false)
-                .background(Color.White, ReaderShapes.pill)
+                .background(MaterialTheme.colorScheme.surface, ReaderShapes.pill)
         )
     }
 }
@@ -329,7 +329,7 @@ private fun SettingsSegment(
             ) {
                 Text(
                     text = option,
-                    style = settingsSideStyle().copy(fontSize = 10.sp),
+                    style = settingsSideStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value),
                     color = if (active) colors.onPrimary else colors.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -357,7 +357,7 @@ private fun SettingsBadge(label: String, tone: SettingsTone) {
     ) {
         Text(
             text = label,
-            style = settingsSideStyle().copy(fontSize = 10.sp),
+            style = settingsSideStyle().copy(fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value),
             color = tint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -429,28 +429,28 @@ private enum class SettingsTone {
 
 private fun settingsSectionStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 16.sp,
     fontWeight = FontWeight(900)
 )
 
 private fun settingsRowTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 13.sp,
+    fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
     lineHeight = 15.sp,
     fontWeight = FontWeight(800)
 )
 
 private fun settingsRowMetaStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 10.sp,
+    fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(400)
 )
 
 private fun settingsSideStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 11.sp,
+    fontSize = ReaderTypeToken.ACTION_LABEL.value,
     lineHeight = 13.sp,
     fontWeight = FontWeight(900),
     textAlign = TextAlign.Center
@@ -458,7 +458,7 @@ private fun settingsSideStyle() = TextStyle(
 
 private fun settingsMetricStyle() = TextStyle(
     fontFamily = FontFamily.Default,
-    fontSize = 15.sp,
+    fontSize = ReaderTypeToken.SECTION_TITLE.value,
     lineHeight = 18.sp,
     fontWeight = FontWeight(900)
 )

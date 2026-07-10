@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.ui.motion.AppMotionTokens
 import com.reader.ui.motion.MotionController
 import com.reader.ui.motion.ReaderMotionTokens
@@ -536,7 +537,7 @@ fun ReaderChip(
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = fg, fontSize = 13.sp, fontWeight = FontWeight(600))
+        Text(text = text, color = fg, fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(600))
     }
 }
 
@@ -626,7 +627,7 @@ fun ReaderFilterChip(
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = text, color = fg, fontSize = 13.sp, fontWeight = FontWeight(600))
+            Text(text = text, color = fg, fontSize = ReaderTypeToken.CHAPTER_TITLE.value, fontWeight = FontWeight(600))
             if (checked) {
                 Box(
                     modifier = Modifier
@@ -636,7 +637,7 @@ fun ReaderFilterChip(
                         .background(Color.White.copy(alpha = 0.85f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✓", color = extra.primaryDark, fontSize = 10.sp, fontWeight = FontWeight(800))
+                    Text("✓", color = extra.primaryDark, fontSize = ReaderTypeToken.TOP_BAR_SUBTITLE.value, fontWeight = FontWeight(800))
                 }
             }
         }
@@ -719,7 +720,7 @@ fun ReaderSegment(
         Text(
             text = text,
             color = fg,
-            fontSize = 13.sp,
+            fontSize = ReaderTypeToken.CHAPTER_TITLE.value,
             fontWeight = if (selected) FontWeight(800) else FontWeight(600)
         )
     }
@@ -940,9 +941,9 @@ private fun DropdownOptionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = item.label, color = extra.readerInk, fontSize = 14.sp)
+        Text(text = item.label, color = extra.readerInk, fontSize = ReaderTypeToken.BOOK_TITLE.value)
         if (item.selected) {
-            Text("✓", color = extra.primaryDark, fontSize = 14.sp, fontWeight = FontWeight(800))
+            Text("✓", color = extra.primaryDark, fontSize = ReaderTypeToken.BOOK_TITLE.value, fontWeight = FontWeight(800))
         }
     }
 }
@@ -1142,7 +1143,7 @@ fun ReaderStepper(
         Text(
             text = value.toString(),
             color = if (enabled) extra.readerInk else extra.muted,
-            fontSize = 16.sp,
+            fontSize = ReaderTypeToken.TOP_BAR_TITLE.value,
             fontWeight = FontWeight(700),
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -1228,7 +1229,7 @@ private fun StepperButton(
         Text(
             text = text,
             color = if (enabled) extra.readerInk else extra.muted,
-            fontSize = 18.sp,
+            fontSize = ReaderTypeToken.READER_BODY.value,
             fontWeight = FontWeight(700)
         )
     }
@@ -1350,7 +1351,7 @@ fun ReaderListRow(
             content = content
         )
         if (selected) {
-            Text("✓", color = extra.primaryDark, fontSize = 16.sp, fontWeight = FontWeight(800))
+            Text("✓", color = extra.primaryDark, fontSize = ReaderTypeToken.TOP_BAR_TITLE.value, fontWeight = FontWeight(800))
         }
         if (trailing != null) trailing()
     }
