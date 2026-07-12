@@ -2,9 +2,16 @@
 
 Android reading app — Compose + Material 3 native host for Reader-Core-Native and Reader UI Contract.
 
-## P0 链路闭环交付（2026-07-10）
+## 当前 Reader UI 消费边界（2026-07-12）
 
-Reader for Android 完成 Contract-first Native UI Architecture 的 P0 链路全闭环。5 条 P0 链路（bookshelf / reader / source-switch / book-detail / settings）× A-F 六列全部 ✅，矩阵 120/120 全绿。
+- 消费 Reader UI 2.5.1 的 immutable release identity；精确值以 `READER_UI_CONSUMER.json` 为准。
+- 35 条 covered event 中 7 条为 Pilot、28 条为 Shadow、0 条为 Authoritative。
+- 当前没有连接物理 Android 设备；JVM tests、assembleDebug 和静态矩阵不能替代 real-device interaction proof。
+- 因此当前状态是“合同/静态接线与部分 runtime Pilot 已落地”，不是“前端或五条 workflow 全闭环”。
+
+## P0 静态链路矩阵（2026-07-10，非完成口径）
+
+5 条 P0 链路（bookshelf / reader / source-switch / book-detail / settings）× A-F 六列的代码、fixture 与静态接线矩阵达到 120/120。该数字不证明 native 视觉一致、真实 Core/Host transaction、设备交互或 Authoritative rollout。
 
 ### 交付成果
 
@@ -22,15 +29,16 @@ Reader for Android 完成 Contract-first Native UI Architecture 的 P0 链路全
 - `BookshelfRouteScreens` 接线
 - 非 P0 文件 raw `Color` 清理
 
-### 验收
+### 当时静态验收
 
 - `./gradlew compileDebugKotlin`：BUILD SUCCESSFUL
 - `./gradlew test`：899 tests，0 failures
 - P0 链路矩阵：120/120 全绿（退出码 0）
 
-### 遗留
+### 当前遗留
 
-- `SourceSwitchScreenSmokeTest` 需设备/模拟器运行（instrumented test）
+- `SourceSwitchScreenSmokeTest` 与 7 条 Pilot 的真实行为仍需物理设备执行；当前没有 attached device。
+- page、import、source-switch、replace、RSS、Sync 共 28 条 covered event 仍由 native path 生产持有并在 runtime 中保持 Shadow。
 - `ReaderControlScreen` 残留 raw `dp` 标注为 demo 布局常量（非 token 化目标）
 
 ## Current architecture role

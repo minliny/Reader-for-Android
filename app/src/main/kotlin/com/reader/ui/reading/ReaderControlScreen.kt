@@ -117,7 +117,7 @@ internal fun ReaderShellScreen(
     bookOpenPilotEnabled: Boolean = false,
     bookOpenDomainState: ReaderBookOpenDomainState = ReaderBookOpenDomainState(),
     onBookOpenViewportLayoutReady: (ReaderBookOpenViewport) -> Unit = {},
-    /** Default-off paired page/TTS/auto-page Pilot projection. */
+    /** Rollout projection: page remains Shadow; production enables TTS/auto-page Pilot. */
     playbackPilotEnabled: Boolean = false,
     playbackDomainState: ReaderPlaybackDomainState = ReaderPlaybackDomainState(),
     onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {},

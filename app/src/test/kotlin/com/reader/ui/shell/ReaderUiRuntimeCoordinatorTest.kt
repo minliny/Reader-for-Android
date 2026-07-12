@@ -427,7 +427,7 @@ class ReaderUiRuntimeCoordinatorTest {
             coordinator.coveredEvents.size - coordinator.pilotEvents.size,
             coordinator.coveredEvents.minus(coordinator.pilotEvents).size
         )
-        assertEquals("2.5.0", lock.getString("readerUiVersion"))
+        assertEquals("2.5.1", lock.getString("readerUiVersion"))
         assertEquals("1.2.0", lock.getString("hostRequestSchemaVersion"))
         assertEquals(2, lock.getInt("runtimeActionsSchemaVersion"))
         assertEquals(
