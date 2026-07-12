@@ -372,7 +372,7 @@ object MotionController {
     }
 
     // ------------------------------------------------------------------
-    // 47 Motion ID 契约查询
+    // Generated Motion ID contract query
     // ------------------------------------------------------------------
 
     /**
@@ -810,17 +810,17 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
 )
 
     /**
-     * 87 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
+     * 96 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
      * `motion-controller.js` 的 from/to/interrupt/finalState 语义值。
      *
-     * 对于在 `motion-controller.js` 中有定义的 Motion ID（62 条），from/to/interrupt/finalState
-     * 使用 JS 侧的语义值；对于仅存在于生成契约中的 Motion ID（22 条），回退到 spec 字段。
+     * 对于在 `motion-controller.js` 中有定义的 Motion ID，from/to/interrupt/finalState
+     * 使用 JS 侧的语义值；对于仅存在于生成契约中的 Motion ID，回退到 spec 字段。
      *
-     * 另有 5 条遗留 Motion ID（无 MotionId 枚举对应，如 "tab.item.press"）直接从
-     * [MOTION_CONTROLLER_JS_SPECS] 补入，保证 [MotionIdConstants] 的 47 个常量全部可解析。
+     * 仅存在于旧 JS 语义表、但不属于生成枚举的高层别名继续补入查询表；所有
+     * [MotionIdConstants] 则直接委托给生成枚举的 serializer wire name。
      *
-     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (87 条) +
-     *                  motion-controller.js 300-649 (62 条 JS 语义 + 5 条遗留)。
+     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (96 条) +
+     *                  motion-controller.js 语义表与本地遗留别名。
      */
     private val MOTION_CONTRACTS: Map<String, MotionContract> = buildMap {
         MotionSpecRegistry.all.forEach { spec ->
@@ -846,7 +846,7 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
                 )
             )
         }
-        // 5 条遗留 Motion ID（无 MotionId 枚举对应，仅存在于 motion-controller.js）
+        // 旧 JS 语义表中的高层别名不属于 MotionId enum，仍保留查询兼容性。
         MOTION_CONTROLLER_JS_SPECS.forEach { (serialName, jsSpec) ->
             if (!containsKey(serialName)) {
                 put(
@@ -863,8 +863,8 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
                 )
             }
         }
-        // 别名："tab.item.switch" 是 "tab.switch" 的旧 wire string（MotionIdConstants.TAB_ITEM_SWITCH），
-        // 需复制 "tab.switch" 的完整契约（含 durationMs=160）。
+        // Generated keeps both tab.item.switch and tab.switch. Preserve the established Android
+        // semantic contract for tab.item.switch (including durationMs=160).
         this["tab.switch"]?.let { tabSwitchContract ->
             put("tab.item.switch", tabSwitchContract.copy(motionId = "tab.item.switch"))
         }
@@ -946,11 +946,8 @@ data class TransientStateCleanup(
 )
 
 /**
- * 47 个 Motion ID 常量（motion-controller.js 292-622）。
- *
- * 已迁移为生成枚举 [MotionId] 的薄兼容层：39 个有 1:1 枚举对应的常量委托给
- * [MotionId.serialName]；8 个无对应枚举值的本地遗留字符串（用于 MOTION_CONTRACTS
- * 的 key 查询与 legacyMotionIdAliases 别名桥接）保留字面量。
+ * Local constant-name compatibility layer. Every wire value delegates to generated [MotionId]
+ * serializer metadata; Android no longer keeps a second literal string table.
  */
 object MotionIdConstants {
     // App launch / route
@@ -960,18 +957,17 @@ object MotionIdConstants {
     val APP_ROUTE_REPLACE: String get() = MotionId.AppRouteReplace.serialName
 
     // Tab / segment
-    const val TAB_ITEM_PRESS = "tab.item.press"
+    val TAB_ITEM_PRESS: String get() = MotionId.TabItemPress.serialName
     val TAB_ITEM_SELECT: String get() = MotionId.TabItemSelect.serialName
-    const val TAB_ITEM_SWITCH = "tab.item.switch"
+    val TAB_ITEM_SWITCH: String get() = MotionId.TabItemSwitch.serialName
     val SEGMENT_ITEM_SWITCH: String get() = MotionId.SegmentItemSwitch.serialName
 
     // Dropdown
     val DROPDOWN_TRIGGER_PRESS: String get() = MotionId.DropdownTriggerPress.serialName
     val DROPDOWN_MENU_EXPAND: String get() = MotionId.DropdownMenuExpand.serialName
-    const val DROPDOWN_MENU_EXPAND_COLLAPSE = "dropdown.menu.expand/collapse"
     val DROPDOWN_MENU_COLLAPSE: String get() = MotionId.DropdownMenuCollapse.serialName
-    const val DROPDOWN_MENU_REPOSITION = "dropdown.menu.reposition"
-    const val DROPDOWN_OPTION_PRESS = "dropdown.option.press"
+    val DROPDOWN_MENU_REPOSITION: String get() = MotionId.DropdownMenuReposition.serialName
+    val DROPDOWN_OPTION_PRESS: String get() = MotionId.DropdownOptionPress.serialName
     val DROPDOWN_OPTION_SELECT: String get() = MotionId.DropdownOptionSelect.serialName
 
     // Overlay (keyboard / sheet / dialog)
@@ -990,7 +986,7 @@ object MotionIdConstants {
     val READER_ENTRY_ACTION_TO_IMMERSIVE: String get() = MotionId.ReaderEntryActionToImmersive.serialName
     val READER_CONTROL_HIDE: String get() = MotionId.ReaderControlHide.serialName
     val READER_CONTROL_HANDLE_PRESS: String get() = MotionId.ReaderControlHandlePress.serialName
-    const val READER_CONTROL_HANDLE_DRAG = "reader.control.handle.drag"
+    val READER_CONTROL_HANDLE_DRAG: String get() = MotionId.ReaderControlHandleDrag.serialName
     val READER_CONTROL_HANDLE_RELEASE: String get() = MotionId.ReaderControlHandleRelease.serialName
     val READER_CONTROL_DOCK_LONG_PRESS: String get() = MotionId.ReaderControlDockLongPress.serialName
     val READER_CONTROL_DOCK_DRAG: String get() = MotionId.ReaderControlDockDrag.serialName

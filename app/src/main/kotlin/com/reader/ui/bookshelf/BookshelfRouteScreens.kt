@@ -293,7 +293,9 @@ private fun BookshelfRouteShelfSection(
     onBookshelfSettings: () -> Unit,
     onOpenBookFromCover: (Book) -> Unit,
     onOpenBookFromAction: (Book) -> Unit,
-    onFilterChange: (BookshelfFilterState) -> Unit = {}
+    onFilterChange: (BookshelfFilterState) -> Unit = {},
+    onCoverView: () -> Unit = {},
+    onListView: () -> Unit = {}
 ) {
     val isEmpty = state.books.isEmpty()
     Box(Modifier.fillMaxWidth()) {
@@ -305,8 +307,8 @@ private fun BookshelfRouteShelfSection(
                 viewMode = state.chrome.viewMode,
                 actionsEnabled = actionsEnabled,
                 filterActive = state.chrome.filter.isActive,
-                onCoverView = {},
-                onListView = {},
+                onCoverView = onCoverView,
+                onListView = onListView,
                 onToggleFilter = {
                     onFilterChange(state.chrome.filter.copy(isOpen = !state.chrome.filter.isOpen))
                 },
@@ -858,5 +860,423 @@ private fun BookshelfRouteCoverFrame(
                 modifier = Modifier.fillMaxSize()
             )
         }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
+// H1-Android 批次 1：3 个书架状态变体路由
+//  - bookshelf-cover-mode      书架封面模式 + 反馈条
+//  - bookshelf-list-mode       书架列表模式 + 反馈条
+//  - bookshelf-book-more-menu  书架网格 + 底部书籍操作菜单浮层（8 个操作按钮）
+//
+// 参考 `bookshelf-empty` / `sort-filter` 的实现模式：
+//  - 复用 BookshelfRouteScaffold / BookshelfRouteShelfSection / BookshelfRouteContinueCard
+//  - 读取真实状态（BookshelfDemoRouteState），不使用固定文本冒充
+// ------------------------------------------------------------------------------------------------
+
+fun demoBookshelfCoverModeRouteState(): BookshelfDemoRouteState {
+    val books = demoBookshelfRouteBooks()
+    return BookshelfDemoRouteState(
+        books = books,
+        continueReading = books.first(),
+        chrome = BookshelfChromeState(viewMode = BookshelfViewMode.COVER)
+    )
+}
+
+fun demoBookshelfListModeRouteState(): BookshelfDemoRouteState {
+    val books = demoBookshelfRouteBooks()
+    return BookshelfDemoRouteState(
+        books = books,
+        continueReading = books.first(),
+        chrome = BookshelfChromeState(viewMode = BookshelfViewMode.LIST)
+    )
+}
+
+fun demoBookshelfBookMoreMenuRouteState(): BookshelfDemoRouteState {
+    val books = demoBookshelfRouteBooks()
+    return BookshelfDemoRouteState(
+        books = books,
+        continueReading = books.first(),
+        chrome = BookshelfChromeState(
+            viewMode = BookshelfViewMode.COVER,
+            focusedBook = books.first()
+        )
+    )
+}
+
+/**
+ * 书架封面模式：封面网格视图 + “已切换到封面视图”反馈条。
+ */
+@Composable
+fun BookshelfCoverModeRouteScreen(
+    onSearch: () -> Unit,
+    onOpenBookFromCover: (Book) -> Unit,
+    onOpenBookFromAction: (Book) -> Unit,
+    onLocalImport: () -> Unit,
+    onBookshelfSettings: () -> Unit,
+    onBookBatchManagement: () -> Unit,
+    onGroupManagement: () -> Unit,
+    onSwitchToList: () -> Unit,
+    state: BookshelfDemoRouteState = demoBookshelfCoverModeRouteState()
+) {
+    var moreOpen by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        BookshelfRouteScaffold(
+            title = "书架",
+            onSearch = onSearch,
+            onMore = { moreOpen = true }
+        ) {
+            state.continueReading?.let { book ->
+                item {
+                    BookshelfRouteContinueCard(
+                        book = book,
+                        onCoverClick = { onOpenBookFromCover(book) },
+                        onContinue = { onOpenBookFromAction(book) }
+                    )
+                }
+            }
+            item {
+                BookshelfRouteShelfSection(
+                    state = state,
+                    actionsEnabled = true,
+                    onSearch = onSearch,
+                    onLocalImport = onLocalImport,
+                    onDiscover = {},
+                    onBookshelfSettings = onBookshelfSettings,
+                    onOpenBookFromCover = onOpenBookFromCover,
+                    onOpenBookFromAction = onOpenBookFromAction,
+                    onCoverView = {},
+                    onListView = onSwitchToList
+                )
+            }
+        }
+        BookshelfRouteViewSwitchToast(
+            text = "已切换到封面视图",
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp)
+        )
+        if (moreOpen) {
+            BookshelfRouteMoreLayer(
+                onDismiss = { moreOpen = false },
+                onBookBatchManagement = {
+                    moreOpen = false
+                    onBookBatchManagement()
+                },
+                onGroupManagement = {
+                    moreOpen = false
+                    onGroupManagement()
+                },
+                onLocalImport = {
+                    moreOpen = false
+                    onLocalImport()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 书架列表模式：列表视图 + “已切换到列表视图”反馈条。
+ */
+@Composable
+fun BookshelfListModeRouteScreen(
+    onSearch: () -> Unit,
+    onOpenBookFromCover: (Book) -> Unit,
+    onOpenBookFromAction: (Book) -> Unit,
+    onLocalImport: () -> Unit,
+    onBookshelfSettings: () -> Unit,
+    onBookBatchManagement: () -> Unit,
+    onGroupManagement: () -> Unit,
+    onSwitchToCover: () -> Unit,
+    state: BookshelfDemoRouteState = demoBookshelfListModeRouteState()
+) {
+    var moreOpen by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        BookshelfRouteScaffold(
+            title = "书架",
+            onSearch = onSearch,
+            onMore = { moreOpen = true }
+        ) {
+            state.continueReading?.let { book ->
+                item {
+                    BookshelfRouteContinueCard(
+                        book = book,
+                        onCoverClick = { onOpenBookFromCover(book) },
+                        onContinue = { onOpenBookFromAction(book) }
+                    )
+                }
+            }
+            item {
+                BookshelfRouteShelfSection(
+                    state = state,
+                    actionsEnabled = true,
+                    onSearch = onSearch,
+                    onLocalImport = onLocalImport,
+                    onDiscover = {},
+                    onBookshelfSettings = onBookshelfSettings,
+                    onOpenBookFromCover = onOpenBookFromCover,
+                    onOpenBookFromAction = onOpenBookFromAction,
+                    onCoverView = onSwitchToCover,
+                    onListView = {}
+                )
+            }
+        }
+        BookshelfRouteViewSwitchToast(
+            text = "已切换到列表视图",
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp)
+        )
+        if (moreOpen) {
+            BookshelfRouteMoreLayer(
+                onDismiss = { moreOpen = false },
+                onBookBatchManagement = {
+                    moreOpen = false
+                    onBookBatchManagement()
+                },
+                onGroupManagement = {
+                    moreOpen = false
+                    onGroupManagement()
+                },
+                onLocalImport = {
+                    moreOpen = false
+                    onLocalImport()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 书架网格 + 底部书籍操作菜单浮层（详情、换源、缓存、加入分组、编辑、替换规则、删除、取消）。
+ */
+@Composable
+fun BookshelfBookMoreMenuRouteScreen(
+    onSearch: () -> Unit,
+    onOpenBookFromCover: (Book) -> Unit,
+    onOpenBookFromAction: (Book) -> Unit,
+    onLocalImport: () -> Unit,
+    onBookshelfSettings: () -> Unit,
+    onBookBatchManagement: () -> Unit,
+    onGroupManagement: () -> Unit,
+    onBookDetail: () -> Unit,
+    onSourceSwitch: () -> Unit,
+    onCacheBook: () -> Unit,
+    onAddToGroup: () -> Unit,
+    onEditBook: () -> Unit,
+    onReplaceRule: () -> Unit,
+    onDeleteBook: () -> Unit,
+    onDismiss: () -> Unit = {},
+    state: BookshelfDemoRouteState = demoBookshelfBookMoreMenuRouteState()
+) {
+    val focusedBook = state.chrome.focusedBook ?: state.books.firstOrNull()
+    var moreOpen by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        BookshelfRouteScaffold(
+            title = "书架",
+            onSearch = onSearch,
+            onMore = { moreOpen = true }
+        ) {
+            state.continueReading?.let { book ->
+                item {
+                    BookshelfRouteContinueCard(
+                        book = book,
+                        onCoverClick = { onOpenBookFromCover(book) },
+                        onContinue = { onOpenBookFromAction(book) }
+                    )
+                }
+            }
+            item {
+                BookshelfRouteShelfSection(
+                    state = state,
+                    actionsEnabled = true,
+                    onSearch = onSearch,
+                    onLocalImport = onLocalImport,
+                    onDiscover = {},
+                    onBookshelfSettings = onBookshelfSettings,
+                    onOpenBookFromCover = onOpenBookFromCover,
+                    onOpenBookFromAction = onOpenBookFromAction
+                )
+            }
+        }
+        if (focusedBook != null) {
+            BookshelfRouteBookMoreMenuLayer(
+                book = focusedBook,
+                onDismiss = onDismiss,
+                onBookDetail = onBookDetail,
+                onSourceSwitch = onSourceSwitch,
+                onCacheBook = onCacheBook,
+                onAddToGroup = onAddToGroup,
+                onEditBook = onEditBook,
+                onReplaceRule = onReplaceRule,
+                onDeleteBook = onDeleteBook
+            )
+        }
+        if (moreOpen) {
+            BookshelfRouteMoreLayer(
+                onDismiss = { moreOpen = false },
+                onBookBatchManagement = {
+                    moreOpen = false
+                    onBookBatchManagement()
+                },
+                onGroupManagement = {
+                    moreOpen = false
+                    onGroupManagement()
+                },
+                onLocalImport = {
+                    moreOpen = false
+                    onLocalImport()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun BookshelfRouteViewSwitchToast(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .shadow(elevation = 6.dp, shape = ReaderShapes.pill, clip = false)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f), ReaderShapes.pill)
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f), ReaderShapes.pill)
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.reader_ic_check),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(text, style = ReaderTextStyles.tabLabel, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun BookshelfRouteBookMoreMenuLayer(
+    book: Book,
+    onDismiss: () -> Unit,
+    onBookDetail: () -> Unit,
+    onSourceSwitch: () -> Unit,
+    onCacheBook: () -> Unit,
+    onAddToGroup: () -> Unit,
+    onEditBook: () -> Unit,
+    onReplaceRule: () -> Unit,
+    onDeleteBook: () -> Unit
+) {
+    val extra = readerExtraColors()
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.36f))
+                .clickable(onClick = onDismiss)
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .shadow(elevation = 18.dp, shape = ReaderShapes.xl, clip = false)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f), ReaderShapes.xl)
+                .border(1.dp, extra.hairline, ReaderShapes.xl)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BookshelfRouteCoverFrame(
+                    book = book,
+                    shape = ReaderShapes.sm,
+                    modifier = Modifier.size(width = 38.dp, height = 56.dp)
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = book.name,
+                        style = ReaderTextStyles.bookTitle,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = book.author,
+                        style = ReaderTextStyles.bookAuthor,
+                        color = extra.muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(extra.hairline)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_book_open, "详情", Modifier.weight(1f), onBookDetail)
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_source_switch, "换源", Modifier.weight(1f), onSourceSwitch)
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_download, "缓存", Modifier.weight(1f), onCacheBook)
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_folder, "加入分组", Modifier.weight(1f), onAddToGroup)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_edit, "编辑", Modifier.weight(1f), onEditBook)
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_replace, "替换规则", Modifier.weight(1f), onReplaceRule)
+                BookshelfRouteMoreMenuAction(R.drawable.reader_ic_trash, "删除", Modifier.weight(1f), onDeleteBook)
+                Spacer(Modifier.weight(1f))
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 44.dp)
+                    .background(extra.metaBackground.copy(alpha = 0.72f), ReaderShapes.pill)
+                    .border(1.dp, extra.hairline, ReaderShapes.pill)
+                    .clickable(onClick = onDismiss)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("取消", style = ReaderTextStyles.continueAction, color = extra.controlInk)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookshelfRouteMoreMenuAction(
+    @DrawableRes iconRes: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val extra = readerExtraColors()
+    Column(
+        modifier = modifier
+            .defaultMinSize(minHeight = 64.dp)
+            .background(extra.metaBackground.copy(alpha = 0.6f), ReaderShapes.md)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            tint = extra.controlInk,
+            modifier = Modifier.size(22.dp)
+        )
+        Text(label, style = ReaderTextStyles.tabLabel, color = extra.controlInk, maxLines = 1)
     }
 }

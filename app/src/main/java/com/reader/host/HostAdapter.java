@@ -42,11 +42,24 @@ public final class HostAdapter {
         return handlers.containsKey(capability);
     }
 
-    public synchronized HostReply dispatch(HostRequest request) {
+    /** Read-only registration snapshot for exact contract-manifest gates. */
+    public synchronized java.util.Set<String> registeredCapabilities() {
+        return java.util.Collections.unmodifiableSet(
+                new java.util.LinkedHashSet<>(handlers.keySet()));
+    }
+
+    public HostReply dispatch(HostRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request required");
         }
-        CapabilityHandler handler = handlers.get(request.capability());
+        HostReply contractFailure = CanonicalHostWireContract.validateRequest(request);
+        if (contractFailure != null) {
+            return contractFailure;
+        }
+        final CapabilityHandler handler;
+        synchronized (this) {
+            handler = handlers.get(request.capability());
+        }
         if (handler == null) {
             return HostReply.error(INTERNAL,
                     "unsupported capability: " + request.capability(), false);
@@ -56,6 +69,10 @@ public final class HostAdapter {
             if (reply == null) {
                 return HostReply.error(INTERNAL,
                         "handler returned null for " + request.capability(), false);
+            }
+            if (reply instanceof HostReply.Complete) {
+                return CanonicalHostWireContract.projectSuccess(
+                        request.capability(), ((HostReply.Complete) reply).resultJson());
             }
             return reply;
         } catch (RuntimeException e) {

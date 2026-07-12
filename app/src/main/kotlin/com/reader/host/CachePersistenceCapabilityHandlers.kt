@@ -266,9 +266,11 @@ class PersistencePutHandler(
 class HostCachePersistenceAdapter(@Suppress("UNUSED_PARAMETER") cache: HostCache) : HostPersistence {
     private val store = ConcurrentHashMap<String, HostPersistenceEntry>()
 
+    @Synchronized
     override fun get(namespace: String, key: String): HostPersistenceEntry? =
         store[compositeKey(namespace, key)]
 
+    @Synchronized
     override fun put(namespace: String, key: String, value: String?, valueBase64: String?, expectedRevision: String?): HostPersistenceEntry {
         val composite = compositeKey(namespace, key)
         val current = store[composite]
@@ -276,12 +278,16 @@ class HostCachePersistenceAdapter(@Suppress("UNUSED_PARAMETER") cache: HostCache
         if (expectedRevision != null && expectedRevision != currentRevision) {
             throw HostPersistenceRevisionMismatch(expectedRevision, currentRevision)
         }
-        val nextRevision = ((currentRevision.toLongOrNull() ?: 0L) + 1L).toString()
+        val currentNumber = currentRevision.toLongOrNull()
+            ?.takeIf { it >= 0L && it < Long.MAX_VALUE }
+            ?: throw IllegalStateException("persistence revision is corrupt or exhausted")
+        val nextRevision = (currentNumber + 1L).toString()
         val entry = HostPersistenceEntry(value, valueBase64, nextRevision)
         store[composite] = entry
         return entry
     }
 
+    @Synchronized
     override fun remove(namespace: String, key: String): Boolean =
         store.remove(compositeKey(namespace, key)) != null
 }
@@ -291,6 +297,7 @@ class SharedPreferencesHostPersistence(
 ) : HostPersistence {
     private fun base(namespace: String, key: String): String = "host.persistence.${compositeKey(namespace, key)}"
 
+    @Synchronized
     override fun get(namespace: String, key: String): HostPersistenceEntry? {
         val base = base(namespace, key)
         if (!prefs.contains("$base.kind")) return null
@@ -304,20 +311,27 @@ class SharedPreferencesHostPersistence(
         }
     }
 
+    @Synchronized
     override fun put(namespace: String, key: String, value: String?, valueBase64: String?, expectedRevision: String?): HostPersistenceEntry {
         val base = base(namespace, key)
         val currentRevision = prefs.getString("$base.revision", "0") ?: "0"
         if (expectedRevision != null && expectedRevision != currentRevision) {
             throw HostPersistenceRevisionMismatch(expectedRevision, currentRevision)
         }
-        val nextRevision = ((currentRevision.toLongOrNull() ?: 0L) + 1L).toString()
+        val currentNumber = currentRevision.toLongOrNull()
+            ?.takeIf { it >= 0L && it < Long.MAX_VALUE }
+            ?: throw IllegalStateException("persistence revision is corrupt or exhausted")
+        val nextRevision = (currentNumber + 1L).toString()
         val kind = if (valueBase64 != null) "valueBase64" else "value"
         val payload = valueBase64 ?: value ?: ""
-        prefs.edit()
+        val committed = prefs.edit()
             .putString("$base.kind", kind)
             .putString("$base.payload", payload)
             .putString("$base.revision", nextRevision)
-            .apply()
+            .commit()
+        if (!committed) {
+            throw IllegalStateException("persistence.put failed to commit $namespace/$key")
+        }
         return if (kind == "valueBase64") {
             HostPersistenceEntry(null, payload, nextRevision)
         } else {
@@ -325,14 +339,18 @@ class SharedPreferencesHostPersistence(
         }
     }
 
+    @Synchronized
     override fun remove(namespace: String, key: String): Boolean {
         val base = base(namespace, key)
         val existed = prefs.contains("$base.kind")
-        prefs.edit()
+        val committed = prefs.edit()
             .remove("$base.kind")
             .remove("$base.payload")
             .remove("$base.revision")
-            .apply()
+            .commit()
+        if (!committed) {
+            throw IllegalStateException("persistence.remove failed to commit $namespace/$key")
+        }
         return existed
     }
 }

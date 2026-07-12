@@ -2257,4 +2257,520 @@ class ReaderUiReducerTest {
         assertEquals("全屏滚动", multi.readerChoices["pageTurnMethod"])
         assertEquals("1.5x", multi.readerChoices["ttsRate"])
     }
+
+    // ── Slice 3: Overlay transition-guard golden tests ──────────────────────────
+    // 契约：overlayState 是单一字段，打开第二个浮层必须替换第一个（互斥）；
+    // 关闭浮层 / tab 切换 / popRoute 必须清空 overlayState 到 None（interrupt rule）。
+
+    @Test
+    fun `opening a second overlay replaces the first - overlay mutual exclusion via single overlayState field`() {
+        // Sheet → Dialog：dialog 必须替换 sheet
+        val withSheet = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter-1"))
+        )
+        assertTrue(withSheet.overlayState is OverlayState.Sheet)
+
+        val withDialog = ReaderUiReducer.reduce(
+            withSheet,
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        assertTrue(
+            "dialog must replace sheet — single overlayState field enforces mutual exclusion",
+            withDialog.overlayState is OverlayState.Dialog
+        )
+
+        // Dialog → Sheet：sheet 必须替换 dialog
+        val withDialogFirst = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        assertTrue(withDialogFirst.overlayState is OverlayState.Dialog)
+
+        val withSheetAfter = ReaderUiReducer.reduce(
+            withDialogFirst,
+            ReaderUiIntent.OpenSheet(SheetContent.ReaderSetting("directory"))
+        )
+        assertTrue(
+            "sheet must replace dialog — single overlayState field enforces mutual exclusion",
+            withSheetAfter.overlayState is OverlayState.Sheet
+        )
+
+        // Keyboard → Sheet：sheet 必须替换 keyboard
+        val withKeyboard = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenKeyboard(inputId = "search-input")
+        )
+        assertTrue(withKeyboard.overlayState is OverlayState.Keyboard)
+
+        val withSheetOverKeyboard = ReaderUiReducer.reduce(
+            withKeyboard,
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter-2"))
+        )
+        assertTrue(
+            "sheet must replace keyboard — single overlayState field enforces mutual exclusion",
+            withSheetOverKeyboard.overlayState is OverlayState.Sheet
+        )
+    }
+
+    @Test
+    fun `closing an overlay clears overlayState to None`() {
+        // CloseSheet → None
+        val withSheet = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter"))
+        )
+        val afterCloseSheet = ReaderUiReducer.reduce(withSheet, ReaderUiIntent.CloseSheet)
+        assertEquals(
+            "CloseSheet must clear overlayState to None",
+            OverlayState.None,
+            afterCloseSheet.overlayState
+        )
+
+        // CloseDialog → None
+        val withDialog = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        val afterCloseDialog = ReaderUiReducer.reduce(withDialog, ReaderUiIntent.CloseDialog)
+        assertEquals(
+            "CloseDialog must clear overlayState to None",
+            OverlayState.None,
+            afterCloseDialog.overlayState
+        )
+
+        // CloseKeyboard → None
+        val withKeyboard = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.OpenKeyboard(inputId = "search-input")
+        )
+        val afterCloseKeyboard = ReaderUiReducer.reduce(withKeyboard, ReaderUiIntent.CloseKeyboard)
+        assertEquals(
+            "CloseKeyboard must clear overlayState to None",
+            OverlayState.None,
+            afterCloseKeyboard.overlayState
+        )
+    }
+
+    @Test
+    fun `tab switch clears overlayState - interrupt rule`() {
+        // 打开 Sheet 浮层后切换 tab → overlayState 必须被清空
+        val withOverlay = ReaderUiReducer.reduce(
+            ReaderUiState(activeTab = MainTab.BOOKSHELF),
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter"))
+        )
+        assertTrue(withOverlay.overlayState !is OverlayState.None)
+
+        val afterTabSwitch = ReaderUiReducer.reduce(
+            withOverlay,
+            ReaderUiIntent.SelectTab(MainTab.SETTINGS, requestId = "req-tab")
+        )
+        assertEquals(
+            "tab switch must clear overlayState (interrupt rule)",
+            OverlayState.None,
+            afterTabSwitch.overlayState
+        )
+
+        // 打开 Dialog 浮层后切换 tab → overlayState 也必须被清空
+        val withDialog = ReaderUiReducer.reduce(
+            ReaderUiState(activeTab = MainTab.BOOKSHELF),
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        assertTrue(withDialog.overlayState is OverlayState.Dialog)
+
+        val afterTabSwitchFromDialog = ReaderUiReducer.reduce(
+            withDialog,
+            ReaderUiIntent.SelectTab(MainTab.RSS, requestId = "req-tab-2")
+        )
+        assertEquals(
+            "tab switch must clear dialog overlayState (interrupt rule)",
+            OverlayState.None,
+            afterTabSwitchFromDialog.overlayState
+        )
+    }
+
+    @Test
+    fun `opening overlay then popping route clears overlay`() {
+        // Push route → 打开 Dialog 浮层 → pop → overlayState 必须清空
+        val withSearch = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.Search)
+        )
+        val withOverlay = ReaderUiReducer.reduce(
+            withSearch,
+            ReaderUiIntent.OpenDialog(
+                DialogContent.Confirm(title = "确认", message = "ok", onConfirm = {})
+            )
+        )
+        assertTrue(withOverlay.overlayState is OverlayState.Dialog)
+
+        val afterPop = ReaderUiReducer.reduce(withOverlay, ReaderUiIntent.PopRoute)
+        assertEquals(
+            "PopRoute must clear overlayState",
+            OverlayState.None,
+            afterPop.overlayState
+        )
+
+        // Push route → 打开 Sheet 浮层 → pop → overlayState 必须清空
+        val withImport = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.ImportSource)
+        )
+        val withSheet = ReaderUiReducer.reduce(
+            withImport,
+            ReaderUiIntent.OpenSheet(SheetContent.BookshelfFilter("filter"))
+        )
+        assertTrue(withSheet.overlayState is OverlayState.Sheet)
+
+        val afterPopSheet = ReaderUiReducer.reduce(withSheet, ReaderUiIntent.PopRoute)
+        assertEquals(
+            "PopRoute must clear sheet overlayState",
+            OverlayState.None,
+            afterPopSheet.overlayState
+        )
+    }
+
+    // ── Slice 5: RSS / Source / Discover golden tests ───────────────────────────
+    // 契约：RSS / Discover tab switch 设置 currentRoute 到对应 TabShell；
+    // Search route push 设置 currentRoute 到 book-search；
+    // RSS list 加载成功设置 Success 并清除 Loading；
+    // Discover filter toggle 通过 SetReaderBehaviorToggle 添加/移除标签；
+    // Source import 打开 import route。
+
+    @Test
+    fun `RSS tab switch sets activeTab to RSS and currentRoute to rss TabShell`() {
+        val initial = ReaderUiState(activeTab = MainTab.BOOKSHELF)
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SelectTab(MainTab.RSS, requestId = "req-rss-tab")
+        )
+        assertEquals(MainTab.RSS, next.activeTab)
+        assertTrue(next.currentRoute is ReaderRoute.TabShell)
+        assertEquals(MainTab.RSS, (next.currentRoute as ReaderRoute.TabShell).tab)
+        assertEquals("rss", next.currentRoute.routeId)
+        assertTrue("tab switch must not push onto backStack", next.backStack.isEmpty())
+    }
+
+    @Test
+    fun `Discover tab switch sets activeTab to DISCOVER and currentRoute to discover TabShell`() {
+        val initial = ReaderUiState(activeTab = MainTab.BOOKSHELF)
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SelectTab(MainTab.DISCOVER, requestId = "req-discover-tab")
+        )
+        assertEquals(MainTab.DISCOVER, next.activeTab)
+        assertTrue(next.currentRoute is ReaderRoute.TabShell)
+        assertEquals(MainTab.DISCOVER, (next.currentRoute as ReaderRoute.TabShell).tab)
+        assertEquals("discover", next.currentRoute.routeId)
+        assertTrue("tab switch must not push onto backStack", next.backStack.isEmpty())
+    }
+
+    @Test
+    fun `Search route push sets currentRoute to book-search`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.PushRoute(ReaderRoute.Search, requestId = "req-search")
+        )
+        assertEquals(ReaderRoute.Search, next.currentRoute)
+        assertEquals("book-search", next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+        assertEquals(ReaderRoute.Search, next.backStack.last())
+    }
+
+    @Test
+    fun `RSS list loaded sets Success state and clears Loading`() {
+        val loading = ReaderUiReducer.reduce(
+            ReaderUiState(rssList = RssListState.Idle),
+            ReaderUiIntent.LoadRssList
+        )
+        assertEquals(RssListState.Loading, loading.rssList)
+
+        val loaded = ReaderUiReducer.reduce(
+            loading,
+            ReaderUiIntent.RssListLoaded(sourceCount = 12)
+        )
+        assertTrue(
+            "rssList must be Success after RssListLoaded",
+            loaded.rssList is RssListState.Success
+        )
+        assertEquals(12, (loaded.rssList as RssListState.Success).sourceCount)
+    }
+
+    @Test
+    fun `Discover filter toggle adds and removes tags via SetReaderBehaviorToggle`() {
+        val initial = ReaderUiState(activeTab = MainTab.DISCOVER)
+        assertTrue(initial.readerBehaviorToggles.isEmpty())
+
+        // 添加筛选标签
+        val withFilter = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "discover-filter-玄幻", enabled = true)
+        )
+        assertEquals(true, withFilter.readerBehaviorToggles["discover-filter-玄幻"])
+
+        // 添加第二个筛选标签（共存）
+        val withTwoFilters = ReaderUiReducer.reduce(
+            withFilter,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "discover-filter-都市", enabled = true)
+        )
+        assertEquals(true, withTwoFilters.readerBehaviorToggles["discover-filter-玄幻"])
+        assertEquals(true, withTwoFilters.readerBehaviorToggles["discover-filter-都市"])
+
+        // 移除第一个筛选标签
+        val withoutFilter = ReaderUiReducer.reduce(
+            withTwoFilters,
+            ReaderUiIntent.SetReaderBehaviorToggle(key = "discover-filter-玄幻", enabled = false)
+        )
+        assertEquals(false, withoutFilter.readerBehaviorToggles["discover-filter-玄幻"])
+        assertEquals(
+            "removing one filter must not affect the other",
+            true,
+            withoutFilter.readerBehaviorToggles["discover-filter-都市"]
+        )
+    }
+
+    @Test
+    fun `Source import opens import route`() {
+        val initial = ReaderUiState()
+        val next = ReaderUiReducer.reduce(
+            initial,
+            ReaderUiIntent.PushRoute(ReaderRoute.ImportSource, requestId = "req-import")
+        )
+        assertEquals(ReaderRoute.ImportSource, next.currentRoute)
+        assertEquals("source-import-preview", next.currentRoute.routeId)
+        assertEquals(1, next.backStack.size)
+        assertEquals(ReaderRoute.ImportSource, next.backStack.last())
+
+        // pop 回到 bookshelf tab
+        val afterBack = ReaderUiReducer.reduce(next, ReaderUiIntent.PopRoute)
+        assertTrue(afterBack.backStack.isEmpty())
+        assertEquals(
+            MainTab.BOOKSHELF,
+            (afterBack.currentRoute as ReaderRoute.TabShell).tab
+        )
+    }
+
+    // ── Slice 4: TTS session / auto-page / progress (SLICE_PLAN §6.5) ──────────
+    // 契约：activeSession 单字段互斥（AUTO_PAGE / TTS），启停必须可从 final state 解释；
+    // session intents 同时入队 HostRequest dispatch，让 AppShell effect 驱动真实 TTS 引擎。
+    // 以下 golden tests 覆盖 §6.5 验收点：会话启动 / 互斥 / 停止 / 暂停恢复 / HostRequest 入队。
+
+    @Test
+    fun `Slice4 - StartTtsSession sets activeSession to TTS playing true`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读文本")
+        )
+        val session = next.activeSession
+        assertNotNull("activeSession must be set after StartTtsSession", session)
+        assertEquals(SessionType.TTS, session!!.type)
+        assertTrue("TTS session must start playing", session.playing)
+    }
+
+    @Test
+    fun `Slice4 - StartAutoPageSession sets activeSession to AUTO_PAGE playing true`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        val session = next.activeSession
+        assertNotNull("activeSession must be set after StartAutoPageSession", session)
+        assertEquals(SessionType.AUTO_PAGE, session!!.type)
+        assertTrue("AUTO_PAGE session must start playing", session.playing)
+    }
+
+    @Test
+    fun `Slice4 - starting TTS while AUTO_PAGE active clears auto-page (mutual exclusion)`() {
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        assertEquals(SessionType.AUTO_PAGE, withAutoPage.activeSession!!.type)
+
+        val withTts = ReaderUiReducer.reduce(
+            withAutoPage,
+            ReaderUiIntent.StartTtsSession(text = "切换到 TTS")
+        )
+        assertEquals(
+            "TTS must replace AUTO_PAGE — single activeSession field enforces mutual exclusion",
+            SessionType.TTS,
+            withTts.activeSession!!.type
+        )
+        assertTrue("replaced TTS session must be playing", withTts.activeSession!!.playing)
+    }
+
+    @Test
+    fun `Slice4 - starting AUTO_PAGE while TTS active clears TTS (mutual exclusion)`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        assertEquals(SessionType.TTS, withTts.activeSession!!.type)
+
+        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession)
+        assertEquals(
+            "AUTO_PAGE must replace TTS — single activeSession field enforces mutual exclusion",
+            SessionType.AUTO_PAGE,
+            withAutoPage.activeSession!!.type
+        )
+        assertTrue("replaced AUTO_PAGE session must be playing", withAutoPage.activeSession!!.playing)
+    }
+
+    @Test
+    fun `Slice4 - StopSession clears activeSession to null`() {
+        val withSession = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        assertNotNull(withSession.activeSession)
+
+        val stopped = ReaderUiReducer.reduce(withSession, ReaderUiIntent.StopSession)
+        assertNull("StopSession must clear activeSession", stopped.activeSession)
+    }
+
+    @Test
+    fun `Slice4 - StopSession on AUTO_PAGE also clears activeSession`() {
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        assertNotNull(withAutoPage.activeSession)
+
+        val stopped = ReaderUiReducer.reduce(withAutoPage, ReaderUiIntent.StopSession)
+        assertNull("StopSession must clear AUTO_PAGE activeSession", stopped.activeSession)
+    }
+
+    @Test
+    fun `Slice4 - ToggleSessionPlaying pauses a playing TTS session`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        assertTrue("TTS must start playing", withTts.activeSession!!.playing)
+
+        val paused = ReaderUiReducer.reduce(withTts, ReaderUiIntent.ToggleSessionPlaying)
+        assertEquals(SessionType.TTS, paused.activeSession!!.type)
+        assertFalse(
+            "ToggleSessionPlaying must pause a playing session",
+            paused.activeSession!!.playing
+        )
+    }
+
+    @Test
+    fun `Slice4 - ToggleSessionPlaying resumes a paused TTS session`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        val paused = ReaderUiReducer.reduce(withTts, ReaderUiIntent.ToggleSessionPlaying)
+        assertFalse(paused.activeSession!!.playing)
+
+        val resumed = ReaderUiReducer.reduce(paused, ReaderUiIntent.ToggleSessionPlaying)
+        assertEquals(SessionType.TTS, resumed.activeSession!!.type)
+        assertTrue(
+            "ToggleSessionPlaying must resume a paused session",
+            resumed.activeSession!!.playing
+        )
+    }
+
+    @Test
+    fun `Slice4 - StartTtsSession enqueues tts system start HostRequest with text param`() {
+        val next = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读内容")
+        )
+        assertEquals(
+            "StartTtsSession must enqueue exactly 1 HostRequest",
+            1,
+            next.pendingHostRequests.size
+        )
+        val dispatch = next.pendingHostRequests.first()
+        assertEquals("tts.system.start", dispatch.capability)
+        assertTrue(
+            "tts.system.start params must carry the text payload",
+            dispatch.paramsJson.contains("Slice4 朗读内容")
+        )
+    }
+
+    @Test
+    fun `Slice4 - StopSession enqueues tts system stop HostRequest only when TTS was active`() {
+        // TTS 活跃时 StopSession 必须入队 tts.system.stop
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        assertEquals(1, withTts.pendingHostRequests.size)
+
+        val stoppedFromTts = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StopSession)
+        assertEquals(
+            "StopSession on TTS must enqueue tts.system.stop (1 start + 1 stop = 2)",
+            2,
+            stoppedFromTts.pendingHostRequests.size
+        )
+        val stopDispatch = stoppedFromTts.pendingHostRequests.last()
+        assertEquals("tts.system.stop", stopDispatch.capability)
+        assertNull("activeSession must be null after stop", stoppedFromTts.activeSession)
+    }
+
+    @Test
+    fun `Slice4 - StopSession on AUTO_PAGE does NOT enqueue tts system stop`() {
+        // AUTO_PAGE 活跃时 StopSession 不应入队 tts.system.stop
+        // （reducer 仅在原会话为 TTS 时才入队 stop dispatch）
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        assertEquals(
+            "StartAutoPageSession must not enqueue any HostRequest",
+            0,
+            withAutoPage.pendingHostRequests.size
+        )
+
+        val stoppedFromAutoPage = ReaderUiReducer.reduce(withAutoPage, ReaderUiIntent.StopSession)
+        assertEquals(
+            "StopSession on AUTO_PAGE must not enqueue tts.system.stop",
+            0,
+            stoppedFromAutoPage.pendingHostRequests.size
+        )
+        assertNull(stoppedFromAutoPage.activeSession)
+    }
+
+    @Test
+    fun `Slice4 - UpdateTtsProgress records sentence and chapter index on TTS session`() {
+        val withTts = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartTtsSession(text = "Slice4 朗读")
+        )
+        val updated = ReaderUiReducer.reduce(
+            withTts,
+            ReaderUiIntent.UpdateTtsProgress(sentenceIndex = 7, chapterIndex = 3)
+        )
+        val session = updated.activeSession!!
+        assertEquals(SessionType.TTS, session.type)
+        assertEquals(7, session.ttsSentenceIndex)
+        assertEquals(3, session.ttsChapterIndex)
+    }
+
+    @Test
+    fun `Slice4 - UpdateCountdown records seconds on AUTO_PAGE session`() {
+        val withAutoPage = ReaderUiReducer.reduce(
+            ReaderUiState(),
+            ReaderUiIntent.StartAutoPageSession
+        )
+        val updated = ReaderUiReducer.reduce(
+            withAutoPage,
+            ReaderUiIntent.UpdateCountdown(seconds = 45)
+        )
+        val session = updated.activeSession!!
+        assertEquals(SessionType.AUTO_PAGE, session.type)
+        assertEquals(45, session.countdownSeconds)
+    }
 }

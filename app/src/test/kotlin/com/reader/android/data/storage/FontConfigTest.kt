@@ -35,8 +35,8 @@ class FontConfigTest {
     }
 
     @Test
-    fun `FontFamily enum has 4 values`() {
-        assertEquals(4, FontFamily.entries.size)
+    fun `FontFamily enum covers all six contract font families`() {
+        assertEquals(6, FontFamily.entries.size)
     }
 
     @Test
@@ -45,5 +45,7 @@ class FontConfigTest {
         assertEquals("宋体/衬线", FontFamily.SERIF.displayName)
         assertEquals("黑体/无衬线", FontFamily.SANS_SERIF.displayName)
         assertEquals("等宽", FontFamily.MONO.displayName)
+        assertEquals("楷体", FontFamily.KAI.displayName)
+        assertEquals("仿宋", FontFamily.FANGSONG.displayName)
     }
 }

@@ -130,9 +130,7 @@ object ReaderUiReducer {
                 capability = "tts.system.start",
                 paramsJson = JSONObject()
                     .put("text", intent.text)
-                    .put("utteranceId", intent.requestId)
-                    .put("chapterTitle", intent.chapterTitle)
-                    .put("chapterIndex", intent.chapterIndex)
+                    .put("correlationId", intent.requestId)
                     .toString()
             )
             state.copy(
@@ -424,8 +422,11 @@ object ReaderUiReducer {
         ReaderUiIntent.ClearHostRequestResult -> state.copy(lastHostRequestResult = null)
 
         // ── P0: Source Switch 专用 reducer ──────────────────────────────────
-        // 不再走通用 PushRoute：SourceSwitchOpen 同时 push route 并进入 Loading，
-        // 让 reducer 可追踪换源专属状态。SourceSwitchClose 同时 pop route 并回到 Idle。
+        // Source-switch remains production Shadow. These reducer cases are the
+        // live authority path; dispatchSourceSwitchPilot can intercept them only
+        // in an explicit experimental opt-in build.
+        // SourceSwitchSelect and SourceSwitchResultsLoaded are not runtime
+        // events and always go through the native reducer.
         is ReaderUiIntent.SourceSwitchOpen -> {
             // 优先复用 readerContext（reader shell 内进入换源）；
             // 无 readerContext 时（如从 book-detail 直接进入换源），用 intent 的
@@ -665,6 +666,9 @@ object ReaderUiReducer {
         }
 
         // ── W5: 内容替换规则 CRUD reducer ──────────────────────────────────
+        // Replace rules remain production Shadow. These reducer cases are the
+        // live authority path; dispatchReplaceRulePilot and its effect executor
+        // are available only through an explicit experimental opt-in build.
         is ReaderUiIntent.ReplaceRuleAdd -> {
             val newRule = ReplaceRule(
                 id = "rule-${state.replaceRules.size + 1}",

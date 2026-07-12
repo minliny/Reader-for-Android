@@ -139,4 +139,20 @@ class AndroidNotificationRuntimeAdapter(
                 }
             }
     }
+
+    /** Posts a real notification for the canonical string id. */
+    fun show(id: String, request: ReaderForegroundNotificationRequest) {
+        val evidence = ensureChannels()
+        if (!evidence.mayRunForegroundWork) {
+            throw SecurityException("notification permission is not granted")
+        }
+        notificationManager.notify(notificationId(id), buildForegroundNotification(request).build())
+    }
+
+    /** Cancels the exact notification previously posted for [id]. */
+    fun cancel(id: String) {
+        notificationManager.cancel(notificationId(id))
+    }
+
+    private fun notificationId(id: String): Int = id.hashCode() and Int.MAX_VALUE
 }

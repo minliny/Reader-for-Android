@@ -31,7 +31,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,7 +47,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.reader.ui.tokens.ReaderTypeToken
+import com.reader.android.BuildConfig
 import com.reader.android.R
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
@@ -59,6 +64,9 @@ import com.reader.ui.shell.DemoLibraryShell
 import com.reader.ui.shell.DemoMainTabShell
 import com.reader.ui.shell.DemoReaderShell
 import com.reader.ui.shell.DemoSettingsShell
+import com.reader.ui.bookshelf.W1ImportRouteScreen
+import com.reader.ui.reading.ReaderContentStateScreen
+import com.reader.ui.reading.SourceSwitchStateScreen
 import com.reader.ui.shell.OverlayState
 import com.reader.ui.shell.ReaderUiIntent
 import com.reader.ui.shell.readerFontSizePinch
@@ -70,23 +78,161 @@ fun DemoRouteScreen(
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
     onDispatch: (ReaderUiIntent) -> Unit = {},
-    overlayState: OverlayState = OverlayState.None
+    overlayState: OverlayState = OverlayState.None,
+    enableCanonicalGraphDiagnostics: Boolean = BuildConfig.DEBUG
 ) {
+    // R16 Shadow only: consume generated ScreenGraph for the live route and
+    // record alias/variant/component coverage without changing renderer authority.
+    remember(routeId) {
+        CanonicalScreenGraphShadowObserver.observe(CanonicalScreenGraphQuery(routeId))
+    }
     val page = remember(routeId) {
-        DemoRouteRegistry.page(routeId)
-            ?: DemoRoutePage(id = routeId, title = routeId, shell = RouteShell.MainTabShell, body = listOf(routeId))
+        requireNotNull(DemoRouteRegistry.page(routeId)) {
+            "Route $routeId is not present in the generated 2.5 DemoRouteRegistry"
+        }
     }
-    when {
-        routeId == "source-switch" -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
-        routeId.startsWith("discover-") -> DiscoverDemoScreen(page, onBack, onNavigate)
-        routeId.startsWith("rss-") -> RssDemoScreen(page, onBack, onNavigate)
-        routeId in bookDemoRoutes -> BookDemoScreen(page, onBack, onNavigate)
-        routeId in readerDemoRoutes -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
-        routeId.startsWith("source-") -> SourceDemoScreen(page, onBack, onNavigate)
-        routeId.startsWith("restore-") -> RestoreDemoScreen(page, onBack, onNavigate)
-        // 通用分发：按 Shell 类型
-        else -> renderGenericRoute(page, onBack, onNavigate, overlayState)
+    val contractRenderer = remember(routeId) { DemoRouteRegistry.rendererFor(routeId) }
+    var graphPreviewOpen by remember(routeId) { mutableStateOf(false) }
+    var graphDiagnostic by remember(routeId) { mutableStateOf<String?>(null) }
+    Box(Modifier.fillMaxSize()) {
+        when {
+            contractRenderer != null -> Contract25RouteScreen(
+                renderer = contractRenderer,
+                page = page,
+                onBack = onBack,
+                onNavigate = onNavigate
+            )
+            routeId == "source-switch" -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
+            routeId.startsWith("discover-") -> DiscoverDemoScreen(page, onBack, onNavigate)
+            routeId.startsWith("rss-") -> RssDemoScreen(page, onBack, onNavigate)
+            routeId in bookDemoRoutes -> BookDemoScreen(page, onBack, onNavigate)
+            routeId in readerDemoRoutes -> ReaderDemoScreen(page, onBack, onNavigate, onDispatch)
+            routeId.startsWith("source-") -> SourceDemoScreen(page, onBack, onNavigate)
+            routeId.startsWith("restore-") -> RestoreDemoScreen(page, onBack, onNavigate)
+            // 通用分发：按 Shell 类型
+            else -> renderGenericRoute(page, onBack, onNavigate, overlayState)
+        }
+
+        if (enableCanonicalGraphDiagnostics) {
+            if (graphPreviewOpen) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .zIndex(10_000f)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ScreenGraph · $routeId",
+                            style = ReaderTextStyles.sectionTitle,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        DemoButton(label = "关闭", compact = true) { graphPreviewOpen = false }
+                    }
+                    graphDiagnostic?.let { diagnostic ->
+                        Text(
+                            text = diagnostic,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Box(Modifier.fillMaxSize()) {
+                        CanonicalScreenGraphRouteRenderer(
+                            query = CanonicalScreenGraphQuery(routeId),
+                            onBack = { graphPreviewOpen = false },
+                            onNavigate = { target -> graphDiagnostic = "navigate:$target" },
+                            onAction = { action ->
+                                graphDiagnostic = "${action.binding.event.name}:${action.binding.payload}"
+                            }
+                        )
+                    }
+                }
+            } else {
+                DemoButton(
+                    label = "SG",
+                    compact = true,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(8.dp)
+                        .zIndex(9_999f)
+                ) { graphPreviewOpen = true }
+            }
+        }
     }
+}
+
+/**
+ * Explicit render dispatch for every route added by the 2.5 contract. There is intentionally no
+ * fallback branch: registry initialization proves the 35-route classification is exhaustive.
+ */
+@Composable
+private fun Contract25RouteScreen(
+    renderer: DemoRouteRenderer,
+    page: DemoRoutePage,
+    onBack: () -> Unit,
+    onNavigate: (String) -> Unit
+) {
+    when (renderer) {
+        DemoRouteRenderer.ReaderWorkspaceState -> ReaderContractStateScreen(
+            page = page,
+            iconRes = R.drawable.reader_ic_appearance,
+            onNavigate = onNavigate
+        )
+        DemoRouteRenderer.ReaderReplacementState -> ReaderReplaceStateScreen(
+            routeId = page.id,
+            onBack = onBack,
+            onNavigate = onNavigate
+        )
+        DemoRouteRenderer.ReaderContentState -> ReaderContentStateScreen(
+            routeId = page.id,
+            onBack = onBack,
+            onNavigate = onNavigate
+        )
+        DemoRouteRenderer.SourceSwitchState -> SourceSwitchStateScreen(
+            routeId = page.id,
+            onBack = onBack,
+            onNavigate = onNavigate
+        )
+        DemoRouteRenderer.LocalImportState -> W1ImportRouteScreen(
+            page = page,
+            onBack = onBack,
+            onNavigate = onNavigate
+        )
+    }
+}
+
+@Composable
+private fun ReaderContractStateScreen(
+    page: DemoRoutePage,
+    @DrawableRes iconRes: Int,
+    onNavigate: (String) -> Unit
+) {
+    DemoReaderShell(
+        readingContent = { genericReaderContent(page.copy(actions = emptyList())) },
+        bottomSheetContent = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                DemoStateCard(
+                    iconRes = iconRes,
+                    title = page.cleanTitle(),
+                    body = page.body.joinToString("\n"),
+                    actions = page.actions,
+                    onNavigate = onNavigate
+                )
+            }
+        }
+    )
 }
 
 private val bookDemoRoutes = setOf("book-detail", "book-directory", "bookshelf-empty", "sort-filter")

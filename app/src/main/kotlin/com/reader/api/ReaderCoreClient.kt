@@ -97,12 +97,47 @@ class ReaderCoreClient private constructor(
         method: String,
         params: JSONObject,
         timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS
-    ): JSONObject = withContext(Dispatchers.IO) {
-        val result = hostRuntime.sendAndAwait(method, params.toString(), timeoutMillis)
+    ): JSONObject = beginCommand(method, params, timeoutMillis).await()
+
+    /**
+     * Starts one Core command and returns the handle immediately. The handle
+     * retains HostRuntime's actual numeric Core requestId, so a transaction
+     * coordinator can await and cancel the same request without guessing or
+     * maintaining a second id counter.
+     */
+    fun beginCommand(
+        method: String,
+        params: JSONObject,
+        timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS
+    ): CancellableCommandHandle = CancellableCommandHandle(
+        method = method,
+        timeoutMillis = timeoutMillis,
+        hostHandle = hostRuntime.beginCommand(method, params.toString())
+    )
+
+    inner class CancellableCommandHandle internal constructor(
+        private val method: String,
+        private val timeoutMillis: Long,
+        private val hostHandle: HostRuntime.CommandHandle
+    ) {
+        val requestId: Long
+            get() = hostHandle.requestId()
+
+        suspend fun await(): JSONObject = withContext(Dispatchers.IO) {
+            decodeCommandResult(method, hostHandle.await(timeoutMillis))
+        }
+
+        fun cancel(): Boolean = hostHandle.cancel()
+
+        val isDone: Boolean
+            get() = hostHandle.isDone
+    }
+
+    private fun decodeCommandResult(method: String, result: com.reader.host.CommandResult): JSONObject {
         when {
-            result.isSuccess() -> JSONObject(result.dataJson())
-            result.isError() -> throw CoreException(result.errorJson())
-            result.isTimeout() -> throw CoreTimeoutException(
+            result.isSuccess -> return JSONObject(result.dataJson())
+            result.isError -> throw CoreException(result.errorJson())
+            result.isTimeout -> throw CoreTimeoutException(
                 "Timeout waiting for Core response (method=$method)"
             )
             else -> throw CoreException(
@@ -354,10 +389,17 @@ class ReaderCoreClient private constructor(
                     tts = AppProvider.ttsEngine,
                     permission = AppProvider.permissionRuntimeAdapter,
                     notification = com.reader.android.data.adapter.AndroidNotificationRuntimeAdapter(context),
-                    webDav = null,
+                    webDav = AppProvider.webDavClient,
                     credentials = AppProvider.webDavCredentialStore,
                     downloadCache = null,
-                    ttsSessionController = AppProvider.ttsSessionController
+                    ttsSessionController = AppProvider.ttsSessionController,
+                    uiWebViewSession = com.reader.host.AndroidUiWebViewSession,
+                    readerUi25Services = com.reader.host.ReaderUi25HostServices.production(
+                        context = context,
+                        credentials = AppProvider.webDavCredentialStore,
+                        webDavClient = AppProvider.webDavClient,
+                        bookSources = AppProvider.bookSourceRepository
+                    )
                 )
                 hostRuntimeBuilder = facade.registerHandlers(hostRuntimeBuilder)
                 // ── credential.resolve (GAP-D-01 closed) ──

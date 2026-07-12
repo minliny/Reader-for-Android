@@ -88,11 +88,12 @@ public final class HostRuntime {
     }
 
     /**
-     * Send a command and await its result/error event, routed by the runtime's
-     * own poll thread. Blocks the caller until the matching event arrives or
-     * {@code timeoutMillis} elapses.
+     * Start a command and retain its numeric Core requestId. The returned
+     * handle owns the same pending future used by {@link #sendAndAwait}; callers
+     * can await or cancel that exact request without reconstructing ids outside
+     * this runtime's single request ledger.
      */
-    public CommandResult sendAndAwait(String method, String paramsJson, long timeoutMillis) {
+    public CommandHandle beginCommand(String method, String paramsJson) {
         long requestId;
         CompletableFuture<CommandResult> future;
         synchronized (this) {
@@ -105,25 +106,109 @@ public final class HostRuntime {
             transport.sendCommand(command);
         } catch (RuntimeException e) {
             pending.remove(requestId);
-            return CommandResult.error(requestId,
+            future.complete(CommandResult.error(requestId,
                     "{\"code\":\"INTERNAL\",\"message\":\"send failed: "
-                            + e.getMessage() + "\",\"retryable\":true}");
+                            + e.getMessage() + "\",\"retryable\":true}"));
         }
+        return new CommandHandle(this, requestId, future);
+    }
+
+    /**
+     * Send a command and await its result/error event, routed by the runtime's
+     * own poll thread. Kept as the compatibility facade over
+     * {@link #beginCommand}; all correlation now lives in one handle path.
+     */
+    public CommandResult sendAndAwait(String method, String paramsJson, long timeoutMillis) {
+        return beginCommand(method, paramsJson).await(timeoutMillis);
+    }
+
+    private CommandResult await(
+            long requestId,
+            CompletableFuture<CommandResult> future,
+            long timeoutMillis) {
         try {
-            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+            return future.get(Math.max(timeoutMillis, 0L), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            pending.remove(requestId);
+            if (!pending.remove(requestId, future)) {
+                CommandResult raced = future.getNow(null);
+                if (raced != null) return raced;
+            }
             return CommandResult.timeout(requestId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            pending.remove(requestId);
+            pending.remove(requestId, future);
             return CommandResult.timeout(requestId);
         } catch (ExecutionException e) {
-            pending.remove(requestId);
+            pending.remove(requestId, future);
             Throwable cause = e.getCause();
             String msg = cause == null ? e.getMessage() : cause.getMessage();
             return CommandResult.error(requestId,
                     "{\"code\":\"INTERNAL\",\"message\":\"" + msg + "\",\"retryable\":true}");
+        }
+    }
+
+    /**
+     * Cancel the exact Core request represented by {@code handle}. Cancellation
+     * is sent through Core's JSON {@code runtime.cancel} method using a fresh
+     * command id while the target id remains the handle's original id. The
+     * local waiter completes promptly with CANCELLED; Core's later cancellation
+     * event is safely ignored because the pending entry has been removed.
+     */
+    private boolean cancel(CommandHandle handle) {
+        CompletableFuture<CommandResult> future = handle.future;
+        if (!pending.remove(handle.requestId, future)) {
+            return false;
+        }
+
+        long cancelCommandId;
+        synchronized (this) {
+            cancelCommandId = counter++;
+        }
+        String params = "{\"requestId\":" + handle.requestId + "}";
+        String command = HostCommander.encodeCommand(cancelCommandId, "runtime.cancel", params);
+        try {
+            transport.sendCommand(command);
+            future.complete(CommandResult.error(handle.requestId,
+                    "{\"code\":\"CANCELLED\",\"message\":\"request cancelled\","
+                            + "\"retryable\":false}"));
+            return true;
+        } catch (RuntimeException e) {
+            future.complete(CommandResult.error(handle.requestId,
+                    "{\"code\":\"INTERNAL\",\"message\":\"cancel send failed: "
+                            + e.getMessage() + "\",\"retryable\":true}"));
+            return false;
+        }
+    }
+
+    /** One host-issued Core command, its numeric request id, waiter and cancel. */
+    public static final class CommandHandle {
+        private final HostRuntime owner;
+        private final long requestId;
+        private final CompletableFuture<CommandResult> future;
+
+        private CommandHandle(
+                HostRuntime owner,
+                long requestId,
+                CompletableFuture<CommandResult> future) {
+            this.owner = owner;
+            this.requestId = requestId;
+            this.future = future;
+        }
+
+        public long requestId() {
+            return requestId;
+        }
+
+        public CommandResult await(long timeoutMillis) {
+            return owner.await(requestId, future, timeoutMillis);
+        }
+
+        public boolean cancel() {
+            return owner.cancel(this);
+        }
+
+        public boolean isDone() {
+            return future.isDone();
         }
     }
 

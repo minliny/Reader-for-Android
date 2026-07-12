@@ -29,9 +29,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,14 +45,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import com.reader.ui.tokens.ReaderTypeToken
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +64,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
+import com.reader.ui.shell.ReaderBookOpenDomainState
+import com.reader.ui.shell.ReaderBookOpenViewport
+import com.reader.ui.shell.ReaderPlaybackDomainState
+import com.reader.ui.shell.ReaderPlaybackPageMeasurement
 import com.reader.ui.shell.SourceSwitchState
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
@@ -92,7 +102,7 @@ import com.reader.ui.motion.MotionController
  * 这些 dp 值不构成 token 违规，属于 screen-local demo 布局参数（per B2-B4 task 5 评估结论）。
  */
 @Composable
-fun ReaderShellScreen(
+internal fun ReaderShellScreen(
     route: ReaderRoute,
     fallbackContext: ReaderContext?,
     onBack: () -> Unit,
@@ -103,6 +113,14 @@ fun ReaderShellScreen(
     onStartTts: (String) -> Unit = {},
     onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
     asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE,
+    /** Default false: only the explicit book.open Pilot bypasses the legacy reading VM. */
+    bookOpenPilotEnabled: Boolean = false,
+    bookOpenDomainState: ReaderBookOpenDomainState = ReaderBookOpenDomainState(),
+    onBookOpenViewportLayoutReady: (ReaderBookOpenViewport) -> Unit = {},
+    /** Default-off paired page/TTS/auto-page Pilot projection. */
+    playbackPilotEnabled: Boolean = false,
+    playbackDomainState: ReaderPlaybackDomainState = ReaderPlaybackDomainState(),
+    onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {},
     /** P0-Fix3: 阅读器更多菜单是否打开（来自 ReaderUiState.moreMenu）。 */
     moreMenuOpen: Boolean = false,
     /** 派发 ReaderUiIntent 到 reducer（用于设置面板交互接线）。 */
@@ -122,9 +140,15 @@ fun ReaderShellScreen(
     }
     val title = context?.bookName?.takeIf { it.isNotBlank() } ?: "长夜余火"
     val isImmersive = routeId == RouteIds.IMMERSIVE_READING
-    // P0-5: fetch the same ImmersiveReadingViewModel instance (scoped by bookUrl key)
-    // to obtain current chapter text for TTS dispatch.
-    val ttsText: String = if (context != null) {
+    // In the opt-in book.open Pilot, the domain store is the only source of
+    // TOC/content. Do not create ImmersiveReadingViewModel there: it would
+    // independently call book.toc/chapter.content and duplicate Core effects.
+    val ttsText: String
+    val directoryState: ReadingUiState?
+    if (bookOpenPilotEnabled) {
+        ttsText = bookOpenDomainState.content
+        directoryState = bookOpenDomainState.toReadingUiState()
+    } else if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
             key = "immersive-${context.bookUrl}",
             factory = ImmersiveReadingViewModelFactory(
@@ -133,8 +157,12 @@ fun ReaderShellScreen(
                 readingProgressRepository = if (com.reader.android.AppProvider.isInitialized) com.reader.android.AppProvider.readingProgressRepository else null
             )
         )
-        vm.content.collectAsStateWithLifecycle().value
-    } else ""
+        ttsText = vm.content.collectAsStateWithLifecycle().value
+        directoryState = vm.uiState.collectAsStateWithLifecycle().value
+    } else {
+        ttsText = ""
+        directoryState = null
+    }
     val readerRouteId = if (routeId == RouteIds.SOURCE_SWITCH) RouteIds.READER_CONTROL else routeId
     val fullPanelKind = readerFullPanelKind(readerRouteId)
     // 设置面板交互接线：将 dispatch 提升为局部 val 以便面板子组件使用
@@ -158,7 +186,13 @@ fun ReaderShellScreen(
             context = context,
             fallbackTitle = title,
             onAsyncStateChange = onAsyncStateChange,
-            asyncResultState = asyncResultState
+            asyncResultState = asyncResultState,
+            bookOpenPilotEnabled = bookOpenPilotEnabled,
+            bookOpenDomainState = bookOpenDomainState,
+            onBookOpenViewportLayoutReady = onBookOpenViewportLayoutReady,
+            playbackPilotEnabled = playbackPilotEnabled,
+            playbackDomainState = playbackDomainState,
+            onPlaybackPageLayoutReady = onPlaybackPageLayoutReady
         )
         // readerOverlayHost slot (named via branch wrapper)
         if (isImmersive) {
@@ -169,6 +203,12 @@ fun ReaderShellScreen(
             ReaderOpenControlTapZone(
                 onOpenControls = { onNavigate(RouteIds.READER_CONTROL) },
                 onLongPress = { readerTextSelectionOpen = true },
+                onPageTurn = { next ->
+                    onDispatch(
+                        if (next) com.reader.ui.shell.ReaderUiIntent.TurnPageNext
+                        else com.reader.ui.shell.ReaderUiIntent.TurnPagePrev
+                    )
+                },
                 modifier = Modifier.fillMaxSize()
             )
             // readerTextSelectionLayer: text selection toolbar + range (immersive overlay slot)
@@ -224,6 +264,8 @@ fun ReaderShellScreen(
                 fullPanelKind != null -> ReaderFullPagePanel(
                     kind = fullPanelKind,
                     onNavigate = onNavigate,
+                    directoryState = directoryState,
+                    currentChapterIndex = context?.chapterIndex ?: 0,
                     ttsText = ttsText,
                     onStartTts = onStartTts,
                     onSessionToggle = onSessionToggle,
@@ -245,6 +287,7 @@ fun ReaderShellScreen(
                 else -> ReaderControlBottomSheet(
                     routeId = readerRouteId,
                     onNavigate = onNavigate,
+                    directoryState = directoryState,
                     ttsText = ttsText,
                     onStartTts = onStartTts,
                     onSessionToggle = onSessionToggle,
@@ -559,8 +602,186 @@ private fun ReaderControlReadingSurface(
     context: ReaderContext?,
     fallbackTitle: String,
     onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
-    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE
+    asyncResultState: AsyncResultStateValue = AsyncResultStateValue.IDLE,
+    bookOpenPilotEnabled: Boolean = false,
+    bookOpenDomainState: ReaderBookOpenDomainState = ReaderBookOpenDomainState(),
+    onBookOpenViewportLayoutReady: (ReaderBookOpenViewport) -> Unit = {},
+    playbackPilotEnabled: Boolean = false,
+    playbackDomainState: ReaderPlaybackDomainState = ReaderPlaybackDomainState(),
+    onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {}
 ) {
+    if (bookOpenPilotEnabled) {
+        val density = LocalDensity.current
+        val correlationId = context?.entryRequestId ?: bookOpenDomainState.displayedCorrelationId
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when {
+                bookOpenDomainState.error != null -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(requireNotNull(bookOpenDomainState.error), color = MaterialTheme.colorScheme.error)
+                }
+                // Content must be on screen before location resolution
+                // completes. The measurement belongs to this actual reading
+                // subtree, never to the pre-content spinner container.
+                bookOpenDomainState.contentLoaded -> {
+                    // Keep only a content-subtree measurement. If it arrives a
+                    // frame before Runtime flips `awaitingViewport`, the effect
+                    // below submits it on that state transition; a loading
+                    // shell measurement is never retained.
+                    var measuredContentSize by remember(
+                        correlationId,
+                        bookOpenDomainState.contentGeneration
+                    ) { mutableStateOf<IntSize?>(null) }
+                    var bodyTextLayout by remember(
+                        correlationId,
+                        bookOpenDomainState.contentGeneration
+                    ) { mutableStateOf<TextLayoutResult?>(null) }
+                    val playbackScrollState = rememberScrollState()
+                    var bodyTopOffsetPx by remember(
+                        correlationId,
+                        bookOpenDomainState.contentGeneration
+                    ) { mutableStateOf<Int?>(null) }
+                    val chapterProgress = (context?.progress ?: 0f).toDouble()
+                    LaunchedEffect(
+                        correlationId,
+                        bookOpenDomainState.activeCorrelationId,
+                        bookOpenDomainState.awaitingViewport,
+                        bookOpenDomainState.contentGeneration,
+                        measuredContentSize,
+                        chapterProgress
+                    ) {
+                        val size = measuredContentSize ?: return@LaunchedEffect
+                        if (
+                            correlationId != null &&
+                            bookOpenDomainState.activeCorrelationId == correlationId &&
+                            bookOpenDomainState.awaitingViewport
+                        ) {
+                            onBookOpenViewportLayoutReady(
+                                ReaderBookOpenViewport(
+                                    correlationId = correlationId,
+                                    viewportWidth = size.width,
+                                    viewportHeight = size.height,
+                                    fontScale = density.fontScale.toDouble(),
+                                    contentGeneration = bookOpenDomainState.contentGeneration,
+                                    chapterProgress = chapterProgress
+                                )
+                            )
+                        }
+                    }
+                    LaunchedEffect(
+                        playbackPilotEnabled,
+                        playbackDomainState.pageCorrelationId,
+                        playbackDomainState.pageDirection,
+                        playbackDomainState.committedLocation,
+                        playbackDomainState.committedPageIndex,
+                        bookOpenDomainState.contentGeneration,
+                        bodyTextLayout,
+                        measuredContentSize,
+                        density.fontScale
+                    ) {
+                        if (!playbackPilotEnabled) return@LaunchedEffect
+                        val pageCorrelationId = playbackDomainState.pageCorrelationId
+                            ?: return@LaunchedEffect
+                        val direction = playbackDomainState.pageDirection
+                            ?: return@LaunchedEffect
+                        val layout = bodyTextLayout ?: return@LaunchedEffect
+                        val viewport = measuredContentSize ?: return@LaunchedEffect
+                        buildReaderPlaybackPageMeasurement(
+                            correlationId = pageCorrelationId,
+                            direction = direction,
+                            content = bookOpenDomainState.content,
+                            contentGeneration = bookOpenDomainState.contentGeneration,
+                            chapterIndex = playbackDomainState.reader?.chapter?.index
+                                ?: return@LaunchedEffect,
+                            committedOffset = playbackDomainState.committedLocation?.chapterOffset
+                                ?: bookOpenDomainState.canonicalLocation?.chapterOffset
+                                ?: 0L,
+                            committedPageIndex = playbackDomainState.committedPageIndex,
+                            textLayout = layout,
+                            viewport = viewport,
+                            fontScale = density.fontScale.toDouble()
+                        )?.let(onPlaybackPageLayoutReady)
+                    }
+                    // Actual scroll mutation is a projection of the matching
+                    // Core canonical commit. Pending layout/location never
+                    // changes the visible native page.
+                    LaunchedEffect(
+                        playbackPilotEnabled,
+                        playbackDomainState.committedLocation?.locationRevision,
+                        playbackDomainState.committedLocation?.chapterOffset,
+                        bodyTextLayout,
+                        bodyTopOffsetPx,
+                        playbackScrollState.maxValue
+                    ) {
+                        if (!playbackPilotEnabled) return@LaunchedEffect
+                        val layout = bodyTextLayout ?: return@LaunchedEffect
+                        val bodyTop = bodyTopOffsetPx ?: return@LaunchedEffect
+                        val content = bookOpenDomainState.content
+                        if (content.isEmpty()) return@LaunchedEffect
+                        val offset = (playbackDomainState.committedLocation?.chapterOffset ?: 0L)
+                            .coerceIn(0L, content.length.toLong())
+                            .toInt()
+                            .coerceAtMost(content.lastIndex)
+                        val lineTop = layout.getLineTop(layout.getLineForOffset(offset)).toInt()
+                        playbackScrollState.scrollTo(
+                            (bodyTop + lineTop).coerceIn(0, playbackScrollState.maxValue)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coordinates ->
+                                measuredContentSize = coordinates.size
+                            }
+                    ) {
+                        ReaderReadingSurface(
+                            title = bookOpenDomainState.book?.name?.ifBlank {
+                                context?.bookName?.ifEmpty { fallbackTitle } ?: fallbackTitle
+                            } ?: fallbackTitle,
+                            content = bookOpenDomainState.content,
+                            onBodyTextLayout = { bodyTextLayout = it },
+                            scrollState = playbackScrollState,
+                            onBodyTopOffsetPx = { bodyTopOffsetPx = it }
+                        )
+                        if (bookOpenDomainState.loading) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        }
+                    }
+                }
+                else -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+            }
+            if (playbackPilotEnabled) {
+                playbackDomainState.error?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = ReaderTextStyles.infoLayer,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(horizontal = 18.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            asyncResultOverlayLabel(asyncResultState)?.let { label ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, style = ReaderTextStyles.infoLayer, color = readerExtraColors().infoLayer)
+                }
+            }
+        }
+        return
+    }
     if (context != null) {
         val vm: ImmersiveReadingViewModel = viewModel(
             key = "immersive-${context.bookUrl}",
@@ -606,6 +827,68 @@ private fun ReaderControlReadingSurface(
             content = readerPreviewText(fallbackTitle)
         )
     }
+}
+
+private fun ReaderBookOpenDomainState.toReadingUiState(): ReadingUiState = when {
+    error != null -> ReadingUiState.Error(requireNotNull(error))
+    book != null -> ReadingUiState.Ready(book, chapters)
+    loading -> ReadingUiState.Loading
+    else -> ReadingUiState.Loading
+}
+
+/**
+ * Derives the next canonical anchor from Compose's actual shaped text and the
+ * measured reader viewport. This deliberately has no chars-per-page fallback:
+ * if layout is absent/zero-sized the paired Pilot stays pending/fails closed.
+ */
+internal fun buildReaderPlaybackPageMeasurement(
+    correlationId: String,
+    direction: String,
+    content: String,
+    contentGeneration: Long,
+    chapterIndex: Int,
+    committedOffset: Long,
+    committedPageIndex: Int,
+    textLayout: TextLayoutResult,
+    viewport: IntSize,
+    fontScale: Double
+): ReaderPlaybackPageMeasurement? {
+    if (
+        correlationId.isBlank() || direction !in setOf("next", "previous") ||
+        content.isEmpty() || textLayout.lineCount <= 0 ||
+        viewport.width <= 0 || viewport.height <= 0 || fontScale <= 0.0
+    ) return null
+    val safeOffset = committedOffset.coerceIn(0L, content.length.toLong()).toInt()
+    val offsetForLine = safeOffset.coerceAtMost(content.lastIndex)
+    val currentLine = textLayout.getLineForOffset(offsetForLine)
+    val currentTop = textLayout.getLineTop(currentLine)
+    val maximumY = (textLayout.size.height - 1).coerceAtLeast(0).toFloat()
+    val targetY = when (direction) {
+        "next" -> currentTop + viewport.height.toFloat()
+        else -> currentTop - viewport.height.toFloat()
+    }.coerceIn(0f, maximumY)
+    val targetLine = textLayout.getLineForVerticalPosition(targetY)
+    val targetOffset = textLayout.getLineStart(targetLine).coerceIn(0, content.length)
+    val targetLineTop = textLayout.getLineTop(targetLine).coerceAtLeast(0f)
+    val measuredPageIndex = (targetLineTop / viewport.height.toFloat()).toInt().coerceAtLeast(0)
+    val targetPageIndex = when (direction) {
+        "next" -> measuredPageIndex.coerceAtLeast(committedPageIndex)
+        else -> measuredPageIndex.coerceAtMost(committedPageIndex).coerceAtLeast(0)
+    }
+    return ReaderPlaybackPageMeasurement(
+        correlationId = correlationId,
+        contentGeneration = contentGeneration,
+        contentLength = content.length,
+        direction = direction,
+        anchor = "chapter:$chapterIndex:char-offset:$targetOffset",
+        targetPageIndex = targetPageIndex,
+        chapterIndex = chapterIndex,
+        chapterOffset = targetOffset,
+        chapterProgress = targetOffset.toDouble() / content.length.toDouble(),
+        viewportWidth = viewport.width,
+        viewportHeight = viewport.height,
+        fontScale = fontScale
+    )
 }
 
 /**
@@ -889,13 +1172,16 @@ private fun ReaderGlobalBrightnessDim(
 private fun ReaderOpenControlTapZone(
     onOpenControls: () -> Unit,
     onLongPress: () -> Unit = {},
+    onPageTurn: (next: Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier) {
-        Spacer(
+        // W2: 左侧 28% 区域 → 上一页
+        Box(
             modifier = Modifier
                 .weight(0.28f)
                 .fillMaxHeight()
+                .clickable(onClick = { onPageTurn(false) })
         )
         Box(
             modifier = Modifier
@@ -906,10 +1192,12 @@ private fun ReaderOpenControlTapZone(
                     onLongClick = onLongPress
                 )
         )
-        Spacer(
+        // W2: 右侧 28% 区域 → 下一页
+        Box(
             modifier = Modifier
                 .weight(0.28f)
                 .fillMaxHeight()
+                .clickable(onClick = { onPageTurn(true) })
         )
     }
 }
@@ -1112,6 +1400,7 @@ private fun ReaderMoreMenuItem(
 private fun ReaderControlBottomSheet(
     routeId: String,
     onNavigate: (String) -> Unit,
+    directoryState: ReadingUiState? = null,
     ttsText: String,
     onStartTts: (String) -> Unit,
     onSessionToggle: () -> Unit,
@@ -1156,13 +1445,19 @@ private fun ReaderControlBottomSheet(
                 .padding(top = 28.dp, start = 12.dp, end = 64.dp, bottom = 110.dp)
         ) {
             when (readerPanelKind(routeId)) {
-                "directory" -> ReaderDirectoryPanel(onNavigate)
+                "directory" -> ReaderDirectoryPanel(
+                    directoryState = directoryState,
+                    currentChapterIndex = currentChapterIndex,
+                    onNavigate = onNavigate,
+                    dispatch = dispatch
+                )
                 "tts" -> ReaderTtsPanel(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop, dispatch)
                 "appearance" -> ReaderAppearancePanel(onNavigate, dispatch, currentThemeId)
                 "settings" -> ReaderSettingsPanel(onNavigate, dispatch)
                 "search" -> ReaderSearchPanel(onNavigate, dispatch)
                 "auto-page" -> ReaderAutoPagePanel(onNavigate, dispatch)
                 "replace" -> ReaderReplacePanel(onNavigate, dispatch)
+                "night-state" -> ReaderNightStatePanel(onNavigate, dispatch)
                 else -> ReaderControlMain(onNavigate, dispatch, currentChapterIndex = currentChapterIndex, modifier = Modifier.fillMaxSize())
             }
         }
@@ -1173,6 +1468,8 @@ private fun ReaderControlBottomSheet(
 private fun ReaderFullPagePanel(
     kind: String,
     onNavigate: (String) -> Unit,
+    directoryState: ReadingUiState? = null,
+    currentChapterIndex: Int = 0,
     ttsText: String,
     onStartTts: (String) -> Unit,
     onSessionToggle: () -> Unit,
@@ -1210,7 +1507,12 @@ private fun ReaderFullPagePanel(
         modifier = modifier.heightIn(min = 430.dp, max = 642.dp)
     ) {
         when (kind) {
-            "directory" -> ReaderFullDirectoryContent(onNavigate, dispatch)
+            "directory" -> ReaderFullDirectoryContent(
+                directoryState = directoryState,
+                currentChapterIndex = currentChapterIndex,
+                onNavigate = onNavigate,
+                dispatch = dispatch
+            )
             "tts" -> ReaderFullTtsContent(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop, dispatch)
             "appearance" -> ReaderFullAppearanceContent(onNavigate, dispatch, currentThemeId)
             "font" -> ReaderFullFontContent(onNavigate, dispatch)
@@ -1308,6 +1610,8 @@ private fun ReaderLargePanelFrame(
 
 @Composable
 private fun ReaderFullDirectoryContent(
+    directoryState: ReadingUiState?,
+    currentChapterIndex: Int,
     onNavigate: (String) -> Unit,
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
@@ -1319,17 +1623,15 @@ private fun ReaderFullDirectoryContent(
             dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key = "directoryTab", value = value))
         }
     )
-    listOf(
-        "第 28 章 城市边界" to "已缓存",
-        "第 29 章 来信" to "书签",
-        "第 30 章 旧车票" to "已缓存",
-        "第 31 章 雨声" to "已缓存",
-        "第 32 章 雨夜" to "当前",
-        "第 33 章 白光" to "未读",
-        "第 34 章 归途" to "未读"
-    ).forEach { (title, marker) ->
-        ReaderFullChapterRow(title = title, marker = marker) {
-            onNavigate(RouteIds.IMMERSIVE_READING)
+    val entries = readerDirectoryEntries(directoryState, currentChapterIndex)
+    if (entries.isEmpty()) {
+        ReaderDirectoryDomainStatus(directoryState)
+    } else {
+        entries.forEach { entry ->
+            ReaderFullChapterRow(title = entry.title, marker = entry.marker) {
+                dispatch(com.reader.ui.shell.ReaderUiIntent.JumpChapter(chapterIndex = entry.chapterIndex))
+                onNavigate(RouteIds.IMMERSIVE_READING)
+            }
         }
     }
 }
@@ -2535,13 +2837,70 @@ private fun ReaderBrightnessRail(
 }
 
 @Composable
-private fun ReaderDirectoryPanel(onNavigate: (String) -> Unit) {
+private fun ReaderDirectoryPanel(
+    directoryState: ReadingUiState?,
+    currentChapterIndex: Int,
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+) {
     ReaderPanelTitle("目录")
-    listOf("第 30 章 旧车票", "第 31 章 雨声", "第 32 章 雨夜").forEach { title ->
-        ReaderChapterNameRow(title) {
-            onNavigate(RouteIds.IMMERSIVE_READING)
+    val entries = readerDirectoryEntries(directoryState, currentChapterIndex)
+    if (entries.isEmpty()) {
+        ReaderDirectoryDomainStatus(directoryState)
+    } else {
+        val currentPosition = (directoryState as? ReadingUiState.Ready)
+            ?.chapters
+            ?.indexOfFirst { it.index == currentChapterIndex }
+            ?.takeIf { it >= 0 }
+            ?: 0
+        val firstVisible = (currentPosition - 1)
+            .coerceAtLeast(0)
+            .coerceAtMost((entries.size - 3).coerceAtLeast(0))
+        entries.drop(firstVisible).take(3).forEach { entry ->
+            ReaderChapterNameRow(entry.title) {
+                dispatch(com.reader.ui.shell.ReaderUiIntent.JumpChapter(chapterIndex = entry.chapterIndex))
+                onNavigate(RouteIds.IMMERSIVE_READING)
+            }
         }
     }
+}
+
+internal data class ReaderDirectoryEntry(val title: String, val marker: String, val chapterIndex: Int = 0)
+
+/** Pure DomainState → directory-row projection, covered by JVM tests. */
+internal fun readerDirectoryEntries(
+    directoryState: ReadingUiState?,
+    currentChapterIndex: Int
+): List<ReaderDirectoryEntry> = when (directoryState) {
+    is ReadingUiState.Ready -> directoryState.chapters.map { chapter ->
+        ReaderDirectoryEntry(
+            title = chapter.title,
+            marker = when {
+                chapter.index == currentChapterIndex -> "当前"
+                chapter.index < currentChapterIndex -> "已读"
+                else -> "未读"
+            },
+            chapterIndex = chapter.index
+        )
+    }
+    ReadingUiState.Loading,
+    is ReadingUiState.Error,
+    null -> emptyList()
+}
+
+@Composable
+private fun ReaderDirectoryDomainStatus(directoryState: ReadingUiState?) {
+    val message = when (directoryState) {
+        ReadingUiState.Loading, null -> "目录加载中…"
+        is ReadingUiState.Error -> directoryState.message.ifBlank { "目录加载失败" }
+        is ReadingUiState.Ready -> "暂无目录"
+    }
+    Text(
+        text = message,
+        style = ReaderTextStyles.emptyBody,
+        color = readerExtraColors().muted,
+        modifier = Modifier.padding(vertical = 10.dp)
+    )
 }
 
 @Composable
@@ -2732,6 +3091,28 @@ private fun ReaderReplacePanel(
     }
     ReaderPanelRow(R.drawable.reader_ic_more, "管理规则", "全屏页", "打开") {
         onNavigate(RouteIds.READER_CONTENT_REPLACEMENT)
+    }
+}
+
+@Composable
+private fun ReaderNightStatePanel(
+    onNavigate: (String) -> Unit,
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+) {
+    ReaderPanelTitle("夜间模式")
+    ReaderPanelRow(R.drawable.reader_ic_appearance, "夜间模式", "已开启", "关闭") {
+        dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateAppThemeMode(mode = "light"))
+    }
+    ReaderPanelRow(R.drawable.reader_ic_sun, "亮度", "自动", "50%") {
+        dispatch(
+            com.reader.ui.shell.ReaderUiIntent.UpdateReaderBrightness(
+                brightness = 0.5f,
+                auto = false
+            )
+        )
+    }
+    ReaderPanelRow(R.drawable.reader_ic_appearance, "系统深色跟随", "关闭", "开启") {
+        dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateAppThemeMode(mode = "system"))
     }
 }
 

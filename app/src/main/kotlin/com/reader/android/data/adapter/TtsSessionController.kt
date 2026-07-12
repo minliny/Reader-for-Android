@@ -37,7 +37,10 @@ data class TtsProgressUpdate(
 data class TtsChapterRequest(
     val text: String,
     val title: String,
-    val index: Int
+    val index: Int,
+    val language: String = "zh-CN",
+    val speechRate: Float = 1.0f,
+    val pitch: Float = 1.0f
 )
 
 /**
@@ -118,6 +121,9 @@ class TtsSessionController(
     @Volatile private var currentParagraphIndex = 0
     @Volatile private var currentChapterIndex = 0
     @Volatile private var currentChapterTitle = ""
+    @Volatile private var currentLanguage = "zh-CN"
+    @Volatile private var currentSpeechRate = 1.0f
+    @Volatile private var currentPitch = 1.0f
     @Volatile private var paused = false
     @Volatile private var stopped = false
     @Volatile private var chapterProvider: TtsChapterProvider? = null
@@ -163,6 +169,9 @@ class TtsSessionController(
         this.started = true
         this.currentChapterIndex = initialChapter.index
         this.currentChapterTitle = initialChapter.title
+        this.currentLanguage = initialChapter.language
+        this.currentSpeechRate = initialChapter.speechRate
+        this.currentPitch = initialChapter.pitch
         this.paragraphs = splitParagraphs(initialChapter.text)
         this.currentParagraphIndex = 0
 
@@ -196,6 +205,9 @@ class TtsSessionController(
                 }
                 currentChapterIndex = nextChapter.index
                 currentChapterTitle = nextChapter.title
+                currentLanguage = nextChapter.language
+                currentSpeechRate = nextChapter.speechRate
+                currentPitch = nextChapter.pitch
                 paragraphs = splitParagraphs(nextChapter.text)
                 currentParagraphIndex = 0
                 continue
@@ -213,7 +225,13 @@ class TtsSessionController(
             _stateFlow.value = TtsPlaybackState.PLAYING
 
             try {
-                tts.speak(TtsUtterance(text = text, utteranceId = utteranceId))
+                tts.speak(TtsUtterance(
+                    text = text,
+                    utteranceId = utteranceId,
+                    language = currentLanguage,
+                    speechRate = currentSpeechRate,
+                    pitch = currentPitch
+                ))
             } catch (e: CancellationException) {
                 // sessionJob.cancel() propagates as CancellationException through
                 // the suspended speak() call — re-throw so stop() owns the final

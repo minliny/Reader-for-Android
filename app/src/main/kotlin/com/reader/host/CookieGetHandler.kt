@@ -49,7 +49,6 @@ class CookieGetHandler(
             cookie.put("path", record.path)
             if (record.secure) cookie.put("secure", true)
             if (record.httpOnly) cookie.put("httpOnly", true)
-            if (record.expiresAt != null) cookie.put("expiresAt", record.expiresAt)
             cookies.put(cookie)
         }
         val result = JSONObject()

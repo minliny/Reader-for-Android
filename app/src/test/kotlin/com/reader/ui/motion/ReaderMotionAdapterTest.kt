@@ -76,4 +76,52 @@ class ReaderMotionAdapterTest {
 
         assertTrue(required.all { ReaderMotionAdapter.hasMotion(it) })
     }
+
+    @Test
+    fun `all 93 generated motions expose unique exact serializer wire names`() {
+        assertEquals(93, MotionId.entries.size)
+        assertEquals(MotionId.entries.toSet(), MotionSpecRegistry.all.map { it.id }.toSet())
+
+        val serialNames = MotionId.entries.map { it.serialName }
+        assertEquals(93, serialNames.toSet().size)
+        assertEquals(
+            mapOf(
+                MotionId.DropdownMenuExpand to "dropdown.menu.expand",
+                MotionId.DropdownMenuReposition to "dropdown.menu.reposition",
+                MotionId.DropdownOptionPress to "dropdown.option.press",
+                MotionId.ReaderControlHandleDrag to "reader.control.handle.drag",
+                MotionId.ReaderControlShow to "reader.control.show",
+                MotionId.ReaderPageTurnNextPrev to "reader.page.turn.next-prev",
+                MotionId.ReaderSessionCapsuleControlPressToggle to "reader.session.capsule.control.press-toggle",
+                MotionId.TabItemPress to "tab.item.press",
+                MotionId.TabItemSwitch to "tab.item.switch"
+            ),
+            listOf(
+                MotionId.DropdownMenuExpand,
+                MotionId.DropdownMenuReposition,
+                MotionId.DropdownOptionPress,
+                MotionId.ReaderControlHandleDrag,
+                MotionId.ReaderControlShow,
+                MotionId.ReaderPageTurnNextPrev,
+                MotionId.ReaderSessionCapsuleControlPressToggle,
+                MotionId.TabItemPress,
+                MotionId.TabItemSwitch
+            ).associateWith { it.serialName }
+        )
+    }
+
+    @Test
+    fun `generated visual pattern drives movement policy for new motions`() {
+        val handleDrag = ReaderMotionAdapter.specFor(MotionId.ReaderControlHandleDrag)
+        val tabPress = ReaderMotionAdapter.specFor(MotionId.TabItemPress)
+        val reducedHandleDrag = ReaderMotionAdapter.specFor(
+            MotionId.ReaderControlHandleDrag,
+            reducedMotion = true
+        )
+
+        assertTrue(handleDrag.allowsMovement)
+        assertFalse(tabPress.allowsMovement)
+        assertFalse(reducedHandleDrag.allowsMovement)
+        assertEquals(0, reducedHandleDrag.durationMillis)
+    }
 }

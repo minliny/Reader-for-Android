@@ -14,14 +14,23 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.api.ReaderCoreClient
+import com.reader.host.AndroidReaderUiActivityCapabilityHost
+import com.reader.host.ReaderUiActivityCapabilityBinding
 import com.reader.ui.motion.SystemAnimationScaleReducedMotionResolver
 import com.reader.ui.shell.AppShellViewModel
 import com.reader.ui.shell.appShellViewModelFactory
 import com.reader.ui.theme.ReaderTheme
 
 class MainActivity : ComponentActivity() {
+    // Activity Result launchers must be registered before STARTED, so the
+    // capability host is an Activity property rather than created in onCreate.
+    private val readerUiCapabilityHost = AndroidReaderUiActivityCapabilityHost(this)
+    private var readerUiCapabilityBindingGeneration: Long? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        readerUiCapabilityBindingGeneration =
+            ReaderUiActivityCapabilityBinding.bind(readerUiCapabilityHost)
 
         // Slice A / 阶段 4 — WebView real binding: construct the host WebView,
         // configure it for JS execution, and bind it to the Core client so
@@ -75,6 +84,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        readerUiCapabilityBindingGeneration?.let { generation ->
+            ReaderUiActivityCapabilityBinding.unbind(readerUiCapabilityHost, generation)
+        }
+        readerUiCapabilityBindingGeneration = null
         // Revert to fail-closed so any post-Activity dispatch (e.g. from a
         // background work coroutine that outlives the Activity) cannot
         // reference a destroyed WebView. Real users re-bind on the next

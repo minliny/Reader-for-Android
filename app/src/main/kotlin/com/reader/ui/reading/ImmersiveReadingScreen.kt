@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -65,13 +69,20 @@ fun ReaderReadingSurface(
     modifier: Modifier = Modifier,
     topPadding: Dp = 72.dp,
     horizontalPadding: Dp = 32.dp,
-    bottomPadding: Dp = 48.dp
+    bottomPadding: Dp = 48.dp,
+    /** Actual Compose paragraph layout used by the R8 page Pilot paginator. */
+    onBodyTextLayout: ((TextLayoutResult) -> Unit)? = null,
+    /** Optional externally owned scroll state used only by canonical page commit. */
+    scrollState: ScrollState? = null,
+    onBodyTopOffsetPx: ((Int) -> Unit)? = null
 ) {
     val readerInk = readerExtraColors().readerInk
+    val internalScrollState = rememberScrollState()
+    val effectiveScrollState = scrollState ?: internalScrollState
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(effectiveScrollState)
             .padding(top = topPadding)
             .padding(horizontal = horizontalPadding)
             .padding(bottom = bottomPadding)
@@ -86,7 +97,11 @@ fun ReaderReadingSurface(
         Text(
             text = content,
             style = ReaderTextStyles.readerBody,
-            color = readerInk
+            color = readerInk,
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                onBodyTopOffsetPx?.invoke(coordinates.positionInParent().y.toInt())
+            },
+            onTextLayout = { onBodyTextLayout?.invoke(it) }
         )
     }
 }

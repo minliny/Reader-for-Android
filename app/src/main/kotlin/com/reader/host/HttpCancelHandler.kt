@@ -6,8 +6,8 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * `http.cancel` capability handler. Core sends `{requestTag}` or
- * `{requestId}`; this handler cancels the matching in-flight OkHttp call
+ * `http.cancel` capability handler. Core sends canonical `{requestId}`;
+ * this handler cancels the matching in-flight OkHttp call
  * (tracked via [HttpCallRegistry]) and returns `host.complete` with
  * `{cancelled: <bool>}`.
  *
@@ -26,15 +26,13 @@ class HttpCancelHandler(
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val tag = params.optString("requestTag", "")
-            .ifEmpty { params.optString("requestId", "") }
+        val tag = params.optString("requestId", "")
         if (tag.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires requestTag or requestId", false)
+            return HostReply.error(INTERNAL, "$CAPABILITY requires requestId", false)
         }
         val cancelled = registry.cancel(tag)
         val result = JSONObject()
         result.put("cancelled", cancelled)
-        result.put("requestTag", tag)
         return HostReply.complete(result.toString())
     }
 

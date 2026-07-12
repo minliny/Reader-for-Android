@@ -97,7 +97,7 @@ class AppShellViewModelHostRequestTest {
 
         val intent = ReaderUiIntent.DispatchHostRequest(
             capability = "permission.check",
-            paramsJson = JSONObject().put("kind", "notifications").toString()
+            paramsJson = JSONObject().put("scope", "notifications").toString()
         )
         vm.dispatch(intent)
         val entry = vm.state.value.pendingHostRequests.first()
@@ -140,7 +140,9 @@ class AppShellViewModelHostRequestTest {
 
         // Queue two entries.
         val intent1 = ReaderUiIntent.DispatchHostRequest("device.vibrate", "{}")
-        val intent2 = ReaderUiIntent.DispatchHostRequest("clipboard.copy", "{}")
+        val intent2 = ReaderUiIntent.DispatchHostRequest(
+            "clipboard.copy", JSONObject().put("text", "copy").toString()
+        )
         vm.dispatch(intent1)
         vm.dispatch(intent2)
 
@@ -195,7 +197,9 @@ class AppShellViewModelHostRequestTest {
         val vm = AppShellViewModel()
 
         // Dispatch + complete to populate lastHostRequestResult.
-        val intent = ReaderUiIntent.DispatchHostRequest("tts.system.start", "{}")
+        val intent = ReaderUiIntent.DispatchHostRequest(
+            "tts.system.start", JSONObject().put("text", "clear proof").toString()
+        )
         vm.dispatch(intent)
         val entry = vm.state.value.pendingHostRequests.first()
         val result = dispatcher.dispatch(entry)
@@ -218,13 +222,15 @@ class AppShellViewModelHostRequestTest {
     fun `deduplication - completing same dispatchId twice does not corrupt state`() {
         val adapter = HostAdapter().apply {
             register("tts.system.start", CapabilityHandler { _ ->
-                HostReply.complete("{}")
+                HostReply.complete("{\"started\":true}")
             })
         }
         val dispatcher = HostRequestDispatcher(adapter)
         val vm = AppShellViewModel()
 
-        val intent = ReaderUiIntent.DispatchHostRequest("tts.system.start", "{}")
+        val intent = ReaderUiIntent.DispatchHostRequest(
+            "tts.system.start", JSONObject().put("text", "dedupe proof").toString()
+        )
         vm.dispatch(intent)
         val entry = vm.state.value.pendingHostRequests.first()
 

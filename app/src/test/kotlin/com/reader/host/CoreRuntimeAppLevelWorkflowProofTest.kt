@@ -119,7 +119,7 @@ class CoreRuntimeAppLevelWorkflowProofTest {
         var state = ReaderUiState()
         state = ReaderUiReducer.reduce(state, ReaderUiIntent.DispatchHostRequest(
             capability = "tts.system.start",
-            paramsJson = JSONObject().apply { put("text", "proof"); put("utteranceId", "u1") }.toString()
+            paramsJson = JSONObject().put("text", "proof").toString()
         ))
         assertEquals("pending should have 1 entry", 1, state.pendingHostRequests.size)
 
@@ -142,14 +142,14 @@ class CoreRuntimeAppLevelWorkflowProofTest {
         var state = ReaderUiState()
         state = ReaderUiReducer.reduce(state, ReaderUiIntent.DispatchHostRequest(
             capability = "permission.check",
-            paramsJson = JSONObject().apply { put("kind", "notifications") }.toString()
+            paramsJson = JSONObject().put("scope", "notifications").toString()
         ))
 
         val completions = drainPendingHostRequests(state, adapter)
         state = completions.fold(state) { s, intent -> ReaderUiReducer.reduce(s, intent) }
 
         assertTrue(state.lastHostRequestResult!!.success)
-        assertTrue(state.lastHostRequestResult!!.resultJson!!.contains("GRANTED"))
+        assertTrue(JSONObject(state.lastHostRequestResult!!.resultJson!!).getBoolean("granted"))
     }
 
     @Test

@@ -14,7 +14,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
@@ -31,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +49,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -77,6 +80,9 @@ import com.reader.ui.bookshelf.BookshelfTabTopBar
 import com.reader.ui.bookshelf.BookshelfViewModel
 import com.reader.ui.bookshelf.BookshelfEmptyRouteScreen
 import com.reader.ui.bookshelf.BookshelfSortFilterRouteScreen
+import com.reader.ui.bookshelf.BookshelfCoverModeRouteScreen
+import com.reader.ui.bookshelf.BookshelfListModeRouteScreen
+import com.reader.ui.bookshelf.BookshelfBookMoreMenuRouteScreen
 import com.reader.ui.bookshelf.BookshelfSearchSettingsScreen
 import com.reader.ui.bookshelf.GroupManagementScreen
 import com.reader.ui.bookshelf.LocalImportScreen
@@ -157,6 +163,8 @@ import com.reader.ui.theme.readerExtraColors
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -184,15 +192,36 @@ fun AppShell(
             reducedMotionResolver,
             // P1-4: bridge TtsSessionController.progressFlow → UpdateTtsProgress
             // so the reducer's activeSession reflects real playback position.
-            if (com.reader.android.AppProvider.isInitialized) {
+            if (
+                com.reader.android.AppProvider.isInitialized &&
+                !com.reader.android.BuildConfig.READER_UI_PLAYBACK_PILOT_ENABLED
+            ) {
                 com.reader.android.AppProvider.ttsSessionController.progressFlow
             } else null
         )
     )
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val bookOpenDomainState by vm.readerBookOpenDomainState.collectAsStateWithLifecycle()
+    val playbackDomainState by vm.readerPlaybackDomainState.collectAsStateWithLifecycle()
     val reducedMotion = state.reducedMotion
     var restoreUiState by remember { mutableStateOf(RestoreUiState()) }
+
+    // The auto-page contract is foreground-only. Lifecycle backgrounding is
+    // routed directly to the paired Pilot executor; it never becomes a
+    // background.schedule HostRequest or a repeating native timer.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, vm.readerPlaybackPilotEnabled) {
+        if (!vm.readerPlaybackPilotEnabled) return@DisposableEffect onDispose { }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) vm.onReaderAppBackgrounded()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            vm.onReaderAppBackgrounded()
+        }
+    }
 
     fun popBackTo(route: ReaderRoute, fallbackPops: Int = 1) {
         val targetIndex = state.backStack.indexOfLast { it == route }
@@ -208,7 +237,7 @@ fun AppShell(
     fun enterReaderFromBook(book: Book) {
         vm.dispatch(
             ReaderUiIntent.EnterReaderFromAction(
-                sourceId = book.origin.ifEmpty { book.bookUrl },
+                sourceId = book.sourceId.ifEmpty { book.origin.ifEmpty { book.bookUrl } },
                 bookUrl = book.bookUrl,
                 bookName = book.name
             )
@@ -351,10 +380,14 @@ fun AppShell(
         val currentPending = vm.state.value.pendingHostRequests
         if (currentPending.none { it.dispatchId == entry.dispatchId }) return@LaunchedEffect
 
+        val hostRequestTimeoutMs = hostRequestTimeoutMillis(entry.capability)
         val result = try {
-            withTimeoutOrNull(HOST_REQUEST_TIMEOUT_MS) {
+            withTimeoutOrNull(hostRequestTimeoutMs) {
                 val dispatcher = HostRequestDispatcher(ReaderCoreClient.get().hostAdapter())
-                dispatcher.dispatch(entry)
+                // CapabilityHandler is synchronous. Keep file pickers, TTS,
+                // WebDAV and WorkManager waits off the Compose main thread so
+                // Activity Result callbacks and timeout cancellation can run.
+                withContext(Dispatchers.IO) { dispatcher.dispatch(entry) }
             }
         } catch (e: Exception) {
             HostRequestResult(
@@ -372,7 +405,7 @@ fun AppShell(
                     requestId = entry.dispatchId,
                     capability = entry.capability,
                     errorCode = "TIMEOUT",
-                    errorMessage = "host request exceeded ${HOST_REQUEST_TIMEOUT_MS}ms"
+                    errorMessage = "host request exceeded ${hostRequestTimeoutMs}ms"
                 )
             )
         } else if (result.success) {
@@ -539,6 +572,12 @@ fun AppShell(
                 ))
             },
             asyncResultState = state.asyncResult.state,
+            bookOpenPilotEnabled = vm.readerBookOpenPilotEnabled,
+            bookOpenDomainState = bookOpenDomainState,
+            onBookOpenViewportLayoutReady = vm::onReaderBookOpenViewportLayoutReady,
+            playbackPilotEnabled = vm.readerPlaybackPilotEnabled,
+            playbackDomainState = playbackDomainState,
+            onPlaybackPageLayoutReady = vm::onReaderPlaybackPageLayoutReady,
             onAsyncStateChange = { requestId, asyncState, value ->
                 // Bridge ImmersiveReadingViewModel load state → ReaderUiState.asyncResult (M5).
                 // The VM reports PENDING / COMPLETED / CANCELLED using context.entryRequestId;
@@ -605,7 +644,7 @@ fun AppShell(
                 onBookClick = { book ->
                     vm.dispatch(
                         ReaderUiIntent.EnterReaderFromAction(
-                            sourceId = book.origin.ifEmpty { book.bookUrl },
+                            sourceId = book.sourceId.ifEmpty { book.origin.ifEmpty { book.bookUrl } },
                             bookUrl = book.bookUrl,
                             bookName = book.name
                         )
@@ -1147,6 +1186,64 @@ fun AppShell(
                         )
                     }
                 }
+                "bookshelf-cover-mode" -> {
+                    MainTabShellFrame(
+                        activeTab = MainTab.BOOKSHELF,
+                        onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                    ) {
+                        BookshelfCoverModeRouteScreen(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onOpenBookFromCover = { book -> enterReaderFromBook(book) },
+                            onOpenBookFromAction = { book -> enterReaderFromBook(book) },
+                            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+                            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+                            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+                            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
+                            onSwitchToList = { navigateToRouteId("bookshelf-list-mode") }
+                        )
+                    }
+                }
+                "bookshelf-list-mode" -> {
+                    MainTabShellFrame(
+                        activeTab = MainTab.BOOKSHELF,
+                        onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                    ) {
+                        BookshelfListModeRouteScreen(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onOpenBookFromCover = { book -> enterReaderFromBook(book) },
+                            onOpenBookFromAction = { book -> enterReaderFromBook(book) },
+                            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+                            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+                            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+                            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
+                            onSwitchToCover = { navigateToRouteId("bookshelf-cover-mode") }
+                        )
+                    }
+                }
+                "bookshelf-book-more-menu" -> {
+                    MainTabShellFrame(
+                        activeTab = MainTab.BOOKSHELF,
+                        onSelect = { vm.dispatch(ReaderUiIntent.SelectTab(it)) }
+                    ) {
+                        BookshelfBookMoreMenuRouteScreen(
+                            onSearch = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.Search)) },
+                            onOpenBookFromCover = { book -> enterReaderFromBook(book) },
+                            onOpenBookFromAction = { book -> enterReaderFromBook(book) },
+                            onLocalImport = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.LocalImport)) },
+                            onBookshelfSettings = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookshelfSearchSettings)) },
+                            onBookBatchManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.BookBatchManagement)) },
+                            onGroupManagement = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
+                            onBookDetail = { navigateToRouteId("book-detail") },
+                            onSourceSwitch = { navigateToRouteId("source-switch") },
+                            onCacheBook = { navigateToRouteId("reader-book-cache") },
+                            onAddToGroup = { vm.dispatch(ReaderUiIntent.PushRoute(ReaderRoute.GroupManagement)) },
+                            onEditBook = { navigateToRouteId("source-rule-edit") },
+                            onReplaceRule = { navigateToRouteId("content-replacement") },
+                            onDeleteBook = { vm.dispatch(ReaderUiIntent.PopRoute) },
+                            onDismiss = { vm.dispatch(ReaderUiIntent.PopRoute) }
+                        )
+                    }
+                }
                 else -> {
                     DemoRouteScreen(
                         routeId = route.id,
@@ -1414,7 +1511,7 @@ private fun MainTabShellFrame(
     content: @Composable () -> Unit
 ) {
     val viewportClass = rememberViewportClass()  // 新增：激活 ViewportClassAdapter
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
         val useLeftRail = viewportClass == ViewportClass.TABLET_EXPANDED ||
             viewportClass == ViewportClass.EXPANDED_WIDTH  // 改用 ViewportClass 判断
         Box(
@@ -1488,7 +1585,7 @@ private fun TabContent(
             onOpenBookFromCover = { book ->
                 vm.dispatch(
                     ReaderUiIntent.EnterReaderFromCover(
-                        sourceId = book.origin.ifEmpty { book.bookUrl },
+                        sourceId = book.sourceId.ifEmpty { book.origin.ifEmpty { book.bookUrl } },
                         bookUrl = book.bookUrl,
                         bookName = book.name
                     )
@@ -1497,7 +1594,7 @@ private fun TabContent(
             onOpenBookFromAction = { book ->
                 vm.dispatch(
                     ReaderUiIntent.EnterReaderFromAction(
-                        sourceId = book.origin.ifEmpty { book.bookUrl },
+                        sourceId = book.sourceId.ifEmpty { book.origin.ifEmpty { book.bookUrl } },
                         bookUrl = book.bookUrl,
                         bookName = book.name
                     )
@@ -1559,6 +1656,10 @@ internal fun appShellViewModelFactory(
 
 /** Timeout for a single HostRequest dispatch in the AppShell effect collector. */
 private const val HOST_REQUEST_TIMEOUT_MS: Long = 10_000L
+private const val FILE_SELECT_HOST_REQUEST_TIMEOUT_MS: Long = 120_000L
+
+private fun hostRequestTimeoutMillis(capability: String): Long =
+    if (capability == "file.select") FILE_SELECT_HOST_REQUEST_TIMEOUT_MS else HOST_REQUEST_TIMEOUT_MS
 
 @Composable
 private fun PushedPlaceholderRouteScreen(title: String, body: String, onBack: () -> Unit) {

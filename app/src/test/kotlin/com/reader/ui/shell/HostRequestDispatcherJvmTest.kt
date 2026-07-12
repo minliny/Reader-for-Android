@@ -73,7 +73,7 @@ class HostRequestDispatcherJvmTest {
         val entry = HostRequestDispatch(
             dispatchId = "req-2",
             capability = "permission.check",
-            paramsJson = JSONObject().put("kind", "notifications").toString()
+            paramsJson = JSONObject().put("scope", "notifications").toString()
         )
         val result = dispatcher.dispatch(entry)
 
@@ -131,14 +131,12 @@ class HostRequestDispatcherJvmTest {
 
     @Test
     fun `dispatch preserves dispatchId and capability across success and error`() {
+        var receivedCapability: String? = null
         val adapter = adapterFor(
             "device.vibrate",
             CapabilityHandler { req ->
-                // Echo the capability back so we can verify the request reached
-                // the handler with the correct capability string.
-                HostReply.complete(
-                    JSONObject().put("echoedCapability", req.capability()).toString()
-                )
+                receivedCapability = req.capability()
+                HostReply.complete(JSONObject().put("vibrated", true).toString())
             }
         )
         val dispatcher = HostRequestDispatcher(adapter)
@@ -155,8 +153,10 @@ class HostRequestDispatcherJvmTest {
         assertTrue(result1.success)
         assertTrue(result2.success)
 
-        // Verify the handler received the capability string unchanged.
+        // Verify the handler received the capability string unchanged while
+        // the wire result remains the canonical closed DTO.
         val parsed1 = JSONObject(result1.resultJson!!)
-        assertEquals("device.vibrate", parsed1.getString("echoedCapability"))
+        assertTrue(parsed1.getBoolean("vibrated"))
+        assertEquals("device.vibrate", receivedCapability)
     }
 }

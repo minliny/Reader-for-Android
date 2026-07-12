@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Holds the single [ReaderUiState] and dispatches [ReaderUiIntent]s through
@@ -34,9 +34,25 @@ import kotlinx.coroutines.launch
  * / `ttsChapterIndex` via `UpdateTtsProgress` — closing the "UI action →
  * Host/Core state writeback" loop.
  */
-class AppShellViewModel(
+class AppShellViewModel internal constructor(
     reducedMotionResolver: ReducedMotionResolver? = null,
-    ttsProgressFlow: Flow<TtsProgressUpdate?>? = null
+    ttsProgressFlow: Flow<TtsProgressUpdate?>? = null,
+    private val readerUiRuntimeCoordinator: ReaderUiRuntimeCoordinator = ReaderUiRuntimeCoordinator(),
+    private val nativeReducer: (ReaderUiState, ReaderUiIntent) -> ReaderUiState = ReaderUiReducer::reduce,
+    private val readerBookOpenDomainStore: ReaderBookOpenDomainStore = ReaderBookOpenDomainStore(),
+    private val readerBookOpenEffectExecutor: ReaderBookOpenEffectExecutor = ReaderBookOpenEffectExecutor(
+        domainStore = readerBookOpenDomainStore,
+        runtime = readerUiRuntimeCoordinator
+    ),
+    /** Test seam; production uses the lifecycle-owned [viewModelScope]. */
+    private val readerBookOpenScope: CoroutineScope? = null,
+    private val readerPlaybackDomainStore: ReaderPlaybackDomainStore = ReaderPlaybackDomainStore(),
+    private val readerPlaybackEffectExecutor: ReaderPlaybackEffectExecutor = ReaderPlaybackEffectExecutor(
+        domainStore = readerPlaybackDomainStore,
+        runtime = readerUiRuntimeCoordinator
+    ),
+    /** Test seam shared by command, speech and foreground one-shot timer work. */
+    private val readerPlaybackScope: CoroutineScope? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -44,10 +60,37 @@ class AppShellViewModel(
     )
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
+    /** Diagnostic-only live-shadow counters; never consumed by the renderer. */
+    val readerUiRuntimeShadowMetrics: ReaderUiRuntimeShadowMetrics
+        get() = readerUiRuntimeCoordinator.metrics
+
+    /** Last covered live-shadow transition, including unexecuted runtime effects. */
+    val readerUiRuntimeShadowObservation: ReaderUiRuntimeShadowObservation?
+        get() = readerUiRuntimeCoordinator.lastObservation
+
+    /** Diagnostic-only runtime state used by parity tests and debug evidence. */
+    val readerUiRuntimeShadowState: io.reader.ui.runtime.ReaderUIState
+        get() = readerUiRuntimeCoordinator.runtimeState
+
+    /** Result-dependent Core transaction state rendered by the opt-in book.open Pilot. */
+    internal val readerBookOpenDomainState: StateFlow<ReaderBookOpenDomainState>
+        get() = readerBookOpenDomainStore.state
+
+    /** Default false BuildConfig gate; independent from the directory consumer-lock cohort. */
+    internal val readerBookOpenPilotEnabled: Boolean
+        get() = readerUiRuntimeCoordinator.bookOpenPilotEnabled
+
+    internal val readerPlaybackPilotEnabled: Boolean
+        get() = readerUiRuntimeCoordinator.playbackPilotEnabled
+
+    internal val readerPlaybackDomainState: StateFlow<ReaderPlaybackDomainState>
+        get() = readerPlaybackDomainStore.state
+
     init {
         // P6: attach the motion runtime so dispatch() can fire motion transactions.
         MotionController.setReducedMotionResolver(reducedMotionResolver)
         MotionController.attachToViewModel(this)
+        readerPlaybackEffectExecutor.setProjectionSink(::projectPlaybackRuntimeState)
         // P1-4: collect TTS progress and dispatch UpdateTtsProgress so the
         // reducer's activeSession reflects the real playback position.
         if (ttsProgressFlow != null) {
@@ -64,19 +107,276 @@ class AppShellViewModel(
         }
     }
 
+    @Synchronized
     fun dispatch(intent: ReaderUiIntent) {
+        val productionBefore = _state.value
+
+        // A new book replaces every in-flight playback generation before the
+        // book.open transaction is admitted. This avoids Runtime emitting
+        // playback teardown effects into the book.open-only executor.
+        val isBookReplacement = intent is ReaderUiIntent.EnterReaderFromCover ||
+            intent is ReaderUiIntent.EnterReaderFromAction
+        val playbackBeforeReplacement = readerUiRuntimeCoordinator.playbackRuntimeState
+        val playbackTeardownQueued = readerPlaybackPilotEnabled && isBookReplacement &&
+            (playbackBeforeReplacement.pageTransaction != null ||
+                playbackBeforeReplacement.ttsTransaction != null ||
+                playbackBeforeReplacement.autoPageTransaction != null)
+        if (playbackTeardownQueued) {
+            readerPlaybackEffectExecutor.teardownForReaderExit(
+                readerPlaybackScope ?: viewModelScope
+            )
+        }
+
+        // Pause/resume and sentence-skip are not part of the promoted pairs.
+        // While a paired Pilot session exists they must fail closed instead
+        // of falling through to the legacy HostRequest/TtsSessionController.
+        if (
+            readerPlaybackPilotEnabled &&
+            readerUiRuntimeCoordinator.playbackRuntimeState.ttsTransaction != null &&
+            (intent == ReaderUiIntent.ToggleSessionPlaying ||
+                (intent is ReaderUiIntent.DispatchHostRequest && intent.capability.startsWith("tts.")))
+        ) {
+            return
+        }
+
+        // Paired R8 Pilot owns reducer + Core/Host execution together. A
+        // missing Core reader snapshot or Runtime rejection fails closed;
+        // the old reducer, HostRequest queue and TtsSessionController path
+        // must remain at zero calls for this event.
+        if (readerPlaybackPilotEnabled && intent.isPlaybackPilotIntent()) {
+            if (!readerPlaybackEffectExecutor.canAdmit(intent, readerBookOpenDomainStore.state.value)) {
+                return
+            }
+            when (val playback = readerUiRuntimeCoordinator.dispatchPlaybackPilot(intent)) {
+                is ReaderPlaybackPilotDispatch.Applied -> {
+                    startMotionTransaction(intent, productionBefore)
+                    readerPlaybackEffectExecutor.applyTransition(
+                        event = playback.event,
+                        state = playback.state,
+                        effects = playback.effects,
+                        cancelledCorrelationIds = playback.cancelledCorrelationIds,
+                        bookOpen = readerBookOpenDomainStore.state.value,
+                        scope = readerPlaybackScope ?: viewModelScope
+                    )
+                    return
+                }
+                ReaderPlaybackPilotDispatch.FailedClosed -> return
+                ReaderPlaybackPilotDispatch.NotEnabled -> return
+            }
+        }
+
+        // `book.open` is a separate, default-off Pilot. Runtime owns the
+        // result-dependent Core ledger; the native reducer is used once only
+        // for route/context presentation and must not re-observe this event.
+        when (val bookOpenPilot = readerUiRuntimeCoordinator.dispatchBookOpenPilot(intent)) {
+            is ReaderBookOpenPilotDispatch.Applied -> {
+                // The Runtime transaction is the cleanup authority. Prefer
+                // its canonical correlation so a malformed returned effect
+                // cannot leave a live transaction behind before executor.begin.
+                val correlationId = bookOpenPilot.transition.state.bookOpenTransaction?.correlationId
+                    ?: bookOpenPilot.transition.effects.singleOrNull()?.correlationId
+                val context = readerContextForBookOpen(intent)
+                if (context == null || correlationId != context.entryRequestId) {
+                    correlationId?.let(readerBookOpenEffectExecutor::cancel)
+                    return
+                }
+                if (playbackTeardownQueued) {
+                    readerPlaybackEffectExecutor.afterSerialTeardown(
+                        readerPlaybackScope ?: viewModelScope
+                    ) {
+                        synchronized(this@AppShellViewModel) {
+                            val currentBookCorrelation = readerUiRuntimeCoordinator.runtimeState
+                                .bookOpenTransaction?.correlationId
+                            if (currentBookCorrelation != correlationId) {
+                                readerBookOpenEffectExecutor.cancel(correlationId)
+                            } else {
+                                admitBookOpenPilot(intent, context, correlationId, bookOpenPilot.transition)
+                            }
+                        }
+                    }
+                } else {
+                    admitBookOpenPilot(intent, context, correlationId, bookOpenPilot.transition)
+                }
+                return
+            }
+            ReaderBookOpenPilotDispatch.FailedClosed -> return
+            ReaderBookOpenPilotDispatch.NotEnabled -> Unit
+        }
+
+        when (val pilot = readerUiRuntimeCoordinator.dispatchPilot(intent, productionBefore)) {
+            is ReaderUiRuntimePilotResult.Applied -> {
+                // R8 directory Pilot: runtime owns the semantic overlay. Only a
+                // successful transition may start presentation motion and write
+                // the narrow native route/sheet projection. The native reducer
+                // and its effect path are deliberately skipped.
+                if (pilot.changed) {
+                    startMotionTransaction(intent, productionBefore)
+                    _state.value = pilot.productionState
+                }
+            }
+            ReaderUiRuntimePilotResult.FailedClosed -> {
+                // Runtime guard/error is authoritative for the Pilot pair. Keep
+                // production state and motion untouched; never bypass it through
+                // ReaderUiReducer.
+                return
+            }
+            ReaderUiRuntimePilotResult.NotPilot -> {
+                // Existing production ownership for uncovered and shadow events:
+                // native reducer/effects execute exactly once, then runtime only
+                // observes the committed result.
+                startMotionTransaction(intent, productionBefore)
+                val productionAfter = nativeReducer(productionBefore, intent)
+                _state.value = productionAfter
+                cancelBookOpenIfReaderExited(productionBefore, productionAfter)
+                if (
+                    readerPlaybackPilotEnabled &&
+                    productionBefore.readerContext != null && productionAfter.readerContext == null
+                ) {
+                    readerPlaybackEffectExecutor.teardownForReaderExit(
+                        readerPlaybackScope ?: viewModelScope
+                    )
+                }
+                readerUiRuntimeCoordinator.observe(intent, productionBefore, productionAfter)
+            }
+        }
+    }
+
+    /** Called by the real Compose reading surface after it receives layout coordinates. */
+    internal fun onReaderBookOpenViewportLayoutReady(viewport: ReaderBookOpenViewport) {
+        if (!readerBookOpenPilotEnabled) return
+        readerBookOpenEffectExecutor.onViewportLayoutReady(
+            viewport = viewport,
+            scope = readerBookOpenScope ?: viewModelScope
+        )
+    }
+
+    internal fun onReaderPlaybackPageLayoutReady(measurement: ReaderPlaybackPageMeasurement) {
+        if (!readerPlaybackPilotEnabled) return
+        readerPlaybackEffectExecutor.onPageLayoutReady(
+            measurement,
+            readerPlaybackScope ?: viewModelScope
+        )
+    }
+
+    internal fun onReaderAppBackgrounded() {
+        if (!readerPlaybackPilotEnabled) return
+        readerPlaybackEffectExecutor.onAppBackgrounded(readerPlaybackScope ?: viewModelScope)
+    }
+
+    override fun onCleared() {
+        readerBookOpenEffectExecutor.cancelActive()
+        readerPlaybackEffectExecutor.cancelAll(readerPlaybackScope ?: viewModelScope)
+        super.onCleared()
+    }
+
+    @Synchronized
+    private fun projectPlaybackRuntimeState(
+        runtime: io.reader.ui.runtime.ReaderUIState,
+        domain: ReaderPlaybackDomainState
+    ) {
+        val current = _state.value
+        val location = domain.committedLocation
+        val readerContext = current.readerContext?.let { context ->
+            if (location != null && location.bookId == context.bookUrl) {
+                context.copy(
+                    chapterIndex = location.chapterIndex,
+                    page = domain.committedPageIndex,
+                    progress = location.chapterProgress.toFloat()
+                )
+            } else {
+                context
+            }
+        }
+        val activeSession = when (runtime.activeSession) {
+            "tts" -> ActiveSession(
+                type = SessionType.TTS,
+                playing = true,
+                ttsSentenceIndex = domain.ttsSnapshot?.currentSliceIndex ?: 0,
+                ttsChapterIndex = location?.chapterIndex ?: readerContext?.chapterIndex ?: 0
+            )
+            "auto-page" -> ActiveSession(
+                type = SessionType.AUTO_PAGE,
+                playing = true,
+                countdownSeconds = READER_AUTO_PAGE_DEFAULT_INTERVAL_MS / 1_000
+            )
+            else -> null
+        }
+        _state.value = current.copy(
+            readerContext = readerContext,
+            activeSession = activeSession
+        )
+    }
+
+    private fun ReaderUiIntent.isPlaybackPilotIntent(): Boolean = when (this) {
+        ReaderUiIntent.TurnPageNext,
+        ReaderUiIntent.TurnPagePrev,
+        is ReaderUiIntent.StartTtsSession,
+        ReaderUiIntent.StartAutoPageSession,
+        ReaderUiIntent.StopSession -> true
+        else -> false
+    }
+
+    private fun readerContextForBookOpen(intent: ReaderUiIntent): ReaderContext? = when (intent) {
+        is ReaderUiIntent.EnterReaderFromCover -> ReaderContext(
+            sourceId = intent.sourceId,
+            bookUrl = intent.bookUrl,
+            bookName = intent.bookName,
+            entry = ReaderEntry.COVER_TO_IMMERSIVE,
+            entryRequestId = intent.requestId
+        )
+        is ReaderUiIntent.EnterReaderFromAction -> ReaderContext(
+            sourceId = intent.sourceId,
+            bookUrl = intent.bookUrl,
+            bookName = intent.bookName,
+            entry = ReaderEntry.ACTION_TO_IMMERSIVE,
+            entryRequestId = intent.requestId
+        )
+        else -> null
+    }
+
+    private fun admitBookOpenPilot(
+        intent: ReaderUiIntent,
+        context: ReaderContext,
+        correlationId: String,
+        transition: io.reader.ui.runtime.ReaderUITransition
+    ) {
+        val before = _state.value
+        try {
+            transition.cancelledCorrelationIds.forEach(readerBookOpenEffectExecutor::cancel)
+            // Only commit presentation after all synchronous admission
+            // checks passed. When replacing a playback session this method is
+            // invoked after its serial system/Core teardown is terminal.
+            readerBookOpenEffectExecutor.start(
+                context = context,
+                firstEffect = transition.effects.single(),
+                scope = readerBookOpenScope ?: viewModelScope
+            )
+            val productionAfter = nativeReducer(before, intent)
+            startMotionTransaction(intent, before)
+            _state.value = productionAfter
+        } catch (_: Exception) {
+            _state.value = before
+            readerBookOpenEffectExecutor.cancel(correlationId)
+        }
+    }
+
+    private fun cancelBookOpenIfReaderExited(before: ReaderUiState, after: ReaderUiState) {
+        if (!readerBookOpenPilotEnabled || after.readerContext != null) return
+        before.readerContext?.entryRequestId?.let(readerBookOpenEffectExecutor::cancel)
+    }
+
+    private fun startMotionTransaction(intent: ReaderUiIntent, stateBefore: ReaderUiState) {
         // P6: map intent → Motion ID and start a motion transaction (runtime side-effect).
         // The reducer remains pure; this is the consume layer that MOTION_EFFECTS.md §6 requires.
-        motionTransactionFor(intent)?.let { (motionId, from, to, durationMs) ->
+        motionTransactionFor(intent, stateBefore)?.let { (motionId, from, to, durationMs) ->
             MotionController.start(
                 motionId = motionId,
                 from = from,
                 to = to,
                 durationMs = durationMs,
-                reducedMotion = _state.value.reducedMotion
+                reducedMotion = stateBefore.reducedMotion
             )
         }
-        _state.update { ReaderUiReducer.reduce(it, intent) }
     }
 
     /**
@@ -86,9 +386,9 @@ class AppShellViewModel(
      * `MotionIdConstants` — no fabricated Motion IDs.
      */
     private fun motionTransactionFor(
-        intent: ReaderUiIntent
+        intent: ReaderUiIntent,
+        current: ReaderUiState = _state.value
     ): Tuple4<String, String, String, Long>? {
-        val current = _state.value
         val from = current.currentRoute.routeId
         return when (intent) {
             is ReaderUiIntent.SelectTab -> Tuple4(

@@ -4,9 +4,10 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeout
 import java.util.Locale
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -38,7 +39,17 @@ class AndroidTtsEngine(
     private val engineRef = AtomicReference<TextToSpeech?>(null)
     @Volatile private var initResult: TtsInitResult? = null
     @Volatile private var state: TtsPlaybackState = TtsPlaybackState.IDLE
-    private val pendingUtterances = ConcurrentLinkedQueue<CompletableDeferred<Unit>>()
+    /**
+     * TextToSpeech callbacks may arrive out of order after QUEUE_FLUSH/stop.
+     * Keying waiters by the platform utterance id prevents a late callback for
+     * one correlation from completing another correlation's suspend call.
+     */
+    private val pendingUtterances = ConcurrentHashMap<String, UtteranceWaiter>()
+
+    private data class UtteranceWaiter(
+        val started: CompletableDeferred<Unit> = CompletableDeferred(),
+        val completed: CompletableDeferred<Unit> = CompletableDeferred()
+    )
 
     override suspend fun init(): TtsInitResult {
         initResult?.let { return it }
@@ -57,16 +68,28 @@ class AndroidTtsEngine(
                     deferred.complete(TtsInitResult(success = false, errorMessage = "language not supported"))
                 } else {
                     engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) { state = TtsPlaybackState.PLAYING }
+                        override fun onStart(utteranceId: String?) {
+                            state = TtsPlaybackState.PLAYING
+                            utteranceId?.let { pendingUtterances[it]?.started?.complete(Unit) }
+                        }
                         override fun onDone(utteranceId: String?) {
                             state = TtsPlaybackState.IDLE
-                            pendingUtterances.poll()?.complete(Unit)
+                            utteranceId?.let { id ->
+                                pendingUtterances.remove(id)?.let { waiter ->
+                                    waiter.started.complete(Unit)
+                                    waiter.completed.complete(Unit)
+                                }
+                            }
                         }
                         override fun onError(utteranceId: String?) {
                             state = TtsPlaybackState.ERROR
-                            pendingUtterances.poll()?.completeExceptionally(
-                                RuntimeException("TTS engine error for $utteranceId")
-                            )
+                            utteranceId?.let { id ->
+                                pendingUtterances.remove(id)?.let { waiter ->
+                                    val error = RuntimeException("TTS engine error for $id")
+                                    waiter.started.completeExceptionally(error)
+                                    waiter.completed.completeExceptionally(error)
+                                }
+                            }
                         }
                     })
                     engineRef.set(engine)
@@ -89,25 +112,77 @@ class AndroidTtsEngine(
     }
 
     override suspend fun speak(utterance: TtsUtterance) {
+        val handle = beginUtterance(utterance)
+        try {
+            handle.awaitStarted()
+            handle.awaitCompletion()
+        } catch (error: Exception) {
+            handle.cancel()
+            throw error
+        }
+    }
+
+    /**
+     * Starts one exact utterance and exposes distinct platform start and
+     * terminal waiters. R8 playback uses this instead of treating enqueue as
+     * speech success; the legacy [speak] API remains source-compatible.
+     */
+    internal fun beginUtterance(utterance: TtsUtterance): AndroidTtsUtteranceHandle {
         val engine = engineRef.get()
             ?: throw IllegalStateException("TTS not initialized — call init() first")
-        val deferred = CompletableDeferred<Unit>()
-        pendingUtterances.add(deferred)
-        state = TtsPlaybackState.PLAYING
+        require(utterance.utteranceId.isNotBlank()) { "TTS utteranceId must not be blank" }
+        // QUEUE_FLUSH may not deliver a terminal callback for the displaced
+        // utterance. Invalidate those exact-id waiters before enqueueing the
+        // replacement so none can time out or complete the new correlation.
+        cancelPendingUtterances("TTS superseded by ${utterance.utteranceId}")
+        val waiter = UtteranceWaiter()
+        check(pendingUtterances.putIfAbsent(utterance.utteranceId, waiter) == null) {
+            "TTS duplicate utteranceId=${utterance.utteranceId}"
+        }
+        val languageResult = engine.setLanguage(Locale.forLanguageTag(utterance.language))
+        if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+            languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            pendingUtterances.remove(utterance.utteranceId, waiter)
+            throw IllegalStateException("TTS language not supported: ${utterance.language}")
+        }
         engine.setSpeechRate(utterance.speechRate)
         engine.setPitch(utterance.pitch)
-        val params = android.speech.tts.TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID to utterance.utteranceId
-        engine.speak(utterance.text, TextToSpeech.QUEUE_FLUSH, null, utterance.utteranceId)
-        // Don't block forever — the engine callback resumes us.
-        runCatching { kotlinx.coroutines.withTimeoutOrNull(60_000L) { deferred.await() } }
-            .onFailure { pendingUtterances.remove(deferred) }
+        val result = engine.speak(
+            utterance.text,
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            utterance.utteranceId
+        )
+        if (result == TextToSpeech.ERROR) {
+            pendingUtterances.remove(utterance.utteranceId, waiter)
+            val error = IllegalStateException("TTS enqueue failed for ${utterance.utteranceId}")
+            waiter.started.completeExceptionally(error)
+            waiter.completed.completeExceptionally(error)
+            throw error
+        }
+        return AndroidTtsUtteranceHandle(
+            utteranceId = utterance.utteranceId,
+            awaitStarted = { withTimeout(10_000L) { waiter.started.await() } },
+            awaitCompletion = { withTimeout(60_000L) { waiter.completed.await() } },
+            cancel = {
+                pendingUtterances.remove(utterance.utteranceId, waiter).also { removed ->
+                    if (removed) {
+                        val cancelled = CancellationException(
+                            "TTS utterance cancelled: ${utterance.utteranceId}"
+                        )
+                        waiter.started.completeExceptionally(cancelled)
+                        waiter.completed.completeExceptionally(cancelled)
+                    }
+                }
+            }
+        )
     }
 
     override suspend fun stop() {
         engineRef.get()?.stop()
         state = TtsPlaybackState.STOPPED
-        pendingUtterances.forEach { it.complete(Unit) }
-        pendingUtterances.clear()
+        cancelPendingUtterances("TTS engine stopped")
     }
 
     override suspend fun pause() {
@@ -133,8 +208,30 @@ class AndroidTtsEngine(
      * doesn't leak.
      */
     fun shutdown() {
+        cancelPendingUtterances("TTS engine shutdown")
         engineRef.getAndSet(null)?.shutdown()
         state = TtsPlaybackState.IDLE
         initResult = null
     }
+
+    private fun cancelPendingUtterances(reason: String) {
+        val cancelled = CancellationException(reason)
+        pendingUtterances.entries.toList().forEach { (id, waiter) ->
+            if (pendingUtterances.remove(id, waiter)) {
+                waiter.started.completeExceptionally(cancelled)
+                waiter.completed.completeExceptionally(cancelled)
+            }
+        }
+    }
+}
+
+internal class AndroidTtsUtteranceHandle(
+    val utteranceId: String,
+    private val awaitStarted: suspend () -> Unit,
+    private val awaitCompletion: suspend () -> Unit,
+    private val cancel: () -> Boolean
+) {
+    suspend fun awaitStarted() = awaitStarted.invoke()
+    suspend fun awaitCompletion() = awaitCompletion.invoke()
+    fun cancel(): Boolean = cancel.invoke()
 }

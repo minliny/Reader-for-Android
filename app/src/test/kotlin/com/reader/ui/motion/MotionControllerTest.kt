@@ -19,7 +19,7 @@ import org.junit.Test
  * - start / interrupt / settle lifecycle (MOTION_CONTRACT.md 237-245)
  * - reduced-motion duration collapse to 0 (MOTION_EFFECTS.md §8)
  * - stale transaction discard (async guard — latest wins)
- * - 47 Motion ID contract registry completeness
+ * - 46 Motion ID contract registry completeness
  * - reducedFrom / durationFor / setReducedMotion
  * - clearTransientState
  * - event log cap (120)
@@ -370,7 +370,7 @@ class MotionControllerTest {
     }
 
     @Test
-    fun `all 47 Motion ID constants resolve to a contract`() {
+    fun `all 46 Motion ID constants resolve to a contract`() {
         val allIds = listOf(
             MotionIdConstants.APP_FIRST_OPEN_ENTER,
             MotionIdConstants.APP_ROUTE_PUSH_FORWARD,
@@ -382,7 +382,6 @@ class MotionControllerTest {
             MotionIdConstants.SEGMENT_ITEM_SWITCH,
             MotionIdConstants.DROPDOWN_TRIGGER_PRESS,
             MotionIdConstants.DROPDOWN_MENU_EXPAND,
-            MotionIdConstants.DROPDOWN_MENU_EXPAND_COLLAPSE,
             MotionIdConstants.DROPDOWN_MENU_COLLAPSE,
             MotionIdConstants.DROPDOWN_MENU_REPOSITION,
             MotionIdConstants.DROPDOWN_OPTION_PRESS,
@@ -426,7 +425,7 @@ class MotionControllerTest {
             "These Motion IDs have no contract: $unresolved",
             unresolved.isEmpty()
         )
-        assertEquals(47, allIds.size)
+        assertEquals(46, allIds.size)
     }
 
     @Test
@@ -592,12 +591,12 @@ class MotionControllerTest {
         )
     }
 
-    // ── Phase 7: Full MotionSpecRegistry coverage (87 entries) ───────────────────
+    // ── R10: Full generated MotionSpecRegistry coverage (93 canonical entries) ──
 
     @Test
-    fun `all 87 MotionSpecRegistry entries resolve through contractFor`() {
+    fun `all 93 MotionSpecRegistry entries resolve through contractFor`() {
         val allSpecs = MotionSpecRegistry.all
-        assertEquals(87, allSpecs.size)
+        assertEquals(93, allSpecs.size)
         val unresolved = allSpecs.map { it.id.serialName }.filter { MotionController.contractFor(it) == null }
         assertTrue("Unresolved MotionIds: $unresolved", unresolved.isEmpty())
     }

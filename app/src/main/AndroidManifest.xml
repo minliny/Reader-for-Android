@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name="com.reader.ReaderApplication"
@@ -11,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Reader"
         android:allowBackup="true"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name="com.reader.ui.MainActivity"
@@ -30,5 +31,15 @@
         <activity
             android:name="com.reader.WebViewHostActivity"
             android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/reader_file_paths" />
+        </provider>
     </application>
 </manifest>

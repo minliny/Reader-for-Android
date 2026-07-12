@@ -1,23 +1,22 @@
 package com.reader.ui.bookshelf
 
+import com.reader.api.Book
 import com.reader.api.SearchBook
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure-JVM coverage for [BookshelfWriteParams] — verifies the JSON params contract for
- * `bookshelf.add` / `bookshelf.remove` CoreCommands without a running Core.
- *
- * Field names mirror the `bookshelf.list` response so the write/read contract is
- * symmetric: `bookId` is the key field, `title`/`author`/`coverUrl`/`intro`/`origin`
- * are the book metadata fields.
+ * Pure-JVM Core wire-contract coverage for shelf writes and reads. Core keys
+ * shelf entries by `(sourceId, bookId)`; `origin` is presentation metadata
+ * and is never a substitute for the root `book.search` source id.
  */
 class BookshelfWriteParamsTest {
 
     @Test
-    fun `buildAddParams wraps book object with bookId title author coverUrl intro origin`() {
+    fun `buildAddParams retains root sourceId in flat Core contract`() {
         val book = SearchBook(
             bookUrl = "https://source.example/book/123",
             name = "三体",
@@ -26,25 +25,27 @@ class BookshelfWriteParamsTest {
             intro = "文革后期的一颗红岸工程信号...",
             lastChapter = "第62章 黑暗森林",
             kind = "科幻",
-            origin = "优书网"
+            origin = "优书网",
+            sourceId = "source-42"
         )
 
         val params = BookshelfWriteParams.buildAddParams(book)
 
-        val bookObj = params.getJSONObject("book")
-        assertEquals("https://source.example/book/123", bookObj.getString("bookId"))
-        assertEquals("三体", bookObj.getString("title"))
-        assertEquals("刘慈欣", bookObj.getString("author"))
-        assertEquals("https://covers.example/123.jpg", bookObj.getString("coverUrl"))
-        assertEquals("文革后期的一颗红岸工程信号...", bookObj.getString("intro"))
-        assertEquals("优书网", bookObj.getString("origin"))
+        assertEquals("source-42", params.getString("sourceId"))
+        assertEquals("https://source.example/book/123", params.getString("bookId"))
+        assertEquals("三体", params.getString("title"))
+        assertEquals("刘慈欣", params.getString("author"))
+        assertEquals("https://covers.example/123.jpg", params.getString("coverUrl"))
+        assertEquals("文革后期的一颗红岸工程信号...", params.getString("intro"))
+        assertEquals("科幻", params.getString("kind"))
+        assertEquals("第62章 黑暗森林", params.getString("lastChapter"))
+        assertFalse("Core BookshelfAddParams has no nested book object", params.has("book"))
+        assertFalse("display origin is not a Core identity field", params.has("origin"))
     }
 
     @Test
-    fun `buildAddParams bookId mirrors bookUrl field`() {
-        // The list response uses `bookId` as the key; SearchBook.bookUrl maps to it so
-        // the write path is symmetric with the read path (parseBookshelfList).
-        val book = SearchBook(
+    fun `buildAddParams rejects missing root sourceId instead of using display origin`() {
+        val missingIdentity = SearchBook(
             bookUrl = "book-url-abc",
             name = "测试书",
             author = "",
@@ -52,48 +53,42 @@ class BookshelfWriteParamsTest {
             intro = "",
             lastChapter = "",
             kind = "",
-            origin = ""
+            origin = "显示名称"
         )
 
-        val params = BookshelfWriteParams.buildAddParams(book)
-        val bookObj = params.getJSONObject("book")
-        assertEquals("book-url-abc", bookObj.getString("bookId"))
+        var rejected = false
+        try {
+            BookshelfWriteParams.buildAddParams(missingIdentity)
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+        assertTrue(rejected)
     }
 
     @Test
-    fun `buildRemoveParams uses bookId field matching list response key`() {
-        val params = BookshelfWriteParams.buildRemoveParams("https://source.example/book/456")
-
-        assertEquals(
-            "https://source.example/book/456",
-            params.getString("bookId")
+    fun `buildRemoveParams uses the same composite identity`() {
+        val params = BookshelfWriteParams.buildRemoveParams(
+            Book(bookUrl = "https://source.example/book/456", name = "三体", sourceId = "source-42")
         )
+
+        assertEquals("source-42", params.getString("sourceId"))
+        assertEquals("https://source.example/book/456", params.getString("bookId"))
+        assertEquals(2, params.length())
     }
 
     @Test
-    fun `buildAddParams contains only the book wrapper key`() {
-        val book = SearchBook(
-            bookUrl = "x",
-            name = "n",
-            author = "a",
-            coverUrl = "c",
-            intro = "i",
-            lastChapter = "",
-            kind = "",
-            origin = "o"
+    fun `shelf parser retains Core sourceId for later book open`() {
+        val books = BookshelfViewModel.parseBookshelfList(
+            JSONObject(
+                """{"books":[{"sourceId":"local","bookId":"local://book/1","title":"本地书","author":"作者","kind":"txt","lastChapter":"第 3 章"}]}"""
+            )
         )
 
-        val params = BookshelfWriteParams.buildAddParams(book)
-        // The top-level params must only contain the `book` wrapper key.
-        assertEquals(1, params.length())
-        assertTrue(params.has("book"))
-    }
-
-    @Test
-    fun `buildRemoveParams contains only the bookId key`() {
-        val params = BookshelfWriteParams.buildRemoveParams("any-book-url")
-
-        assertEquals(1, params.length())
-        assertTrue(params.has("bookId"))
+        val book = books.single()
+        assertEquals("local", book.sourceId)
+        assertEquals("local", book.origin)
+        assertEquals("local://book/1", book.bookUrl)
+        assertEquals("txt", book.kind)
+        assertEquals("第 3 章", book.latestChapterTitle)
     }
 }

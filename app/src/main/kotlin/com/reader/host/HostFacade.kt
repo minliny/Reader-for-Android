@@ -25,9 +25,13 @@ import com.reader.android.data.adapter.TtsUtterance
 import com.reader.android.data.adapter.WebDavCredentialStore
 import com.reader.ui.shell.PermissionKind
 import com.reader.ui.shell.PermissionStatus
+import com.reader.WebViewHostActivity
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URI
+
+private const val OPAQUE_CREDENTIAL_SENTINEL = "https://reader.invalid/opaque-credential"
 
 /**
  * Slice C — HostFacade: single aggregation point for all host-owned
@@ -66,7 +70,12 @@ class HostFacade(
      * When null (JVM test path), handlers fall back to direct engine calls.
      */
     val ttsSessionController: TtsSessionController? = null,
-    val backgroundRegistry: BackgroundTaskRegistry = BackgroundTaskRegistry()
+    val backgroundRegistry: BackgroundTaskRegistry = BackgroundTaskRegistry(),
+    /** Canonical foreground one-shot timers; never mapped to background.schedule. */
+    val foregroundTimerRegistry: ForegroundTimerRegistry = ForegroundTimerRegistry(),
+    val uiWebViewSession: UiWebViewSession = UnavailableUiWebViewSession,
+    /** Reader UI 2.5 additions; defaults remain registered but fail closed. */
+    val readerUi25Services: ReaderUi25HostServices = ReaderUi25HostServices()
 ) {
     /**
      * Registers all UI-facing capability handlers onto [runtime]. Each
@@ -75,7 +84,8 @@ class HostFacade(
      *
      * Returns [runtime] for chaining.
      */
-    fun registerHandlers(runtime: HostRuntime): HostRuntime = runtime
+    fun registerHandlers(runtime: HostRuntime): HostRuntime {
+        val canonical = runtime
         .register(TtsSystemStartHandler.CAPABILITY, TtsSystemStartHandler(this))
         .register(TtsSystemStopHandler.CAPABILITY, TtsSystemStopHandler(this))
         .register(TtsSystemPauseHandler.CAPABILITY, TtsSystemPauseHandler(this))
@@ -96,10 +106,23 @@ class HostFacade(
         .register(DeviceScreenReleaseHandler.CAPABILITY, DeviceScreenReleaseHandler(this))
         .register(BackgroundScheduleHandler.CAPABILITY, BackgroundScheduleHandler(this))
         .register(BackgroundCancelHandler.CAPABILITY, BackgroundCancelHandler(this))
+        .register(
+            ForegroundTimerArmHandler.CAPABILITY,
+            ForegroundTimerArmHandler(foregroundTimerRegistry)
+        )
+        .register(
+            ForegroundTimerCancelHandler.CAPABILITY,
+            ForegroundTimerCancelHandler(foregroundTimerRegistry)
+        )
         .register(CredentialGetHandler.CAPABILITY, CredentialGetHandler(this))
         .register(CredentialSetHandler.CAPABILITY, CredentialSetHandler(this))
         .register(CredentialDeleteHandler.CAPABILITY, CredentialDeleteHandler(this))
         .register(StoragePathHandler.CAPABILITY, StoragePathHandler(this))
+        .register(WebViewOpenHandler.CAPABILITY, WebViewOpenHandler(this))
+        .register(WebViewCloseHandler.CAPABILITY, WebViewCloseHandler(this))
+        .register(WebViewEvaluateHandler.CAPABILITY, WebViewEvaluateHandler(this))
+        return registerReaderUi25Handlers(canonical)
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -116,6 +139,18 @@ class TtsSystemStartHandler(private val facade: HostFacade) : CapabilityHandler 
         if (text.isEmpty()) return HostReply.error(INTERNAL, "text required", false)
         val chapterTitle = params.optString("chapterTitle", "")
         val chapterIndex = params.optInt("chapterIndex", 0)
+        val language = params.optString("language", "zh-CN")
+        val speechRate = params.optDouble("rate", 1.0).toFloat()
+        val pitch = params.optDouble("pitch", 1.0).toFloat()
+        if (!speechRate.isFinite() || speechRate !in 0.1f..4.0f) {
+            return HostReply.error(INTERNAL, "rate must be within 0.1...4.0", false)
+        }
+        if (!pitch.isFinite() || pitch !in 0.5f..2.0f) {
+            return HostReply.error(INTERNAL, "pitch must be within 0.5...2.0", false)
+        }
+        if (params.optString("voice", "").isNotBlank()) {
+            return HostReply.error("NOT_SUPPORTED", "explicit Android TTS voice selection is not wired", false)
+        }
         try {
             val controller = facade.ttsSessionController
             if (controller != null) {
@@ -123,16 +158,33 @@ class TtsSystemStartHandler(private val facade: HostFacade) : CapabilityHandler 
                 // + AudioFocus + BecomingNoisy + progress writeback.
                 val started = runBlocking {
                     controller.start(
-                        TtsChapterRequest(text = text, title = chapterTitle, index = chapterIndex)
+                        TtsChapterRequest(
+                            text = text,
+                            title = chapterTitle,
+                            index = chapterIndex,
+                            language = language,
+                            speechRate = speechRate,
+                            pitch = pitch
+                        )
                     )
                 }
                 if (!started) return HostReply.error(INTERNAL, "TTS engine init failed", true)
             } else {
                 // Legacy direct-speak path (JVM tests without controller).
-                val utteranceId = params.optString("utteranceId", "")
+                val utteranceId = params.optString("correlationId", "")
+                    .ifBlank { "host-${request.operationId()}" }
                 runBlocking {
-                    facade.tts.init()
-                    facade.tts.speak(TtsUtterance(text = text, utteranceId = utteranceId))
+                    val initialized = facade.tts.init()
+                    if (!initialized.success) {
+                        throw IllegalStateException(initialized.errorMessage ?: "TTS engine init failed")
+                    }
+                    facade.tts.speak(TtsUtterance(
+                        text = text,
+                        utteranceId = utteranceId,
+                        language = language,
+                        speechRate = speechRate,
+                        pitch = pitch
+                    ))
                 }
             }
         } catch (e: Exception) {
@@ -155,7 +207,7 @@ class TtsSystemStopHandler(private val facade: HostFacade) : CapabilityHandler {
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.stop failed: ${e.message}", true)
         }
-        return HostReply.complete(JSONObject().put("stopped", true).toString())
+        return HostReply.complete(JSONObject().put("acknowledged", true).toString())
     }
     companion object { const val CAPABILITY = "tts.system.stop"; private const val INTERNAL = "INTERNAL" }
 }
@@ -172,7 +224,7 @@ class TtsSystemPauseHandler(private val facade: HostFacade) : CapabilityHandler 
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.pause failed: ${e.message}", true)
         }
-        return HostReply.complete(JSONObject().put("paused", true).toString())
+        return HostReply.complete(JSONObject().put("acknowledged", true).toString())
     }
     companion object { const val CAPABILITY = "tts.system.pause"; private const val INTERNAL = "INTERNAL" }
 }
@@ -189,7 +241,7 @@ class TtsSystemResumeHandler(private val facade: HostFacade) : CapabilityHandler
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "tts.resume failed: ${e.message}", true)
         }
-        return HostReply.complete(JSONObject().put("resumed", true).toString())
+        return HostReply.complete(JSONObject().put("acknowledged", true).toString())
     }
     companion object { const val CAPABILITY = "tts.system.resume"; private const val INTERNAL = "INTERNAL" }
 }
@@ -243,14 +295,11 @@ class PermissionCheckHandler(private val facade: HostFacade) : CapabilityHandler
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val kindStr = params.optString("kind", "")
-        val kind = parsePermissionKind(kindStr)
-            ?: return HostReply.error(INTERNAL, "unknown permission kind: $kindStr", false)
+        val scope = params.optString("scope", "")
+        val kind = parsePermissionKind(scope)
+            ?: return HostReply.error(INTERNAL, "unknown permission scope: $scope", false)
         val status = facade.permission.query(kind)
-        val result = JSONObject()
-        result.put("kind", kindStr)
-        result.put("status", status.name)
-        return HostReply.complete(result.toString())
+        return HostReply.complete(JSONObject().put("granted", status == PermissionStatus.GRANTED).toString())
     }
     companion object { const val CAPABILITY = "permission.check"; private const val INTERNAL = "INTERNAL" }
 }
@@ -260,18 +309,20 @@ class PermissionRequestHandler(private val facade: HostFacade) : CapabilityHandl
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val kindStr = params.optString("kind", "")
-        val kind = parsePermissionKind(kindStr)
-            ?: return HostReply.error(INTERNAL, "unknown permission kind: $kindStr", false)
-        // The adapter only reads state; the actual request flow is launched
-        // by the UI layer via ActivityResultContracts. Here we return the
-        // current status so the Reducer can decide whether to prompt.
+        val scope = params.optString("scope", "")
+        val kind = parsePermissionKind(scope)
+            ?: return HostReply.error(INTERNAL, "unknown permission scope: $scope", false)
+        // This adapter can only query state. It must not acknowledge a request
+        // it did not launch; an absent grant therefore fails closed.
         val status = facade.permission.query(kind)
-        val result = JSONObject()
-        result.put("kind", kindStr)
-        result.put("status", status.name)
-        result.put("requiresUiPrompt", status == PermissionStatus.DENIED)
-        return HostReply.complete(result.toString())
+        if (status != PermissionStatus.GRANTED) {
+            return HostReply.error(
+                "REQUIRES_UI_CONTEXT",
+                "permission.request requires the foreground Activity permission launcher for scope=$scope",
+                false
+            )
+        }
+        return HostReply.complete(JSONObject().put("granted", true).toString())
     }
     companion object { const val CAPABILITY = "permission.request"; private const val INTERNAL = "INTERNAL" }
 }
@@ -295,7 +346,7 @@ class PermissionOpenSettingsHandler(private val facade: HostFacade) : Capability
 
 internal fun parsePermissionKind(kind: String): PermissionKind? = when (kind.lowercase()) {
     "notifications" -> PermissionKind.NOTIFICATIONS
-    "file_access", "file-access" -> PermissionKind.FILE_ACCESS
+    "storage", "file_access", "file-access" -> PermissionKind.FILE_ACCESS
     "battery_optimization", "battery-optimization" -> PermissionKind.BATTERY_OPTIMIZATION
     else -> null
 }
@@ -311,19 +362,18 @@ class NotificationShowHandler(private val facade: HostFacade) : CapabilityHandle
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val purposeStr = params.optString("purpose", "DOWNLOAD")
-        val purpose = runCatching { ReaderNotificationPurpose.valueOf(purposeStr) }
-            .getOrDefault(ReaderNotificationPurpose.DOWNLOAD)
+        val id = params.optString("id", "")
+        if (id.isBlank()) return HostReply.error(INTERNAL, "notification.show requires id", false)
         val title = params.optString("title", "")
-        val message = params.optString("message", "")
-        val progressPercent = if (params.has("progressPercent")) params.optInt("progressPercent") else null
+        val body = params.optString("body", "")
         try {
-            adapter.buildForegroundNotification(
+            adapter.show(
+                id,
                 ReaderForegroundNotificationRequest(
-                    purpose = purpose,
+                    purpose = ReaderNotificationPurpose.DOWNLOAD,
                     title = title,
-                    message = message,
-                    progressPercent = progressPercent
+                    message = body,
+                    ongoing = false
                 )
             )
         } catch (e: Exception) {
@@ -331,7 +381,7 @@ class NotificationShowHandler(private val facade: HostFacade) : CapabilityHandle
         }
         val result = JSONObject()
         result.put("shown", true)
-        result.put("purpose", purpose.name)
+        result.put("id", id)
         return HostReply.complete(result.toString())
     }
     companion object { const val CAPABILITY = "notification.show"; private const val INTERNAL = "INTERNAL" }
@@ -368,15 +418,20 @@ class ShareInvokeHandler(private val facade: HostFacade) : CapabilityHandler {
         }
         val text = params.optString("text", "")
         if (text.isEmpty()) return HostReply.error(INTERNAL, "text required", false)
-        // The UI layer builds and launches the share Intent; here we
-        // acknowledge the request and echo the mimeType so the Reducer can
-        // track the intent. Building an actual Intent requires the Android
-        // runtime and is deferred to the UI layer.
-        val mimeType = params.optString("mimeType", "text/plain")
-        val result = JSONObject()
-        result.put("shared", true)
-        result.put("mimeType", mimeType)
-        return HostReply.complete(result.toString())
+        if (params.has("url") || params.has("files")) {
+            return HostReply.error("NOT_SUPPORTED", "share.invoke url/files require a typed share surface", false)
+        }
+        val host = facade.readerUi25Services.activityHostProvider()
+            ?: return HostReply.error("REQUIRES_UI_CONTEXT", "share.invoke requires a foreground Activity", false)
+        return try {
+            if (!host.shareText(text)) {
+                HostReply.error(INTERNAL, "share chooser was not launched", true)
+            } else {
+                HostReply.complete(JSONObject().put("shared", true).toString())
+            }
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "share.invoke failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "share.invoke"; private const val INTERNAL = "INTERNAL" }
 }
@@ -410,7 +465,7 @@ class ClipboardPasteHandler(private val facade: HostFacade) : CapabilityHandler 
             clipboard.primaryClip?.getItemAt(0)?.text?.toString()
         } catch (e: Exception) { null }
         val result = JSONObject()
-        result.put("text", text ?: JSONObject.NULL)
+        result.put("text", text ?: "")
         return HostReply.complete(result.toString())
     }
     companion object { const val CAPABILITY = "clipboard.paste" }
@@ -427,16 +482,19 @@ class DeviceVibrateHandler(private val facade: HostFacade) : CapabilityHandler {
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val durationMillis = params.optLong("durationMillis", 50L)
+        val durationMillis = params.optLong("durationMs", 50L)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(durationMillis, VibrationEffect.DEFAULT_AMPLITUDE))
+                vm?.defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
-                val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                vibrator?.vibrate(VibrationEffect.createOneShot(durationMillis, VibrationEffect.DEFAULT_AMPLITUDE))
+                ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             }
+            if (vibrator == null || !vibrator.hasVibrator()) {
+                return HostReply.error("NOT_AVAILABLE", "device has no usable vibrator", false)
+            }
+            vibrator.vibrate(VibrationEffect.createOneShot(durationMillis, VibrationEffect.DEFAULT_AMPLITUDE))
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "device.vibrate failed: ${e.message}", true)
         }
@@ -450,13 +508,18 @@ class DeviceScreenKeepOnHandler(private val facade: HostFacade) : CapabilityHand
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val keepOn = params.optBoolean("keepOn", true)
-        // The UI layer applies FLAG_KEEP_SCREEN_ON on the window; here we
-        // acknowledge the request so the Reducer can track the intent.
-        val result = JSONObject()
-        result.put("applied", true)
-        result.put("keepOn", keepOn)
-        return HostReply.complete(result.toString())
+        val enabled = params.optBoolean("enabled", true)
+        val host = facade.readerUi25Services.activityHostProvider()
+            ?: return HostReply.error("REQUIRES_UI_CONTEXT", "device.screen.keep-on requires a foreground Activity", false)
+        return try {
+            if (!host.setKeepAwake(enabled)) {
+                HostReply.error(INTERNAL, "screen keep-awake flag was not applied", true)
+            } else {
+                HostReply.complete(JSONObject().put("enabled", enabled).toString())
+            }
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "device.screen.keep-on failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "device.screen.keep-on"; private const val INTERNAL = "INTERNAL" }
 }
@@ -469,9 +532,17 @@ class DeviceScreenKeepOnHandler(private val facade: HostFacade) : CapabilityHand
  */
 class DeviceScreenReleaseHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
-        val result = JSONObject()
-        result.put("released", true)
-        return HostReply.complete(result.toString())
+        val host = facade.readerUi25Services.activityHostProvider()
+            ?: return HostReply.error("REQUIRES_UI_CONTEXT", "device.screen.release requires a foreground Activity", false)
+        return try {
+            if (!host.setKeepAwake(false)) {
+                HostReply.error("INTERNAL", "screen keep-awake flag was not cleared", true)
+            } else {
+                HostReply.complete(JSONObject().put("released", true).toString())
+            }
+        } catch (e: Exception) {
+            HostReply.error("INTERNAL", "device.screen.release failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "device.screen.release" }
 }
@@ -487,18 +558,15 @@ class DeviceScreenReleaseHandler(private val facade: HostFacade) : CapabilityHan
  */
 class NotificationCancelHandler(private val facade: HostFacade) : CapabilityHandler {
     override fun handle(request: HostRequest): HostReply {
-        val ctx = facade.context
-            ?: return HostReply.error(INTERNAL, "context not wired (JVM test)", false)
+        val adapter = facade.notification
+            ?: return HostReply.error(INTERNAL, "notification adapter not wired", false)
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
         try {
-            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            if (params.has("notificationId") && !params.isNull("notificationId")) {
-                nm.cancel(params.optInt("notificationId"))
-            } else {
-                nm.cancelAll()
-            }
+            val id = params.optString("id", "")
+            if (id.isBlank()) return HostReply.error(INTERNAL, "notification.cancel requires id", false)
+            adapter.cancel(id)
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "notification.cancel failed: ${e.message}", true)
         }
@@ -522,17 +590,23 @@ class BackgroundScheduleHandler(private val facade: HostFacade) : CapabilityHand
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val taskTag = params.optString("taskTag", "")
-        if (taskTag.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires taskTag", false)
+        val taskId = params.optString("taskId", "")
+        if (taskId.isEmpty()) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires taskId", false)
         }
-        val kind = params.optString("kind", "download")
-        facade.backgroundRegistry.schedule(taskTag, kind)
-        val result = JSONObject()
-        result.put("scheduled", true)
-        result.put("taskTag", taskTag)
-        result.put("kind", kind)
-        return HostReply.complete(result.toString())
+        val delayMs = params.optLong("delayMs", 0L)
+        if (delayMs < 0L) return HostReply.error(INTERNAL, "delayMs must be >= 0", false)
+        val host = facade.readerUi25Services.backgroundTasks
+            ?: return HostReply.error("NOT_CONFIGURED", "WorkManager background host is not configured", false)
+        return try {
+            val started = host.schedule(taskId, delayMs)
+            facade.backgroundRegistry.schedule(taskId, "workmanager", started.taskId)
+            HostReply.complete(JSONObject().put("scheduled", true).toString())
+        } catch (e: ReaderUiHostCapabilityFailure) {
+            HostReply.error(e.errorCode, e.message ?: "background.schedule failed", e.retryable)
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "background.schedule failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "background.schedule"; private const val INTERNAL = "INTERNAL" }
 }
@@ -542,15 +616,23 @@ class BackgroundCancelHandler(private val facade: HostFacade) : CapabilityHandle
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val taskTag = params.optString("taskTag", "")
-        if (taskTag.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires taskTag", false)
+        val taskId = params.optString("taskId", "")
+        if (taskId.isEmpty()) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires taskId", false)
         }
-        val cancelled = facade.backgroundRegistry.cancel(taskTag)
-        val result = JSONObject()
-        result.put("cancelled", cancelled)
-        result.put("taskTag", taskTag)
-        return HostReply.complete(result.toString())
+        val task = facade.backgroundRegistry.find(taskId)
+            ?: return HostReply.complete(JSONObject().put("cancelled", false).toString())
+        val host = facade.readerUi25Services.backgroundTasks
+            ?: return HostReply.error("NOT_CONFIGURED", "WorkManager background host is not configured", false)
+        return try {
+            val cancelled = host.end(task.hostTaskId ?: taskId)
+            if (cancelled) facade.backgroundRegistry.cancel(taskId)
+            HostReply.complete(JSONObject().put("cancelled", cancelled).toString())
+        } catch (e: ReaderUiHostCapabilityFailure) {
+            HostReply.error(e.errorCode, e.message ?: "background.cancel failed", e.retryable)
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "background.cancel failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "background.cancel"; private const val INTERNAL = "INTERNAL" }
 }
@@ -564,26 +646,21 @@ class CredentialGetHandler(private val facade: HostFacade) : CapabilityHandler {
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val identifier = params.optString("identifier", "")
-        if (identifier.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires identifier", false)
+        val key = params.optString("key", "")
+        if (key.isEmpty()) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires key", false)
         }
-        val credential = facade.credentials.load(identifier)
-            ?: return HostReply.error(NOT_FOUND, "credential not found: $identifier", false)
-        val result = JSONObject()
-        result.put("identifier", identifier)
-        result.put("serverUrl", credential.serverUrl)
-        result.put("authType", when (credential.auth) {
-            is com.reader.android.data.adapter.AuthMethod.Basic -> "basic"
-            is com.reader.android.data.adapter.AuthMethod.Digest -> "digest"
-            is com.reader.android.data.adapter.AuthMethod.Bearer -> "bearer"
-        })
-        result.put("hasPassword", credential.auth is com.reader.android.data.adapter.AuthMethod.Basic ||
-            credential.auth is com.reader.android.data.adapter.AuthMethod.Digest)
-        result.put("hasToken", credential.auth is com.reader.android.data.adapter.AuthMethod.Bearer)
-        return HostReply.complete(result.toString())
+        val credential = facade.credentials.load(key)
+            ?: return HostReply.complete(JSONObject().put("exists", false).toString())
+        val auth = credential.auth
+        if (credential.serverUrl != OPAQUE_CREDENTIAL_SENTINEL ||
+            auth !is com.reader.android.data.adapter.AuthMethod.Bearer
+        ) {
+            return HostReply.error("INCOMPATIBLE_CREDENTIAL", "credential $key is a structured WebDAV record", false)
+        }
+        return HostReply.complete(JSONObject().put("exists", true).put("value", auth.token).toString())
     }
-    companion object { const val CAPABILITY = "credential.get"; private const val INTERNAL = "INTERNAL"; private const val NOT_FOUND = "NOT_FOUND" }
+    companion object { const val CAPABILITY = "credential.get"; private const val INTERNAL = "INTERNAL" }
 }
 
 class CredentialSetHandler(private val facade: HostFacade) : CapabilityHandler {
@@ -591,40 +668,26 @@ class CredentialSetHandler(private val facade: HostFacade) : CapabilityHandler {
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val identifier = params.optString("identifier", "")
-        if (identifier.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires identifier", false)
+        val key = params.optString("key", "")
+        if (key.isEmpty()) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires key", false)
         }
-        val serverUrl = params.optString("serverUrl", "")
-        if (serverUrl.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires serverUrl", false)
+        if (!params.has("value") || params.isNull("value") || params.opt("value") !is String) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires string value", false)
         }
-        val authType = params.optString("authType", "")
-        val auth: com.reader.android.data.adapter.AuthMethod = when (authType.lowercase()) {
-            "basic" -> {
-                val u = params.optString("username", "")
-                val p = params.optString("password", "")
-                if (u.isEmpty() || p.isEmpty()) return HostReply.error(INTERNAL, "basic auth requires username and password", false)
-                com.reader.android.data.adapter.AuthMethod.Basic(u, p)
-            }
-            "digest" -> {
-                val u = params.optString("username", "")
-                val p = params.optString("password", "")
-                if (u.isEmpty() || p.isEmpty()) return HostReply.error(INTERNAL, "digest auth requires username and password", false)
-                com.reader.android.data.adapter.AuthMethod.Digest(u, p)
-            }
-            "bearer" -> {
-                val t = params.optString("token", "")
-                if (t.isEmpty()) return HostReply.error(INTERNAL, "bearer auth requires token", false)
-                com.reader.android.data.adapter.AuthMethod.Bearer(t)
-            }
-            else -> return HostReply.error(INTERNAL, "unknown authType: $authType", false)
+        val value = params.getString("value")
+        return try {
+            facade.credentials.save(
+                key,
+                com.reader.android.data.adapter.WebDavCredential(
+                    OPAQUE_CREDENTIAL_SENTINEL,
+                    com.reader.android.data.adapter.AuthMethod.Bearer(value)
+                )
+            )
+            HostReply.complete(JSONObject().put("stored", true).toString())
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "credential.set failed: ${e.message}", true)
         }
-        facade.credentials.save(identifier, com.reader.android.data.adapter.WebDavCredential(serverUrl, auth))
-        val result = JSONObject()
-        result.put("stored", true)
-        result.put("identifier", identifier)
-        return HostReply.complete(result.toString())
     }
     companion object { const val CAPABILITY = "credential.set"; private const val INTERNAL = "INTERNAL" }
 }
@@ -634,15 +697,15 @@ class CredentialDeleteHandler(private val facade: HostFacade) : CapabilityHandle
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val identifier = params.optString("identifier", "")
-        if (identifier.isEmpty()) {
-            return HostReply.error(INTERNAL, "$CAPABILITY requires identifier", false)
+        val key = params.optString("key", "")
+        if (key.isEmpty()) {
+            return HostReply.error(INTERNAL, "$CAPABILITY requires key", false)
         }
-        val revoked = facade.credentials.revoke(identifier)
-        val result = JSONObject()
-        result.put("deleted", revoked)
-        result.put("identifier", identifier)
-        return HostReply.complete(result.toString())
+        return try {
+            HostReply.complete(JSONObject().put("deleted", facade.credentials.revoke(key)).toString())
+        } catch (e: Exception) {
+            HostReply.error(INTERNAL, "credential.delete failed: ${e.message}", true)
+        }
     }
     companion object { const val CAPABILITY = "credential.delete"; private const val INTERNAL = "INTERNAL" }
 }
@@ -658,27 +721,168 @@ class StoragePathHandler(private val facade: HostFacade) : CapabilityHandler {
         val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
         }
-        val kind = params.optString("kind", "")
-        val result = JSONObject()
-        if (kind.isEmpty()) {
-            result.put("files", ctx.filesDir.absolutePath)
-            result.put("cache", ctx.cacheDir.absolutePath)
-            result.put("externalFiles", ctx.getExternalFilesDir(null)?.absolutePath ?: "")
-            result.put("externalCache", ctx.externalCacheDir?.absolutePath ?: "")
-        } else {
-            val path = when (kind) {
-                "files" -> ctx.filesDir.absolutePath
-                "cache" -> ctx.cacheDir.absolutePath
-                "external_files", "externalFiles" -> ctx.getExternalFilesDir(null)?.absolutePath ?: ""
-                "external_cache", "externalCache" -> ctx.externalCacheDir?.absolutePath ?: ""
-                else -> return HostReply.error(INTERNAL, "unknown storage kind: $kind", false)
-            }
-            result.put("kind", kind)
-            result.put("path", path)
+        val scope = params.optString("scope", "")
+        val path = when (scope) {
+            "files" -> ctx.filesDir.absolutePath
+            "cache" -> ctx.cacheDir.absolutePath
+            "external" -> ctx.getExternalFilesDir(null)?.absolutePath
+                ?: return HostReply.error("NOT_AVAILABLE", "external files directory is unavailable", false)
+            else -> return HostReply.error(INTERNAL, "unknown storage scope: $scope", false)
         }
-        return HostReply.complete(result.toString())
+        return HostReply.complete(JSONObject().put("path", path).toString())
     }
     companion object { const val CAPABILITY = "storage.path"; private const val INTERNAL = "INTERNAL" }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// WebView handlers (schema UI contract names: webview.open / close / evaluate)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * `webview.open` capability handler. Launches [WebViewHostActivity] to host
+ * a WebView for the requested URL. Mirrors the iOS/HarmonyOS `webview.open`
+ * contract — Core sends `{ url }` and the host acknowledges with
+ * `{ opened, url }`.
+ *
+ * Uses `FLAG_ACTIVITY_NEW_TASK` because the facade's [HostFacade.context] is
+ * typically an Application context. When the context is null (JVM test path)
+ * the handler fails closed with a non-retryable INTERNAL error, matching the
+ * pattern of [ClipboardCopyHandler] / [DeviceVibrateHandler].
+ */
+class WebViewOpenHandler(private val facade: HostFacade) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val ctx = facade.context
+            ?: return HostReply.error(INTERNAL, "context not wired (JVM test)", false)
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
+        }
+        val url = params.optString("url", "")
+        if (url.isEmpty()) return HostReply.error(INTERNAL, "url required", false)
+        if (params.optString("profileId", "").isNotBlank()) {
+            return HostReply.error("NOT_SUPPORTED", "Android UI WebView does not expose isolated profileId sessions", false)
+        }
+        val scheme = try { URI(url).scheme?.lowercase() } catch (_: Exception) { null }
+        if (scheme != "https" && scheme != "http") {
+            return HostReply.error(INTERNAL, "webview.open requires an http(s) url", false)
+        }
+        try {
+            val intent = Intent(ctx, WebViewHostActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(WebViewHostActivity.EXTRA_URL, url)
+            }
+            ctx.startActivity(intent)
+        } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "webview.open failed: ${e.message}", true)
+        }
+        val result = JSONObject()
+        result.put("opened", true)
+        return HostReply.complete(result.toString())
+    }
+    companion object { const val CAPABILITY = "webview.open"; private const val INTERNAL = "INTERNAL" }
+}
+
+/**
+ * `webview.close` capability handler. Closes the active WebView Activity.
+ *
+ * Returns success only after the active session has accepted a real
+ * `Activity.finish()` request. A missing/destroyed session fails closed.
+ */
+class WebViewCloseHandler(private val facade: HostFacade) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
+        }
+        if (params.optString("profileId", "").isNotBlank()) {
+            return HostReply.error("NOT_SUPPORTED", "Android UI WebView does not expose isolated profileId sessions", false)
+        }
+        val closed = try { facade.uiWebViewSession.close() } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "webview.close failed: ${e.message}", true)
+        }
+        if (!closed) {
+            return HostReply.error(
+                REQUIRES_UI_CONTEXT,
+                "webview.close requires an active WebView Activity",
+                false
+            )
+        }
+        val result = JSONObject()
+        result.put("closed", true)
+        return HostReply.complete(result.toString())
+    }
+    companion object {
+        const val CAPABILITY = "webview.close"
+        private const val INTERNAL = "INTERNAL"
+        private const val REQUIRES_UI_CONTEXT = "REQUIRES_UI_CONTEXT"
+    }
+}
+
+/**
+ * `webview.evaluate` capability handler (schema UI contract name). Evaluates
+ * JavaScript in the active WebView.
+ *
+ * Delegates to the active user-visible WebView session and returns its actual
+ * JavaScript result. Contract payload is `{ url, script, timeoutMs? }`.
+ */
+class WebViewEvaluateHandler(private val facade: HostFacade) : CapabilityHandler {
+    override fun handle(request: HostRequest): HostReply {
+        val params = try { JSONObject(request.paramsJson()) } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "invalid params: ${e.message}", false)
+        }
+        val url = params.optString("url", "")
+        if (url.isBlank()) return HostReply.error(INTERNAL, "url required", false)
+        val scheme = try { URI(url).scheme?.lowercase() } catch (_: Exception) { null }
+        if (scheme != "https" && scheme != "http") {
+            return HostReply.error(INTERNAL, "webview.evaluate requires an http(s) url", false)
+        }
+        val script = params.optString("script", "")
+        if (script.isBlank()) return HostReply.error(INTERNAL, "script required", false)
+        if (params.optString("profileId", "").isNotBlank()) {
+            return HostReply.error("NOT_SUPPORTED", "Android UI WebView does not expose isolated profileId sessions", false)
+        }
+        val timeoutMillis = if (params.has("timeoutMs") && !params.isNull("timeoutMs")) {
+            params.optLong("timeoutMs", 0L).takeIf { it > 0L }
+                ?: return HostReply.error(INTERNAL, "timeoutMs must be greater than 0", false)
+        } else {
+            null
+        }
+        val evaluation = try {
+            runBlocking { facade.uiWebViewSession.evaluate(url, script, timeoutMillis) }
+        } catch (e: WebViewExecutorError) {
+            return webViewExecutorErrorReply(e)
+        } catch (e: Exception) {
+            return HostReply.error(INTERNAL, "webview.evaluate failed: ${e.message}", true)
+        }
+        val result = JSONObject()
+        val rawValue = evaluation.value
+        val canonicalResult = when (rawValue) {
+            null -> JSONObject()
+            is JSONObject -> rawValue
+            is Map<*, *> -> JSONObject(rawValue)
+            is String -> runCatching { JSONObject(rawValue) }
+                .getOrElse { JSONObject().put("value", rawValue.removeSurrounding("\"")) }
+            else -> JSONObject().put("value", rawValue)
+        }
+        result.put("result", canonicalResult)
+        evaluation.finalUrl?.let { result.put("finalUrl", it) }
+        evaluation.title?.let { result.put("title", it) }
+        return HostReply.complete(result.toString())
+    }
+    companion object { const val CAPABILITY = "webview.evaluate"; private const val INTERNAL = "INTERNAL" }
+}
+
+private fun webViewExecutorErrorReply(error: WebViewExecutorError): HostReply = when (error) {
+    is WebViewExecutorError.Timeout -> HostReply.error(
+        "TIMEOUT", error.message ?: "webview.evaluate timed out", true
+    )
+    is WebViewExecutorError.NotImplemented -> HostReply.error(
+        "NOT_IMPLEMENTED", error.message ?: "webview.evaluate unavailable", false
+    )
+    is WebViewExecutorError.ExecutionFailed -> HostReply.error(
+        "EXECUTION_FAILED", error.message ?: "webview.evaluate failed", true
+    )
+    is WebViewExecutorError.RequiresUiContext -> HostReply.error(
+        "REQUIRES_UI_CONTEXT", error.message ?: "webview.evaluate requires UI context", false
+    )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -693,17 +897,24 @@ class StoragePathHandler(private val facade: HostFacade) : CapabilityHandler {
  * UI layer can observe the queue.
  */
 class BackgroundTaskRegistry {
-    data class Task(val tag: String, val kind: String, val scheduledAtMillis: Long)
+    data class Task(
+        val tag: String,
+        val kind: String,
+        val scheduledAtMillis: Long,
+        val hostTaskId: String? = null
+    )
 
     private val tasks = java.util.concurrent.ConcurrentHashMap<String, Task>()
 
-    fun schedule(tag: String, kind: String) {
-        tasks[tag] = Task(tag, kind, System.currentTimeMillis())
+    fun schedule(tag: String, kind: String, hostTaskId: String? = null) {
+        tasks[tag] = Task(tag, kind, System.currentTimeMillis(), hostTaskId)
     }
 
     fun cancel(tag: String): Boolean = tasks.remove(tag) != null
 
     fun list(): List<Task> = tasks.values.toList()
+
+    fun find(tag: String): Task? = tasks[tag]
 
     fun size(): Int = tasks.size
 }

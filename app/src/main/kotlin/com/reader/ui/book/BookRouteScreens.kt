@@ -84,7 +84,7 @@ fun BookDetailScreen(
                 dangerLabel = "移除书架",
                 onPrimary = onContinueReading,
                 onDanger = {
-                    bookshelfVm.removeFromBookshelf(state.book.bookUrl)
+                    bookshelfVm.removeFromBookshelf(state.book)
                     onRemoveFromBookshelf()
                 }
             )

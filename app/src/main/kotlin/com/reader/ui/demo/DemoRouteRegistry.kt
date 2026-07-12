@@ -3,7 +3,9 @@ package com.reader.ui.demo
 import com.reader.ui.shell.MainTab
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
+import io.reader.ui.contract.RouteId
 import io.reader.ui.contract.RouteShell
+import kotlinx.serialization.ExperimentalSerializationApi
 
 data class DemoRoutePage(
     val id: String,
@@ -19,8 +21,47 @@ data class DemoRouteAction(
     val onStart: (() -> Unit)? = null
 )
 
+/** Native Compose renderer families for the 2.5 route-state additions. */
+enum class DemoRouteRenderer {
+    ReaderWorkspaceState,
+    ReaderReplacementState,
+    SourceSwitchState,
+    ReaderContentState,
+    LocalImportState
+}
+
+private data class DemoRouteAddition(
+    val page: DemoRoutePage,
+    val renderer: DemoRouteRenderer
+)
+
+private fun action(label: String, targetRoute: String): DemoRouteAction =
+    DemoRouteAction(label = label, targetRoute = targetRoute)
+
+private fun addition(
+    id: String,
+    title: String,
+    shell: RouteShell,
+    renderer: DemoRouteRenderer,
+    body: List<String>,
+    actions: List<DemoRouteAction>
+): DemoRouteAddition = DemoRouteAddition(
+    page = DemoRoutePage(
+        id = id,
+        title = title,
+        shell = shell,
+        body = body,
+        actions = actions
+    ),
+    renderer = renderer
+)
+
+@OptIn(ExperimentalSerializationApi::class)
+private fun RouteId.contractSerialName(): String =
+    RouteId.serializer().descriptor.getElementName(ordinal)
+
 object DemoRouteRegistry {
-    val pages: List<DemoRoutePage> = listOf(
+    private val authoredPages: List<DemoRoutePage> = listOf(
         DemoRoutePage(id = "discover-control", title = "发现控制层（Discover Control）", shell = RouteShell.MainTabShell, body = listOf("诡秘之主", "爱潜水的乌贼 · 奇幻 · 完本", "最新：番外已整理", "蒸汽、塔罗与旧日秘密交织，适合继续追读。", "三体", "刘慈欣 · 科幻 · 完本", "最新：三部曲合集", "文明在宇宙暗处相互凝视，微小选择带来巨大回声。", "明朝那些事儿", "当年明月 · 历史 · 完本", "最新：全集校对", "用更轻松的方式重新翻开明朝人物与权力线索。", "纸上城市", "默认分组 · 都市 · 连载", "最新：第 12 章", "纸页边缘折起，城市的名字开始变化。"), actions = listOf(DemoRouteAction("优书网 默认分组 · 已启用发现 · 120ms", "discover"), DemoRouteAction("优书网 默认 · 120ms", "discover-control"), DemoRouteAction("起点导入 正版 · 180ms", "discover-switching-source"), DemoRouteAction("轻小说文库 需登录", "discover-control"), DemoRouteAction("本地聚合源 维护中", "discover-control"), DemoRouteAction("排行榜", "discover-entry-ranking"), DemoRouteAction("分类", "discover-entry-category"), DemoRouteAction("完本", "discover-entry-finished"))),
         DemoRoutePage(id = "discover-sort", title = "发现排序选择（Discover Sort）", shell = RouteShell.MainTabShell, body = listOf("82% 发现 优书网 默认分组 · 已启用发现 · 120ms 排行榜 分类 完本 最新 书单 筛选 男频 · 人气 应用 范围 关键词 男频 女频 排序 人气 更新 收藏 完本 字数 排行榜 长夜余火 爱潜水的乌贼 · 科幻 · 连载 最新：第 32 章 雨夜 雨声在窗外连成一片，旧世界的线索在夜里慢慢浮出。", "诡秘之主", "爱潜水的乌贼 · 奇幻 · 完本", "最新：番外已整理", "蒸汽、塔罗与旧日秘密交织，适合继续追读。", "三体", "刘慈欣 · 科幻 · 完本", "最新：三部曲合集", "文明在宇宙暗处相互凝视，微小选择带来巨大回声。", "明朝那些事儿", "当年明月 · 历史 · 完本", "最新：全集校对", "用更轻松的方式重新翻开明朝人物与权力线索。", "纸上城市", "默认分组 · 都市 · 连载", "最新：第 12 章", "纸页边缘折起，城市的名字开始变化。"), actions = listOf(DemoRouteAction("优书网 默认分组 · 已启用发现 · 120ms", "discover-control"), DemoRouteAction("排行榜", "discover-entry-ranking"), DemoRouteAction("分类", "discover-entry-category"), DemoRouteAction("完本", "discover-entry-finished"), DemoRouteAction("最新", "discover-entry-latest"), DemoRouteAction("书单", "discover-entry-booklist"), DemoRouteAction("关键词", "discover-filter-keyword"), DemoRouteAction("男频", "discover-filter-male"))),
         DemoRoutePage(id = "discover-entry-ranking", title = "发现入口：排行榜（Discover Entry Ranking）", shell = RouteShell.MainTabShell, body = listOf("82% 发现 优书网 默认分组 · 已启用发现 · 120ms 排行榜 分类 完本 最新 书单 筛选 男频 · 人气 应用 排行榜 长夜余火 爱潜水的乌贼 · 科幻 · 连载 最新：第 32 章 雨夜 雨声在窗外连成一片，旧世界的线索在夜里慢慢浮出。", "诡秘之主", "爱潜水的乌贼 · 奇幻 · 完本", "最新：番外已整理", "蒸汽、塔罗与旧日秘密交织，适合继续追读。", "三体", "刘慈欣 · 科幻 · 完本", "最新：三部曲合集", "文明在宇宙暗处相互凝视，微小选择带来巨大回声。", "明朝那些事儿", "当年明月 · 历史 · 完本", "最新：全集校对", "用更轻松的方式重新翻开明朝人物与权力线索。", "纸上城市", "默认分组 · 都市 · 连载", "最新：第 12 章", "纸页边缘折起，城市的名字开始变化。"), actions = listOf(DemoRouteAction("优书网 默认分组 · 已启用发现 · 120ms", "discover-control"), DemoRouteAction("排行榜", "discover-entry-ranking"), DemoRouteAction("分类", "discover-entry-category"), DemoRouteAction("完本", "discover-entry-finished"), DemoRouteAction("最新", "discover-entry-latest"), DemoRouteAction("书单", "discover-entry-booklist"))),
@@ -223,13 +264,335 @@ object DemoRouteRegistry {
         DemoRoutePage(id = "control-layer-base-v2", title = "阅读控制层基线 V2（Control Layer Base V2）", shell = RouteShell.ReaderShell, body = listOf("阅读控制层基线 V2（Control Layer Base V2）")),
     )
 
+    /**
+     * The 2.5 contract additions are explicit native rendering plans, not generic placeholders.
+     * Each entry records the generated route wire id, canonical shell/state copy, navigation
+     * targets and the Android renderer family that consumes it.
+     */
+    private val contract25Additions: List<DemoRouteAddition> = listOf(
+        addition(
+            id = "reader-font-import-confirm",
+            title = "字体导入确认（Reader Font Import Confirm）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("确认导入所选字体；应用后阅读排版会重新计算。"),
+            actions = listOf(action("取消", "reader-full-font"), action("确认导入", "reader-full-font"))
+        ),
+        addition(
+            id = "reader-font-delete-confirm",
+            title = "字体删除确认（Reader Font Delete Confirm）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("删除字体后不可恢复；正在使用该字体的主题会回退到默认字体。"),
+            actions = listOf(action("取消", "reader-full-font"), action("确认删除", "reader-full-font"))
+        ),
+        addition(
+            id = "reader-font-fallback",
+            title = "字体失效回退（Reader Font Fallback）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("当前字体文件不可用，已安全回退到系统字体并保留排版参数。"),
+            actions = listOf(action("返回字体管理", "reader-full-font"))
+        ),
+        addition(
+            id = "reader-theme-new",
+            title = "新建主题（Reader Theme New）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("从当前阅读背景、文字颜色和亮度参数创建自定义主题。"),
+            actions = listOf(action("返回", "reader-full-theme"), action("从编辑器创建", "reader-full-theme-edit"))
+        ),
+        addition(
+            id = "reader-theme-delete-confirm",
+            title = "主题删除确认（Reader Theme Delete Confirm）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("确认删除自定义主题；当前阅读会切换到内置主题。"),
+            actions = listOf(action("取消", "reader-full-theme"), action("确认删除", "reader-full-theme"))
+        ),
+        addition(
+            id = "reader-typography-reset-confirm",
+            title = "排版恢复默认确认（Reader Typography Reset Confirm）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderWorkspaceState,
+            body = listOf("字号、行距、段距和页边距将恢复默认值。"),
+            actions = listOf(action("取消", "reader-full-layout"), action("恢复默认", "reader-full-layout"))
+        ),
+        addition(
+            id = "reader-replace-delete-confirm",
+            title = "删除替换规则确认（Replace Delete Confirm）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderReplacementState,
+            body = listOf("删除后不可恢复；其他替换规则和原始正文不会被修改。"),
+            actions = listOf(action("取消", "content-replacement"), action("确认删除", "content-replacement"))
+        ),
+        addition(
+            id = "reader-replace-apply-result",
+            title = "替换规则应用结果（Replace Apply Result）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderReplacementState,
+            body = listOf("已按规则顺序应用到当前正文，可返回管理或继续阅读。"),
+            actions = listOf(action("返回规则管理", "content-replacement"), action("继续阅读", "immersive-reading"))
+        ),
+        addition(
+            id = "reader-replace-import-export",
+            title = "替换规则导入导出（Replace Import Export）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderReplacementState,
+            body = listOf("以 JSON 预览、导入或导出替换规则，并在提交前校验规则格式。"),
+            actions = listOf(action("返回规则管理", "content-replacement"))
+        ),
+        addition(
+            id = "reader-replace-page",
+            title = "内容替换规则管理（Reader Replace Page）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderReplacementState,
+            body = listOf("管理规则顺序、启用状态、作用范围，并预览原文与替换后正文。"),
+            actions = listOf(action("详细预览", "reader-replace-preview"), action("返回阅读", "immersive-reading"))
+        ),
+        addition(
+            id = "reader-replace-preview",
+            title = "替换规则预览（Replace Preview）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderReplacementState,
+            body = listOf("并排对比原文与替换后正文，展示本次应用的规则列表。"),
+            actions = listOf(action("返回规则管理", "content-replacement"), action("继续阅读", "immersive-reading"))
+        ),
+        addition(
+            id = "source-switch-empty",
+            title = "换源空结果（Source Switch Empty）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("没有找到可用候选书源；可重新加载或返回阅读。"),
+            actions = listOf(action("重新加载", "source-switch"), action("返回阅读", "reader"))
+        ),
+        addition(
+            id = "source-switch-error",
+            title = "换源加载失败（Source Switch Error）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("候选书源加载失败，请检查网络或书源状态。"),
+            actions = listOf(action("重试加载", "source-switch"), action("返回阅读", "reader"))
+        ),
+        addition(
+            id = "source-switch-timeout",
+            title = "换源超时（Source Switch Timeout）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("候选书源请求超时，可能是网络延迟或来源响应过慢。"),
+            actions = listOf(action("重试加载", "source-switch"), action("返回阅读", "reader"))
+        ),
+        addition(
+            id = "source-switch-loading",
+            title = "换源切换中（Source Switch Loading）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("正在重新拉取目录与正文，当前阅读位置保持不变。"),
+            actions = listOf(action("取消切换", "source-switch-rollback"))
+        ),
+        addition(
+            id = "source-switch-rollback",
+            title = "换源失败回滚（Source Switch Rollback）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("目标书源切换失败，已回滚到原书源并保留阅读进度。"),
+            actions = listOf(action("重新选择书源", "source-switch"), action("返回阅读", "reader"))
+        ),
+        addition(
+            id = "source-switch-preview",
+            title = "换源预览（Source Switch Preview）",
+            shell = RouteShell.FlowShell,
+            renderer = DemoRouteRenderer.SourceSwitchState,
+            body = listOf("预览候选书源的最新章节、正文片段和延迟后再确认切换。"),
+            actions = listOf(action("返回列表", "source-switch"), action("确认换源", "source-switch-loading"))
+        ),
+        addition(
+            id = "reader-toc-loading",
+            title = "目录加载中（TOC Loading）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("正在从书源拉取章节列表。"),
+            actions = listOf(action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-toc-offline",
+            title = "目录离线（TOC Offline）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("当前网络不可用，无法更新目录。"),
+            actions = listOf(action("重试", "toc-bookmarks"), action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-toc-error",
+            title = "目录解析错误（TOC Error）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("书源返回的章节列表无法解析，可重试或更换书源。"),
+            actions = listOf(action("重试", "toc-bookmarks"), action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-content-loading",
+            title = "正文加载中（Content Loading）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("正在加载正文，并保持当前章节上下文。"),
+            actions = listOf(action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-content-offline",
+            title = "正文离线（Content Offline）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("当前网络不可用，无法拉取本章正文。"),
+            actions = listOf(action("重试", "immersive-reading"), action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-content-error",
+            title = "正文解析错误（Content Error）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("本章正文解析失败，可能是编码或来源异常。"),
+            actions = listOf(action("重试", "immersive-reading"), action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "reader-page-boundary-first",
+            title = "首章首页边界（Page Boundary First）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("已是第一章，没有更早的章节。"),
+            actions = listOf(action("返回控制层", "reader"), action("继续阅读", "immersive-reading"))
+        ),
+        addition(
+            id = "reader-page-boundary-last",
+            title = "末章末页边界（Page Boundary Last）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("已是最后一章，没有更多正文。"),
+            actions = listOf(action("返回控制层", "reader"), action("回到首页", "immersive-reading"))
+        ),
+        addition(
+            id = "reader-progress-restore",
+            title = "阅读进度恢复（Progress Restore）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("已恢复到上次阅读章节、字符锚点和分页签名。"),
+            actions = listOf(action("继续阅读", "immersive-reading"), action("从控制层开始", "reader"))
+        ),
+        addition(
+            id = "reader-background-restore",
+            title = "后台恢复（Background Restore）",
+            shell = RouteShell.ReaderShell,
+            renderer = DemoRouteRenderer.ReaderContentState,
+            body = listOf("应用从后台恢复；可重载正文并保留当前位置。"),
+            actions = listOf(action("立即重载", "immersive-reading"), action("返回控制层", "reader"))
+        ),
+        addition(
+            id = "import-permission-denied",
+            title = "导入权限拒绝（Import Permission Denied）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("存储权限被拒绝，需要授权读取所选 EPUB / TXT 文件。"),
+            actions = listOf(action("退出导入", "bookshelf"), action("去设置开启", "local-import"))
+        ),
+        addition(
+            id = "import-format-unsupported",
+            title = "导入格式不支持（Import Format Unsupported）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("所选文件格式不受支持；当前支持 EPUB 与 TXT。"),
+            actions = listOf(action("取消", "bookshelf"), action("重新选择", "local-import"))
+        ),
+        addition(
+            id = "import-empty-file",
+            title = "导入空文件（Import Empty File）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("文件为空或不可读，请检查文件内容与访问权限。"),
+            actions = listOf(action("取消", "bookshelf"), action("重新选择", "local-import"))
+        ),
+        addition(
+            id = "import-parsing",
+            title = "导入解析中（Import Parsing）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("正在读取文件、解析元数据并识别章节结构。"),
+            actions = listOf(action("取消导入", "local-import"), action("下一步", "import-duplicate"))
+        ),
+        addition(
+            id = "import-duplicate",
+            title = "导入重复项（Import Duplicate）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("逐项选择保留原书、覆盖或跳过重复书籍。"),
+            actions = listOf(action("上一步", "import-parsing"), action("下一步", "import-conflict-resolve"))
+        ),
+        addition(
+            id = "import-conflict-resolve",
+            title = "导入冲突处理（Import Conflict Resolve）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("对本地文件与库内书籍的差异选择覆盖、跳过或保留两份。"),
+            actions = listOf(action("上一步", "import-duplicate"), action("应用并导入", "import-parsing"))
+        ),
+        addition(
+            id = "import-partial-success",
+            title = "导入部分成功（Import Partial Success）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("3 本成功、1 本失败；可重试失败项或查看完整结果。"),
+            actions = listOf(action("查看详情", "import-result-detail"), action("返回书架", "bookshelf"))
+        ),
+        addition(
+            id = "import-result-detail",
+            title = "导入结果详情（Import Result Detail）",
+            shell = RouteShell.LibraryShell,
+            renderer = DemoRouteRenderer.LocalImportState,
+            body = listOf("按成功、失败和跳过分组展示本次导入明细。"),
+            actions = listOf(action("再次导入", "local-import"), action("返回书架", "bookshelf"))
+        )
+    )
+
+    private val contract25RendererByRoute: Map<String, DemoRouteRenderer> =
+        contract25Additions.associate { it.page.id to it.renderer }
+
+    private val allAuthoredPages: List<DemoRoutePage> =
+        authoredPages + contract25Additions.map { it.page }
+
+    private val authoredPageById: Map<String, DemoRoutePage> = allAuthoredPages.associateBy { it.id }
+
+    /**
+     * Generated [RouteId] is the exact membership and ordering authority. A future contract
+     * addition now fails with a precise missing-route error instead of silently rendering a
+     * catch-all page; duplicated or stale Android-only routes fail for the same reason.
+     */
+    val pages: List<DemoRoutePage> = run {
+        require(authoredPageById.size == allAuthoredPages.size) {
+            "Duplicate DemoRoutePage ids: ${allAuthoredPages.groupBy { it.id }.filterValues { it.size > 1 }.keys}"
+        }
+        val generatedIds = RouteId.entries.map { it.contractSerialName() }
+        val generatedSet = generatedIds.toSet()
+        require(authoredPageById.keys == generatedSet) {
+            val missing = generatedSet - authoredPageById.keys
+            val stale = authoredPageById.keys - generatedSet
+            "Android demo registry must exactly match generated RouteId; missing=$missing stale=$stale"
+        }
+        generatedIds.map { id -> checkNotNull(authoredPageById[id]) }
+    }
+
+    val contract25RouteIds: Set<String> = contract25RendererByRoute.keys
+
+    fun rendererFor(routeId: String): DemoRouteRenderer? = contract25RendererByRoute[routeId]
+
     val routeIds: Set<String> = pages.map { it.id }.toSet()
 
     val bookStateRouteIds: Set<String> = setOf(
         "book-detail",
         "book-directory",
         "bookshelf-empty",
-        "sort-filter"
+        "sort-filter",
+        "bookshelf-cover-mode",
+        "bookshelf-list-mode",
+        "bookshelf-book-more-menu"
     )
 
     val rssStateRouteIds: Set<String> = setOf(

@@ -102,10 +102,9 @@ class BookshelfViewModel : ViewModel() {
     }
 
     /**
-     * P0-2: Add a book to the shelf via Core `bookshelf.add` CoreCommand.
-     * Core owns the bookshelf DomainState; Android only fires the command and refreshes.
-     * The book object uses the same field names as `bookshelf.list` response (`bookId`,
-     * `title`, `author`, `coverUrl`, `intro`, `origin`).
+     * Add a book to the shelf through Core's `(sourceId, bookId)` composite
+     * key. `SearchBook.sourceId` is the root identity from `book.search`; its
+     * `origin` remains display metadata and must not be substituted here.
      */
     fun addToBookshelf(book: SearchBook) {
         viewModelScope.launch {
@@ -121,10 +120,10 @@ class BookshelfViewModel : ViewModel() {
     /**
      * P0-2: Remove a book from the shelf via Core `bookshelf.remove` CoreCommand.
      */
-    fun removeFromBookshelf(bookUrl: String) {
+    fun removeFromBookshelf(book: Book) {
         viewModelScope.launch {
             try {
-                core.sendAndAwait("bookshelf.remove", BookshelfWriteParams.buildRemoveParams(bookUrl))
+                core.sendAndAwait("bookshelf.remove", BookshelfWriteParams.buildRemoveParams(book))
                 loadBooks()
             } catch (e: Exception) {
                 // Core not ready or command failed — shelf stays as-is.
@@ -132,18 +131,27 @@ class BookshelfViewModel : ViewModel() {
         }
     }
 
-    private fun parseBookshelfList(data: JSONObject): List<Book> {
-        val arr = data.optJSONArray("books") ?: return emptyList()
-        return (0 until arr.length()).map { i ->
-            val b = arr.getJSONObject(i)
-            Book(
-                bookUrl = b.optString("bookId"),
-                name = b.optString("title"),
-                author = b.optString("author"),
-                coverUrl = b.optString("coverUrl"),
-                intro = b.optString("intro"),
-                origin = b.optString("origin")
-            )
+    companion object {
+        /** Pure parser so JVM tests can prove the Core identity survives a shelf round trip. */
+        internal fun parseBookshelfList(data: JSONObject): List<Book> {
+            val arr = data.optJSONArray("books") ?: return emptyList()
+            return (0 until arr.length()).map { i ->
+                val b = arr.getJSONObject(i)
+                val sourceId = b.optString("sourceId").ifBlank { b.optString("origin") }
+                Book(
+                    bookUrl = b.optString("bookId"),
+                    name = b.optString("title"),
+                    author = b.optString("author"),
+                    coverUrl = b.optString("coverUrl"),
+                    intro = b.optString("intro"),
+                    kind = b.optString("kind"),
+                    latestChapterTitle = b.optString("lastChapter"),
+                    // Old Core snapshots may still carry `origin`; keep it as
+                    // presentation metadata while identities use sourceId.
+                    origin = b.optString("origin").ifBlank { sourceId },
+                    sourceId = sourceId
+                )
+            }
         }
     }
 }
@@ -178,22 +186,26 @@ data class BookshelfFilterState(
  * CoreCommands. Extracted as internal object so JVM tests can verify the Core command
  * contract (field names + structure) without a running Core runtime.
  *
- * Field names mirror the `bookshelf.list` response (`bookId`, `title`, `author`,
- * `coverUrl`, `intro`, `origin`) — Core owns the bookshelf DomainState schema.
+ * Core owns the shelf schema. Its write and delete commands use the composite
+ * identity `(sourceId, bookId)`; `origin` is not a wire field.
  */
 internal object BookshelfWriteParams {
     fun buildAddParams(book: SearchBook): JSONObject = JSONObject().apply {
-        put("book", JSONObject().apply {
-            put("bookId", book.bookUrl)
-            put("title", book.name)
-            put("author", book.author)
-            put("coverUrl", book.coverUrl)
-            put("intro", book.intro)
-            put("origin", book.origin)
-        })
+        require(book.sourceId.isNotBlank()) { "book.search root sourceId is required for bookshelf.add" }
+        put("sourceId", book.sourceId)
+        put("bookId", book.bookUrl)
+        put("title", book.name)
+        put("author", book.author)
+        if (book.coverUrl.isNotBlank()) put("coverUrl", book.coverUrl)
+        if (book.intro.isNotBlank()) put("intro", book.intro)
+        if (book.kind.isNotBlank()) put("kind", book.kind)
+        if (book.lastChapter.isNotBlank()) put("lastChapter", book.lastChapter)
     }
 
-    fun buildRemoveParams(bookUrl: String): JSONObject = JSONObject().apply {
-        put("bookId", bookUrl)
+    fun buildRemoveParams(book: Book): JSONObject = JSONObject().apply {
+        val sourceId = book.sourceId.ifBlank { book.origin }
+        require(sourceId.isNotBlank()) { "book sourceId is required for bookshelf.remove" }
+        put("sourceId", sourceId)
+        put("bookId", book.bookUrl)
     }
 }

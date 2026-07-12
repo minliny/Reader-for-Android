@@ -79,9 +79,9 @@ class HostRequestDispatcher(
         // dispatchId is a string requestId from ReaderUiIntent.generateRequestId;
         // derive a stable numeric operationId from its hashCode to keep the
         // HostRequest contract field populated without leaking the string.
-        entry.dispatchId.hashCode().toLong() and 0xFFFFFFFFL
+        (entry.dispatchId.hashCode().toLong() and 0xFFFFFFFFL).coerceAtLeast(1L)
     } catch (e: Exception) {
-        0L
+        1L
     }
 
     companion object {

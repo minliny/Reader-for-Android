@@ -53,7 +53,13 @@ class Phase2HostCapabilityHandlersJvmTest {
         notification = null,
         webDav = null,
         credentials = WebDavCredentialStore(Phase2FakeCredentialKeystore()),
-        downloadCache = null
+        downloadCache = null,
+        readerUi25Services = ReaderUi25HostServices(
+            backgroundTasks = object : ReaderBackgroundTaskHost {
+                override fun start(name: String) = ReaderBackgroundTaskStartResult("host-$name")
+                override fun end(taskId: String) = true
+            }
+        )
     )
 
     // ── host.smoke.echo ──────────────────────────────────────────────────
@@ -105,17 +111,17 @@ class Phase2HostCapabilityHandlersJvmTest {
 
         val reply = HttpCancelHandler(registry).handle(
             HostRequest(1L, 2001L, HttpCancelHandler.CAPABILITY,
-                JSONObject().put("requestTag", "in-flight-1").toString())
+                JSONObject().put("requestId", "in-flight-1").toString())
         )
         assertTrue("must complete", reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
         assertTrue("cancelled should be true", result.getBoolean("cancelled"))
-        assertEquals("in-flight-1", result.getString("requestTag"))
+        assertFalse(result.has("requestTag"))
         assertTrue("call must be cancelled", call.isCanceled())
     }
 
     @Test
-    fun `http_cancel_handler accepts requestId alias for requestTag`() {
+    fun `http_cancel_handler accepts canonical requestId`() {
         val registry = HttpCallRegistry()
         val reply = HttpCancelHandler(registry).handle(
             HostRequest(1L, 2002L, HttpCancelHandler.CAPABILITY,
@@ -124,7 +130,7 @@ class Phase2HostCapabilityHandlersJvmTest {
         assertTrue(reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
         assertFalse("cancelled should be false for unknown tag", result.getBoolean("cancelled"))
-        assertEquals("missing-tag", result.getString("requestTag"))
+        assertFalse(result.has("requestTag"))
     }
 
     @Test
@@ -238,7 +244,7 @@ class Phase2HostCapabilityHandlersJvmTest {
         assertTrue(reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
         assertTrue(result.getBoolean("cleared"))
-        assertEquals("all", result.getString("scope"))
+        assertFalse(result.has("scope"))
         // Both scopes must be empty now.
         assertTrue(store.get("https://a.example.com").cookies.isEmpty())
         assertTrue(store.get("https://b.example.com").cookies.isEmpty())
@@ -257,7 +263,7 @@ class Phase2HostCapabilityHandlersJvmTest {
         assertTrue(reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
         assertTrue(result.getBoolean("cleared"))
-        assertEquals("https://a.example.com", result.getString("scope"))
+        assertFalse(result.has("scope"))
         // Only the scoped url is cleared; the other scope retains its cookie.
         assertTrue(store.get("https://a.example.com").cookies.isEmpty())
         assertEquals(1, store.get("https://b.example.com").cookies.size)
@@ -298,58 +304,49 @@ class Phase2HostCapabilityHandlersJvmTest {
     // ── credential.get / set / delete ──────────────────────────────────
 
     @Test
-    fun `credential_set stores basic credential and credential_get reads it back`() {
+    fun `credential_set and get round trip canonical opaque value`() {
         val facade = makeFacade()
         val setReply = CredentialSetHandler(facade).handle(
             HostRequest(1L, 5001L, CredentialSetHandler.CAPABILITY,
                 JSONObject().apply {
-                    put("identifier", "webdav-primary")
-                    put("serverUrl", "https://cloud.example.com/dav")
-                    put("authType", "basic")
-                    put("username", "alice")
-                    put("password", "secret")
+                    put("key", "webdav.password")
+                    put("value", "secret")
                 }.toString())
         )
         assertTrue("set must complete", setReply.isComplete())
         val setResult = JSONObject((setReply as HostReply.Complete).resultJson())
         assertTrue(setResult.getBoolean("stored"))
-        assertEquals("webdav-primary", setResult.getString("identifier"))
+        assertFalse(setResult.has("identifier"))
 
         val getReply = CredentialGetHandler(facade).handle(
             HostRequest(1L, 5002L, CredentialGetHandler.CAPABILITY,
-                JSONObject().put("identifier", "webdav-primary").toString())
+                JSONObject().put("key", "webdav.password").toString())
         )
         assertTrue("get must complete", getReply.isComplete())
         val getResult = JSONObject((getReply as HostReply.Complete).resultJson())
-        assertEquals("webdav-primary", getResult.getString("identifier"))
-        assertEquals("https://cloud.example.com/dav", getResult.getString("serverUrl"))
-        assertEquals("basic", getResult.getString("authType"))
-        assertTrue("basic auth should report hasPassword", getResult.getBoolean("hasPassword"))
-        assertFalse("basic auth should not report hasToken", getResult.getBoolean("hasToken"))
+        assertTrue(getResult.getBoolean("exists"))
+        assertEquals("secret", getResult.getString("value"))
     }
 
     @Test
-    fun `credential_set supports bearer token auth`() {
+    fun `credential_set supports arbitrary opaque string values`() {
         val facade = makeFacade()
         val reply = CredentialSetHandler(facade).handle(
             HostRequest(1L, 5003L, CredentialSetHandler.CAPABILITY,
                 JSONObject().apply {
-                    put("identifier", "bearer-1")
-                    put("serverUrl", "https://api.example.com")
-                    put("authType", "bearer")
-                    put("token", "tok-xyz")
+                    put("key", "api.token")
+                    put("value", "tok-xyz")
                 }.toString())
         )
         assertTrue(reply.isComplete())
         val getReply = CredentialGetHandler(facade).handle(
             HostRequest(1L, 5004L, CredentialGetHandler.CAPABILITY,
-                JSONObject().put("identifier", "bearer-1").toString())
+                JSONObject().put("key", "api.token").toString())
         )
         assertTrue(getReply.isComplete())
         val result = JSONObject((getReply as HostReply.Complete).resultJson())
-        assertEquals("bearer", result.getString("authType"))
-        assertFalse(result.getBoolean("hasPassword"))
-        assertTrue(result.getBoolean("hasToken"))
+        assertTrue(result.getBoolean("exists"))
+        assertEquals("tok-xyz", result.getString("value"))
     }
 
     @Test
@@ -395,14 +392,14 @@ class Phase2HostCapabilityHandlersJvmTest {
     }
 
     @Test
-    fun `credential_get returns NOT_FOUND for missing identifier`() {
+    fun `credential_get returns exists false for missing key`() {
         val facade = makeFacade()
         val reply = CredentialGetHandler(facade).handle(
             HostRequest(1L, 5008L, CredentialGetHandler.CAPABILITY,
-                JSONObject().put("identifier", "never-saved").toString())
+                JSONObject().put("key", "never-saved").toString())
         )
-        assertTrue(reply.isError())
-        assertEquals("NOT_FOUND", (reply as HostReply.Error).code())
+        assertTrue(reply.isComplete())
+        assertFalse(JSONObject((reply as HostReply.Complete).resultJson()).getBoolean("exists"))
     }
 
     @Test
@@ -412,24 +409,23 @@ class Phase2HostCapabilityHandlersJvmTest {
         CredentialSetHandler(facade).handle(
             HostRequest(1L, 5009L, CredentialSetHandler.CAPABILITY,
                 JSONObject().apply {
-                    put("identifier", "to-delete"); put("serverUrl", "https://x.example.com")
-                    put("authType", "bearer"); put("token", "t")
+                    put("key", "to-delete"); put("value", "t")
                 }.toString())
         )
         val delReply = CredentialDeleteHandler(facade).handle(
             HostRequest(1L, 5010L, CredentialDeleteHandler.CAPABILITY,
-                JSONObject().put("identifier", "to-delete").toString())
+                JSONObject().put("key", "to-delete").toString())
         )
         assertTrue(delReply.isComplete())
         val result = JSONObject((delReply as HostReply.Complete).resultJson())
         assertTrue(result.getBoolean("deleted"))
-        // Subsequent get must NOT_FOUND.
+        // Subsequent get is a canonical miss.
         val getReply = CredentialGetHandler(facade).handle(
             HostRequest(1L, 5011L, CredentialGetHandler.CAPABILITY,
-                JSONObject().put("identifier", "to-delete").toString())
+                JSONObject().put("key", "to-delete").toString())
         )
-        assertTrue(getReply.isError())
-        assertEquals("NOT_FOUND", (getReply as HostReply.Error).code())
+        assertTrue(getReply.isComplete())
+        assertFalse(JSONObject((getReply as HostReply.Complete).resultJson()).getBoolean("exists"))
     }
 
     @Test
@@ -441,7 +437,7 @@ class Phase2HostCapabilityHandlersJvmTest {
         val facade = makeFacade()
         val reply = CredentialDeleteHandler(facade).handle(
             HostRequest(1L, 5012L, CredentialDeleteHandler.CAPABILITY,
-                JSONObject().put("identifier", "absent").toString())
+                JSONObject().put("key", "absent").toString())
         )
         assertTrue(reply.isComplete())
         assertTrue(JSONObject((reply as HostReply.Complete).resultJson()).getBoolean("deleted"))
@@ -455,20 +451,20 @@ class Phase2HostCapabilityHandlersJvmTest {
         val reply = BackgroundScheduleHandler(facade).handle(
             HostRequest(1L, 6001L, BackgroundScheduleHandler.CAPABILITY,
                 JSONObject().apply {
-                    put("taskTag", "download-book-1"); put("kind", "download")
+                    put("taskId", "download-book-1")
                 }.toString())
         )
         assertTrue(reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
         assertTrue(result.getBoolean("scheduled"))
-        assertEquals("download-book-1", result.getString("taskTag"))
-        assertEquals("download", result.getString("kind"))
+        assertFalse(result.has("taskTag"))
+        assertFalse(result.has("kind"))
         assertEquals(1, facade.backgroundRegistry.size())
         assertEquals("download-book-1", facade.backgroundRegistry.list().first().tag)
     }
 
     @Test
-    fun `background_schedule rejects missing taskTag`() {
+    fun `background_schedule rejects missing taskId`() {
         val facade = makeFacade()
         val reply = BackgroundScheduleHandler(facade).handle(
             HostRequest(1L, 6002L, BackgroundScheduleHandler.CAPABILITY, "{}")
@@ -480,10 +476,10 @@ class Phase2HostCapabilityHandlersJvmTest {
     @Test
     fun `background_cancel cancels previously scheduled task`() {
         val facade = makeFacade()
-        facade.backgroundRegistry.schedule("download-book-2", "download")
+        facade.backgroundRegistry.schedule("download-book-2", "workmanager", "host-download-book-2")
         val reply = BackgroundCancelHandler(facade).handle(
             HostRequest(1L, 6003L, BackgroundCancelHandler.CAPABILITY,
-                JSONObject().put("taskTag", "download-book-2").toString())
+                JSONObject().put("taskId", "download-book-2").toString())
         )
         assertTrue(reply.isComplete())
         val result = JSONObject((reply as HostReply.Complete).resultJson())
@@ -496,7 +492,7 @@ class Phase2HostCapabilityHandlersJvmTest {
         val facade = makeFacade()
         val reply = BackgroundCancelHandler(facade).handle(
             HostRequest(1L, 6004L, BackgroundCancelHandler.CAPABILITY,
-                JSONObject().put("taskTag", "missing").toString())
+                JSONObject().put("taskId", "missing").toString())
         )
         assertTrue(reply.isComplete())
         assertFalse(JSONObject((reply as HostReply.Complete).resultJson()).getBoolean("cancelled"))
@@ -536,23 +532,23 @@ class Phase2HostCapabilityHandlersJvmTest {
     // ── device.screen.release ──────────────────────────────────────────
 
     @Test
-    fun `device_screen_release returns released=true without requiring context`() {
+    fun `device_screen_release fails closed without foreground Activity`() {
         val facade = makeFacade()
         val reply = DeviceScreenReleaseHandler(facade).handle(
             HostRequest(1L, 8001L, DeviceScreenReleaseHandler.CAPABILITY, "{}")
         )
-        assertTrue(reply.isComplete())
-        assertTrue(JSONObject((reply as HostReply.Complete).resultJson()).getBoolean("released"))
+        assertTrue(reply.isError())
+        assertEquals("REQUIRES_UI_CONTEXT", (reply as HostReply.Error).code())
     }
 
     @Test
-    fun `device_screen_release ignores extra params and still acknowledges`() {
+    fun `device_screen_release never acknowledges unavailable platform work`() {
         val facade = makeFacade()
         val reply = DeviceScreenReleaseHandler(facade).handle(
             HostRequest(1L, 8002L, DeviceScreenReleaseHandler.CAPABILITY,
                 JSONObject().put("anything", "ignored").toString())
         )
-        assertTrue(reply.isComplete())
+        assertTrue(reply.isError())
     }
 }
 

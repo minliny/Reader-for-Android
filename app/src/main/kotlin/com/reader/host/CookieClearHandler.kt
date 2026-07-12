@@ -11,7 +11,7 @@ import org.json.JSONObject
  *  - When `url` is absent/empty, clears all cookies
  *    ([CookieStore.clearAll]).
  *
- * Returns `host.complete` with `{cleared: true, scope: "<url>" | "all"}`.
+ * Returns canonical `host.complete` with `{cleared: true}`.
  */
 class CookieClearHandler(
     private val cookieStore: CookieStore
@@ -24,10 +24,12 @@ class CookieClearHandler(
         } catch (e: Exception) {
             return HostReply.error(INTERNAL, "invalid $CAPABILITY params: ${e.message}", false)
         }
-        val url = params.optString("url", "")
+        val scope = sequenceOf("url", "domain", "sessionId")
+            .map { params.optString(it, "") }
+            .firstOrNull { it.isNotBlank() }
         try {
-            if (url.isNotEmpty()) {
-                runBlocking { cookieStore.clear(url) }
+            if (scope != null) {
+                runBlocking { cookieStore.clear(scope) }
             } else {
                 runBlocking { cookieStore.clearAll() }
             }
@@ -36,7 +38,6 @@ class CookieClearHandler(
         }
         val result = JSONObject()
         result.put("cleared", true)
-        result.put("scope", if (url.isNotEmpty()) url else "all")
         return HostReply.complete(result.toString())
     }
 
