@@ -3,6 +3,7 @@ package com.reader.ui.demo
 import com.reader.ui.shell.ReaderRoute
 import io.reader.ui.contract.RouteId
 import io.reader.ui.contract.RouteShell
+import io.reader.ui.contract.ScreenGraphRegistry
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -27,8 +28,8 @@ import org.junit.Test
 class DemoRouteRegistryTest {
 
     @Test
-    fun `registry contains exactly all 235 generated routes`() {
-        assertEquals(235, RouteId.entries.size)
+    fun `registry contains exactly all 260 generated routes`() {
+        assertEquals(260, RouteId.entries.size)
         assertEquals(RouteId.entries.size, DemoRouteRegistry.pages.size)
     }
 
@@ -99,6 +100,52 @@ class DemoRouteRegistryTest {
     }
 
     @Test
+    fun `all 24 contract 3_0 capability routes have exact native structure and fail closed actions`() {
+        val expected = setOf(
+            "onboarding-welcome",
+            "onboarding-capability-setup",
+            "permission-recovery",
+            "local-format-support",
+            "pdf-reader",
+            "manga-reader",
+            "http-tts-management",
+            "http-tts-editor",
+            "http-tts-test",
+            "content-edit",
+            "book-cover-change",
+            "book-cover-search",
+            "chapter-reviews",
+            "bookmarks-manager",
+            "download-queue",
+            "download-task-detail",
+            "storage-management",
+            "webview-login",
+            "webview-captcha",
+            "webview-challenge",
+            "webview-cookie-return",
+            "settings-tts",
+            "settings-storage",
+            "settings-accessibility"
+        )
+        val canonicalRoutes = ScreenGraphRegistry.loadCanonical().document.routes
+            .associateBy { generatedRouteId(it.routeId) }
+
+        assertEquals(expected, DemoRouteRegistry.contract30RouteIds)
+        assertEquals(expected, DemoRouteRegistry.capabilityClosureStructures.keys)
+        expected.forEach { routeId ->
+            val page = requireNotNull(DemoRouteRegistry.page(routeId))
+            val canonical = requireNotNull(canonicalRoutes[routeId])
+            assertEquals(DemoRouteRenderer.CapabilityClosureStructure, DemoRouteRegistry.rendererFor(routeId))
+            assertEquals(canonical.shell, page.shell)
+            assertEquals(
+                canonical.variants.single().components.map { it.type },
+                DemoRouteRegistry.capabilityClosureStructures.getValue(routeId)
+            )
+            assertTrue("$routeId must not expose planned bindings as Android actions", page.actions.isEmpty())
+        }
+    }
+
+    @Test
     fun `key new routes select their canonical renderers and remain navigable`() {
         assertEquals(
             DemoRouteRenderer.ReaderWorkspaceState,
@@ -119,6 +166,10 @@ class DemoRouteRegistryTest {
         assertEquals(
             DemoRouteRenderer.LocalImportState,
             DemoRouteRegistry.rendererFor("import-conflict-resolve")
+        )
+        assertEquals(
+            DemoRouteRenderer.CapabilityClosureStructure,
+            DemoRouteRegistry.rendererFor("onboarding-welcome")
         )
         assertTrue(DemoRouteRegistry.routeFor("reader-replace-page") is ReaderRoute.Demo)
         assertTrue(DemoRouteRegistry.routeFor("source-switch-preview") is ReaderRoute.Demo)
@@ -163,4 +214,8 @@ class DemoRouteRegistryTest {
         val descriptor = RouteId.serializer().descriptor
         return RouteId.entries.mapTo(linkedSetOf()) { descriptor.getElementName(it.ordinal) }
     }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun generatedRouteId(routeId: RouteId): String =
+        RouteId.serializer().descriptor.getElementName(routeId.ordinal)
 }

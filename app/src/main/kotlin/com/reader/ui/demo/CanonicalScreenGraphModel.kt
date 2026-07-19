@@ -1,5 +1,15 @@
 package com.reader.ui.demo
 
+import com.reader.ui.source.SourceDebugRouteState
+import com.reader.ui.source.SourceDemoRouteState
+import com.reader.ui.source.SourceDemoRouteIds
+import com.reader.ui.source.SourceRuleEditRouteState
+import com.reader.ui.source.sourceDemoRouteState
+import com.reader.ui.source.sourceDebugResultRouteState
+import com.reader.ui.source.sourceRuleEditRouteState
+import com.reader.ui.restore.RestorePageState
+import com.reader.ui.restore.RestoreRouteIds
+import com.reader.ui.restore.restorePageForRoute
 import io.reader.ui.contract.ComponentType
 import io.reader.ui.contract.PageState
 import io.reader.ui.contract.RouteId
@@ -59,7 +69,9 @@ internal sealed interface AndroidCanonicalComponentAdapterEntry {
 
 internal enum class AndroidCanonicalComponentAdapterFidelity {
     Faithful,
-    GenericUsable
+    GenericUsable,
+    /** Dedicated Host adapter; live Host state remains required at render time. */
+    Integrated
 }
 
 /** Existing Compose primitives that can currently consume the node without inventing data. */
@@ -81,6 +93,15 @@ internal enum class AndroidCanonicalComponentAdapterKind {
     Button,
     FormSection,
     Content,
+    ReaderFullAppearancePage,
+    ReaderFullSettingsPage,
+    SourceDebugResultPage,
+    SourceRuleEditPage,
+    SourceDemoContentPage,
+    RestoreReadOnlyPage,
+    SettingsReadOnlyPage,
+    ReadingBackground,
+    TapZones,
     GenericStructure,
     GenericText,
     GenericContinueCard,
@@ -88,20 +109,26 @@ internal enum class AndroidCanonicalComponentAdapterKind {
     GenericState,
     GenericProgress,
     GenericControl,
-    GenericBackground,
     GenericDialog
 }
 
 internal data class AndroidCanonicalComponentCoverage(
     val canonicalComponentCount: Int,
+    val canonicalInstanceCount: Int,
     val referencedTypes: Set<ComponentType>,
     val explicitGapTypes: Set<ComponentType>,
     val supportedTypes: Set<ComponentType>,
     val faithfulTypes: Set<ComponentType>,
     val genericUsableTypes: Set<ComponentType>,
+    val integratedTypes: Set<ComponentType>,
     val partialTypes: Set<ComponentType>,
     val insufficientTypes: Set<ComponentType>,
-    val visibleFailureTypes: Set<ComponentType>
+    val visibleFailureTypes: Set<ComponentType>,
+    val faithfulInstanceCount: Int,
+    val genericUsableInstanceCount: Int,
+    val integratedInstanceCount: Int,
+    val partialInstanceCount: Int,
+    val insufficientInstanceCount: Int
 ) {
     val isFullRenderer: Boolean
         get() = visibleFailureTypes.isEmpty() && genericUsableTypes.isEmpty()
@@ -112,7 +139,7 @@ internal data class AndroidCanonicalComponentCoverage(
 
 /**
  * Machine-executable referenced-vs-adapter registry. Keys are derived from
- * generated ScreenGraph catalog data, not from an Android copy of 129 names.
+ * generated ScreenGraph catalog data, not from an Android copy of 138 names.
  */
 internal class AndroidCanonicalComponentAdapterRegistry private constructor(
     val entries: Map<ComponentType, AndroidCanonicalComponentAdapterEntry>,
@@ -150,10 +177,11 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             ComponentType.Permission to AndroidCanonicalComponentAdapterKind.Permission,
             ComponentType.Toast to AndroidCanonicalComponentAdapterKind.Toast,
             ComponentType.List to AndroidCanonicalComponentAdapterKind.List,
-            ComponentType.ListRow to AndroidCanonicalComponentAdapterKind.ListRow,
             ComponentType.Button to AndroidCanonicalComponentAdapterKind.Button,
             ComponentType.FormSection to AndroidCanonicalComponentAdapterKind.FormSection,
-            ComponentType.Content to AndroidCanonicalComponentAdapterKind.Content
+            ComponentType.Content to AndroidCanonicalComponentAdapterKind.Content,
+            ComponentType.ReaderFullAppearancePage to AndroidCanonicalComponentAdapterKind.ReaderFullAppearancePage,
+            ComponentType.ReaderFullSettingsPage to AndroidCanonicalComponentAdapterKind.ReaderFullSettingsPage
         )
 
         private val genericKinds: Map<ComponentType, AndroidCanonicalComponentAdapterKind> = mapOf(
@@ -177,16 +205,66 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             ComponentType.SyncProgressPage to AndroidCanonicalComponentAdapterKind.GenericProgress,
             ComponentType.ReadingInfoLayer to AndroidCanonicalComponentAdapterKind.GenericProgress,
             ComponentType.FloatingPageControl to AndroidCanonicalComponentAdapterKind.GenericControl,
-            ComponentType.ReadingBackgroundLayer to AndroidCanonicalComponentAdapterKind.GenericBackground
+            ComponentType.SourceDebugResultPage to AndroidCanonicalComponentAdapterKind.SourceDebugResultPage,
+            ComponentType.SourceRuleEditPage to AndroidCanonicalComponentAdapterKind.SourceRuleEditPage,
+            ComponentType.SourceDetailPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceBatchPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceGroupsPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceLogsPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceDetectPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceDebugPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceCodeViewPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.SourceDebugContentLogPage to AndroidCanonicalComponentAdapterKind.SourceDemoContentPage,
+            ComponentType.RestoreConfirmPage to AndroidCanonicalComponentAdapterKind.RestoreReadOnlyPage,
+            ComponentType.RestoreProgressPage to AndroidCanonicalComponentAdapterKind.RestoreReadOnlyPage,
+            ComponentType.RestoreResultPage to AndroidCanonicalComponentAdapterKind.RestoreReadOnlyPage,
+            ComponentType.SettingsGeneralPage to AndroidCanonicalComponentAdapterKind.SettingsReadOnlyPage,
+            ComponentType.AboutFeedbackPage to AndroidCanonicalComponentAdapterKind.SettingsReadOnlyPage,
+            ComponentType.BookshelfSearchSettingsPage to AndroidCanonicalComponentAdapterKind.SettingsReadOnlyPage,
+            // Reader-UI 3.0 capability-closure primitives are deliberately read-only here.
+            // Their canonical props remain visible, while planned bindings are never promoted
+            // to executable Android callbacks until a Host owner is admitted.
+            ComponentType.ProgressBar to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.SettingsListItem to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.BookCover to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.ListRow to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.Toggle to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.Slider to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.Dropdown to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.Input to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.WebView to AndroidCanonicalComponentAdapterKind.GenericStructure,
+            ComponentType.SourceFormPage to AndroidCanonicalComponentAdapterKind.GenericStructure
+        )
+
+        /** Dedicated integrations that consume live Host state but retain an explicit Host-owned boundary. */
+        private val integratedKinds: Map<ComponentType, AndroidCanonicalComponentAdapterKind> = mapOf(
+            ComponentType.TapZones to AndroidCanonicalComponentAdapterKind.TapZones,
+            ComponentType.ReadingBackgroundLayer to AndroidCanonicalComponentAdapterKind.ReadingBackground
         )
 
         private val partialReasons: Map<ComponentType, String> = mapOf(
             ComponentType.ReaderAppearancePanel to "1 of 7 canonical instances has no children",
-            ComponentType.ReaderBase to "26 of 47 canonical instances have no children",
-            ComponentType.ReaderDirectoryPanel to "2 of 5 canonical instances have no children",
-            ComponentType.ReaderReplacePanel to "1 of 6 canonical instances has no children",
+            ComponentType.ReaderBase to
+                "host-composite requires a dedicated Core/runtime/store/layout adapter; 23 of 49 instances contain contract children that must not be recursively pseudo-rendered",
+            ComponentType.ReaderDirectoryPanel to "2 of 6 canonical instances have no children",
+            ComponentType.ReaderReplacePanel to "1 of 7 canonical instances has no children",
             ComponentType.ReadingTextFlow to "5 of 8 instances have no text children or text payload",
             ComponentType.SourceSwitchFlowPage to "2 of 8 canonical instances have no children"
+        )
+
+        private val insufficientReasons: Map<ComponentType, String> = mapOf(
+            ComponentType.ReaderTopArea to
+                "48 host-composite instances require Core/runtime/store state; empty props cannot drive the existing Android reader header",
+            ComponentType.ReaderBottomBar to
+                "11 host-composite instances require runtime/store state; empty props cannot drive the existing Android module bar",
+            ComponentType.SyncBackupPage to
+                "3 canonical instances expose only route/loading variant; server, account, directory, connection status, backup rows, and executable sync/network bindings are absent",
+            ComponentType.RssSearchEntry to
+                "2 canonical instances expose no props, children, or bindings; native search entry requires an explicit search-navigation callback",
+            ComponentType.RssArticleSection to
+                "2 canonical instances expose no article props/children or bindings; native article sections require article data and an open-article callback",
+            ComponentType.RssSourceEditPage to
+                "2 canonical instances expose add/edit mode only; field values and debug/save/cancel bindings required by the native editor are absent"
         )
 
         fun loadCanonical(): AndroidCanonicalComponentAdapterRegistry {
@@ -197,15 +275,19 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             val explicitGaps = graph.document.componentCatalog
                 .filter { it.status == ScreenGraphComponentCatalogStatus.ExplicitGap }
                 .mapTo(linkedSetOf()) { it.type }
-            val insufficient = referenced - faithfulKinds.keys - genericKinds.keys - partialReasons.keys
-            check(faithfulKinds.size == 18 && genericKinds.size == 21) {
-                "Android adapter classification drifted: faithful=${faithfulKinds.size} generic=${genericKinds.size}"
+            val insufficient = referenced - faithfulKinds.keys - genericKinds.keys - integratedKinds.keys - partialReasons.keys
+            check(faithfulKinds.size == 19 && genericKinds.size == 46 && integratedKinds.size == 2) {
+                "Android adapter classification drifted: faithful=${faithfulKinds.size} " +
+                    "generic=${genericKinds.size} integrated=${integratedKinds.size}"
             }
-            check(partialReasons.size == 6 && insufficient.size == 84) {
+            check(partialReasons.size == 6 && insufficient.size == 65) {
                 "Android visible-gap classification drifted: partial=${partialReasons.size} insufficient=${insufficient.size}"
             }
+            check(insufficientReasons.keys.all { it in insufficient }) {
+                "Explicit insufficient blockers must remain in the insufficient partition"
+            }
             check(
-                faithfulKinds.keys + genericKinds.keys + partialReasons.keys + insufficient == referenced
+                faithfulKinds.keys + genericKinds.keys + integratedKinds.keys + partialReasons.keys + insufficient == referenced
             ) {
                 "Android component classification must exactly partition all referenced types"
             }
@@ -221,13 +303,25 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
                         fidelity = AndroidCanonicalComponentAdapterFidelity.GenericUsable,
                         provenance = genericProvenance(type, genericKinds.getValue(type))
                     )
+                    type in integratedKinds -> AndroidCanonicalComponentAdapterEntry.Supported(
+                        kind = integratedKinds.getValue(type),
+                        fidelity = AndroidCanonicalComponentAdapterFidelity.Integrated,
+                        provenance = when (type) {
+                            ComponentType.TapZones ->
+                                "ReaderTapZoneHost + ReaderTapZoneHostAdapter + strict canonical binding bridge"
+                            ComponentType.ReadingBackgroundLayer ->
+                                "ReaderTheme Host paper + strict schema adapter; full-surface bounds remain Host-owned"
+                            else -> error("No integrated provenance registered for $type")
+                        }
+                    )
                     type in partialReasons -> AndroidCanonicalComponentAdapterEntry.VisibleFailure(
                         code = "ANDROID_COMPONENT_PARTIAL_CANONICAL_DATA",
                         reason = "${partialReasons.getValue(type)}; type remains visible-gap until every instance is renderable"
                     )
                     else -> AndroidCanonicalComponentAdapterEntry.VisibleFailure(
                         code = "ANDROID_COMPONENT_CONTRACT_DATA_INSUFFICIENT",
-                        reason = "$type lacks the typed props, children, or trigger semantics required by its existing Compose implementation"
+                        reason = insufficientReasons[type]
+                            ?: "$type lacks the typed props, children, or trigger semantics required by its existing Compose implementation"
                     )
                 }
             }
@@ -237,7 +331,7 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             check((entries.keys intersect explicitGaps).isEmpty()) {
                 "Canonical explicit-gap types must not be registered as rendered adapters"
             }
-            check(referenced.size == 129 && explicitGaps.size == 45) {
+            check(referenced.size == 138 && explicitGaps.size == 36) {
                 "ScreenGraph component coverage drifted: referenced=${referenced.size} explicitGaps=${explicitGaps.size}"
             }
             val supported = entries.filterValues { it is AndroidCanonicalComponentAdapterEntry.Supported }.keys
@@ -249,19 +343,33 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
                 (it as? AndroidCanonicalComponentAdapterEntry.Supported)?.fidelity ==
                     AndroidCanonicalComponentAdapterFidelity.GenericUsable
             }.keys
+            val integrated = entries.filterValues {
+                (it as? AndroidCanonicalComponentAdapterEntry.Supported)?.fidelity ==
+                    AndroidCanonicalComponentAdapterFidelity.Integrated
+            }.keys
             val unsupported = entries.filterValues { it is AndroidCanonicalComponentAdapterEntry.VisibleFailure }.keys
+            val catalogByType = graph.document.componentCatalog.associateBy { it.type }
+            fun instanceCount(types: Set<ComponentType>): Int =
+                types.sumOf { type -> catalogByType.getValue(type).instanceCount }
             return AndroidCanonicalComponentAdapterRegistry(
                 entries = entries,
                 coverage = AndroidCanonicalComponentCoverage(
                     canonicalComponentCount = graph.document.componentCatalog.size,
+                    canonicalInstanceCount = instanceCount(referenced),
                     referencedTypes = referenced,
                     explicitGapTypes = explicitGaps,
                     supportedTypes = supported,
                     faithfulTypes = faithful,
                     genericUsableTypes = generic,
+                    integratedTypes = integrated,
                     partialTypes = partialReasons.keys,
                     insufficientTypes = insufficient,
-                    visibleFailureTypes = unsupported
+                    visibleFailureTypes = unsupported,
+                    faithfulInstanceCount = instanceCount(faithful),
+                    genericUsableInstanceCount = instanceCount(generic),
+                    integratedInstanceCount = instanceCount(integrated),
+                    partialInstanceCount = instanceCount(partialReasons.keys),
+                    insufficientInstanceCount = instanceCount(insufficient)
                 )
             )
         }
@@ -274,6 +382,8 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             ComponentType.BookshelfShelfSection,
             ComponentType.FormSection,
             ComponentType.Content -> "DemoSectionCard"
+            ComponentType.ReaderFullAppearancePage -> "ReaderFullAppearanceContent + route-specific full appearance screens"
+            ComponentType.ReaderFullSettingsPage -> "ReaderFullSettingsContent + ReaderPageTurnSettingsScreen"
             ComponentType.ShelfSectionHeader -> "ReaderTextStyles.sectionTitle"
             ComponentType.Loading -> "DemoLoadingSkeleton"
             ComponentType.Empty,
@@ -296,11 +406,20 @@ internal class AndroidCanonicalComponentAdapterRegistry private constructor(
             AndroidCanonicalComponentAdapterKind.GenericContinueCard -> "DemoBookCover + canonical title/author/card data"
             AndroidCanonicalComponentAdapterKind.GenericState -> "DemoStateBlock + canonical title/message/action evidence"
             AndroidCanonicalComponentAdapterKind.GenericProgress -> "DemoReaderProgressBar + canonical progress/chapter props"
-            AndroidCanonicalComponentAdapterKind.GenericBackground -> "strict paper theme background surface"
             AndroidCanonicalComponentAdapterKind.GenericDialog -> "overlay card + recursive canonical Button children"
             AndroidCanonicalComponentAdapterKind.GenericControl -> "static canonical control; binding retained as evidence only"
             AndroidCanonicalComponentAdapterKind.GenericText -> "Reader text styles + canonical text props"
             AndroidCanonicalComponentAdapterKind.GenericStructure -> "canonical title/message structure surface"
+            AndroidCanonicalComponentAdapterKind.SourceDebugResultPage ->
+                "SourceDebugContent + canonical search/detail/catalog variant bridge"
+            AndroidCanonicalComponentAdapterKind.SourceRuleEditPage ->
+                "SourceRuleEditContent + strict canonical route/props bridge"
+            AndroidCanonicalComponentAdapterKind.SourceDemoContentPage ->
+                "Source management/debug native content + strict canonical route/props bridge"
+            AndroidCanonicalComponentAdapterKind.RestoreReadOnlyPage ->
+                "Restore native content primitives + strict canonical read-only route/props bridge"
+            AndroidCanonicalComponentAdapterKind.SettingsReadOnlyPage ->
+                "Settings/Bookshelf native display primitives + strict canonical read-only route/props bridge"
             else -> error("Unexpected generic family for $type: $kind")
         }
 
@@ -421,6 +540,7 @@ internal data class CanonicalScreenGraphShadowObservation(
     val components: List<CanonicalComponentObservation>,
     val faithfulComponentTypes: Set<ComponentType>,
     val genericUsableComponentTypes: Set<ComponentType>,
+    val integratedComponentTypes: Set<ComponentType>,
     val unsupportedComponentTypes: Set<ComponentType>,
     val actionGapCount: Int
 )
@@ -462,6 +582,11 @@ internal object CanonicalScreenGraphShadowObserver {
                     ?.takeIf { it.fidelity == AndroidCanonicalComponentAdapterFidelity.GenericUsable }
                     ?.let { item.node.type }
             },
+            integratedComponentTypes = components.mapNotNullTo(linkedSetOf()) { item ->
+                (item.adapter as? AndroidCanonicalComponentAdapterEntry.Supported)
+                    ?.takeIf { it.fidelity == AndroidCanonicalComponentAdapterFidelity.Integrated }
+                    ?.let { item.node.type }
+            },
             unsupportedComponentTypes = components
                 .filter { it.adapter is AndroidCanonicalComponentAdapterEntry.VisibleFailure }
                 .mapTo(linkedSetOf()) { it.node.type },
@@ -473,7 +598,10 @@ internal object CanonicalScreenGraphShadowObserver {
 internal data class CanonicalComponentAction(
     val componentId: String,
     val binding: ScreenGraphActionBinding
-)
+) {
+    /** Region identity is part of the executable contract, not display-only evidence. */
+    val target: String get() = binding.target
+}
 
 internal data class CanonicalStateEventObservation(
     val componentId: String,
@@ -489,6 +617,8 @@ internal data class CanonicalComponentRenderModel(
     val props: Map<String, JsonElement> get() = node.props
     val bindings: List<ScreenGraphActionBinding> get() = node.bindings
     val stateEventEvidence: List<ScreenGraphStateEventEvidence> get() = node.stateEventEvidence
+    val requiresHostCompositeAdapter: Boolean get() = node.compositionMode == "host-composite"
+    val allowsContractTreeRecursion: Boolean get() = node.compositionMode == "contract-tree"
 
     /** Generated bindings are executable only when the canonical trigger is explicit. */
     fun bindingObservations(): List<CanonicalComponentAction> =
@@ -542,6 +672,122 @@ internal data class CanonicalComponentRenderModel(
             accessibility = accessibility()
         )
     }
+}
+
+/**
+ * Bridges the contract's compact result variant to the existing Android source-debug
+ * content state. The generic renderer remains honest: detailed result rows still come
+ * from the Android demo state, while the canonical route and variant select the page.
+ */
+internal fun CanonicalComponentRenderModel.sourceDebugResultAdapterState(): SourceDebugRouteState? {
+    if (node.type != ComponentType.SourceDebugResultPage) return null
+    val variant = (props["variant"] as? JsonPrimitive)
+        ?.takeIf { it.isString }
+        ?.contentOrNull
+        ?: return null
+    val targetRouteId = when (variant) {
+        "search" -> SourceDemoRouteIds.SourceDebugSearchResult
+        "detail" -> SourceDemoRouteIds.SourceDebugDetailResult
+        "catalog" -> SourceDemoRouteIds.SourceDebugCatalogResult
+        else -> return null
+    }
+    if (routeId != "source-debug-result" && routeId != targetRouteId) return null
+    return sourceDebugResultRouteState(targetRouteId)
+        ?.takeIf { it.activeModuleKey == variant }
+}
+
+/** Strict route/props bridge for the three canonical rule-edit instances. */
+internal fun CanonicalComponentRenderModel.sourceRuleEditAdapterState(): SourceRuleEditRouteState? {
+    if (
+        node.type != ComponentType.SourceRuleEditPage ||
+        node.children.isNotEmpty() ||
+        bindings.isNotEmpty() ||
+        stateEventEvidence.isNotEmpty()
+    ) {
+        return null
+    }
+    val validProps = when (routeId) {
+        "source-edit" -> props.keys == setOf("title") &&
+            (props["title"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull == "规则编辑"
+        SourceDemoRouteIds.SourceRuleEdit -> props.isEmpty()
+        SourceDemoRouteIds.SourceEditDebug -> props.keys == setOf("variant") &&
+            (props["variant"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull == "debug"
+        else -> false
+    }
+    return if (validProps) sourceRuleEditRouteState(routeId) else null
+}
+
+/**
+ * Strict bridge for source pages whose existing native content is meaningful without
+ * their shell-level bottom actions, sheets, or dialogs.
+ */
+internal fun CanonicalComponentRenderModel.sourceDemoContentAdapterState(): SourceDemoRouteState? {
+    if (node.children.isNotEmpty() || bindings.isNotEmpty() || stateEventEvidence.isNotEmpty()) return null
+    val expectedRouteAndProps = when (node.type) {
+        ComponentType.SourceDetailPage -> SourceDemoRouteIds.SourceDetail to mapOf(
+            "title" to JsonPrimitive("笔趣阁")
+        )
+        ComponentType.SourceBatchPage -> SourceDemoRouteIds.SourceBatch to emptyMap()
+        ComponentType.SourceGroupsPage -> SourceDemoRouteIds.SourceGroups to emptyMap()
+        ComponentType.SourceLogsPage -> SourceDemoRouteIds.SourceLogs to emptyMap()
+        ComponentType.SourceDetectPage -> SourceDemoRouteIds.SourceDetect to emptyMap()
+        ComponentType.SourceDebugPage -> SourceDemoRouteIds.SourceDebug to emptyMap()
+        ComponentType.SourceCodeViewPage -> SourceDemoRouteIds.SourceCodeView to emptyMap()
+        ComponentType.SourceDebugContentLogPage -> SourceDemoRouteIds.SourceDebugContentLog to emptyMap()
+        else -> return null
+    }
+    if (routeId != expectedRouteAndProps.first || props != expectedRouteAndProps.second) return null
+    return sourceDemoRouteState(routeId)
+}
+
+/** Strict read-only bridge; canonical restore nodes currently expose no executable binding. */
+internal fun CanonicalComponentRenderModel.restoreReadOnlyAdapterPage(): RestorePageState? {
+    if (node.children.isNotEmpty() || bindings.isNotEmpty() || stateEventEvidence.isNotEmpty()) return null
+    val targetRouteAndProps = when (node.type to routeId) {
+        ComponentType.RestoreConfirmPage to "restore-scopes" -> RestoreRouteIds.Confirm to mapOf(
+            "variant" to JsonPrimitive("scopes")
+        )
+        ComponentType.RestoreConfirmPage to "restore-preview" -> RestoreRouteIds.Confirm to mapOf(
+            "variant" to JsonPrimitive("preview")
+        )
+        ComponentType.RestoreConfirmPage to RestoreRouteIds.Confirm -> RestoreRouteIds.Confirm to emptyMap()
+        ComponentType.RestoreProgressPage to "restore-running" -> RestoreRouteIds.Progress to mapOf(
+            "variant" to JsonPrimitive("running")
+        )
+        ComponentType.RestoreProgressPage to RestoreRouteIds.Progress -> RestoreRouteIds.Progress to emptyMap()
+        ComponentType.RestoreResultPage to RestoreRouteIds.Result -> RestoreRouteIds.Result to emptyMap()
+        else -> return null
+    }
+    if (props != targetRouteAndProps.second) return null
+    return restorePageForRoute(targetRouteAndProps.first)
+}
+
+internal enum class CanonicalSettingsReadOnlyPage {
+    General,
+    DeveloperMotion,
+    AboutFeedback,
+    BookshelfSearch
+}
+
+/** Strict settings-family bridge with no executable control or navigation callback. */
+internal fun CanonicalComponentRenderModel.settingsReadOnlyAdapterPage(): CanonicalSettingsReadOnlyPage? {
+    if (node.children.isNotEmpty() || bindings.isNotEmpty() || stateEventEvidence.isNotEmpty()) return null
+    val expected = when (node.type to routeId) {
+        ComponentType.SettingsGeneralPage to "settings-general" ->
+            CanonicalSettingsReadOnlyPage.General to emptyMap()
+        ComponentType.SettingsGeneralPage to "settings-developer" ->
+            CanonicalSettingsReadOnlyPage.DeveloperMotion to mapOf(
+                "variant" to JsonPrimitive("developer-motion")
+            )
+        ComponentType.AboutFeedbackPage to "about-feedback" ->
+            CanonicalSettingsReadOnlyPage.AboutFeedback to emptyMap()
+        ComponentType.AboutFeedbackPage to "about" ->
+            CanonicalSettingsReadOnlyPage.AboutFeedback to emptyMap()
+        ComponentType.BookshelfSearchSettingsPage to "bookshelf-search-settings" ->
+            CanonicalSettingsReadOnlyPage.BookshelfSearch to emptyMap()
+        else -> return null
+    }
+    return expected.first.takeIf { props == expected.second }
 }
 
 internal data class CanonicalComponentAccessibility(

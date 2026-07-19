@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.reader.android.R
 import com.reader.ui.shell.ReaderUiIntent
 import com.reader.ui.shell.ReplaceRule
+import com.reader.ui.shell.ReaderReplaceMutationUiState
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
@@ -58,11 +60,16 @@ import com.reader.ui.theme.readerExtraColors
 fun ReaderReplaceRuleScreen(
     onBack: () -> Unit,
     rules: List<ReplaceRule> = emptyList(),
+    mutationState: ReaderReplaceMutationUiState = ReaderReplaceMutationUiState(),
     dispatch: (ReaderUiIntent) -> Unit = {}
 ) {
     val extra = readerExtraColors()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingRule by remember { mutableStateOf<ReplaceRule?>(null) }
+
+    LaunchedEffect(Unit) {
+        dispatch(ReaderUiIntent.LoadReplaceRules())
+    }
 
     Column(
         modifier = Modifier
@@ -102,7 +109,12 @@ fun ReaderReplaceRuleScreen(
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clickable { showAddDialog = true; editingRule = null },
+                    .clickable {
+                        if (!mutationState.busy) {
+                            showAddDialog = true
+                            editingRule = null
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -112,6 +124,11 @@ fun ReaderReplaceRuleScreen(
                 )
             }
         }
+
+        ReplaceMutationStatus(
+            state = mutationState,
+            onUndo = { dispatch(ReaderUiIntent.UndoLastReplace()) }
+        )
 
         // Rules list
         if (rules.isEmpty()) {
@@ -136,9 +153,22 @@ fun ReaderReplaceRuleScreen(
                 items(rules) { rule ->
                     ReplaceRuleRow(
                         rule = rule,
-                        onToggle = { dispatch(ReaderUiIntent.ReplaceRuleToggle(id = rule.id)) },
-                        onEdit = { editingRule = rule; showAddDialog = true },
-                        onDelete = { dispatch(ReaderUiIntent.ReplaceRuleDelete(id = rule.id)) }
+                        onToggle = {
+                            if (!mutationState.busy) {
+                                dispatch(ReaderUiIntent.PersistReplaceRuleToggle(id = rule.id))
+                            }
+                        },
+                        onEdit = {
+                            if (!mutationState.busy) {
+                                editingRule = rule
+                                showAddDialog = true
+                            }
+                        },
+                        onDelete = {
+                            if (!mutationState.busy) {
+                                dispatch(ReaderUiIntent.PersistReplaceRuleDelete(id = rule.id))
+                            }
+                        }
                     )
                 }
             }
@@ -152,7 +182,7 @@ fun ReaderReplaceRuleScreen(
             onDismiss = { showAddDialog = false; editingRule = null },
             onSave = { name, pattern, replacement, scope ->
                 if (editingRule != null) {
-                    dispatch(ReaderUiIntent.ReplaceRuleUpdate(
+                    dispatch(ReaderUiIntent.PersistReplaceRuleUpdate(
                         id = editingRule!!.id,
                         name = name,
                         pattern = pattern,
@@ -160,7 +190,7 @@ fun ReaderReplaceRuleScreen(
                         scope = scope
                     ))
                 } else {
-                    dispatch(ReaderUiIntent.ReplaceRuleAdd(
+                    dispatch(ReaderUiIntent.PersistReplaceRuleCreate(
                         name = name,
                         pattern = pattern,
                         replacement = replacement,
@@ -170,6 +200,47 @@ fun ReaderReplaceRuleScreen(
                 showAddDialog = false
                 editingRule = null
             }
+        )
+    }
+}
+
+@Composable
+private fun ReplaceMutationStatus(
+    state: ReaderReplaceMutationUiState,
+    onUndo: () -> Unit
+) {
+    val extra = readerExtraColors()
+    val message = when {
+        state.busy && state.lastAction == com.reader.ui.shell.ReaderReplaceMutationAction.LOAD ->
+            "Reader Core 正在加载规则"
+        state.busy -> "Reader Core 正在保存规则"
+        state.error != null -> state.error
+        state.message != null -> state.message
+        state.canUndo -> "上次 Core 规则修改仍可撤销"
+        else -> "规则修改由 Reader Core 持久化"
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .background(extra.controlActiveSoft, ReaderShapes.md)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = message,
+            style = ReaderTextStyles.tabLabel,
+            color = if (state.error == null) extra.controlInk else extra.danger,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = if (state.busy) "处理中" else if (state.canUndo) "撤销" else "不可撤销",
+            style = ReaderTextStyles.continueAction,
+            color = if (state.canUndo) extra.controlPrimary else extra.muted,
+            modifier = if (state.canUndo) Modifier.clickable(onClick = onUndo) else Modifier
         )
     }
 }
@@ -402,4 +473,3 @@ private fun RuleEditField(
         }
     }
 }
-

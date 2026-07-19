@@ -165,9 +165,9 @@ sealed class ReaderUiIntent {
     // ── 会话状态（S7）────────────────────────────────────────────────────────
 
     /** 启动自动翻页会话（互斥：先清 TTS）。 */
-    object StartAutoPageSession : ReaderUiIntent() {
+    data class StartAutoPageSession(
         override val requestId: String = generateRequestId()
-    }
+    ) : ReaderUiIntent()
 
     /** 启动 TTS 朗读会话（互斥：先清 AUTO_PAGE）。 */
     data class StartTtsSession(
@@ -276,14 +276,14 @@ sealed class ReaderUiIntent {
     // ── 翻页（C2）────────────────────────────────────────────────────────────
 
     /** 翻到下一页。 */
-    object TurnPageNext : ReaderUiIntent() {
+    data class TurnPageNext(
         override val requestId: String = generateRequestId()
-    }
+    ) : ReaderUiIntent()
 
     /** 翻到上一页。 */
-    object TurnPagePrev : ReaderUiIntent() {
+    data class TurnPagePrev(
         override val requestId: String = generateRequestId()
-    }
+    ) : ReaderUiIntent()
 
     // ── 章节跳转 ──────────────────────────────────────────────────────────────
 
@@ -430,10 +430,48 @@ sealed class ReaderUiIntent {
 
     // ── P3: 通用设置 action ───────────────────────────────────────────────────
 
-    /** P3.4: 清理缓存（→ effect 调 Core cache.clear 命令）。 */
-    object ClearCache : ReaderUiIntent() {
+    /** P3.4: 清理全部逻辑缓存（Core `cache.clear`, scope=cache）。 */
+    data class ClearCache(
         override val requestId: String = generateRequestId()
-    }
+    ) : ReaderUiIntent()
+
+    /** 从 live ReaderContext 读取 sourceId/bookId 并刷新本书缓存状态。 */
+    data class RefreshCurrentBookCache(
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /**
+     * 从当前章节派生 Core 的半开区间。UI 不允许直接提供 sourceId/bookId
+     * 或绝对章节范围，避免 fixture/过期身份越过当前阅读上下文。
+     */
+    data class PrefetchCurrentBookCache(
+        val includeCurrentChapter: Boolean,
+        val chapterCount: Int,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** 清理 live ReaderContext 对应的单本缓存。 */
+    data class ClearCurrentBookCache(
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Core cache command terminal success; stale request ids are ignored. */
+    data class CacheActionSucceeded(
+        val action: ReaderCacheAction,
+        val snapshot: ReaderBookCacheUiState? = null,
+        /** True when a mutation committed but no trustworthy post-mutation snapshot exists. */
+        val projectionInvalidated: Boolean = false,
+        /** Non-null only when the mutation committed and its follow-up status refresh failed. */
+        val refreshError: String? = null,
+        val message: String,
+        override val requestId: String
+    ) : ReaderUiIntent()
+
+    /** Core cache command terminal failure; stale request ids are ignored. */
+    data class CacheActionFailed(
+        val message: String,
+        override val requestId: String
+    ) : ReaderUiIntent()
 
     /** P3.4: 恢复默认设置（重置 App 主题/语言/启动页/行为偏好）。 */
     object RestoreDefaultSettings : ReaderUiIntent() {
@@ -745,6 +783,90 @@ sealed class ReaderUiIntent {
     data class ReplaceRulesLoaded(
         val rules: List<ReplaceRule>,
         override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Visible native page entry: load the complete current rule set from Core. */
+    data class LoadReplaceRules(
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Correlated terminal result of [LoadReplaceRules]. */
+    data class ReplaceRulesHydrated(
+        val rules: List<ReplaceRule>,
+        override val requestId: String
+    ) : ReaderUiIntent()
+
+    /** Exact private-storage token restored at ViewModel construction; never synthesized by UI. */
+    data class RestoreReplaceUndoToken(
+        val undoTokenJson: String,
+        val undoOperation: String,
+        val undoRuleId: Long,
+        val undoExpiresAt: Long,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Native Core-backed editor create; separate from the legacy Shadow reducer intent. */
+    data class PersistReplaceRuleCreate(
+        val name: String,
+        val pattern: String,
+        val replacement: String = "",
+        val scope: String = "all",
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Native Core-backed editor update; requires a numeric Core rule id. */
+    data class PersistReplaceRuleUpdate(
+        val id: String,
+        val name: String? = null,
+        val pattern: String? = null,
+        val replacement: String? = null,
+        val scope: String? = null,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Native Core-backed editor delete; requires a numeric Core rule id. */
+    data class PersistReplaceRuleDelete(
+        val id: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Native Core-backed editor enable/disable mutation. */
+    data class PersistReplaceRuleToggle(
+        val id: String,
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Uses only the opaque token retained from the latest Core replace.persist result. */
+    data class UndoLastReplace(
+        override val requestId: String = generateRequestId()
+    ) : ReaderUiIntent()
+
+    /** Core replace.persist terminal success. Token bytes are never supplied by UI controls. */
+    data class ReplacePersistSucceeded(
+        val action: ReaderReplaceMutationAction,
+        val rule: ReplaceRule?,
+        val deletedRuleId: Long?,
+        val undoTokenJson: String,
+        val undoOperation: String,
+        val undoRuleId: Long,
+        val undoExpiresAt: Long,
+        val undoTokenPersisted: Boolean,
+        override val requestId: String
+    ) : ReaderUiIntent()
+
+    /** Core replace.undo terminal success. */
+    data class ReplaceUndoSucceeded(
+        val operation: String,
+        val ruleId: Long,
+        val changed: Boolean,
+        val restoredRule: ReplaceRule?,
+        override val requestId: String
+    ) : ReaderUiIntent()
+
+    /** Core replace.persist / replace.undo terminal failure. */
+    data class ReplaceCoreActionFailed(
+        val message: String,
+        override val requestId: String
     ) : ReaderUiIntent()
 }
 

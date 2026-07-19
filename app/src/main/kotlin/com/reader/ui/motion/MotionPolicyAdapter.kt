@@ -17,7 +17,8 @@ import io.reader.ui.contract.RouteShell
  * policy for a given request, plus convenience overloads for the common route-transition and
  * gesture scenarios.
  *
- * Contract source: generated/kotlin/MotionPolicy.kt (28 policies + 1 fallback).
+ * Contract source: generated/kotlin/MotionPolicy.kt. Version 3.0 intentionally has no
+ * catch-all fallback; unmatched requests return null.
  * Frontend equivalent: motion-controller.js resolveMotionFor() (this is the Android counterpart).
  *
  * Usage:
@@ -30,7 +31,7 @@ import io.reader.ui.contract.RouteShell
  */
 object MotionPolicyAdapter {
 
-    /** All motion policies from the contract (28 entries + 1 fallback). */
+    /** All motion policies from the generated contract. */
     val all: List<MotionPolicy> get() = MotionPolicyRegistry.all
 
     /**
@@ -40,8 +41,8 @@ object MotionPolicyAdapter {
      * then pick the one with the highest composite key (priority * 1000 + specificity).
      * This mirrors the contract's ReaderMotionResolver semantics.
      *
-     * The fallback policy (id="fallback-no-motion", priority=0, all-null match) always matches,
-     * so in practice this never returns null unless the registry is empty.
+     * Version 3.0 is fail-safe: an unmatched request returns null instead of silently selecting
+     * a generic animation.
      */
     fun resolve(request: MotionRequest): MotionId? {
         return all
@@ -71,7 +72,8 @@ object MotionPolicyAdapter {
             toRoute = toRoute,
             fromShell = fromShell,
             toShell = toShell,
-            operation = operation
+            operation = operation,
+            containerRole = MotionContainerRole.AppShell
         )
     )
 

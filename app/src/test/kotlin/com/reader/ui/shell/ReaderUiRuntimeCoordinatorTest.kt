@@ -8,6 +8,9 @@ import io.reader.ui.runtime.ReaderUIRuntime
 import io.reader.ui.runtime.ReaderUIRuntimeException
 import io.reader.ui.runtime.ReaderUIState
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,7 +106,7 @@ class ReaderUiRuntimeCoordinatorTest {
         )
         assertEquals("awaiting-plan", ttsObservation.runtimeState?.ttsTransaction?.stage)
 
-        vm.dispatch(ReaderUiIntent.StartAutoPageSession)
+        vm.dispatch(ReaderUiIntent.StartAutoPageSession())
         assertEquals(SessionType.AUTO_PAGE, vm.state.value.activeSession?.type)
         assertEquals("auto-page", vm.readerUiRuntimeShadowState.activeSession)
         assertEquals(1, vm.state.value.pendingHostRequests.size)
@@ -372,6 +375,7 @@ class ReaderUiRuntimeCoordinatorTest {
     @Test
     fun `consumer lock keeps 35 covered with 7 Pilot and 28 default Shadow events`() {
         val lock = JSONObject(findConsumerLock().readText())
+        val expectedReaderUiVersion = verifiedArtifactReaderUiVersion(lock)
         val rollout = lock.getJSONObject("rollout")
         val covered = rollout.getJSONArray("coveredEvents").strings()
         val coordinator = ReaderUiRuntimeCoordinator()
@@ -427,7 +431,7 @@ class ReaderUiRuntimeCoordinatorTest {
             coordinator.coveredEvents.size - coordinator.pilotEvents.size,
             coordinator.coveredEvents.minus(coordinator.pilotEvents).size
         )
-        assertEquals("2.5.1", lock.getString("readerUiVersion"))
+        assertTrue(expectedReaderUiVersion.matches(STRICT_SEMVER))
         assertEquals("1.2.0", lock.getString("hostRequestSchemaVersion"))
         assertEquals(2, lock.getInt("runtimeActionsSchemaVersion"))
         assertEquals(
@@ -729,7 +733,7 @@ class ReaderUiRuntimeCoordinatorTest {
             playbackPilotEnabled = true
         )
 
-        val result = coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession)
+        val result = coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession())
 
         assertTrue(result is ReaderPlaybackPilotDispatch.Applied)
         val applied = result as ReaderPlaybackPilotDispatch.Applied
@@ -749,7 +753,7 @@ class ReaderUiRuntimeCoordinatorTest {
             playbackPilotEnabled = true
         )
 
-        coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession)
+        coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession())
         assertNotNull(runtime.state.autoPageTransaction)
 
         val result = coordinator.dispatchPlaybackPilot(ReaderUiIntent.StopSession)
@@ -760,6 +764,85 @@ class ReaderUiRuntimeCoordinatorTest {
         assertNull(applied.state.autoPageTransaction)
         assertEquals("reader.autoPage.stop", coordinator.lastObservation?.event)
         assertEquals(ReaderUiRuntimeDispatchMode.PILOT, coordinator.lastObservation?.mode)
+    }
+
+    @Test
+    fun `repeated page and auto page actions keep runtime exactly once while fresh clicks supersede`() {
+        val pageRuntime = ReaderUIRuntime(ReaderUIState(routeId = "immersive-reading"))
+        val pageCoordinator = ReaderUiRuntimeCoordinator(
+            runtime = pageRuntime,
+            directoryPilotEnabled = false,
+            bookOpenPilotEnabled = false,
+            playbackPilotEnabled = true
+        )
+        val firstPage = ReaderUiIntent.TurnPageNext()
+        val secondPage = ReaderUiIntent.TurnPageNext()
+        val previousPage = ReaderUiIntent.TurnPagePrev()
+        assertEquals(3, setOf(firstPage.requestId, secondPage.requestId, previousPage.requestId).size)
+
+        assertTrue(pageCoordinator.dispatchPlaybackPilot(firstPage) is ReaderPlaybackPilotDispatch.Applied)
+        assertTrue(pageCoordinator.dispatchPlaybackPilot(firstPage) is ReaderPlaybackPilotDispatch.FailedClosed)
+        assertEquals(firstPage.requestId, pageRuntime.state.pageTransaction?.correlationId)
+
+        val second = pageCoordinator.dispatchPlaybackPilot(secondPage) as ReaderPlaybackPilotDispatch.Applied
+        assertEquals(listOf(firstPage.requestId), second.cancelledCorrelationIds)
+        assertEquals(secondPage.requestId, pageRuntime.state.pageTransaction?.correlationId)
+        val previous = pageCoordinator.dispatchPlaybackPilot(previousPage) as ReaderPlaybackPilotDispatch.Applied
+        assertEquals(listOf(secondPage.requestId), previous.cancelledCorrelationIds)
+        assertEquals(previousPage.requestId, pageRuntime.state.pageTransaction?.correlationId)
+
+        val autoRuntime = ReaderUIRuntime(ReaderUIState(routeId = "immersive-reading"))
+        val autoCoordinator = ReaderUiRuntimeCoordinator(
+            runtime = autoRuntime,
+            directoryPilotEnabled = false,
+            bookOpenPilotEnabled = false,
+            playbackPilotEnabled = true
+        )
+        val firstAuto = ReaderUiIntent.StartAutoPageSession()
+        val secondAuto = ReaderUiIntent.StartAutoPageSession()
+        assertFalse(firstAuto.requestId == secondAuto.requestId)
+        assertTrue(autoCoordinator.dispatchPlaybackPilot(firstAuto) is ReaderPlaybackPilotDispatch.Applied)
+        assertTrue(autoCoordinator.dispatchPlaybackPilot(firstAuto) is ReaderPlaybackPilotDispatch.FailedClosed)
+        val replacement = autoCoordinator.dispatchPlaybackPilot(secondAuto) as ReaderPlaybackPilotDispatch.Applied
+        assertTrue(firstAuto.requestId in replacement.cancelledCorrelationIds)
+        assertEquals(secondAuto.requestId, autoRuntime.state.autoPageTransaction?.correlationId)
+    }
+
+    @Test
+    fun `concurrent page clicks receive unique correlations and serialize through supersede ledger`() {
+        val runtime = ReaderUIRuntime(ReaderUIState(routeId = "immersive-reading"))
+        val coordinator = ReaderUiRuntimeCoordinator(
+            runtime = runtime,
+            directoryPilotEnabled = false,
+            bookOpenPilotEnabled = false,
+            playbackPilotEnabled = true
+        )
+        val intents = List(8) { ReaderUiIntent.TurnPageNext() }
+        assertEquals(intents.size, intents.map { it.requestId }.toSet().size)
+        val ready = CountDownLatch(intents.size)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(intents.size)
+        try {
+            val futures = intents.map { intent ->
+                executor.submit<ReaderPlaybackPilotDispatch> {
+                    ready.countDown()
+                    check(start.await(5, TimeUnit.SECONDS))
+                    coordinator.dispatchPlaybackPilot(intent)
+                }
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS))
+            start.countDown()
+            val results = futures.map { it.get(5, TimeUnit.SECONDS) }
+                .map { it as ReaderPlaybackPilotDispatch.Applied }
+            val cancelled = results.flatMap { it.cancelledCorrelationIds }
+            val active = requireNotNull(runtime.state.pageTransaction?.correlationId)
+
+            assertEquals(intents.size - 1, cancelled.size)
+            assertEquals(cancelled.size, cancelled.toSet().size)
+            assertEquals(intents.map { it.requestId }.toSet(), cancelled.toSet() + active)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -811,6 +894,30 @@ class ReaderUiRuntimeCoordinatorTest {
         error("READER_UI_CONSUMER.json not found from $workingDirectory")
     }
 
+    /**
+     * The release verifier writes this version and identity into the consumer lock.
+     * The local composite Reader-UI checkout may already be ahead of the consumed artifact,
+     * so the lock remains the expected release source until an atomic lock-only bump lands.
+     */
+    private fun verifiedArtifactReaderUiVersion(lock: JSONObject): String {
+        assertEquals(2, lock.getInt("schemaVersion"))
+        assertEquals("android", lock.getString("host"))
+        val identity = lock.getJSONObject("releaseIdentity")
+        assertEquals(
+            "${identity.getString("sourceSha")}:${identity.getString("manifestSha256")}",
+            identity.getString("releaseId")
+        )
+        return lock.getString("readerUiVersion")
+    }
+
     private fun org.json.JSONArray.strings(): List<String> =
         (0 until length()).map(::getString)
+
+    private companion object {
+        val STRICT_SEMVER = Regex(
+            "^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)" +
+                "(?:-(?:(?:0|[1-9]\\d*)|(?:\\d*[A-Za-z-][0-9A-Za-z-]*))" +
+                "(?:\\.(?:(?:0|[1-9]\\d*)|(?:\\d*[A-Za-z-][0-9A-Za-z-]*)))*)?$"
+        )
+    }
 }

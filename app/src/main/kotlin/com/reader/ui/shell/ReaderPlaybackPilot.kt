@@ -2,6 +2,7 @@ package com.reader.ui.shell
 
 import com.reader.android.AppProvider
 import com.reader.android.data.adapter.TtsUtterance
+import com.reader.android.data.repository.ConfirmedReadingProgress
 import com.reader.api.Book
 import com.reader.api.Chapter
 import com.reader.api.ReaderCoreClient
@@ -130,6 +131,27 @@ internal data class ReaderPlaybackTtsSnapshot(
     val chapterIndex: Int
 )
 
+/**
+ * Canonical location waiting for Core's durable `reading.progress.update`
+ * acknowledgement.  It is correlation-scoped and deliberately separate from
+ * [ReaderPlaybackDomainState.committedLocation]: location resolution alone
+ * must never move the visible page.
+ */
+internal data class ReaderPlaybackPendingProgress(
+    val correlationId: String,
+    val sourceId: String,
+    val bookId: String,
+    val pageIndex: Int,
+    val chapterPosition: Int,
+    val totalChapters: Int,
+    val bookName: String,
+    val author: String?,
+    val chapterTitle: String,
+    val chapterUrl: String,
+    val location: ReaderBookOpenCanonicalLocation,
+    val updatedAt: Long
+)
+
 internal data class ReaderPlaybackDomainState(
     val reader: ReaderPlaybackReaderSnapshot? = null,
     val pageCorrelationId: String? = null,
@@ -138,6 +160,7 @@ internal data class ReaderPlaybackDomainState(
     val pageGeneration: Int? = null,
     val committedPageIndex: Int = 0,
     val committedLocation: ReaderBookOpenCanonicalLocation? = null,
+    val pendingProgress: ReaderPlaybackPendingProgress? = null,
     val ttsCorrelationId: String? = null,
     val ttsPlan: ReaderPlaybackTtsPlan? = null,
     val ttsSnapshot: ReaderPlaybackTtsSnapshot? = null,
@@ -222,20 +245,43 @@ internal class ReaderPlaybackDomainStore {
     @Synchronized
     fun commitPage(
         correlationId: String,
-        pageIndex: Int,
-        location: ReaderBookOpenCanonicalLocation
+        confirmed: ReaderPlaybackPendingProgress
     ): Boolean {
-        if (mutable.value.pageCorrelationId != correlationId) return false
+        val current = mutable.value
+        if (
+            current.pageCorrelationId != correlationId ||
+            current.pendingProgress != confirmed ||
+            confirmed.correlationId != correlationId
+        ) return false
         mutable.value = mutable.value.copy(
-            committedPageIndex = pageIndex,
-            committedLocation = location,
+            committedPageIndex = confirmed.pageIndex,
+            committedLocation = confirmed.location,
+            pendingProgress = null,
             pageCorrelationId = null,
             pageDirection = null,
             pageSource = null,
             pageGeneration = null,
             error = null,
-            stage = "reader.location.resolved"
+            stage = "reader.progress.persisted"
         )
+        return true
+    }
+
+    @Synchronized
+    fun recordPendingProgress(pending: ReaderPlaybackPendingProgress): Boolean {
+        if (mutable.value.pageCorrelationId != pending.correlationId) return false
+        mutable.value = mutable.value.copy(
+            pendingProgress = pending,
+            stage = "persisting-progress"
+        )
+        return true
+    }
+
+    @Synchronized
+    fun discardPendingProgress(correlationId: String): Boolean {
+        val current = mutable.value
+        if (current.pendingProgress?.correlationId != correlationId) return false
+        mutable.value = current.copy(pendingProgress = null)
         return true
     }
 
@@ -287,6 +333,11 @@ internal interface ReaderPlaybackRuntimeDriver {
         pageIndex: Int? = null,
         error: String? = null
     ): ReaderPlaybackRuntimeAdvance
+    fun acceptPageProgressResult(
+        correlationId: String,
+        stored: Boolean? = null,
+        error: String? = null
+    ): ReaderPlaybackRuntimeAdvance
     fun acceptTTSCoreResult(coreType: String, correlationId: String, error: String? = null): ReaderPlaybackRuntimeAdvance
     fun acceptTTSSystemStart(correlationId: String, error: String? = null): ReaderPlaybackRuntimeAdvance
     fun acceptAutoPageTimerFired(correlationId: String, generation: Int): ReaderPlaybackRuntimeAdvance
@@ -304,6 +355,33 @@ internal interface ReaderPlaybackCommandHandle {
 
 internal interface ReaderCorePlaybackCommandClient {
     fun beginCommand(method: String, params: JSONObject): ReaderPlaybackCommandHandle
+}
+
+internal fun interface ReaderPlaybackProgressMirror {
+    suspend fun mirror(progress: ReaderPlaybackPendingProgress)
+}
+
+private object ProductionReaderPlaybackProgressMirror : ReaderPlaybackProgressMirror {
+    override suspend fun mirror(progress: ReaderPlaybackPendingProgress) {
+        if (!AppProvider.isInitialized) return
+        AppProvider.readingProgressRepository.mirrorConfirmedProgress(
+            ConfirmedReadingProgress(
+                sourceId = progress.sourceId,
+                bookId = progress.bookId,
+                bookName = progress.bookName,
+                author = progress.author,
+                chapterUrl = progress.chapterUrl,
+                chapterTitle = progress.chapterTitle,
+                chapterPosition = progress.chapterPosition,
+                totalChapters = progress.totalChapters,
+                pageIndex = progress.pageIndex,
+                chapterOffset = progress.location.chapterOffset,
+                chapterProgress = progress.location.chapterProgress,
+                locationRevision = progress.location.locationRevision,
+                updatedAt = progress.updatedAt
+            )
+        )
+    }
 }
 
 internal class ProductionReaderCorePlaybackCommandClient(
@@ -362,7 +440,9 @@ internal open class ReaderPlaybackEffectExecutor(
     },
     private val speechEngineFactory: () -> ReaderPlaybackSpeechEngine = {
         AndroidReaderPlaybackSpeechEngine()
-    }
+    },
+    private val progressMirror: ReaderPlaybackProgressMirror = ProductionReaderPlaybackProgressMirror,
+    private val epochSeconds: () -> Long = { System.currentTimeMillis() / 1_000L }
 ) {
     private val issuedEffects = mutableSetOf<String>()
     private val handles = mutableMapOf<String, ReaderPlaybackCommandHandle>()
@@ -371,6 +451,7 @@ internal open class ReaderPlaybackEffectExecutor(
     private val ttsContexts = mutableMapOf<String, ReaderPlaybackReaderSnapshot>()
     private val speechGenerations = mutableMapOf<String, Long>()
     private val generationCounter = AtomicLong(0L)
+    private val progressTimestamp = AtomicLong(0L)
     /** FIFO tail: every Runtime effect array is awaited in contract order. */
     private var serialTail: Job? = null
     private var projectionSink: ((ReaderUIState, ReaderPlaybackDomainState) -> Unit)? = null
@@ -382,10 +463,10 @@ internal open class ReaderPlaybackEffectExecutor(
     }
 
     internal fun canAdmit(intent: ReaderUiIntent, bookOpen: ReaderBookOpenDomainState): Boolean = when (intent) {
-        ReaderUiIntent.TurnPageNext,
-        ReaderUiIntent.TurnPagePrev,
+        is ReaderUiIntent.TurnPageNext,
+        is ReaderUiIntent.TurnPagePrev,
         is ReaderUiIntent.StartTtsSession,
-        ReaderUiIntent.StartAutoPageSession -> ReaderPlaybackReaderSnapshot.from(bookOpen) != null
+        is ReaderUiIntent.StartAutoPageSession -> ReaderPlaybackReaderSnapshot.from(bookOpen) != null
         ReaderUiIntent.StopSession -> true
         else -> false
     }
@@ -457,6 +538,10 @@ internal open class ReaderPlaybackEffectExecutor(
         // serial executor has projected that transaction.
         val before = runtime.playbackRuntimeState
         val pageCorrelationId = before.pageTransaction?.correlationId
+        // Core progress is a write-through commit boundary.  Reader UI rejects
+        // cancellation in this stage, so Host must leave the command and its
+        // correlation alive until the terminal callback arrives.
+        if (before.pageTransaction?.stage == "persisting-progress") return
         val ttsCorrelationId = before.ttsTransaction?.correlationId
         val autoPageCorrelationId = before.autoPageTransaction?.correlationId
         listOfNotNull(pageCorrelationId, ttsCorrelationId, autoPageCorrelationId)
@@ -479,21 +564,31 @@ internal open class ReaderPlaybackEffectExecutor(
 
     @Synchronized
     open fun cancelAll(scope: CoroutineScope? = null) {
-        handles.values.forEach(ReaderPlaybackCommandHandle::cancel)
-        handles.clear()
+        val committingCorrelation = domainStore.state.value.pendingProgress?.correlationId
+        handles.entries.toList().forEach { (key, handle) ->
+            if (committingCorrelation == null || !key.startsWith("$committingCorrelation:reader.progress.update:")) {
+                handle.cancel()
+                handles.remove(key)
+            }
+        }
         speechHandles.values.forEach(ReaderPlaybackSpeechHandle::cancel)
         speechHandles.clear()
         timerJobs.values.forEach(Job::cancel)
         timerJobs.clear()
         speechGenerations.keys.toList().forEach(::invalidateCorrelation)
-        serialTail?.cancel()
-        serialTail = null
+        if (committingCorrelation == null) {
+            serialTail?.cancel()
+            serialTail = null
+        }
         scope?.launch { runCatching { speechEngine.stop() } }
     }
 
     internal suspend fun awaitSerialIdle() {
-        val tail = synchronized(this) { serialTail }
-        tail?.join()
+        while (true) {
+            val tail = synchronized(this) { serialTail }
+            tail?.join()
+            if (synchronized(this) { serialTail === tail }) return
+        }
     }
 
     @Synchronized
@@ -503,6 +598,16 @@ internal open class ReaderPlaybackEffectExecutor(
 
     private suspend fun processAdvance(advance: ReaderPlaybackRuntimeAdvance, scope: CoroutineScope) {
         if (!advance.accepted) return
+        val latestRuntime = runtime.playbackRuntimeState
+        if (advance.state != latestRuntime) {
+            // A lifecycle/stop transition may have been queued while an
+            // irreversible Core progress write was awaiting its result. Do
+            // not replay stale successor effects (notably auto-page rearm)
+            // after that newer Runtime state has already won.
+            domainStore.syncRuntime(latestRuntime)
+            notifyProjection(latestRuntime)
+            return
+        }
         advance.cancelledCorrelationIds.forEach(::invalidateCorrelation)
         domainStore.syncRuntime(advance.state)
         for (effect in advance.effects) processEffect(effect, scope)
@@ -558,6 +663,7 @@ internal open class ReaderPlaybackEffectExecutor(
         if (!isCorrelationCurrent(effect)) return
         when (effect.type) {
             "reader.location.resolve" -> completePageLocation(effect, result, scope)
+            "reader.progress.update" -> completePageProgress(effect, result, scope)
             "tts.queue.plan" -> completeTtsPlan(correlationId, result, scope)
             "tts.queue.start" -> completeTtsQueueStart(correlationId, result, scope)
             "tts.queue.stop" -> ttsContexts.remove(correlationId)
@@ -603,6 +709,20 @@ internal open class ReaderPlaybackEffectExecutor(
                     put("pageIndex", effect.payload.requiredInt("targetPageIndex"))
                 })
             }
+            "reader.progress.update" -> {
+                val pending = domainStore.state.value.pendingProgress
+                    ?.takeIf { it.correlationId == correlationId }
+                    ?: error("reader.progress.update requires matching pending canonical location")
+                "reading.progress.update" to JSONObject().apply {
+                    put("sourceId", pending.sourceId)
+                    put("bookId", pending.bookId)
+                    put("chapterIndex", pending.location.chapterIndex)
+                    put("chapterOffset", pending.location.chapterOffset)
+                    put("chapterProgress", pending.location.chapterProgress)
+                    put("locationRevision", pending.location.locationRevision)
+                    put("updatedAt", pending.updatedAt)
+                }
+            }
             "tts.queue.plan" -> "tts.slice" to JSONObject().apply {
                 put("chapter", reader.toTtsChapterJson())
                 put("content", reader.content)
@@ -640,8 +760,46 @@ internal open class ReaderPlaybackEffectExecutor(
             pageIndex = pageIndex
         )
         if (!advance.accepted) return
-        if (!domainStore.commitPage(correlationId, pageIndex, location)) return
-        processAdvance(advance, scope)
+        val pending = ReaderPlaybackPendingProgress(
+            correlationId = correlationId,
+            sourceId = reader.sourceId,
+            bookId = reader.bookId,
+            pageIndex = pageIndex,
+            chapterPosition = reader.selectedChapterPosition,
+            totalChapters = reader.chapters.size,
+            bookName = reader.book.name,
+            author = reader.book.author.takeIf(String::isNotBlank),
+            chapterTitle = reader.chapter.title,
+            chapterUrl = reader.chapter.url,
+            location = location,
+            updatedAt = nextProgressTimestamp()
+        )
+        if (!domainStore.recordPendingProgress(pending)) return
+        // Re-enter behind the current location effect so its terminal trace is
+        // recorded before the progress write begins.
+        enqueueSerial(scope) { processAdvance(advance, scope) }
+    }
+
+    private suspend fun completePageProgress(effect: ReaderUIEffect, result: JSONObject, scope: CoroutineScope) {
+        val correlationId = requireNotNull(effect.correlationId)
+        val pending = domainStore.state.value.pendingProgress
+            ?.takeIf { it.correlationId == correlationId }
+            ?: return
+        try {
+            validateStoredProgress(result, pending)
+        } catch (error: Exception) {
+            handleCoreFailure(effect, "PAGE_INVALID_PROGRESS:${error.message}", scope)
+            return
+        }
+        val advance = runtime.acceptPageProgressResult(correlationId, stored = true)
+        if (!advance.accepted) return
+        if (!domainStore.commitPage(correlationId, pending)) return
+        // Core is the canonical write. Room is a lossy UX/recent-books mirror
+        // and must never turn a confirmed Core success into a failed page step.
+        runCatching { progressMirror.mirror(pending) }
+        // Auto-page rearm follows the terminal progress trace and can only run
+        // after the canonical + visible commit above.
+        enqueueSerial(scope) { processAdvance(advance, scope) }
     }
 
     private suspend fun completeTtsPlan(correlationId: String, result: JSONObject, scope: CoroutineScope) {
@@ -842,8 +1000,12 @@ internal open class ReaderPlaybackEffectExecutor(
         domainStore.fail(correlationId, message)
         val advance = when (effect.type) {
             "reader.location.resolve" -> runtime.acceptPageLocationResult(correlationId, error = message)
+            "reader.progress.update" -> runtime.acceptPageProgressResult(correlationId, error = message)
             "tts.queue.plan", "tts.queue.start" -> runtime.acceptTTSCoreResult(effect.type, correlationId, message)
             else -> null
+        }
+        if (effect.type == "reader.progress.update") {
+            domainStore.discardPendingProgress(correlationId)
         }
         if (advance != null) processAdvance(advance, scope)
     }
@@ -853,6 +1015,8 @@ internal open class ReaderPlaybackEffectExecutor(
         val domain = domainStore.state.value
         return when (effect.type) {
             "reader.location.resolve" -> domain.pageCorrelationId == correlationId
+            "reader.progress.update" -> domain.pageCorrelationId == correlationId &&
+                domain.pendingProgress?.correlationId == correlationId
             "tts.queue.plan", "tts.queue.start" -> domain.ttsCorrelationId == correlationId
             "tts.queue.stop" -> correlationId in ttsContexts
             else -> false
@@ -862,6 +1026,7 @@ internal open class ReaderPlaybackEffectExecutor(
     @Synchronized
     private fun invalidateCorrelation(correlationId: String) {
         handles.entries.filter { it.key.startsWith("$correlationId:") }.forEach { (key, handle) ->
+            if (key.startsWith("$correlationId:reader.progress.update:")) return@forEach
             handle.cancel()
             handles.remove(key)
         }
@@ -998,6 +1163,30 @@ internal open class ReaderPlaybackEffectExecutor(
             reflow.requiredString("fallbackAnchor"),
             reflow.getBoolean("layoutIndependent")
         )
+    }
+
+    private fun validateStoredProgress(
+        result: JSONObject,
+        pending: ReaderPlaybackPendingProgress
+    ) {
+        require(result.optBoolean("stored", false)) { "reading.progress.update stored must be true" }
+        require(result.requiredString("sourceId") == pending.sourceId) { "sourceId drift" }
+        require(result.requiredString("bookId") == pending.bookId) { "bookId drift" }
+        require(result.requiredNonNegativeLong("updatedAt") == pending.updatedAt) { "updatedAt stale/current-row drift" }
+        require(result.requiredNonNegativeInt("chapterIndex") == pending.location.chapterIndex) { "chapterIndex drift" }
+        require(result.requiredNonNegativeLong("chapterOffset") == pending.location.chapterOffset) { "chapterOffset drift" }
+        require(result.requiredProgress("chapterProgress") == pending.location.chapterProgress) { "chapterProgress drift" }
+        require(result.requiredString("locationRevision") == pending.location.locationRevision) {
+            "locationRevision drift"
+        }
+    }
+
+    private fun nextProgressTimestamp(): Long {
+        while (true) {
+            val previous = progressTimestamp.get()
+            val next = maxOf(epochSeconds(), previous + 1L, 1L)
+            if (progressTimestamp.compareAndSet(previous, next)) return next
+        }
     }
 
     private fun ReaderPlaybackReaderSnapshot.toTtsChapterJson(): JSONObject = JSONObject().apply {

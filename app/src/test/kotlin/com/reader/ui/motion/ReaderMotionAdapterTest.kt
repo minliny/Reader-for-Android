@@ -78,12 +78,12 @@ class ReaderMotionAdapterTest {
     }
 
     @Test
-    fun `all 93 generated motions expose unique exact serializer wire names`() {
-        assertEquals(93, MotionId.entries.size)
+    fun `all 95 generated motions expose unique exact serializer wire names`() {
+        assertEquals(95, MotionId.entries.size)
         assertEquals(MotionId.entries.toSet(), MotionSpecRegistry.all.map { it.id }.toSet())
 
         val serialNames = MotionId.entries.map { it.serialName }
-        assertEquals(93, serialNames.toSet().size)
+        assertEquals(95, serialNames.toSet().size)
         assertEquals(
             mapOf(
                 MotionId.DropdownMenuExpand to "dropdown.menu.expand",
@@ -107,6 +107,39 @@ class ReaderMotionAdapterTest {
                 MotionId.TabItemPress,
                 MotionId.TabItemSwitch
             ).associateWith { it.serialName }
+        )
+    }
+
+    @Test
+    fun `generated registry separates 89 active exact motions from six non production ids`() {
+        val nonProductionIds = setOf(
+            MotionId.ReaderSourceSwitchOpenClose,
+            MotionId.OverlayDialogEnterExit,
+            MotionId.OverlaySheetEnterExit,
+            MotionId.ReaderSessionControlSpaceEnter,
+            MotionId.ReaderSessionControlSpaceUpdate,
+            MotionId.ReaderSessionControlSpaceExit
+        )
+        val activeExact = MotionSpecRegistry.all.filter { spec ->
+            spec.trigger?.isNotEmpty() == true &&
+                spec.from?.isNotEmpty() == true &&
+                spec.to?.isNotEmpty() == true &&
+                spec.interrupt?.isNotEmpty() == true &&
+                spec.finalState?.isNotBlank() == true &&
+                spec.cleanup?.isNotEmpty() == true
+        }
+        val pending = MotionSpecRegistry.all.map { it.id }.toSet() - activeExact.map { it.id }.toSet()
+        val deprecated = MotionSpecRegistry.all.filter { it.deprecated }.map { it.id }.toSet()
+
+        assertEquals(89, activeExact.size)
+        assertEquals(nonProductionIds, pending)
+        assertEquals(
+            setOf(
+                MotionId.ReaderSourceSwitchOpenClose,
+                MotionId.OverlayDialogEnterExit,
+                MotionId.OverlaySheetEnterExit
+            ),
+            deprecated
         )
     }
 

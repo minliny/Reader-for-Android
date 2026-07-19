@@ -444,13 +444,13 @@ class MotionControllerTest {
     }
 
     @Test
-    fun `reader control hide finalState is immersiveReadingHotZonesRestored`() {
+    fun `reader control hide finalState follows generated contract`() {
         val contract = MotionController.contractFor(
             MotionIdConstants.READER_CONTROL_HIDE
         )!!
 
-        assertEquals("immersiveReadingHotZonesRestored", contract.finalState)
-        assertEquals(240L, contract.defaultDurationMs)
+        assertEquals("immersive.hidden", contract.finalState)
+        assertEquals(360L, contract.defaultDurationMs)
     }
 
     // ── Event log + listeners ────────────────────────────────────────────────────
@@ -591,12 +591,12 @@ class MotionControllerTest {
         )
     }
 
-    // ── R10: Full generated MotionSpecRegistry coverage (93 canonical entries) ──
+    // ── R10: Full generated MotionSpecRegistry coverage (95 canonical entries) ──
 
     @Test
-    fun `all 93 MotionSpecRegistry entries resolve through contractFor`() {
+    fun `all 95 MotionSpecRegistry entries resolve through contractFor`() {
         val allSpecs = MotionSpecRegistry.all
-        assertEquals(93, allSpecs.size)
+        assertEquals(95, allSpecs.size)
         val unresolved = allSpecs.map { it.id.serialName }.filter { MotionController.contractFor(it) == null }
         assertTrue("Unresolved MotionIds: $unresolved", unresolved.isEmpty())
     }

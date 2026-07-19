@@ -247,6 +247,20 @@ val LocalReaderExtraColors = staticCompositionLocalOf {
     )
 }
 
+/**
+ * Host-store theme identity paired with the exact paper color provided to
+ * production Compose. Contract fixtures may validate this boundary but never
+ * replace it as render authority.
+ */
+internal data class ReaderThemeHostState(
+    val themeId: String,
+    val effectiveThemeId: String,
+    val isNight: Boolean,
+    val paper: Color
+)
+
+private val LocalReaderThemeHostState = staticCompositionLocalOf<ReaderThemeHostState?> { null }
+
 internal val LightExtra = ReaderExtraColors(
     paper = Paper,
     readerPaper = ReaderPaper,
@@ -598,7 +612,21 @@ fun ReaderTheme(
     }
     val colors = if (isNight) DarkColors else LightColors
     val extra = ReaderThemeResolver.palette(themeId, isNight)
-    CompositionLocalProvider(LocalReaderExtraColors provides extra) {
+    val effectiveThemeId = if (isNight && !themeId.endsWith("-night")) {
+        "$themeId-night"
+    } else {
+        themeId
+    }
+    val hostState = ReaderThemeHostState(
+        themeId = themeId,
+        effectiveThemeId = effectiveThemeId,
+        isNight = isNight,
+        paper = extra.paper
+    )
+    CompositionLocalProvider(
+        LocalReaderExtraColors provides extra,
+        LocalReaderThemeHostState provides hostState
+    ) {
         MaterialTheme(
             colorScheme = colors,
             shapes = MaterialShapes,
@@ -611,3 +639,7 @@ fun ReaderTheme(
 /** Consume the extra color tokens in a composable. */
 @Composable
 fun readerExtraColors(): ReaderExtraColors = LocalReaderExtraColors.current
+
+/** Null outside the formal [ReaderTheme] environment so strict adapters can fail closed. */
+@Composable
+internal fun readerThemeHostState(): ReaderThemeHostState? = LocalReaderThemeHostState.current

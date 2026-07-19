@@ -3,6 +3,7 @@ package com.reader.ui.demo
 import com.reader.ui.shell.MainTab
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
+import io.reader.ui.contract.ComponentType
 import io.reader.ui.contract.RouteId
 import io.reader.ui.contract.RouteShell
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -21,18 +22,21 @@ data class DemoRouteAction(
     val onStart: (() -> Unit)? = null
 )
 
-/** Native Compose renderer families for the 2.5 route-state additions. */
+/** Native Compose renderer families for explicit post-2.4 contract additions. */
 enum class DemoRouteRenderer {
     ReaderWorkspaceState,
     ReaderReplacementState,
     SourceSwitchState,
     ReaderContentState,
-    LocalImportState
+    LocalImportState,
+    /** Reader-UI 3.0 structure is present, but its planned actions stay fail-closed. */
+    CapabilityClosureStructure
 }
 
 private data class DemoRouteAddition(
     val page: DemoRoutePage,
-    val renderer: DemoRouteRenderer
+    val renderer: DemoRouteRenderer,
+    val componentTypes: List<ComponentType> = emptyList()
 )
 
 private fun action(label: String, targetRoute: String): DemoRouteAction =
@@ -44,7 +48,8 @@ private fun addition(
     shell: RouteShell,
     renderer: DemoRouteRenderer,
     body: List<String>,
-    actions: List<DemoRouteAction>
+    actions: List<DemoRouteAction>,
+    componentTypes: List<ComponentType> = emptyList()
 ): DemoRouteAddition = DemoRouteAddition(
     page = DemoRoutePage(
         id = id,
@@ -53,7 +58,28 @@ private fun addition(
         body = body,
         actions = actions
     ),
-    renderer = renderer
+    renderer = renderer,
+    componentTypes = componentTypes
+)
+
+private fun capabilityAddition(
+    id: String,
+    title: String,
+    shell: RouteShell,
+    componentTypes: List<ComponentType>,
+    summary: String
+): DemoRouteAddition = addition(
+    id = id,
+    title = title,
+    shell = shell,
+    renderer = DemoRouteRenderer.CapabilityClosureStructure,
+    body = listOf(
+        summary,
+        "Reader-UI 3.0 顶层结构：${componentTypes.joinToString(" + ") { it.name }}。",
+        "交互动作：planned / fail-closed；Host 接管前不创建业务回调。"
+    ),
+    actions = emptyList(),
+    componentTypes = componentTypes
 )
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -187,6 +213,7 @@ object DemoRouteRegistry {
         DemoRoutePage(id = "local-import", title = "本地书导入（Local Import）", shell = RouteShell.LibraryShell, body = listOf("本地书导入（Local Import）")),
         DemoRoutePage(id = "immersive-reading", title = "沉浸阅读（Immersive Reading）", shell = RouteShell.ReaderShell, body = listOf("沉浸阅读（Immersive Reading）")),
         DemoRoutePage(id = "settings-general", title = "通用设置（General Settings）", shell = RouteShell.SettingsShell, body = listOf("通用设置（General Settings）")),
+        DemoRoutePage(id = "settings-developer", title = "开发模式（Developer Mode）", shell = RouteShell.SettingsShell, body = listOf("开发模式（Developer Mode）")),
         DemoRoutePage(id = "bookshelf-search-settings", title = "书架与搜索设置（Bookshelf and Search Settings）", shell = RouteShell.SettingsShell, body = listOf("书架与搜索设置（Bookshelf and Search Settings）")),
         DemoRoutePage(id = "about-feedback", title = "关于与反馈（About and Feedback）", shell = RouteShell.SettingsShell, body = listOf("关于与反馈（About and Feedback）")),
         DemoRoutePage(id = "sync-backup", title = "同步与备份（Sync and Backup）", shell = RouteShell.SettingsShell, body = listOf("同步与备份（Sync and Backup）")),
@@ -552,11 +579,187 @@ object DemoRouteRegistry {
         )
     )
 
-    private val contract25RendererByRoute: Map<String, DemoRouteRenderer> =
-        contract25Additions.associate { it.page.id to it.renderer }
+    /**
+     * Reader-UI 3.0 capability-closure routes. These entries intentionally describe only the
+     * canonical top-level native structure. Their generated bindings are evidence, not Android
+     * callbacks, so every page remains read-only until a concrete Host owner is admitted.
+     */
+    private val contract30Additions: List<DemoRouteAddition> = listOf(
+        capabilityAddition(
+            id = "onboarding-welcome",
+            title = "首次使用（Onboarding Welcome）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.AppShellStructure),
+            summary = "展示首次使用入口与能力说明。"
+        ),
+        capabilityAddition(
+            id = "onboarding-capability-setup",
+            title = "能力与权限设置（Onboarding Capability Setup）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.PermissionRequiredPage),
+            summary = "展示首次启动需要确认的能力与权限。"
+        ),
+        capabilityAddition(
+            id = "permission-recovery",
+            title = "权限恢复（Permission Recovery）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.PermissionRequiredPage),
+            summary = "展示权限缺失后的恢复路径与状态。"
+        ),
+        capabilityAddition(
+            id = "local-format-support",
+            title = "本地格式支持（Local Format Support）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.LocalBookImportPage),
+            summary = "展示本地文件格式支持范围与导入入口。"
+        ),
+        capabilityAddition(
+            id = "pdf-reader",
+            title = "PDF 阅读（PDF Reader）",
+            shell = RouteShell.ReaderShell,
+            componentTypes = listOf(ComponentType.ReaderBase, ComponentType.ReaderTopArea),
+            summary = "展示 PDF 阅读容器与阅读顶部区域。"
+        ),
+        capabilityAddition(
+            id = "manga-reader",
+            title = "漫画阅读（Manga Reader）",
+            shell = RouteShell.ReaderShell,
+            componentTypes = listOf(ComponentType.ReaderBase, ComponentType.ReaderTopArea),
+            summary = "展示漫画阅读容器与阅读顶部区域。"
+        ),
+        capabilityAddition(
+            id = "http-tts-management",
+            title = "HTTP TTS 管理（HTTP TTS Management）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SettingsGeneralPage),
+            summary = "展示 HTTP TTS 配置列表和管理状态。"
+        ),
+        capabilityAddition(
+            id = "http-tts-editor",
+            title = "HTTP TTS 编辑（HTTP TTS Editor）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SourceFormPage),
+            summary = "展示 HTTP TTS 表单结构；保存和测试尚未接入 Host。"
+        ),
+        capabilityAddition(
+            id = "http-tts-test",
+            title = "HTTP TTS 测试（HTTP TTS Test）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.GlobalStatePage),
+            summary = "展示 HTTP TTS 测试状态。"
+        ),
+        capabilityAddition(
+            id = "content-edit",
+            title = "正文编辑（Content Edit）",
+            shell = RouteShell.ReaderShell,
+            componentTypes = listOf(ComponentType.ReaderTopArea, ComponentType.ReaderReplacePanel),
+            summary = "展示正文编辑顶部区域与替换面板。"
+        ),
+        capabilityAddition(
+            id = "book-cover-change",
+            title = "更换封面（Change Book Cover）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SourceFormPage),
+            summary = "展示本地封面地址编辑结构。"
+        ),
+        capabilityAddition(
+            id = "book-cover-search",
+            title = "搜索封面（Search Book Cover）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SearchResultsPage),
+            summary = "展示封面搜索结果结构。"
+        ),
+        capabilityAddition(
+            id = "chapter-reviews",
+            title = "章节评论（Chapter Reviews）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.List),
+            summary = "展示章节评论列表结构。"
+        ),
+        capabilityAddition(
+            id = "bookmarks-manager",
+            title = "书签管理（Bookmarks Manager）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.ReaderDirectoryPanel),
+            summary = "展示书签管理和目录面板结构。"
+        ),
+        capabilityAddition(
+            id = "download-queue",
+            title = "下载队列（Download Queue）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.ReaderBookCachePage),
+            summary = "展示缓存下载队列结构。"
+        ),
+        capabilityAddition(
+            id = "download-task-detail",
+            title = "下载任务（Download Task Detail）",
+            shell = RouteShell.LibraryShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.ReaderBookCachePage),
+            summary = "展示单个下载任务的状态结构。"
+        ),
+        capabilityAddition(
+            id = "storage-management",
+            title = "存储管理（Storage Management）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.GlobalSettingsPage),
+            summary = "展示存储占用和清理管理结构。"
+        ),
+        capabilityAddition(
+            id = "webview-login",
+            title = "网页登录（WebView Login）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.WebView, ComponentType.Button),
+            summary = "展示网页登录容器和只读取消动作证据。"
+        ),
+        capabilityAddition(
+            id = "webview-captcha",
+            title = "人机验证（WebView Captcha）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.WebView),
+            summary = "展示验证码 WebView 容器。"
+        ),
+        capabilityAddition(
+            id = "webview-challenge",
+            title = "验证恢复（WebView Challenge Recovery）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.GlobalStatePage),
+            summary = "展示网页验证中断后的恢复状态。"
+        ),
+        capabilityAddition(
+            id = "webview-cookie-return",
+            title = "Cookie 回传（WebView Cookie Return）",
+            shell = RouteShell.FlowShell,
+            componentTypes = listOf(ComponentType.GlobalStatePage),
+            summary = "展示 Cookie 回传结果状态。"
+        ),
+        capabilityAddition(
+            id = "settings-tts",
+            title = "朗读设置（TTS Settings）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SettingsGeneralPage),
+            summary = "展示朗读能力设置入口。"
+        ),
+        capabilityAddition(
+            id = "settings-storage",
+            title = "存储设置（Storage Settings）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SettingsGeneralPage),
+            summary = "展示存储能力设置入口。"
+        ),
+        capabilityAddition(
+            id = "settings-accessibility",
+            title = "无障碍设置（Accessibility Settings）",
+            shell = RouteShell.SettingsShell,
+            componentTypes = listOf(ComponentType.BackTopBar, ComponentType.SettingsGeneralPage),
+            summary = "展示无障碍与减弱动效设置入口。"
+        )
+    )
+
+    private val explicitRendererByRoute: Map<String, DemoRouteRenderer> =
+        (contract25Additions + contract30Additions).associate { it.page.id to it.renderer }
 
     private val allAuthoredPages: List<DemoRoutePage> =
-        authoredPages + contract25Additions.map { it.page }
+        authoredPages + contract25Additions.map { it.page } + contract30Additions.map { it.page }
 
     private val authoredPageById: Map<String, DemoRoutePage> = allAuthoredPages.associateBy { it.id }
 
@@ -579,9 +782,14 @@ object DemoRouteRegistry {
         generatedIds.map { id -> checkNotNull(authoredPageById[id]) }
     }
 
-    val contract25RouteIds: Set<String> = contract25RendererByRoute.keys
+    val contract25RouteIds: Set<String> = contract25Additions.mapTo(linkedSetOf()) { it.page.id }
 
-    fun rendererFor(routeId: String): DemoRouteRenderer? = contract25RendererByRoute[routeId]
+    val contract30RouteIds: Set<String> = contract30Additions.mapTo(linkedSetOf()) { it.page.id }
+
+    internal val capabilityClosureStructures: Map<String, List<ComponentType>> =
+        contract30Additions.associate { it.page.id to it.componentTypes }
+
+    fun rendererFor(routeId: String): DemoRouteRenderer? = explicitRendererByRoute[routeId]
 
     val routeIds: Set<String> = pages.map { it.id }.toSet()
 

@@ -1,11 +1,10 @@
 package com.reader.ui.reading
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +29,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,11 +41,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -58,16 +62,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.reader.ui.tokens.ReaderTypeToken
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reader.android.R
 import com.reader.ui.shell.AsyncResultStateValue
 import com.reader.ui.shell.ReaderContext
+import com.reader.ui.shell.ReaderBookCacheUiState
 import com.reader.ui.shell.ReaderBookOpenDomainState
 import com.reader.ui.shell.ReaderBookOpenViewport
 import com.reader.ui.shell.ReaderPlaybackDomainState
 import com.reader.ui.shell.ReaderPlaybackPageMeasurement
+import com.reader.ui.shell.ReaderReplaceMutationUiState
+import com.reader.ui.shell.ReplaceRule
 import com.reader.ui.shell.SourceSwitchState
 import com.reader.ui.shell.ReaderRoute
 import com.reader.ui.shell.RouteIds
@@ -77,6 +86,9 @@ import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.ReaderThemeResolver
 import com.reader.ui.theme.readerExtraColors
 import com.reader.ui.motion.MotionController
+import io.reader.ui.contract.ReaderAppearanceSelect
+import io.reader.ui.contract.ReaderAppearanceSpecRegistry
+import io.reader.ui.contract.ReaderAppearanceStepper
 
 /**
  * Reader shell — self-rendering frame aligned with `frontend-demo/shared-shell-kit/kit.js`
@@ -123,6 +135,16 @@ internal fun ReaderShellScreen(
     onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {},
     /** P0-Fix3: 阅读器更多菜单是否打开（来自 ReaderUiState.moreMenu）。 */
     moreMenuOpen: Boolean = false,
+    /** reducer 持有的外观离散选项，完整外观页直接消费，避免局部状态漂移。 */
+    readerChoices: Map<String, String> = emptyMap(),
+    /** App 明暗模式，用于解析 Reader 2 八个主题卡片的选中态。 */
+    appThemeMode: String = "system",
+    /** Core cache.book.status/prefetch/clear 的 live UI projection。 */
+    bookCacheState: ReaderBookCacheUiState = ReaderBookCacheUiState(),
+    /** 当前 Core-backed 替换规则。 */
+    replaceRules: List<ReplaceRule> = emptyList(),
+    /** replace.persist/undo 的 live terminal state and opaque token availability。 */
+    replaceMutationState: ReaderReplaceMutationUiState = ReaderReplaceMutationUiState(),
     /** 派发 ReaderUiIntent 到 reducer（用于设置面板交互接线）。 */
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
@@ -192,24 +214,25 @@ internal fun ReaderShellScreen(
             onBookOpenViewportLayoutReady = onBookOpenViewportLayoutReady,
             playbackPilotEnabled = playbackPilotEnabled,
             playbackDomainState = playbackDomainState,
-            onPlaybackPageLayoutReady = onPlaybackPageLayoutReady
+            onPlaybackPageLayoutReady = onPlaybackPageLayoutReady,
+            tapZoneCallbacks = if (isImmersive) {
+                ReaderTapZoneCallbacks(
+                    onPrevious = if (playbackPilotEnabled) {
+                        { onDispatch(com.reader.ui.shell.ReaderUiIntent.TurnPagePrev()) }
+                    } else null,
+                    onControl = { onNavigate(RouteIds.READER_CONTROL) },
+                    onControlLongPress = { readerTextSelectionOpen = true },
+                    onNext = if (playbackPilotEnabled) {
+                        { onDispatch(com.reader.ui.shell.ReaderUiIntent.TurnPageNext()) }
+                    } else null
+                )
+            } else null
         )
         // readerOverlayHost slot (named via branch wrapper)
         if (isImmersive) {
             ReaderShellImmersiveInfoLayer(
                 title = title,
                 modifier = Modifier.align(Alignment.TopCenter)
-            )
-            ReaderOpenControlTapZone(
-                onOpenControls = { onNavigate(RouteIds.READER_CONTROL) },
-                onLongPress = { readerTextSelectionOpen = true },
-                onPageTurn = { next ->
-                    onDispatch(
-                        if (next) com.reader.ui.shell.ReaderUiIntent.TurnPageNext
-                        else com.reader.ui.shell.ReaderUiIntent.TurnPagePrev
-                    )
-                },
-                modifier = Modifier.fillMaxSize()
             )
             // readerTextSelectionLayer: text selection toolbar + range (immersive overlay slot)
             if (readerTextSelectionOpen) {
@@ -272,6 +295,9 @@ internal fun ReaderShellScreen(
                     onSessionStop = onSessionStop,
                     dispatch = onDispatch,
                     currentThemeId = context?.themeId ?: "paper",
+                    readerContext = context,
+                    readerChoices = readerChoices,
+                    appThemeMode = appThemeMode,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 34.dp)
@@ -279,6 +305,8 @@ internal fun ReaderShellScreen(
                 utilityPanelKind != null -> ReaderUtilityPanel(
                     kind = utilityPanelKind,
                     onNavigate = onNavigate,
+                    readerContext = context,
+                    cacheState = bookCacheState,
                     dispatch = onDispatch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -295,6 +323,9 @@ internal fun ReaderShellScreen(
                     currentChapterIndex = context?.chapterIndex ?: 0,
                     dispatch = onDispatch,
                     currentThemeId = context?.themeId ?: "paper",
+                    cacheState = bookCacheState,
+                    replaceRules = replaceRules,
+                    replaceMutationState = replaceMutationState,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 18.dp)
@@ -608,11 +639,26 @@ private fun ReaderControlReadingSurface(
     onBookOpenViewportLayoutReady: (ReaderBookOpenViewport) -> Unit = {},
     playbackPilotEnabled: Boolean = false,
     playbackDomainState: ReaderPlaybackDomainState = ReaderPlaybackDomainState(),
-    onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {}
+    onPlaybackPageLayoutReady: (ReaderPlaybackPageMeasurement) -> Unit = {},
+    tapZoneCallbacks: ReaderTapZoneCallbacks? = null
 ) {
     if (bookOpenPilotEnabled) {
         val density = LocalDensity.current
         val correlationId = context?.entryRequestId ?: bookOpenDomainState.displayedCorrelationId
+        var measuredContentSize by remember(
+            correlationId,
+            bookOpenDomainState.contentGeneration
+        ) { mutableStateOf<IntSize?>(null) }
+        var bodyTextLayout by remember(
+            correlationId,
+            bookOpenDomainState.contentGeneration
+        ) { mutableStateOf<TextLayoutResult?>(null) }
+        val playbackScrollState = rememberScrollState()
+        var bodyTopOffsetPx by remember(
+            correlationId,
+            bookOpenDomainState.contentGeneration
+        ) { mutableStateOf<Int?>(null) }
+        val chapterProgress = (context?.progress ?: 0f).toDouble()
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -631,20 +677,6 @@ private fun ReaderControlReadingSurface(
                     // frame before Runtime flips `awaitingViewport`, the effect
                     // below submits it on that state transition; a loading
                     // shell measurement is never retained.
-                    var measuredContentSize by remember(
-                        correlationId,
-                        bookOpenDomainState.contentGeneration
-                    ) { mutableStateOf<IntSize?>(null) }
-                    var bodyTextLayout by remember(
-                        correlationId,
-                        bookOpenDomainState.contentGeneration
-                    ) { mutableStateOf<TextLayoutResult?>(null) }
-                    val playbackScrollState = rememberScrollState()
-                    var bodyTopOffsetPx by remember(
-                        correlationId,
-                        bookOpenDomainState.contentGeneration
-                    ) { mutableStateOf<Int?>(null) }
-                    val chapterProgress = (context?.progress ?: 0f).toDouble()
                     LaunchedEffect(
                         correlationId,
                         bookOpenDomainState.activeCorrelationId,
@@ -756,6 +788,25 @@ private fun ReaderControlReadingSurface(
                     contentAlignment = Alignment.Center
                 ) { CircularProgressIndicator() }
             }
+            tapZoneCallbacks?.let { callbacks ->
+                val committedOffset = playbackDomainState.committedLocation?.chapterOffset
+                    ?: bookOpenDomainState.canonicalLocation?.chapterOffset
+                    ?: 0L
+                ReaderTapZoneHost(
+                    state = ReaderTapZoneHostAdapter.fromPilot(
+                        bookOpen = bookOpenDomainState,
+                        playback = playbackDomainState,
+                        layoutBoundary = measuredReaderTapZoneBoundary(
+                            content = bookOpenDomainState.content,
+                            committedOffset = committedOffset,
+                            textLayout = bodyTextLayout,
+                            viewport = measuredContentSize
+                        )
+                    ),
+                    callbacks = callbacks,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             if (playbackPilotEnabled) {
                 playbackDomainState.error?.let { message ->
                     Text(
@@ -793,15 +844,44 @@ private fun ReaderControlReadingSurface(
         )
         val readingState by vm.uiState.collectAsStateWithLifecycle()
         val content by vm.content.collectAsStateWithLifecycle()
+        val displayedContent = content.ifBlank { readerPreviewText(fallbackTitle) }
+        var measuredContentSize by remember(context.entryRequestId, content) {
+            mutableStateOf<IntSize?>(null)
+        }
+        var bodyTextLayout by remember(context.entryRequestId, content) {
+            mutableStateOf<TextLayoutResult?>(null)
+        }
         val title = when (val state = readingState) {
             is ReadingUiState.Ready -> state.book.name.ifEmpty { context.bookName.ifEmpty { fallbackTitle } }
             else -> context.bookName.ifEmpty { fallbackTitle }
         }
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { measuredContentSize = it.size }
+        ) {
             ReaderReadingSurface(
                 title = title,
-                content = content.ifBlank { readerPreviewText(fallbackTitle) }
+                content = displayedContent,
+                onBodyTextLayout = { bodyTextLayout = it }
             )
+            tapZoneCallbacks?.let { callbacks ->
+                val committedOffset = (context.progress.coerceIn(0f, 1f) * displayedContent.length)
+                    .toLong()
+                ReaderTapZoneHost(
+                    state = ReaderTapZoneHostAdapter.fromLegacy(
+                        readingState = readingState,
+                        layoutBoundary = measuredReaderTapZoneBoundary(
+                            content = displayedContent,
+                            committedOffset = committedOffset,
+                            textLayout = bodyTextLayout,
+                            viewport = measuredContentSize
+                        )
+                    ),
+                    callbacks = callbacks,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             // asyncResult visual feedback (M5): when the guard has DISCARDED or SUPERSEDED
             // a stale result, surface a lightweight indicator so the user knows a newer
             // entry is loading — rather than silently showing stale text.
@@ -822,10 +902,19 @@ private fun ReaderControlReadingSurface(
             }
         }
     } else {
-        ReaderReadingSurface(
-            title = "雨夜",
-            content = readerPreviewText(fallbackTitle)
-        )
+        Box(Modifier.fillMaxSize()) {
+            ReaderReadingSurface(
+                title = "雨夜",
+                content = readerPreviewText(fallbackTitle)
+            )
+            tapZoneCallbacks?.let { callbacks ->
+                ReaderTapZoneHost(
+                    state = ReaderTapZoneHostState.Disabled,
+                    callbacks = callbacks,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
 
@@ -1167,41 +1256,6 @@ private fun ReaderGlobalBrightnessDim(
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ReaderOpenControlTapZone(
-    onOpenControls: () -> Unit,
-    onLongPress: () -> Unit = {},
-    onPageTurn: (next: Boolean) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Row(modifier = modifier) {
-        // W2: 左侧 28% 区域 → 上一页
-        Box(
-            modifier = Modifier
-                .weight(0.28f)
-                .fillMaxHeight()
-                .clickable(onClick = { onPageTurn(false) })
-        )
-        Box(
-            modifier = Modifier
-                .weight(0.44f)
-                .fillMaxHeight()
-                .combinedClickable(
-                    onClick = onOpenControls,
-                    onLongClick = onLongPress
-                )
-        )
-        // W2: 右侧 28% 区域 → 下一页
-        Box(
-            modifier = Modifier
-                .weight(0.28f)
-                .fillMaxHeight()
-                .clickable(onClick = { onPageTurn(true) })
-        )
-    }
-}
-
 @Composable
 private fun ReaderControlDismissTapZone(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     // fd-reader-dismiss-zone: single transparent rectangle covering the dismiss area
@@ -1411,7 +1465,10 @@ private fun ReaderControlBottomSheet(
     /** 派发 ReaderUiIntent 到 reducer（设置面板交互接线）。 */
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
     /** 当前主题 id，透传到 ReaderAppearancePanel 用于高亮选中 swatch。 */
-    currentThemeId: String = "paper"
+    currentThemeId: String = "paper",
+    cacheState: ReaderBookCacheUiState = ReaderBookCacheUiState(),
+    replaceRules: List<ReplaceRule> = emptyList(),
+    replaceMutationState: ReaderReplaceMutationUiState = ReaderReplaceMutationUiState()
 ) {
     val extra = readerExtraColors()
     // Demo .fd-reader-sheet: height 330, padding 0, border 1px controlLineStrong,
@@ -1453,10 +1510,15 @@ private fun ReaderControlBottomSheet(
                 )
                 "tts" -> ReaderTtsPanel(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop, dispatch)
                 "appearance" -> ReaderAppearancePanel(onNavigate, dispatch, currentThemeId)
-                "settings" -> ReaderSettingsPanel(onNavigate, dispatch)
+                "settings" -> ReaderSettingsPanel(onNavigate, dispatch, cacheState)
                 "search" -> ReaderSearchPanel(onNavigate, dispatch)
                 "auto-page" -> ReaderAutoPagePanel(onNavigate, dispatch)
-                "replace" -> ReaderReplacePanel(onNavigate, dispatch)
+                "replace" -> ReaderReplacePanel(
+                    onNavigate,
+                    dispatch,
+                    replaceRules,
+                    replaceMutationState
+                )
                 "night-state" -> ReaderNightStatePanel(onNavigate, dispatch)
                 else -> ReaderControlMain(onNavigate, dispatch, currentChapterIndex = currentChapterIndex, modifier = Modifier.fillMaxSize())
             }
@@ -1478,7 +1540,10 @@ private fun ReaderFullPagePanel(
     /** 派发 ReaderUiIntent 到 reducer（设置面板交互接线）。 */
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
     /** 当前主题 id，透传到 ReaderFullAppearanceContent 用于高亮选中 swatch。 */
-    currentThemeId: String = "paper"
+    currentThemeId: String = ReaderAppearanceSpecRegistry.defaults.dayThemeId,
+    readerContext: ReaderContext? = null,
+    readerChoices: Map<String, String> = emptyMap(),
+    appThemeMode: String = "system"
 ) {
     val module = readerModules.firstOrNull { it.kind == kind } ?: readerModules.last()
     val quickRoute = readerQuickRoute(kind)
@@ -1514,8 +1579,15 @@ private fun ReaderFullPagePanel(
                 dispatch = dispatch
             )
             "tts" -> ReaderFullTtsContent(onNavigate, ttsText, onStartTts, onSessionToggle, onSessionStop, dispatch)
-            "appearance" -> ReaderFullAppearanceContent(onNavigate, dispatch, currentThemeId)
-            "font" -> ReaderFullFontContent(onNavigate, dispatch)
+            "appearance" -> ReaderFullAppearanceContent(
+                onNavigate = onNavigate,
+                dispatch = dispatch,
+                currentThemeId = currentThemeId,
+                readerContext = readerContext,
+                readerChoices = readerChoices,
+                appThemeMode = appThemeMode
+            )
+            "font" -> ReaderFullFontContent(onNavigate, dispatch, readerContext, readerChoices)
             "theme" -> ReaderFullThemeContent(onNavigate, dispatch, currentThemeId)
             "theme-edit" -> ReaderFullThemeEditContent(onNavigate, dispatch)
             "layout" -> ReaderFullLayoutContent(onNavigate, dispatch)
@@ -1530,6 +1602,8 @@ private fun ReaderUtilityPanel(
     kind: String,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
+    readerContext: ReaderContext? = null,
+    cacheState: ReaderBookCacheUiState = ReaderBookCacheUiState(),
     /** 派发 ReaderUiIntent 到 reducer（调试/缓存动作接线）。 */
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
 ) {
@@ -1542,7 +1616,7 @@ private fun ReaderUtilityPanel(
         modifier = modifier.heightIn(min = 360.dp, max = 610.dp)
     ) {
         if (isCache) {
-            ReaderBookCacheContent(onNavigate, dispatch)
+            ReaderBookCacheContent(onNavigate, dispatch, readerContext, cacheState)
         } else {
             ReaderDebugInfoContent(onNavigate, dispatch)
         }
@@ -1688,78 +1762,433 @@ private fun ReaderFullTtsContent(
 }
 
 @Composable
-private fun ReaderFullAppearanceContent(
+internal fun ReaderFullAppearanceContent(
     onNavigate: (String) -> Unit,
     /** 派发 ReaderUiIntent 到 reducer（主题切换接线）。 */
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
     /** 当前主题 id，用于高亮选中 swatch。 */
-    currentThemeId: String = "paper"
+    currentThemeId: String = "paper",
+    readerContext: ReaderContext? = null,
+    readerChoices: Map<String, String> = emptyMap(),
+    appThemeMode: String = "system"
 ) {
-    ReaderFullSettingBlock(title = "阅读主题") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            // 主题选择器色板：使用 ReaderThemeResolver.DAY_SWATCHES 的真实日间 swatch 颜色
-            // （paper=#F5EAD8 / warm=#FBF0DF / green=#E7F0E2 / blue=#E9F1F4）。
-            val activeBase = currentThemeId.removeSuffix("-night")
-            ReaderThemeResolver.DAY_SWATCHES.forEach { swatch ->
-                val active = swatch.id == activeBase
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp)
-                        .background(color = swatch.color, shape = ReaderShapes.md)
-                        .border(
-                            width = if (active) 2.dp else 1.dp,
-                            color = if (active) readerExtraColors().controlPrimary else readerExtraColors().controlLineStrong,
-                            shape = ReaderShapes.md
-                        )
-                        .clickable {
-                            // 派发主题切换 + 绑定 segment.item.switch 动效。
-                            dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTheme(themeId = swatch.id))
-                            MotionController.start(
-                                motionId = "segment.item.switch",
-                                from = "segment.previous",
-                                to = "segment.next",
-                                durationMs = 120L,
-                                reducedMotion = MotionController.reducedFrom(null)
-                            )
-                        }
+    val baseTheme = currentThemeId.removeSuffix("-night")
+    val effectiveTheme = if (currentThemeId.endsWith("-night") || appThemeMode == "dark") {
+        "$baseTheme-night"
+    } else {
+        baseTheme
+    }
+    val fontSize = readerContext?.fontSize ?: readerAppearanceStepper("fontSize").defaultValue.toFloat()
+    val lineSpacing = readerContext?.lineSpacing ?: readerAppearanceStepper("lineHeight").defaultValue.toFloat()
+    val pageMargin = readerContext?.pageMargin ?: 16f
+    val paragraphGap = readerChoices["paragraphGap"]?.toFloatOrNull()
+        ?: readerAppearanceStepper("paragraphGap").defaultValue.toFloat()
+    val letterSpacing = readerChoices["letterSpacing"]?.toFloatOrNull()
+        ?: readerAppearanceStepper("letterSpacing").defaultValue.toFloat()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ReaderAppearanceThemeLibrary(
+            currentThemeId = effectiveTheme,
+            onSelect = { theme ->
+                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTheme(themeId = theme.id))
+                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateAppThemeMode(if (theme.isNight) "dark" else "light"))
+                MotionController.start(
+                    motionId = "segment.item.switch",
+                    from = "segment.previous",
+                    to = "segment.next",
+                    durationMs = 120L,
+                    reducedMotion = MotionController.reducedFrom(null)
                 )
+            },
+            onSetDay = { dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateAppThemeMode("light")) },
+            onSetNight = { dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateAppThemeMode("dark")) }
+        )
+        ReaderAppearanceFontLibrary(
+            selectedFont = readerChoices["fontFamily"] ?: ReaderAppearanceSpecRegistry.defaults.fontId,
+            onSelect = { value ->
+                if (value == "import") onNavigate("reader-font-import-confirm")
+                else dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice("fontFamily", value))
+            }
+        )
+        ReaderAppearanceTypographyLibrary(
+            fontSize = fontSize,
+            lineSpacing = lineSpacing,
+            paragraphGap = paragraphGap,
+            letterSpacing = letterSpacing,
+            readerChoices = readerChoices,
+            onChoice = { key, value -> dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice(key, value)) },
+            onFontSize = { value ->
+                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTypography(value, lineSpacing, pageMargin))
+            },
+            onLineSpacing = { value ->
+                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTypography(fontSize, value, pageMargin))
+            },
+            onParagraphGap = { value ->
+                dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice("paragraphGap", value.toString()))
+            },
+            onLetterSpacing = { value ->
+                dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice("letterSpacing", value.toString()))
+            }
+        )
+    }
+}
+
+private data class ReaderAppearanceFontOption(
+    val value: String,
+    val label: String,
+    val family: FontFamily = FontFamily.SansSerif,
+    val importAction: Boolean = false
+)
+
+private val readerAppearanceFonts = ReaderAppearanceSpecRegistry.fonts.map { font ->
+    ReaderAppearanceFontOption(
+        value = font.id,
+        label = font.label,
+        family = when (font.familyRole) {
+            "serif" -> FontFamily.Serif
+            "mono" -> FontFamily.Monospace
+            else -> FontFamily.SansSerif
+        },
+        importAction = font.importAction
+    )
+}
+
+private fun readerAppearanceSelect(id: String): ReaderAppearanceSelect =
+    requireNotNull(ReaderAppearanceSpecRegistry.select(id)) { "Missing Reader Appearance select: $id" }
+
+private fun readerAppearanceStepper(id: String): ReaderAppearanceStepper =
+    requireNotNull(ReaderAppearanceSpecRegistry.stepper(id)) { "Missing Reader Appearance stepper: $id" }
+
+@Composable
+private fun ReaderAppearanceLibraryHeader(title: String, meta: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(20.dp)
+            .padding(horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = readerExtraColors().controlInk,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = meta,
+            fontSize = 9.sp,
+            lineHeight = 13.sp,
+            color = readerExtraColors().controlMuted,
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun ReaderAppearanceThemeLibrary(
+    currentThemeId: String,
+    onSelect: (ReaderThemeResolver.ThemeSwatch) -> Unit,
+    onSetDay: () -> Unit,
+    onSetNight: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .padding(horizontal = 2.dp, vertical = 10.dp)
+    ) {
+        ReaderAppearanceLibraryHeader("主题库", "日间：纸纹 · 夜间：夜纹")
+        Spacer(Modifier.height(2.dp))
+        ReaderThemeResolver.FULL_APPEARANCE_THEMES.chunked(4).forEachIndexed { rowIndex, row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(59.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                row.forEach { theme ->
+                    ReaderAppearanceThemeCard(
+                        theme = theme,
+                        active = currentThemeId == theme.id,
+                        onClick = { onSelect(theme) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            if (rowIndex < 1) Spacer(Modifier.height(6.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)
+        ) {
+            ReaderAppearanceActionButton("设为日间主题", onSetDay)
+            ReaderAppearanceActionButton("设为夜间主题", onSetNight)
+        }
+        Spacer(Modifier.height(9.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(readerExtraColors().controlLine))
+    }
+}
+
+@Composable
+private fun ReaderAppearanceThemeCard(
+    theme: ReaderThemeResolver.ThemeSwatch,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val extra = readerExtraColors()
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .background(if (active) extra.controlActiveBg else extra.controlPanelSoft, ReaderShapes.md)
+            .then(if (active) Modifier.border(1.dp, extra.controlPrimary, ReaderShapes.md) else Modifier)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(if (active) 8.dp else 9.dp))
+        Box(modifier = Modifier.width(62.5.dp).height(24.dp), contentAlignment = Alignment.TopCenter) {
+            Box(
+                modifier = Modifier
+                    .offset(y = 2.dp)
+                    .width(46.dp)
+                    .height(18.dp)
+                    .background(theme.color, RoundedCornerShape(6.dp))
+                    .border(if (active) 2.dp else 0.5.dp, if (active) extra.controlPrimary else extra.controlLineStrong, RoundedCornerShape(6.dp))
+            )
+        }
+        Text(
+            text = theme.label,
+            fontSize = 9.sp,
+            lineHeight = 13.sp,
+            color = extra.controlMuted,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun ReaderAppearanceActionButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .width(74.dp)
+            .height(28.dp)
+            .border(1.dp, readerExtraColors().controlLine, RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = readerExtraColors().controlInk)
+    }
+}
+
+@Composable
+private fun ReaderAppearanceFontLibrary(
+    selectedFont: String,
+    onSelect: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(169.dp)
+            .padding(horizontal = 2.dp, vertical = 10.dp)
+    ) {
+        ReaderAppearanceLibraryHeader("字体库", "可拖动调整位置")
+        Spacer(Modifier.height(14.dp))
+        val fontRows = readerAppearanceFonts.chunked(4)
+        fontRows.forEachIndexed { rowIndex, row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { font ->
+                    ReaderAppearanceFontCell(
+                        option = font,
+                        active = selectedFont == font.value,
+                        onClick = { onSelect(font.value) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+            if (rowIndex < fontRows.lastIndex) Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReaderAppearanceFontCell(
+    option: ReaderAppearanceFontOption,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val extra = readerExtraColors()
+    val shape = RoundedCornerShape(12.dp)
+    val borderColor = extra.controlLineStrong.copy(alpha = 0.30f)
+    val dashColor = extra.controlMuted.copy(alpha = 0.50f)
+    Box(
+        modifier = modifier
+            .height(30.dp)
+            .then(if (active) Modifier.shadow(2.dp, shape) else Modifier)
+            .background(if (active) extra.controlPrimary else extra.controlSurfaceSolid, shape)
+            .then(
+                if (option.importAction) Modifier.drawBehind {
+                    drawRoundRect(
+                        color = dashColor,
+                        cornerRadius = CornerRadius(12.dp.toPx()),
+                        style = Stroke(
+                            width = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))
+                        )
+                    )
+                } else if (!active) Modifier.border(1.dp, borderColor, shape) else Modifier
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = option.label,
+            fontSize = 12.sp,
+            fontFamily = option.family,
+            color = if (active) extra.controlPrimaryText else extra.controlInk,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ReaderAppearanceTypographyLibrary(
+    fontSize: Float,
+    lineSpacing: Float,
+    paragraphGap: Float,
+    letterSpacing: Float,
+    readerChoices: Map<String, String>,
+    onChoice: (String, String) -> Unit,
+    onFontSize: (Float) -> Unit,
+    onLineSpacing: (Float) -> Unit,
+    onParagraphGap: (Float) -> Unit,
+    onLetterSpacing: (Float) -> Unit
+) {
+    val selectSpecs = ReaderAppearanceSpecRegistry.selects
+    fun storageKey(spec: ReaderAppearanceSelect): String = when (spec.id) {
+        "paragraphIndentMode" -> "firstLineIndent"
+        "textConversion" -> "script"
+        else -> spec.id
+    }
+    fun defaultLabel(spec: ReaderAppearanceSelect): String =
+        spec.options.first { it.value == spec.defaultValue }.label
+    val fontSizeSpec = readerAppearanceStepper("fontSize")
+    val lineHeightSpec = readerAppearanceStepper("lineHeight")
+    val paragraphGapSpec = readerAppearanceStepper("paragraphGap")
+    val letterSpacingSpec = readerAppearanceStepper("letterSpacing")
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(406.dp)
+            .padding(horizontal = 2.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ReaderAppearanceLibraryHeader("排版库", "即时应用")
+        selectSpecs.forEach { spec ->
+            val key = storageKey(spec)
+            ReaderAppearanceSelectField(
+                label = spec.label,
+                value = readerChoices[key] ?: defaultLabel(spec),
+                options = spec.options.map { it.label }
+            ) { selected ->
+                onChoice(key, selected)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(144.dp)
+                .background(readerExtraColors().controlPanel, ReaderShapes.md)
+                .border(1.dp, readerExtraColors().controlLine, ReaderShapes.md)
+                .padding(horizontal = 9.dp, vertical = 2.dp)
+        ) {
+            ReaderAppearanceStepperRow(fontSizeSpec.label, "${fontSize.toInt()}px", { onFontSize((fontSize - fontSizeSpec.step.toFloat()).coerceIn(fontSizeSpec.minimum.toFloat(), fontSizeSpec.maximum.toFloat())) }, { onFontSize((fontSize + fontSizeSpec.step.toFloat()).coerceIn(fontSizeSpec.minimum.toFloat(), fontSizeSpec.maximum.toFloat())) })
+            ReaderAppearanceStepperRow(lineHeightSpec.label, String.format("%.2f", lineSpacing), { onLineSpacing((lineSpacing - lineHeightSpec.step.toFloat()).coerceIn(lineHeightSpec.minimum.toFloat(), lineHeightSpec.maximum.toFloat())) }, { onLineSpacing((lineSpacing + lineHeightSpec.step.toFloat()).coerceIn(lineHeightSpec.minimum.toFloat(), lineHeightSpec.maximum.toFloat())) })
+            ReaderAppearanceStepperRow(paragraphGapSpec.label, "${paragraphGap.toInt()}px", { onParagraphGap((paragraphGap - paragraphGapSpec.step.toFloat()).coerceIn(paragraphGapSpec.minimum.toFloat(), paragraphGapSpec.maximum.toFloat())) }, { onParagraphGap((paragraphGap + paragraphGapSpec.step.toFloat()).coerceIn(paragraphGapSpec.minimum.toFloat(), paragraphGapSpec.maximum.toFloat())) })
+            ReaderAppearanceStepperRow(letterSpacingSpec.label, String.format("%.1fpx", letterSpacing), { onLetterSpacing((letterSpacing - letterSpacingSpec.step.toFloat()).coerceIn(letterSpacingSpec.minimum.toFloat(), letterSpacingSpec.maximum.toFloat())) }, { onLetterSpacing((letterSpacing + letterSpacingSpec.step.toFloat()).coerceIn(letterSpacingSpec.minimum.toFloat(), letterSpacingSpec.maximum.toFloat())) })
+        }
+    }
+}
+
+@Composable
+private fun ReaderAppearanceSelectField(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val extra = readerExtraColors()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(extra.controlPanel, RoundedCornerShape(6.dp))
+            .border(1.dp, extra.controlLine, RoundedCornerShape(6.dp))
+            .padding(horizontal = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = extra.controlInk, modifier = Modifier.weight(1f))
+        Box {
+            Row(
+                modifier = Modifier
+                    .width(88.dp)
+                    .height(32.dp)
+                    .background(extra.controlSurfaceSolid, RoundedCornerShape(10.dp))
+                    .border(0.56.dp, extra.controlLineStrong, RoundedCornerShape(10.dp))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = extra.controlInk, modifier = Modifier.weight(1f), maxLines = 1)
+                Text("▾", fontSize = 10.sp, color = extra.controlPrimary)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            expanded = false
+                            onSelected(option)
+                        }
+                    )
+                }
             }
         }
     }
-    ReaderFullSettingBlock(title = "文字排版") {
-        ReaderPanelRow(R.drawable.reader_ic_appearance, "字号", "18", "+") {}
-        ReaderPanelRow(R.drawable.reader_ic_text, "行距", "1.96", "+") {}
-        ReaderFontChoiceRow(onNavigate = onNavigate)
+}
+
+@Composable
+private fun ReaderAppearanceStepperRow(
+    label: String,
+    value: String,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = readerExtraColors().controlInk, modifier = Modifier.weight(1f))
+        ReaderAppearanceStepperButton("−", onDecrease)
+        Text(value, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = readerExtraColors().controlInk, textAlign = TextAlign.Center, modifier = Modifier.width(48.dp))
+        ReaderAppearanceStepperButton("+", onIncrease)
     }
-    ReaderFullSettingBlock(title = "页面空间", meta = "边距 / 缩进") {
-        ReaderPanelRow(R.drawable.reader_ic_text, "页边距", "默认", "调整") {
-            onNavigate(RouteIds.READER_FULL_LAYOUT)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_text, "段落缩进", "2 字符", "调整") {
-            onNavigate(RouteIds.READER_FULL_LAYOUT)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_text, "自定义字体", "2 个已导入", "管理") {
-            onNavigate(RouteIds.READER_FULL_FONT)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_palette, "自定义背景", "纯色 / 本地图片", "管理") {
-            onNavigate(RouteIds.READER_FULL_THEME)
-        }
-    }
-    // W4: 新增全屏设置页快速入口
-    ReaderFullSettingBlock(title = "更多设置", meta = "全屏页") {
-        ReaderPanelRow(R.drawable.reader_ic_text, "字体设置", "字号/字体族/字距", "展开") {
-            onNavigate(RouteIds.READER_FULL_FONT)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_palette, "主题设置", "色板/背景/自定义", "展开") {
-            onNavigate(RouteIds.READER_FULL_THEME)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_appearance, "版面设置", "边距/缩进/分栏", "展开") {
-            onNavigate(RouteIds.READER_FULL_LAYOUT)
-        }
-        ReaderPanelRow(R.drawable.reader_ic_auto_page, "翻页设置", "方式/动画/音量键", "展开") {
-            onNavigate(RouteIds.READER_FULL_PAGE_TURN)
-        }
+}
+
+@Composable
+private fun ReaderAppearanceStepperButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .width(24.dp)
+            .height(28.dp)
+            .background(readerExtraColors().controlPanelSoft, ReaderShapes.md)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = readerExtraColors().controlInk)
     }
 }
 
@@ -1768,24 +2197,45 @@ private fun ReaderFullAppearanceContent(
 @Composable
 private fun ReaderFullFontContent(
     onNavigate: (String) -> Unit,
-    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit,
+    readerContext: ReaderContext? = null,
+    readerChoices: Map<String, String> = emptyMap()
 ) {
+    val fontSizeSpec = readerFullAppearanceStepper("fontSize")
+    val lineHeightSpec = readerFullAppearanceStepper("lineHeight")
+    val fontSize = readerContext?.fontSize ?: fontSizeSpec.defaultValue.toFloat()
+    val lineHeight = readerContext?.lineSpacing ?: lineHeightSpec.defaultValue.toFloat()
+    val selectedFontId = readerChoices["fontFamily"] ?: ReaderAppearanceSpecRegistry.defaults.fontId
     ReaderFullSettingBlock(title = "字号") {
-        ReaderPanelRow(R.drawable.reader_ic_text, "正文字号", "18pt", "+") {
+        ReaderPanelRow(R.drawable.reader_ic_text, fontSizeSpec.label, "${fontSize.toInt()}px", "+") {
             dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTypography(
-                fontSize = 19f, lineSpacing = 1.55f, pageMargin = 16f
+                fontSize = nextReaderAppearanceValue(fontSize, fontSizeSpec),
+                lineSpacing = lineHeight,
+                pageMargin = readerContext?.pageMargin ?: 16f
             ))
         }
-        ReaderPanelRow(R.drawable.reader_ic_text, "字号步进", "1pt", "") {}
+        ReaderPanelRow(R.drawable.reader_ic_text, "字号步进", "${fontSizeSpec.step.toInt()}px", "") {}
     }
     ReaderFullSettingBlock(title = "字体族") {
-        listOf("系统默认", "思源宋体", "思源黑体", "霞鹜文楷").forEach { label ->
-            ReaderPanelRow(R.drawable.reader_ic_text, label, "", "选择") {}
+        readerFullAppearanceFonts.forEach { font ->
+            ReaderPanelRow(
+                R.drawable.reader_ic_text,
+                font.label,
+                if (selectedFontId == font.id) "已选" else "",
+                "选择"
+            ) {
+                dispatch(com.reader.ui.shell.ReaderUiIntent.SetReaderChoice("fontFamily", font.id))
+            }
         }
     }
     ReaderFullSettingBlock(title = "自定义字体") {
         ReaderPanelRow(R.drawable.reader_ic_text, "已导入字体", "2 个", "管理") {}
-        ReaderPanelRow(R.drawable.reader_ic_download, "导入字体文件", "", "") {}
+        ReaderPanelRow(
+            R.drawable.reader_ic_download,
+            ReaderAppearanceSpecRegistry.fonts.first { it.importAction }.label,
+            "",
+            ""
+        ) {}
     }
 }
 
@@ -1793,16 +2243,13 @@ private fun ReaderFullFontContent(
 private fun ReaderFullThemeContent(
     onNavigate: (String) -> Unit,
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit,
-    currentThemeId: String = "paper"
+    currentThemeId: String = ReaderAppearanceSpecRegistry.defaults.dayThemeId
 ) {
     ReaderFullSettingBlock(title = "阅读主题") {
-        listOf(
-            "paper" to "纸张", "warm" to "暖色", "green" to "护眼", "blue" to "海蓝",
-            "paper-night" to "夜间", "warm-night" to "暖夜"
-        ).forEach { (id, label) ->
-            ReaderPanelRow(R.drawable.reader_ic_palette, label,
-                if (currentThemeId == id) "已选" else "", "选择") {
-                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTheme(themeId = id))
+        readerFullAppearanceThemes.forEach { theme ->
+            ReaderPanelRow(R.drawable.reader_ic_palette, theme.label,
+                if (currentThemeId == theme.id) "已选" else "", "选择") {
+                dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateReaderTheme(themeId = theme.id))
             }
         }
     }
@@ -1875,14 +2322,14 @@ private fun ReaderFullPageTurnContent(
     }
     ReaderFullSettingBlock(title = "自动翻页") {
         ReaderPanelRow(R.drawable.reader_ic_auto_page, "自动翻页", "关闭", "开启") {
-            dispatch(com.reader.ui.shell.ReaderUiIntent.StartAutoPageSession)
+            dispatch(com.reader.ui.shell.ReaderUiIntent.StartAutoPageSession())
         }
         ReaderPanelRow(R.drawable.reader_ic_clock, "翻页间隔", "8 秒", "调整") {}
     }
 }
 
 @Composable
-private fun ReaderFullSettingsContent(
+internal fun ReaderFullSettingsContent(
     onNavigate: (String) -> Unit,
     dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
 ) {
@@ -1932,65 +2379,116 @@ private fun ReaderFullSettingsContent(
 @Composable
 private fun ReaderBookCacheContent(
     onNavigate: (String) -> Unit,
-    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit,
+    readerContext: ReaderContext?,
+    cacheState: ReaderBookCacheUiState
 ) {
-    // summary: 3 articles (cached count, cache size, auto-cache status)
+    val sourceId = readerContext?.sourceId?.takeIf(String::isNotBlank)
+    val bookId = readerContext?.bookUrl?.takeIf(String::isNotBlank)
+    LaunchedEffect(sourceId, bookId) {
+        if (sourceId != null && bookId != null) {
+            dispatch(com.reader.ui.shell.ReaderUiIntent.RefreshCurrentBookCache())
+        }
+    }
+    val identityMatches = sourceId != null && bookId != null &&
+        cacheState.sourceId == sourceId && cacheState.bookId == bookId
+    val chapterCount = if (identityMatches) cacheState.chapterCount else 0
+    val cachedCount = if (identityMatches) cacheState.cachedCount else 0
+    val statusText = when {
+        cacheState.busy -> "正在与 Reader Core 同步"
+        cacheState.error != null -> cacheState.error
+        cacheState.message != null -> cacheState.message
+        else -> "等待缓存状态"
+    }
     ReaderUtilitySummary(
         items = listOf(
-            "31/36" to "已缓存章节",
-            "128 MB" to "当前书籍缓存",
-            "未开启" to "自动缓存后续章节"
+            "$cachedCount/$chapterCount" to "已缓存章节",
+            formatCacheBytes(if (identityMatches) cacheState.totalContentBytes else 0L) to "Core 缓存内容",
+            "${if (identityMatches) cacheState.queuedCount + cacheState.inProgressCount else 0}" to "排队/处理中"
         )
     )
-    // cache actions block: 4 action buttons — 接线到 dispatch（HostRequest 派发）
-    ReaderFullSettingBlock(title = "缓存动作", meta = "只作用于当前书籍") {
+    ReaderFullSettingBlock(title = "缓存动作", meta = statusText) {
         ReaderUtilityActionGrid(
             actions = listOf(
-                ReaderUtilityAction(R.drawable.reader_ic_download, "缓存当前章节", "第 32 章 雨夜"),
-                ReaderUtilityAction(R.drawable.reader_ic_refresh, "缓存后续章节", "从当前章节继续 20 章"),
-                ReaderUtilityAction(R.drawable.reader_ic_directory, "更新缓存目录", "刷新章节列表和缓存标记"),
+                ReaderUtilityAction(
+                    R.drawable.reader_ic_download,
+                    "缓存当前章节",
+                    "第 ${(readerContext?.chapterIndex ?: 0) + 1} 章"
+                ),
+                ReaderUtilityAction(R.drawable.reader_ic_refresh, "缓存后续章节", "从当前章节之后继续 20 章"),
+                ReaderUtilityAction(R.drawable.reader_ic_directory, "刷新缓存状态", "重新读取 Core 章节与队列状态"),
                 ReaderUtilityAction(R.drawable.reader_ic_trash, "清理本书缓存", "保留阅读进度和书签", danger = true)
             ),
             onAction = { action ->
-                // 接线：缓存动作 → reducer（通过 DispatchHostRequest 派发到 host 层）
-                val capability = when (action.title) {
-                    "缓存当前章节" -> "cache.chapter.fetch"
-                    "缓存后续章节" -> "cache.chapter.prefetch"
-                    "更新缓存目录" -> "cache.directory.refresh"
-                    "清理本书缓存" -> "cache.book.clear"
-                    else -> "cache.action"
+                if (!cacheState.busy && sourceId != null && bookId != null) {
+                    when (action.title) {
+                        "缓存当前章节" -> dispatch(
+                            com.reader.ui.shell.ReaderUiIntent.PrefetchCurrentBookCache(
+                                includeCurrentChapter = true,
+                                chapterCount = 1
+                            )
+                        )
+                        "缓存后续章节" -> dispatch(
+                            com.reader.ui.shell.ReaderUiIntent.PrefetchCurrentBookCache(
+                                includeCurrentChapter = false,
+                                chapterCount = 20
+                            )
+                        )
+                        "刷新缓存状态" -> dispatch(
+                            com.reader.ui.shell.ReaderUiIntent.RefreshCurrentBookCache()
+                        )
+                        "清理本书缓存" -> dispatch(
+                            com.reader.ui.shell.ReaderUiIntent.ClearCurrentBookCache()
+                        )
+                    }
                 }
-                dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
-                    capability = capability,
-                    paramsJson = "{}"
-                ))
             }
         )
     }
-    // chapter cache list: per-row cache/remove buttons
-    ReaderFullSettingBlock(title = "章节缓存", meta = "右侧固定显示缓存状态和操作") {
-        listOf(
-            Triple("第 30 章 旧车票", true, false),
-            Triple("第 31 章 雨声", true, false),
-            Triple("第 32 章 雨夜", true, true),
-            Triple("第 33 章 白光", false, false),
-            Triple("第 34 章 归途", false, false)
-        ).forEach { (title, cached, isCurrent) ->
+    val currentChapterIndex = readerContext?.chapterIndex ?: -1
+    val visibleChapters = if (identityMatches) {
+        cacheState.chapters.filter { chapter ->
+            chapter.chapterIndex in (currentChapterIndex - 2)..(currentChapterIndex + 2)
+        }.ifEmpty { cacheState.chapters.take(5) }
+    } else {
+        emptyList()
+    }
+    ReaderFullSettingBlock(
+        title = "章节缓存",
+        meta = if (visibleChapters.isEmpty()) "暂无 Core 章节状态" else "当前章节附近 · 来自 Core"
+    ) {
+        visibleChapters.forEach { chapter ->
+            val cached = chapter.cachedBytes > 0 || chapter.state == "cached" || chapter.state == "completed"
+            val isCurrent = chapter.chapterIndex == currentChapterIndex
             ReaderCacheListRow(
-                title = title,
+                title = chapter.title.ifBlank { "第 ${chapter.chapterIndex + 1} 章" },
                 cached = cached,
                 isCurrent = isCurrent,
                 onClick = { onNavigate(RouteIds.IMMERSIVE_READING) },
-                onToggleCache = {
-                    // 接线：章节缓存/移除 → reducer（DispatchHostRequest）
-                    dispatch(com.reader.ui.shell.ReaderUiIntent.DispatchHostRequest(
-                        capability = if (cached) "cache.chapter.remove" else "cache.chapter.fetch",
-                        paramsJson = "{}"
-                    ))
-                }
+                actionLabel = when {
+                    cached -> "已缓存"
+                    isCurrent -> "缓存"
+                    else -> chapter.state
+                },
+                onToggleCache = if (!cached && isCurrent && !cacheState.busy) {
+                    {
+                        dispatch(
+                            com.reader.ui.shell.ReaderUiIntent.PrefetchCurrentBookCache(
+                                includeCurrentChapter = true,
+                                chapterCount = 1
+                            )
+                        )
+                    }
+                } else null
             )
         }
     }
+}
+
+private fun formatCacheBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> "%.1f MB".format(bytes.toDouble() / (1024.0 * 1024.0))
+    bytes >= 1024L -> "%.1f KB".format(bytes.toDouble() / 1024.0)
+    else -> "$bytes B"
 }
 
 @Composable
@@ -2162,7 +2660,8 @@ private fun ReaderCacheListRow(
     cached: Boolean,
     isCurrent: Boolean,
     onClick: () -> Unit,
-    onToggleCache: () -> Unit = {}
+    actionLabel: String = if (cached) "已缓存" else "缓存",
+    onToggleCache: (() -> Unit)? = null
 ) {
     val extra = readerExtraColors()
     Row(
@@ -2209,11 +2708,11 @@ private fun ReaderCacheListRow(
             modifier = Modifier.size(18.dp)
         )
         Text(
-            text = if (cached) "移除" else "缓存",
+            text = actionLabel,
             style = ReaderTextStyles.tabLabel,
-            color = readerExtraColors().controlPrimary,
+            color = if (onToggleCache == null) extra.controlMuted else readerExtraColors().controlPrimary,
             maxLines = 1,
-            modifier = Modifier.clickable { onToggleCache() }
+            modifier = if (onToggleCache == null) Modifier else Modifier.clickable(onClick = onToggleCache)
         )
     }
 }
@@ -3000,7 +3499,8 @@ private fun ReaderAppearancePanel(
 @Composable
 private fun ReaderSettingsPanel(
     onNavigate: (String) -> Unit,
-    @Suppress("UNUSED_PARAMETER") dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+    @Suppress("UNUSED_PARAMETER") dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
+    cacheState: ReaderBookCacheUiState = ReaderBookCacheUiState()
 ) {
     ReaderPanelTitle("设置")
     ReaderPanelRow(R.drawable.reader_ic_auto_page, "自动翻页", "关闭", "开启") {
@@ -3009,7 +3509,12 @@ private fun ReaderSettingsPanel(
     ReaderPanelRow(R.drawable.reader_ic_replace, "内容替换", "4 条规则", "管理") {
         onNavigate(RouteIds.READER_CONTENT_REPLACEMENT)
     }
-    ReaderPanelRow(R.drawable.reader_ic_download, "本书缓存", "31/36 章", "缓存") {
+    ReaderPanelRow(
+        R.drawable.reader_ic_download,
+        "本书缓存",
+        "${cacheState.cachedCount}/${cacheState.chapterCount} 章",
+        if (cacheState.busy) "处理中" else "缓存"
+    ) {
         onNavigate(RouteIds.READER_BOOK_CACHE)
     }
 }
@@ -3044,7 +3549,7 @@ private fun ReaderAutoPagePanel(
         dispatch(com.reader.ui.shell.ReaderUiIntent.UpdateCountdown(seconds = 10))
     }
     ReaderPanelRow(R.drawable.reader_ic_auto_page, "开始自动翻页", "", "开启") {
-        dispatch(com.reader.ui.shell.ReaderUiIntent.StartAutoPageSession)
+        dispatch(com.reader.ui.shell.ReaderUiIntent.StartAutoPageSession())
     }
     // W2: 翻页事件接线 — 上一页/下一页
     Row(
@@ -3052,10 +3557,10 @@ private fun ReaderAutoPagePanel(
         modifier = Modifier.fillMaxWidth()
     ) {
         ReaderIconOnlyAction(R.drawable.reader_ic_chevron_left, "上一页", {
-            dispatch(com.reader.ui.shell.ReaderUiIntent.TurnPagePrev)
+            dispatch(com.reader.ui.shell.ReaderUiIntent.TurnPagePrev())
         }, Modifier.weight(1f))
         ReaderIconOnlyAction(R.drawable.reader_ic_chevron, "下一页", {
-            dispatch(com.reader.ui.shell.ReaderUiIntent.TurnPageNext)
+            dispatch(com.reader.ui.shell.ReaderUiIntent.TurnPageNext())
         }, Modifier.weight(1f))
     }
 }
@@ -3063,34 +3568,68 @@ private fun ReaderAutoPagePanel(
 @Composable
 private fun ReaderReplacePanel(
     onNavigate: (String) -> Unit,
-    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {}
+    dispatch: (com.reader.ui.shell.ReaderUiIntent) -> Unit = {},
+    rules: List<ReplaceRule> = emptyList(),
+    mutationState: ReaderReplaceMutationUiState = ReaderReplaceMutationUiState()
 ) {
+    var showManager by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        dispatch(com.reader.ui.shell.ReaderUiIntent.LoadReplaceRules())
+    }
     ReaderPanelTitle("替换")
-    // W5: 规则 CRUD 接线 — 切换/删除/新增
-    listOf(
-        Triple("rule-1", "雨容称呼", true),
-        Triple("rule-2", "旧称统一", true),
-        Triple("rule-3", "标点清理", false)
-    ).forEach { (id, label, enabled) ->
+    rules.take(3).forEach { rule ->
         ReaderPanelRow(
             R.drawable.reader_ic_replace,
-            label,
-            if (enabled) "已启用" else "已禁用",
-            if (enabled) "禁用" else "启用"
+            rule.name,
+            if (rule.enabled) "已启用" else "已禁用",
+            if (mutationState.busy) "处理中" else if (rule.enabled) "禁用" else "启用"
         ) {
-            dispatch(com.reader.ui.shell.ReaderUiIntent.ReplaceRuleToggle(id = id))
+            if (!mutationState.busy) {
+                dispatch(com.reader.ui.shell.ReaderUiIntent.PersistReplaceRuleToggle(id = rule.id))
+            }
         }
     }
-    ReaderPanelRow(R.drawable.reader_ic_add, "新增替换规则", "", "添加") {
-        dispatch(com.reader.ui.shell.ReaderUiIntent.ReplaceRuleAdd(
-            name = "新规则",
-            pattern = "",
-            replacement = "",
-            scope = "all"
-        ))
+    if (rules.isEmpty()) {
+        ReaderPanelRow(R.drawable.reader_ic_replace, "暂无 Core 替换规则", "先在规则管理页创建", "查看") {
+            showManager = true
+        }
+    }
+    val undoMeta = mutationState.error ?: mutationState.message ?: when {
+        mutationState.undoTokenJson != null -> "Core 已签发一次性撤销凭据"
+        else -> "仅保存成功后可用"
+    }
+    ReaderPanelRow(
+        R.drawable.reader_ic_refresh,
+        "撤销上次规则修改",
+        undoMeta,
+        when {
+            mutationState.busy -> "处理中"
+            mutationState.canUndo -> "撤销"
+            else -> "不可用"
+        }
+    ) {
+        if (mutationState.canUndo) {
+            dispatch(com.reader.ui.shell.ReaderUiIntent.UndoLastReplace())
+        }
     }
     ReaderPanelRow(R.drawable.reader_ic_more, "管理规则", "全屏页", "打开") {
-        onNavigate(RouteIds.READER_CONTENT_REPLACEMENT)
+        showManager = true
+    }
+    if (showManager) {
+        Dialog(
+            onDismissRequest = { showManager = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            ReaderReplaceRuleScreen(
+                onBack = { showManager = false },
+                rules = rules,
+                mutationState = mutationState,
+                dispatch = dispatch
+            )
+        }
     }
 }
 

@@ -2,101 +2,75 @@ package com.reader.android.data.repository
 
 import com.reader.android.data.storage.ReadingProgress
 import com.reader.android.data.storage.ReadingProgressDao
-import com.reader.api.Chapter
-import com.reader.api.ReaderCoreClient
-import org.json.JSONObject
 
 /**
- * P0-3: Reading progress persistence repository. Wraps [ReadingProgressDao] and handles
- * the field mapping between the in-memory reader state (`bookUrl`, `chapterIndex`, `page`,
- * `progress`) and the Room entity ([ReadingProgress]).
+ * A fully validated Core `reading.progress.update` success projected into the
+ * Android read model. Instances are created only after the Host has matched
+ * the complete returned Core row to its correlation-scoped pending location.
+ */
+internal data class ConfirmedReadingProgress(
+    val sourceId: String,
+    val bookId: String,
+    val bookName: String,
+    val author: String?,
+    val chapterUrl: String,
+    val chapterTitle: String,
+    /** TOC list position used by the legacy Android reader surface. */
+    val chapterPosition: Int,
+    val totalChapters: Int,
+    val pageIndex: Int,
+    val chapterOffset: Long,
+    val chapterProgress: Double,
+    val locationRevision: String,
+    /** Unix seconds echoed by Core's confirmed current row. */
+    val updatedAt: Long
+) {
+    init {
+        require(sourceId.isNotBlank())
+        require(bookId.isNotBlank())
+        require(chapterPosition >= 0)
+        require(totalChapters > 0 && chapterPosition < totalChapters)
+        require(pageIndex >= 0)
+        require(chapterOffset >= 0L)
+        require(chapterProgress.isFinite() && chapterProgress in 0.0..1.0)
+        require(locationRevision.isNotBlank())
+        require(updatedAt > 0L)
+    }
+}
+
+/**
+ * Room-backed Android projection of Core-owned reading progress.
  *
- * `scrollPosition` in the entity stores the `progress` float (0f..1f) — the naming differs
- * but the semantics match (fractional reading position within the chapter).
- *
- * Process-restart recovery: [getProgress] reads from Room, so re-entering a book after
- * the process was killed restores the last-saved `chapterIndex` / `page` / `progress`.
- *
- * C1: [saveProgress] delegates to Core `reading.progress.update` (backed by Core's own
- * storage via `put_progress`) first; the Room-backed DAO stays as the fallback path used
- * when the Core bridge is unavailable (e.g. JVM unit tests where [ReaderCoreClient] is
- * not initialized) or the Core call fails.
+ * Core is the only canonical writer. This repository never constructs or
+ * sends a Core DTO and never falls back to Room after a Core failure. Room is
+ * intentionally a lossy mirror for recent-books and legacy restore surfaces;
+ * it is updated only from [ConfirmedReadingProgress].
  */
 class ReadingProgressRepository(private val dao: ReadingProgressDao) {
 
     suspend fun getProgress(bookUrl: String): ReadingProgress? = dao.getByUrl(bookUrl)
 
-    /**
-     * P0-3: Returns the most-recently-read books (by `lastReadTime` DESC). Used by the
-     * "continue reading" / "recent" surface on the bookshelf. Derived from the same
-     * `reading_progress` table as [getProgress] — no separate recent-reading entity.
-     */
     suspend fun getRecent(limit: Int = 20): List<ReadingProgress> = dao.getRecent(limit)
 
     suspend fun getAll(): List<ReadingProgress> = dao.getAll()
 
-    /**
-     * Persist the current reading position. Callers should pass the latest known
-     * `chapterIndex` / `page` / `progress` (from [com.reader.ui.shell.ReaderContext])
-     * plus the loaded [Chapter] / `totalChapters` so the entity fields are complete.
-     *
-     * C1: Tries Core `reading.progress.update` first; falls back to the Room-backed
-     * DAO when the Core bridge is unavailable (JVM tests / Core not initialized).
-     */
-    suspend fun saveProgress(
-        bookUrl: String,
-        bookName: String,
-        chapterIndex: Int,
-        page: Int,
-        progress: Float,
-        chapter: Chapter?,
-        totalChapters: Int,
-        author: String? = null
-    ) {
-        val entity = ReadingProgress(
-            bookUrl = bookUrl,
-            bookName = bookName,
-            author = author,
-            currentChapterUrl = chapter?.url ?: "",
-            currentChapterTitle = chapter?.title ?: "",
-            chapterIndex = chapterIndex,
-            totalChapters = totalChapters,
-            page = page,
-            scrollPosition = progress,
-            lastReadTime = System.currentTimeMillis()
-        )
-        // C1: Core has landed `reading.progress.update` (reader-storage put_progress).
-        // Try Core first; fall back to Room on any bridge failure (e.g. JVM tests
-        // where ReaderCoreClient is not initialized).
-        try {
-            val params = buildCoreParams(entity)
-            ReaderCoreClient.get().sendAndAwait(
-                CORE_METHOD, params, CORE_TIMEOUT_MILLIS
+    internal suspend fun mirrorConfirmedProgress(progress: ConfirmedReadingProgress) {
+        dao.upsert(
+            ReadingProgress(
+                bookUrl = progress.bookId,
+                bookName = progress.bookName,
+                author = progress.author,
+                currentChapterUrl = progress.chapterUrl,
+                currentChapterTitle = progress.chapterTitle,
+                chapterIndex = progress.chapterPosition,
+                totalChapters = progress.totalChapters,
+                page = progress.pageIndex,
+                scrollPosition = progress.chapterProgress.toFloat(),
+                lastReadTime = Math.multiplyExact(progress.updatedAt, 1_000L)
             )
-            return
-        } catch (e: Exception) {
-            // Core bridge unavailable — fall back to Room below.
-        }
-        dao.upsert(entity)
+        )
     }
 
-    suspend fun delete(bookUrl: String) = dao.delete(bookUrl)
-
-    private fun buildCoreParams(entity: ReadingProgress): JSONObject = JSONObject().apply {
-        put("bookId", entity.bookUrl)
-        put("bookName", entity.bookName)
-        if (entity.author != null) put("author", entity.author)
-        put("chapterUrl", entity.currentChapterUrl)
-        put("chapterTitle", entity.currentChapterTitle)
-        put("chapterIndex", entity.chapterIndex)
-        put("totalChapters", entity.totalChapters)
-        put("page", entity.page)
-        put("progress", entity.scrollPosition.toDouble())
-        put("lastReadTime", entity.lastReadTime)
-    }
-
-    companion object {
-        private const val CORE_METHOD = "reading.progress.update"
-        private const val CORE_TIMEOUT_MILLIS = 10_000L
-    }
+    /** Delete only the Android projection; canonical Core storage is untouched. */
+    suspend fun deleteLocalMirror(bookUrl: String) = dao.delete(bookUrl)
 }

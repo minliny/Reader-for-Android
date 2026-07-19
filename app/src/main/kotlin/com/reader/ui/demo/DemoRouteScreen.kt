@@ -88,7 +88,7 @@ fun DemoRouteScreen(
     }
     val page = remember(routeId) {
         requireNotNull(DemoRouteRegistry.page(routeId)) {
-            "Route $routeId is not present in the generated 2.5 DemoRouteRegistry"
+            "Route $routeId is not present in the generated 3.0 DemoRouteRegistry"
         }
     }
     val contractRenderer = remember(routeId) { DemoRouteRegistry.rendererFor(routeId) }
@@ -96,7 +96,7 @@ fun DemoRouteScreen(
     var graphDiagnostic by remember(routeId) { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize()) {
         when {
-            contractRenderer != null -> Contract25RouteScreen(
+            contractRenderer != null -> ExplicitContractRouteScreen(
                 renderer = contractRenderer,
                 page = page,
                 onBack = onBack,
@@ -149,7 +149,8 @@ fun DemoRouteScreen(
                             onBack = { graphPreviewOpen = false },
                             onNavigate = { target -> graphDiagnostic = "navigate:$target" },
                             onAction = { action ->
-                                graphDiagnostic = "${action.binding.event.name}:${action.binding.payload}"
+                                graphDiagnostic =
+                                    "${action.target}:${action.binding.event.name}:${action.binding.payload}"
                             }
                         )
                     }
@@ -170,11 +171,11 @@ fun DemoRouteScreen(
 }
 
 /**
- * Explicit render dispatch for every route added by the 2.5 contract. There is intentionally no
- * fallback branch: registry initialization proves the 35-route classification is exhaustive.
+ * Explicit render dispatch for every post-2.4 route addition. There is intentionally no fallback
+ * branch: registry initialization proves the 2.5 and 3.0 classifications are exhaustive.
  */
 @Composable
-private fun Contract25RouteScreen(
+private fun ExplicitContractRouteScreen(
     renderer: DemoRouteRenderer,
     page: DemoRoutePage,
     onBack: () -> Unit,
@@ -206,6 +207,107 @@ private fun Contract25RouteScreen(
             onBack = onBack,
             onNavigate = onNavigate
         )
+        DemoRouteRenderer.CapabilityClosureStructure -> CapabilityClosureRouteScreen(
+            page = page,
+            onBack = onBack
+        )
+    }
+}
+
+/**
+ * Native shell coverage for Reader-UI 3.0 capability routes. The registry has no actions for
+ * these pages and every shell receives a no-op navigation callback, so generated planned
+ * bindings remain visible in ScreenGraph diagnostics but cannot execute as Android behavior.
+ */
+@Composable
+private fun CapabilityClosureRouteScreen(
+    page: DemoRoutePage,
+    onBack: () -> Unit
+) {
+    val readOnlyPage = page.copy(actions = emptyList())
+    val failClosedNavigate: (String) -> Unit = {}
+    when (readOnlyPage.shell) {
+        RouteShell.MainTabShell -> DemoMainTabShell(
+            title = readOnlyPage.cleanTitle(),
+            activeRoute = "bookshelf",
+            onNavigate = failClosedNavigate
+        ) {
+            capabilityClosureLazyContent(readOnlyPage)
+        }
+        RouteShell.LibraryShell -> DemoLibraryShell(
+            title = readOnlyPage.cleanTitle(),
+            onBack = onBack,
+            bottomActions = emptyList(),
+            onNavigate = failClosedNavigate
+        ) {
+            capabilityClosureLazyContent(readOnlyPage)
+        }
+        RouteShell.ReaderShell -> DemoReaderShell(
+            readingContent = {
+                CapabilityClosureNativeContent(
+                    page = readOnlyPage,
+                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                )
+            }
+        )
+        RouteShell.SettingsShell -> DemoSettingsShell(
+            title = readOnlyPage.cleanTitle(),
+            onBack = onBack,
+            bottomActions = emptyList(),
+            onNavigate = failClosedNavigate
+        ) {
+            capabilityClosureLazyContent(readOnlyPage)
+        }
+        RouteShell.FlowShell -> DemoFlowShell(
+            title = readOnlyPage.cleanTitle(),
+            onBack = onBack,
+            stepContent = {
+                CapabilityClosureNativeContent(
+                    page = readOnlyPage,
+                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                )
+            }
+        )
+    }
+}
+
+private fun LazyListScope.capabilityClosureLazyContent(page: DemoRoutePage) {
+    item { CapabilityClosureNativeContent(page = page, modifier = Modifier.fillMaxWidth()) }
+}
+
+@Composable
+private fun CapabilityClosureNativeContent(
+    page: DemoRoutePage,
+    modifier: Modifier = Modifier
+) {
+    val componentTypes = requireNotNull(DemoRouteRegistry.capabilityClosureStructures[page.id]) {
+        "Missing Reader-UI 3.0 native structure for ${page.id}"
+    }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        DemoStateCard(
+            iconRes = R.drawable.reader_ic_info,
+            title = page.cleanTitle(),
+            body = page.body.first()
+        )
+        DemoSectionCard(title = "Reader-UI 3.0 原生结构") {
+            componentTypes.forEachIndexed { index, type ->
+                DemoListItem(
+                    title = type.name,
+                    subtitle = "canonical top-level ${index + 1} / ${componentTypes.size}",
+                    trailingText = "只读"
+                )
+            }
+        }
+        DemoSectionCard(title = "交互约束") {
+            Text(
+                text = page.body.last(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
     }
 }
 
@@ -1105,8 +1207,8 @@ private fun ReaderDemoScreen(page: DemoRoutePage, onBack: () -> Unit, onNavigate
             modifier = Modifier
                 .fillMaxSize()
                 .readerPageSwipe(
-                    onNextPage = { onDispatch(ReaderUiIntent.TurnPageNext) },
-                    onPrevPage = { onDispatch(ReaderUiIntent.TurnPagePrev) }
+                    onNextPage = { onDispatch(ReaderUiIntent.TurnPageNext()) },
+                    onPrevPage = { onDispatch(ReaderUiIntent.TurnPagePrev()) }
                 )
                 .readerFontSizePinch { zoom -> /* 字号 pinch 暂不触发 intent，留空 */ },
             contentPadding = PaddingValues(start = 30.dp, end = 30.dp, top = 78.dp, bottom = 190.dp),
@@ -1179,11 +1281,11 @@ private fun ReaderBottomPanel(page: DemoRoutePage, onBack: () -> Unit, onNavigat
 private fun ReaderProgress(routeId: String, onDispatch: (ReaderUiIntent) -> Unit = {}) {
     DemoCard(alpha = 0.42f) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DemoTextButton("上一章") { onDispatch(ReaderUiIntent.TurnPagePrev) }
+            DemoTextButton("上一章") { onDispatch(ReaderUiIntent.TurnPagePrev()) }
             Box(Modifier.weight(1f).height(5.dp).background(readerExtraColors().hairline, ReaderShapes.pill)) {
                 Box(Modifier.fillMaxWidth(0.38f).height(5.dp).background(MaterialTheme.colorScheme.primary, ReaderShapes.pill))
             }
-            DemoTextButton("下一章") { onDispatch(ReaderUiIntent.TurnPageNext) }
+            DemoTextButton("下一章") { onDispatch(ReaderUiIntent.TurnPageNext()) }
         }
         Text(if (routeId == "auto-page") "自动翻页 · 8 秒" else "38% · 第 1 / 3 页", style = denseMetaStyle(), color = readerExtraColors().muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
     }

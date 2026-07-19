@@ -5,7 +5,9 @@ import io.reader.ui.contract.MotionOperation
 import io.reader.ui.contract.MotionPolicyRegistry
 import io.reader.ui.contract.MotionRequest
 import io.reader.ui.contract.RouteShell
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,7 +17,7 @@ import org.junit.Test
  *
  * Verifies:
  * - MotionPolicyRegistry has at least 28 policies (contract has 42 + 1 fallback = 43)
- * - resolveRouteTransition returns non-null for push / pop operations (fallback always matches)
+ * - resolveRouteTransition supplies the appShell role required by generic push / pop policies
  * - resolve does not crash for an all-null request
  * - all policies have a non-null motionId
  * - resolveGesture does not crash for a reader-surface update
@@ -40,7 +42,7 @@ class MotionPolicyAdapterTest {
             toShell = RouteShell.LibraryShell,
             operation = MotionOperation.Push
         )
-        assertNotNull("Route push should resolve to a MotionId", motionId)
+        assertEquals(io.reader.ui.contract.MotionId.AppRoutePushForward, motionId)
     }
 
     @Test
@@ -52,7 +54,7 @@ class MotionPolicyAdapterTest {
             toShell = RouteShell.MainTabShell,
             operation = MotionOperation.Pop
         )
-        assertNotNull("Route pop should resolve to a MotionId", motionId)
+        assertEquals(io.reader.ui.contract.MotionId.AppRoutePopBackward, motionId)
     }
 
     @Test
@@ -69,9 +71,7 @@ class MotionPolicyAdapterTest {
                 containerRole = null
             )
         )
-        // 无任何匹配字段的 request 可能返回 fallback 或 null，取决于契约
-        // 如果契约有 fallback policy，这里会返回非 null；如果没有，返回 null
-        // 测试只需验证不崩溃即可
+        assertNull(motionId)
     }
 
     @Test

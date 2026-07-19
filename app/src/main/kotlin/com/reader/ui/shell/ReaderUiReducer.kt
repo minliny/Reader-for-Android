@@ -121,7 +121,7 @@ object ReaderUiReducer {
         // autoPage 与 tts 互斥：设置 activeSession 自动清掉另一种。
         // P0-5: session intents also enqueue DispatchHostRequest so the AppShell
         // effect collector drives the real TTS engine via HostAdapter.
-        ReaderUiIntent.StartAutoPageSession -> state.copy(
+        is ReaderUiIntent.StartAutoPageSession -> state.copy(
             activeSession = ActiveSession(SessionType.AUTO_PAGE, playing = true)
         )
         is ReaderUiIntent.StartTtsSession -> {
@@ -228,10 +228,10 @@ object ReaderUiReducer {
         )
 
         // ── 翻页（C2）── MotionId: reader.page.turn.next/prev
-        ReaderUiIntent.TurnPageNext -> state.copy(
+        is ReaderUiIntent.TurnPageNext -> state.copy(
             readerContext = state.readerContext?.copy(page = state.readerContext.page + 1)
         )
-        ReaderUiIntent.TurnPagePrev -> state.copy(
+        is ReaderUiIntent.TurnPagePrev -> state.copy(
             readerContext = state.readerContext?.copy(
                 page = (state.readerContext.page - 1).coerceAtLeast(0)
             )
@@ -350,9 +350,98 @@ object ReaderUiReducer {
         // reducer 记录意图，Core 响应后刷新列表。
         is ReaderUiIntent.SetSourceEnabled -> state
 
-        // ── P3: 通用设置 action ──
-        // TODO: 调 Core cache.clear 命令；reducer 暂为 no-op。
-        ReaderUiIntent.ClearCache -> state
+        // ── P3: Core-backed cache actions ──
+        is ReaderUiIntent.ClearCache -> state.copy(
+            bookCache = state.bookCache.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderCacheAction.CLEAR_GLOBAL,
+                message = null,
+                error = null
+            )
+        )
+        is ReaderUiIntent.RefreshCurrentBookCache -> {
+            val context = state.readerContext
+            state.copy(
+                bookCache = state.bookCache.copy(
+                    phase = ReaderCoreActionPhase.RUNNING,
+                    activeRequestId = intent.requestId,
+                    lastAction = ReaderCacheAction.STATUS,
+                    sourceId = context?.sourceId,
+                    bookId = context?.bookUrl,
+                    message = null,
+                    error = null
+                )
+            )
+        }
+        is ReaderUiIntent.PrefetchCurrentBookCache -> state.copy(
+            bookCache = state.bookCache.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = if (intent.includeCurrentChapter) {
+                    ReaderCacheAction.PREFETCH_CURRENT
+                } else {
+                    ReaderCacheAction.PREFETCH_NEXT
+                },
+                message = null,
+                error = null
+            )
+        )
+        is ReaderUiIntent.ClearCurrentBookCache -> state.copy(
+            bookCache = state.bookCache.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderCacheAction.CLEAR_BOOK,
+                message = null,
+                error = null
+            )
+        )
+        is ReaderUiIntent.CacheActionSucceeded -> {
+            if (state.bookCache.activeRequestId != intent.requestId) {
+                state
+            } else {
+                val snapshot = intent.snapshot
+                val context = state.readerContext
+                val staleBookResult = snapshot != null && context != null &&
+                    (snapshot.sourceId != context.sourceId || snapshot.bookId != context.bookUrl)
+                if (staleBookResult) {
+                    state
+                } else {
+                    val projected = when {
+                        snapshot != null -> snapshot
+                        intent.projectionInvalidated -> ReaderBookCacheUiState()
+                        else -> state.bookCache
+                    }
+                    state.copy(
+                        bookCache = projected.copy(
+                            phase = if (intent.refreshError == null) {
+                                ReaderCoreActionPhase.SUCCEEDED
+                            } else {
+                                ReaderCoreActionPhase.PARTIAL
+                            },
+                            activeRequestId = null,
+                            lastAction = intent.action,
+                            message = intent.message,
+                            error = intent.refreshError
+                        )
+                    )
+                }
+            }
+        }
+        is ReaderUiIntent.CacheActionFailed -> {
+            if (state.bookCache.activeRequestId != intent.requestId) {
+                state
+            } else {
+                state.copy(
+                    bookCache = state.bookCache.copy(
+                        phase = ReaderCoreActionPhase.FAILED,
+                        activeRequestId = null,
+                        message = null,
+                        error = intent.message
+                    )
+                )
+            }
+        }
         // TODO: 重置 settings 子状态（appThemeMode/行为开关等）。
         ReaderUiIntent.RestoreDefaultSettings -> state
 
@@ -709,8 +798,206 @@ object ReaderUiReducer {
                 }
             )
         }
+        is ReaderUiIntent.PersistReplaceRuleCreate -> {
+            val optimistic = ReplaceRule(
+                id = "pending-${intent.requestId}",
+                name = intent.name,
+                pattern = intent.pattern,
+                replacement = intent.replacement,
+                scope = intent.scope
+            )
+            state.copy(
+                replaceRules = state.replaceRules + optimistic,
+                replaceMutation = state.replaceMutation.copy(
+                    phase = ReaderCoreActionPhase.RUNNING,
+                    activeRequestId = intent.requestId,
+                    lastAction = ReaderReplaceMutationAction.CREATE,
+                    message = null,
+                    error = null,
+                    previousRules = state.replaceRules
+                )
+            )
+        }
+        is ReaderUiIntent.PersistReplaceRuleUpdate -> state.copy(
+            replaceRules = state.replaceRules.map { rule ->
+                if (rule.id == intent.id) {
+                    rule.copy(
+                        name = intent.name ?: rule.name,
+                        pattern = intent.pattern ?: rule.pattern,
+                        replacement = intent.replacement ?: rule.replacement,
+                        scope = intent.scope ?: rule.scope
+                    )
+                } else {
+                    rule
+                }
+            },
+            replaceMutation = state.replaceMutation.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderReplaceMutationAction.UPDATE,
+                message = null,
+                error = null,
+                previousRules = state.replaceRules
+            )
+        )
+        is ReaderUiIntent.PersistReplaceRuleDelete -> state.copy(
+            replaceRules = state.replaceRules.filterNot { it.id == intent.id },
+            replaceMutation = state.replaceMutation.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderReplaceMutationAction.DELETE,
+                message = null,
+                error = null,
+                previousRules = state.replaceRules
+            )
+        )
+        is ReaderUiIntent.PersistReplaceRuleToggle -> state.copy(
+            replaceRules = state.replaceRules.map { rule ->
+                if (rule.id == intent.id) rule.copy(enabled = !rule.enabled) else rule
+            },
+            replaceMutation = state.replaceMutation.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderReplaceMutationAction.TOGGLE,
+                message = null,
+                error = null,
+                previousRules = state.replaceRules
+            )
+        )
         is ReaderUiIntent.ReplaceRulesLoaded -> {
             state.copy(replaceRules = intent.rules)
+        }
+        is ReaderUiIntent.LoadReplaceRules -> state.copy(
+            replaceMutation = state.replaceMutation.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderReplaceMutationAction.LOAD,
+                message = null,
+                error = null,
+                previousRules = state.replaceRules
+            )
+        )
+        is ReaderUiIntent.ReplaceRulesHydrated -> {
+            val mutation = state.replaceMutation
+            if (mutation.activeRequestId != intent.requestId ||
+                mutation.lastAction != ReaderReplaceMutationAction.LOAD
+            ) {
+                state
+            } else {
+                state.copy(
+                    replaceRules = intent.rules,
+                    replaceMutation = mutation.copy(
+                        phase = ReaderCoreActionPhase.SUCCEEDED,
+                        activeRequestId = null,
+                        message = "已从 Reader Core 加载 ${intent.rules.size} 条规则",
+                        error = null,
+                        previousRules = emptyList()
+                    )
+                )
+            }
+        }
+        is ReaderUiIntent.RestoreReplaceUndoToken -> state.copy(
+            replaceMutation = state.replaceMutation.copy(
+                undoTokenJson = intent.undoTokenJson,
+                undoOperation = intent.undoOperation,
+                undoRuleId = intent.undoRuleId,
+                undoExpiresAt = intent.undoExpiresAt,
+                undoTokenPersisted = true
+            )
+        )
+        is ReaderUiIntent.UndoLastReplace -> state.copy(
+            replaceMutation = state.replaceMutation.copy(
+                phase = ReaderCoreActionPhase.RUNNING,
+                activeRequestId = intent.requestId,
+                lastAction = ReaderReplaceMutationAction.UNDO,
+                message = null,
+                error = null,
+                previousRules = state.replaceRules
+            )
+        )
+        is ReaderUiIntent.ReplacePersistSucceeded -> {
+            val mutation = state.replaceMutation
+            if (mutation.activeRequestId != intent.requestId) {
+                state
+            } else {
+                val before = mutation.previousRules
+                val reconciled = when (intent.action) {
+                    ReaderReplaceMutationAction.LOAD -> before
+                    ReaderReplaceMutationAction.CREATE ->
+                        intent.rule?.let { before + it } ?: before
+                    ReaderReplaceMutationAction.UPDATE,
+                    ReaderReplaceMutationAction.TOGGLE ->
+                        intent.rule?.let { persisted ->
+                            before.map { rule -> if (rule.id == persisted.id) persisted else rule }
+                        } ?: before
+                    ReaderReplaceMutationAction.DELETE ->
+                        before.filterNot { it.id == intent.deletedRuleId?.toString() }
+                    ReaderReplaceMutationAction.UNDO -> before
+                }
+                state.copy(
+                    replaceRules = reconciled,
+                    replaceMutation = ReaderReplaceMutationUiState(
+                        phase = ReaderCoreActionPhase.SUCCEEDED,
+                        lastAction = intent.action,
+                        message = if (intent.undoTokenPersisted) {
+                            "规则已保存，可撤销"
+                        } else {
+                            "规则已保存；撤销凭据仅在本次会话可用"
+                        },
+                        undoTokenJson = intent.undoTokenJson,
+                        undoOperation = intent.undoOperation,
+                        undoRuleId = intent.undoRuleId,
+                        undoExpiresAt = intent.undoExpiresAt,
+                        undoTokenPersisted = intent.undoTokenPersisted
+                    )
+                )
+            }
+        }
+        is ReaderUiIntent.ReplaceUndoSucceeded -> {
+            val mutation = state.replaceMutation
+            if (mutation.activeRequestId != intent.requestId) {
+                state
+            } else {
+                val before = mutation.previousRules
+                val restored = if (!intent.changed) {
+                    before
+                } else when (intent.operation) {
+                    "create" -> before.filterNot { it.id == intent.ruleId.toString() }
+                    "update", "delete" -> intent.restoredRule?.let { restoredRule ->
+                        if (before.any { it.id == restoredRule.id }) {
+                            before.map { rule -> if (rule.id == restoredRule.id) restoredRule else rule }
+                        } else {
+                            before + restoredRule
+                        }
+                    } ?: before
+                    else -> before
+                }
+                state.copy(
+                    replaceRules = restored,
+                    replaceMutation = ReaderReplaceMutationUiState(
+                        phase = ReaderCoreActionPhase.SUCCEEDED,
+                        lastAction = ReaderReplaceMutationAction.UNDO,
+                        message = if (intent.changed) "已撤销上次规则修改" else "规则无需变更"
+                    )
+                )
+            }
+        }
+        is ReaderUiIntent.ReplaceCoreActionFailed -> {
+            val mutation = state.replaceMutation
+            if (mutation.activeRequestId != intent.requestId) {
+                state
+            } else {
+                state.copy(
+                    replaceRules = mutation.previousRules,
+                    replaceMutation = mutation.copy(
+                        phase = ReaderCoreActionPhase.FAILED,
+                        activeRequestId = null,
+                        message = null,
+                        error = intent.message,
+                        previousRules = emptyList()
+                    )
+                )
+            }
         }
     }
 
@@ -739,6 +1026,7 @@ object ReaderUiReducer {
             currentRoute = ReaderRoute.TabShell(intent.tab),
             backStack = emptyList(),
             readerContext = null,
+            bookCache = ReaderBookCacheUiState(),
             activeSession = null,
             overlayState = OverlayState.None,
             motionInterrupt = if (cancelled) {
@@ -787,6 +1075,10 @@ object ReaderUiReducer {
             backStack = newBackStack,
             currentRoute = newRoute,
             readerContext = ctx,
+            // Cache selectors are book-scoped. A new live identity invalidates
+            // any prior status/request so a late old-book result cannot leave
+            // the new cache page permanently busy.
+            bookCache = ReaderBookCacheUiState(),
             // Entry starts in immersive reading — never auto-open the control layer.
             activeSession = null,
             overlayState = OverlayState.None,
@@ -827,6 +1119,7 @@ object ReaderUiReducer {
             backStack = newBackStack,
             currentRoute = newRoute,
             readerContext = if (readerFullyPopped) null else state.readerContext,
+            bookCache = if (readerFullyPopped) ReaderBookCacheUiState() else state.bookCache,
             activeSession = if (readerFullyPopped) null else state.activeSession,
             overlayState = OverlayState.None,
             motionInterrupt = null

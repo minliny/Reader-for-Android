@@ -32,6 +32,9 @@ import com.reader.android.data.storage.ChapterCacheManager
 import com.reader.android.data.storage.RssItemDao
 import com.reader.android.data.storage.RssSubscriptionDao
 import com.reader.android.data.storage.ReadingProgressDao
+import com.reader.android.data.storage.NoOpReaderReplaceUndoTokenStore
+import com.reader.android.data.storage.ReaderReplaceUndoTokenStore
+import com.reader.android.data.storage.SharedPreferencesReaderReplaceUndoTokenStore
 
 /**
  * P1 Runtime Wiring: Central dependency provider.
@@ -57,6 +60,7 @@ object AppProvider {
     private var _ttsEngine: AndroidTtsEngine? = null
     private var _audioFocusController: AudioFocusController? = null
     private var _ttsSessionController: TtsSessionController? = null
+    private var _readerReplaceUndoTokenStore: ReaderReplaceUndoTokenStore? = null
     private var _networkAllowed: Boolean = false
     private var initialized = false
 
@@ -67,6 +71,10 @@ object AppProvider {
 
     /** Default false. Tests must NOT bypass this without explicit opt-in. */
     val isNetworkAllowed: Boolean get() = _networkAllowed
+
+    /** Exact Core-issued replace undo token, durable across Android process restarts. */
+    internal val readerReplaceUndoTokenStore: ReaderReplaceUndoTokenStore
+        get() = _readerReplaceUndoTokenStore ?: NoOpReaderReplaceUndoTokenStore
 
     fun enableNetworkForTestingOnly() {
         _networkAllowed = true
@@ -314,6 +322,9 @@ object AppProvider {
         // writeback. Tests inject fakes via initForAudioFocusController.
         _ttsEngine = AndroidTtsEngine(context.applicationContext)
         _audioFocusController = AndroidAudioFocusController(context.applicationContext)
+        _readerReplaceUndoTokenStore = SharedPreferencesReaderReplaceUndoTokenStore(
+            context.applicationContext
+        )
         // P1-6: wire the OkHttp-backed WebDAV client + BackupRestoreManager.
         // The credential identifier "webdav.default" matches the one used
         // by WebDavCredentialProvider so credential.resolve + webdav.* share
@@ -345,6 +356,7 @@ object AppProvider {
         _ttsSessionController = null
         _ttsEngine = null
         _audioFocusController = null
+        _readerReplaceUndoTokenStore = null
         appContext = null
         db?.close()
         db = null

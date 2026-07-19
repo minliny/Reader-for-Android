@@ -112,7 +112,12 @@ function extractRegistryRouteIds(source) {
   const additionsBlock = extractSourceRange(
     source,
     "private val contract25Additions",
-    "private val contract25RendererByRoute"
+    "private val contract30Additions"
+  );
+  const contract30Block = extractSourceRange(
+    source,
+    "private val contract30Additions",
+    "private val explicitRendererByRoute"
   );
   const pageIds = [...authoredBlock.matchAll(/DemoRoutePage\(id\s*=\s*"([^"]+)"/g)].map(
     (match) => match[1]
@@ -120,7 +125,10 @@ function extractRegistryRouteIds(source) {
   const additionIds = [...additionsBlock.matchAll(/\bid\s*=\s*"([^"]+)"/g)].map(
     (match) => match[1]
   );
-  return [...pageIds, ...additionIds];
+  const contract30Ids = [...contract30Block.matchAll(/\bid\s*=\s*"([^"]+)"/g)].map(
+    (match) => match[1]
+  );
+  return [...pageIds, ...additionIds, ...contract30Ids];
 }
 
 const generatedRouteIds = extractGeneratedRouteIds(readFile(generatedRoutePath));

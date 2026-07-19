@@ -336,6 +336,48 @@ fun BookshelfSearchSettingsScreen(
     )
 }
 
+/** Native bookshelf settings primitives with all interactive controls replaced by static values. */
+@Composable
+internal fun BookshelfSearchCanonicalReadOnlyContent() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        BookshelfSettingsSection(title = "书架") {
+            BookshelfSettingsRow(
+                iconRes = R.drawable.reader_ic_grid,
+                title = "默认展示",
+                side = { BookshelfSmallPill(label = "封面") }
+            )
+            BookshelfManagementDivider()
+            BookshelfSettingsRow(
+                iconRes = R.drawable.reader_ic_columns,
+                title = "封面列数",
+                side = { BookshelfSmallPill(label = "3列") }
+            )
+            BookshelfManagementDivider()
+            BookshelfSettingsRow(
+                iconRes = R.drawable.reader_ic_folder,
+                title = "默认分组",
+                side = { BookshelfSmallPill(label = "全部") }
+            )
+        }
+        BookshelfSettingsSection(title = "搜索") {
+            BookshelfSettingsRow(
+                iconRes = R.drawable.reader_ic_search,
+                title = "保留搜索历史",
+                side = { BookshelfSmallPill(label = "已开启") }
+            )
+            BookshelfManagementDivider()
+            BookshelfSettingsRow(
+                iconRes = R.drawable.reader_ic_people,
+                title = "合并同作者结果",
+                side = { BookshelfSmallPill(label = "已开启") }
+            )
+        }
+    }
+}
+
 @Composable
 private fun BookshelfManagementScaffold(
     title: String,

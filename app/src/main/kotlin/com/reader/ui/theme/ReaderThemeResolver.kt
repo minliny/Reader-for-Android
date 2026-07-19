@@ -1,6 +1,7 @@
 package com.reader.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import io.reader.ui.contract.ReaderAppearanceSpecRegistry
 
 /**
  * 阅读器主题解析器 —— 对齐 HarmonyOS `ReaderThemeResolver.ets`。
@@ -23,27 +24,28 @@ object ReaderThemeResolver {
     )
 
     /**
-     * 8 个主题色板（4 日间 + 4 夜间）。色值来自 demo fixture：
-     * 日间 paper=#F5EAD8 / warm=#FBF0DF / green=#E7F0E2 / blue=#E9F1F4，
-     * 夜间 #2D2924 / #27231F / #202B26 / #232934。
+     * Reader 2 `AppearanceContent` 的 8 个主题卡片。底层继续复用
+     * paper/warm/green/blue 四个持久化 id；blue 在新的主题库中承担无纹理日间/夜间对。
      */
-    val THEMES: List<ThemeSwatch> = listOf(
-        ThemeSwatch("paper", "纸张", false, Color(0xFFF5EAD8)),
-        ThemeSwatch("warm", "暖色", false, Color(0xFFFBF0DF)),
-        ThemeSwatch("green", "护眼", false, Color(0xFFE7F0E2)),
-        ThemeSwatch("blue", "蓝色", false, Color(0xFFE9F1F4)),
-        ThemeSwatch("paper-night", "纸张夜间", true, Color(0xFF2D2924)),
-        ThemeSwatch("warm-night", "暖色夜间", true, Color(0xFF27231F)),
-        ThemeSwatch("green-night", "护眼夜间", true, Color(0xFF202B26)),
-        ThemeSwatch("blue-night", "蓝色夜间", true, Color(0xFF232934))
-    )
+    val THEMES: List<ThemeSwatch> = ReaderAppearanceSpecRegistry.themes.map { theme ->
+        ThemeSwatch(
+            id = theme.id,
+            label = theme.label,
+            isNight = theme.scheme == "night",
+            color = Color(theme.swatchHex.removePrefix("#").toLong(16) or 0xFF000000L)
+        )
+    }
+
+    /** Figma Reader 2 主题库的视觉顺序。 */
+    val FULL_APPEARANCE_THEMES: List<ThemeSwatch> = THEMES
 
     /** 日间 4 swatch（快速面板用）。 */
     val DAY_SWATCHES: List<ThemeSwatch> = THEMES.filterNot { it.isNight }
 
     /** 取主题 swatch 颜色，未知 id 回退到 paper。 */
     fun swatchColor(themeId: String): Color =
-        THEMES.firstOrNull { it.id == themeId }?.color ?: Color(0xFFF5EAD8)
+        THEMES.firstOrNull { it.id == themeId }?.color
+            ?: THEMES.first { it.id == ReaderAppearanceSpecRegistry.defaults.dayThemeId }.color
 
     /** themeId 是否为夜间主题（以 `-night` 结尾）。 */
     fun isNightTheme(themeId: String): Boolean = themeId.endsWith("-night")
@@ -86,22 +88,22 @@ object ReaderThemeResolver {
 
     // 夜间 4 主题：swatch 驱动 paper，ink/infoLayer 用夜间的浅色。
     private val paperNight = ThemePalette(
-        paper = Color(0xFF2D2924), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF2C2824),
+        paper = Color(0xFF34302B), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF34302B),
         readerInk = Color(0xFFEADFCE), infoLayer = Color(0xFFBAAD9C),
         paperStart = Color(0xFF302B26), paperEnd = Color(0xFF302B26), surfaceSoft = Color(0xB82A2622)
     )
     private val warmNight = ThemePalette(
-        paper = Color(0xFF27231F), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF2C2824),
+        paper = Color(0xFF302922), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF302922),
         readerInk = Color(0xFFEADFCE), infoLayer = Color(0xFFBAAD9C),
         paperStart = Color(0xFF302B26), paperEnd = Color(0xFF302B26), surfaceSoft = Color(0xB82A2622)
     )
     private val greenNight = ThemePalette(
-        paper = Color(0xFF202B26), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF2C2824),
+        paper = Color(0xFF263129), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF263129),
         readerInk = Color(0xFFE0DCC8), infoLayer = Color(0xFFAAB09E),
         paperStart = Color(0xFF302B26), paperEnd = Color(0xFF302B26), surfaceSoft = Color(0xB82A2622)
     )
     private val blueNight = ThemePalette(
-        paper = Color(0xFF232934), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF2C2824),
+        paper = Color(0xFF26231F), readerPaper = Color(0xFF24211E), paperBright = Color(0xFF26231F),
         readerInk = Color(0xFFD8DCE4), infoLayer = Color(0xFFA2AAB4),
         paperStart = Color(0xFF302B26), paperEnd = Color(0xFF302B26), surfaceSoft = Color(0xB82A2622)
     )
@@ -110,7 +112,14 @@ object ReaderThemeResolver {
         "paper" -> paperDay
         "warm" -> warmDay
         "green" -> greenDay
-        "blue" -> blueDay
+        "blue" -> blueDay.copy(
+            paper = Color.White,
+            readerPaper = Color.White,
+            paperBright = Color.White,
+            paperStart = Color.White,
+            paperEnd = Color.White,
+            surfaceSoft = Color(0xB8FFFCF8)
+        )
         "paper-night" -> paperNight
         "warm-night" -> warmNight
         "green-night" -> greenNight

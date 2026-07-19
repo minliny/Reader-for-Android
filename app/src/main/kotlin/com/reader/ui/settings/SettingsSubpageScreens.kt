@@ -50,6 +50,8 @@ import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
 import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.android.data.adapter.WebDavCredential
 import com.reader.ui.shell.PermissionStatus
+import com.reader.ui.shell.ReaderBookCacheUiState
+import com.reader.ui.shell.ReaderCoreActionPhase
 import com.reader.ui.shell.SettingsShellFrame
 import com.reader.ui.shell.WebDavTestStatus
 import com.reader.ui.theme.ReaderShapes
@@ -77,6 +79,8 @@ fun SettingsGeneralScreen(
     onCrashLogChange: (Boolean) -> Unit = {},
     /** 缓存清理回调。 */
     onClearCache: () -> Unit = {},
+    /** Core cache.clear 的可见执行状态。 */
+    cacheState: ReaderBookCacheUiState = ReaderBookCacheUiState(),
     /** 恢复默认回调。 */
     onRestoreDefault: () -> Unit = {},
     /** 打开系统权限设置页。 */
@@ -168,9 +172,19 @@ fun SettingsGeneralScreen(
                 SettingsSubDivider()
                 SettingsSubRow(
                     iconRes = R.drawable.reader_ic_trash,
-                    title = "缓存清理",
-                    onClick = onClearCache,
-                    side = { SettingsSubActionLabel("清理缓存") }
+                    title = cacheState.error ?: cacheState.message ?: "缓存清理",
+                    onClick = { if (!cacheState.busy) onClearCache() },
+                    side = {
+                        SettingsSubActionLabel(
+                            when (cacheState.phase) {
+                                ReaderCoreActionPhase.RUNNING -> "清理中"
+                                ReaderCoreActionPhase.SUCCEEDED -> "再次清理"
+                                ReaderCoreActionPhase.PARTIAL -> "刷新状态"
+                                ReaderCoreActionPhase.FAILED -> "重试"
+                                ReaderCoreActionPhase.IDLE -> "清理缓存"
+                            }
+                        )
+                    }
                 )
             }
         }
@@ -274,6 +288,79 @@ fun AboutFeedbackScreen(
                     side = { SettingsSubChevron() }
                 )
             }
+        }
+    }
+}
+
+/** Native settings primitives rendered without switch, segment, button, or navigation callbacks. */
+@Composable
+internal fun SettingsCanonicalReadOnlyContent(mode: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        when (mode) {
+            "general" -> {
+                SettingsSubSection(title = "基础偏好") {
+                    SettingsSubRow(
+                        iconRes = R.drawable.reader_ic_palette,
+                        title = "App主题",
+                        side = { SettingsSubValue("跟随系统") }
+                    )
+                    SettingsSubDivider()
+                    SettingsSubRow(
+                        iconRes = R.drawable.reader_ic_globe,
+                        title = "语言",
+                        side = { SettingsSubValue("简体中文") }
+                    )
+                }
+                SettingsSubSection(title = "行为与反馈") {
+                    SettingsSubRow(
+                        iconRes = R.drawable.reader_ic_refresh,
+                        title = "自动检查更新",
+                        side = { SettingsSubBadge("已开启", SettingsSubTone.Good) }
+                    )
+                    SettingsSubDivider()
+                    SettingsSubRow(
+                        iconRes = R.drawable.reader_ic_motion,
+                        title = "减少动态效果",
+                        side = { SettingsSubValue("跟随系统") }
+                    )
+                }
+            }
+            "developer-motion" -> SettingsSubSection(title = "开发者动效") {
+                SettingsSubRow(
+                    iconRes = R.drawable.reader_ic_motion,
+                    title = "动效策略",
+                    side = { SettingsSubValue("合同驱动") }
+                )
+                SettingsSubDivider()
+                SettingsSubRow(
+                    iconRes = R.drawable.reader_ic_code,
+                    title = "Reduced Motion",
+                    side = { SettingsSubValue("跟随系统") }
+                )
+            }
+            "about-feedback" -> SettingsSubSection(title = "项目信息") {
+                SettingsSubRow(
+                    iconRes = R.drawable.reader_ic_refresh,
+                    title = "检查更新",
+                    side = { SettingsSubValue("已是最新") }
+                )
+                SettingsSubDivider()
+                SettingsSubRow(
+                    iconRes = R.drawable.reader_ic_code,
+                    title = "源码仓库",
+                    side = { SettingsSubValue("Reader") }
+                )
+                SettingsSubDivider()
+                SettingsSubRow(
+                    iconRes = R.drawable.reader_ic_link,
+                    title = "开源许可",
+                    side = { SettingsSubValue("开源") }
+                )
+            }
+            else -> error("Unsupported canonical settings mode: $mode")
         }
     }
 }

@@ -810,16 +810,13 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
 )
 
     /**
-     * 96 个 Motion ID 的契约表，从契约 [MotionSpecRegistry.all] 派生，并合并
-     * `motion-controller.js` 的 from/to/interrupt/finalState 语义值。
-     *
-     * 对于在 `motion-controller.js` 中有定义的 Motion ID，from/to/interrupt/finalState
-     * 使用 JS 侧的语义值；对于仅存在于生成契约中的 Motion ID，回退到 spec 字段。
+     * Motion ID 契约表以生成的 [MotionSpecRegistry.all] 为唯一 canonical 数据源，
+     * 并仅在生成项尚未声明精确状态时回退到本地 JS 兼容语义表。
      *
      * 仅存在于旧 JS 语义表、但不属于生成枚举的高层别名继续补入查询表；所有
      * [MotionIdConstants] 则直接委托给生成枚举的 serializer wire name。
      *
-     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all (96 条) +
+     * Contract source: generated/kotlin/Motion.kt MotionSpecRegistry.all +
      *                  motion-controller.js 语义表与本地遗留别名。
      */
     private val MOTION_CONTRACTS: Map<String, MotionContract> = buildMap {
@@ -830,17 +827,17 @@ private val MOTION_CONTROLLER_JS_SPECS: Map<String, MotionControllerJsSpec> = ma
                 serialName,
                 MotionContract(
                     motionId = serialName,
-                    from = jsSpec?.from ?: buildList {
+                    from = spec.from ?: jsSpec?.from ?: buildList {
                         spec.operation?.let { add(it.name) }
                         spec.containerRole?.let { add(it.name) }
                         if (isEmpty()) add("idle")
                     },
-                    to = jsSpec?.to ?: buildList {
+                    to = spec.to ?: jsSpec?.to ?: buildList {
                         spec.visualPattern?.let { add(it.name) }
                         add(spec.implementationKind.name)
                     },
-                    interrupt = jsSpec?.interrupt ?: listOf(spec.interruptPolicy.name),
-                    finalState = jsSpec?.finalState ?: spec.id.name,
+                    interrupt = spec.interrupt ?: jsSpec?.interrupt ?: listOf(spec.interruptPolicy.name),
+                    finalState = spec.finalState ?: jsSpec?.finalState ?: spec.id.name,
                     reducedMotion = spec.reducedMotionPolicy.name,
                     defaultDurationMs = spec.durationMs.toLong()
                 )
@@ -984,6 +981,7 @@ object MotionIdConstants {
     // Reader entry / control
     val READER_ENTRY_COVER_TO_IMMERSIVE: String get() = MotionId.ReaderEntryCoverToImmersive.serialName
     val READER_ENTRY_ACTION_TO_IMMERSIVE: String get() = MotionId.ReaderEntryActionToImmersive.serialName
+    val READER_CONTROL_SHOW: String get() = MotionId.ReaderControlShow.serialName
     val READER_CONTROL_HIDE: String get() = MotionId.ReaderControlHide.serialName
     val READER_CONTROL_HANDLE_PRESS: String get() = MotionId.ReaderControlHandlePress.serialName
     val READER_CONTROL_HANDLE_DRAG: String get() = MotionId.ReaderControlHandleDrag.serialName

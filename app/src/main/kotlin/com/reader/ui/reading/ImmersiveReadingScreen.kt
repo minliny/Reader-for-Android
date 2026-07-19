@@ -1,11 +1,9 @@
 package com.reader.ui.reading
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,11 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -109,7 +109,8 @@ fun ReaderReadingSurface(
 @Composable
 fun ImmersiveReadingScreen(
     context: ReaderContext,
-    onOpenControls: () -> Unit
+    onOpenControls: () -> Unit,
+    onPageTurn: ((next: Boolean) -> Unit)? = null
 ) {
     val vm: ImmersiveReadingViewModel = viewModel(
         key = "immersive-${context.bookUrl}",
@@ -142,19 +143,48 @@ fun ImmersiveReadingScreen(
             Text(s.message, color = MaterialTheme.colorScheme.error)
         }
 
-        is ReadingUiState.Ready -> Box(Modifier.fillMaxSize()) {
+        is ReadingUiState.Ready -> {
+            var measuredContentSize by androidx.compose.runtime.remember(
+                context.entryRequestId,
+                content
+            ) { androidx.compose.runtime.mutableStateOf<IntSize?>(null) }
+            var bodyTextLayout by androidx.compose.runtime.remember(
+                context.entryRequestId,
+                content
+            ) { androidx.compose.runtime.mutableStateOf<TextLayoutResult?>(null) }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { measuredContentSize = it.size }
+            ) {
             ReaderReadingSurface(
                 title = s.book.name.ifEmpty { context.bookName },
-                content = content
+                content = content,
+                onBodyTextLayout = { bodyTextLayout = it }
             )
             ReaderImmersiveInfoLayer(
                 title = context.bookName.ifEmpty { s.book.name },
                 modifier = Modifier.align(Alignment.TopCenter)
             )
-            ReaderTapZones(
-                onOpenControls = onOpenControls,
+            val committedOffset = (context.progress.coerceIn(0f, 1f) * content.length).toLong()
+            ReaderTapZoneHost(
+                state = ReaderTapZoneHostAdapter.fromLegacy(
+                    readingState = s,
+                    layoutBoundary = measuredReaderTapZoneBoundary(
+                        content = content,
+                        committedOffset = committedOffset,
+                        textLayout = bodyTextLayout,
+                        viewport = measuredContentSize
+                    )
+                ),
+                callbacks = ReaderTapZoneCallbacks(
+                    onPrevious = onPageTurn?.let { callback -> { callback(false) } },
+                    onControl = onOpenControls,
+                    onNext = onPageTurn?.let { callback -> { callback(true) } }
+                ),
                 modifier = Modifier.fillMaxSize()
             )
+        }
         }
     }
 }
@@ -191,31 +221,6 @@ private fun ReaderImmersiveInfoLayer(title: String, modifier: Modifier = Modifie
     }
 }
 
-@Composable
-private fun ReaderTapZones(
-    onOpenControls: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(modifier = modifier) {
-        Spacer(
-            modifier = Modifier
-                .weight(0.28f)
-                .fillMaxHeight()
-        )
-        Box(
-            modifier = Modifier
-                .weight(0.44f)
-                .fillMaxHeight()
-                .clickable(onClick = onOpenControls)
-        )
-        Spacer(
-            modifier = Modifier
-                .weight(0.28f)
-                .fillMaxHeight()
-        )
-    }
-}
-
 /**
  * Loads chapter text for the immersive surface. Reuses the existing [BookApi] path for real
  * sources; for the `fixture://` seed used by Slice 2 demonstrations it serves local text so
@@ -228,8 +233,8 @@ private fun ReaderTapZones(
 class ImmersiveReadingViewModel(
     private val context: ReaderContext,
     private val onAsyncStateChange: ((requestId: String, state: AsyncResultStateValue, value: Any?) -> Unit)? = null,
-    // P0-3: reading progress repository for restore-on-entry + save-on-leave.
-    // Null when AppProvider is unavailable (fixture paths / unit tests).
+    // Core is the canonical progress writer. This repository exposes only the
+    // confirmed-success Room mirror for legacy restore/recent-book reads.
     private val readingProgressRepository: com.reader.android.data.repository.ReadingProgressRepository? = null,
     // P0-4: chapter cache for cache-first content loading. Null when AppProvider
     // is unavailable (fixture paths / unit tests). When non-null, the VM consults
@@ -245,12 +250,11 @@ class ImmersiveReadingViewModel(
     private val _content = MutableStateFlow("")
     val content: StateFlow<String> = _content.asStateFlow()
 
-    // P0-3: track loaded chapters + book so saveProgress() can persist full metadata
-    // (currentChapterUrl, currentChapterTitle, totalChapters) without re-fetching.
+    // Loaded TOC is retained for the reader surface. Progress persistence is
+    // owned by the paired playback Host path after canonical location resolve.
     private var loadedChapters: List<Chapter> = emptyList()
-    private var loadedBook: Book? = null
-    // P0-3: latest reading position, updated by the UI via updatePosition().
-    // Initialized from context, updated as the user reads, saved in onCleared().
+    // Latest presentation position remains local UI state; it is not a second
+    // persistence writer.
     private var currentChapterIndex: Int = context.chapterIndex
     private var currentPage: Int = context.page
     private var currentProgress: Float = context.progress
@@ -265,37 +269,6 @@ class ImmersiveReadingViewModel(
         currentChapterIndex = chapterIndex
         currentPage = page
         currentProgress = progress
-    }
-
-    /**
-     * P0-3: Persist current reading position to Room. Called from onCleared() and can
-     * be called explicitly by the UI on chapter changes.
-     */
-    private fun saveProgress() {
-        val repo = readingProgressRepository ?: return
-        val chapters = loadedChapters
-        val chapter = chapters.getOrNull(currentChapterIndex)
-        viewModelScope.launch {
-            try {
-                repo.saveProgress(
-                    bookUrl = context.bookUrl,
-                    bookName = context.bookName,
-                    chapterIndex = currentChapterIndex,
-                    page = currentPage,
-                    progress = currentProgress,
-                    chapter = chapter,
-                    totalChapters = chapters.size,
-                    author = loadedBook?.author
-                )
-            } catch (e: Exception) {
-                // Best-effort persistence — don't crash on DB errors.
-            }
-        }
-    }
-
-    override fun onCleared() {
-        saveProgress()
-        super.onCleared()
     }
 
     private fun load() {
@@ -329,7 +302,6 @@ class ImmersiveReadingViewModel(
                     onAsyncStateChange?.invoke(context.entryRequestId, AsyncResultStateValue.CANCELLED, null)
                     return@launch
                 }
-                loadedBook = book
                 loadedChapters = chapters
                 _uiState.value = ReadingUiState.Ready(book, chapters)
                 // P0-3: restore last-saved chapter index from Room so re-entering a book

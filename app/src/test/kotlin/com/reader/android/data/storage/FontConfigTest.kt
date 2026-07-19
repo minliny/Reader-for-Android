@@ -40,10 +40,10 @@ class FontConfigTest {
     }
 
     @Test
-    fun `FontFamily display names are Chinese`() {
-        assertEquals("系统默认", FontFamily.SYSTEM.displayName)
-        assertEquals("宋体/衬线", FontFamily.SERIF.displayName)
-        assertEquals("黑体/无衬线", FontFamily.SANS_SERIF.displayName)
+    fun `FontFamily display names follow Reader 2 appearance labels`() {
+        assertEquals("系统", FontFamily.SYSTEM.displayName)
+        assertEquals("宋体", FontFamily.SERIF.displayName)
+        assertEquals("黑体", FontFamily.SANS_SERIF.displayName)
         assertEquals("等宽", FontFamily.MONO.displayName)
         assertEquals("楷体", FontFamily.KAI.displayName)
         assertEquals("仿宋", FontFamily.FANGSONG.displayName)

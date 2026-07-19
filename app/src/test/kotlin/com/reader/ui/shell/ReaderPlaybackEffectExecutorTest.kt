@@ -7,6 +7,7 @@ import com.reader.api.Chapter
 import io.reader.ui.runtime.ReaderUIRuntime
 import io.reader.ui.runtime.ReaderUIState
 import io.reader.ui.runtime.ReaderUIAutoPageTransaction
+import io.reader.ui.runtime.ReaderUIPageTransaction
 import io.reader.ui.runtime.ReaderUIEffect
 import io.reader.ui.runtime.ReaderUIEffectKind
 import kotlinx.coroutines.CompletableDeferred
@@ -24,9 +25,11 @@ import java.util.concurrent.atomic.AtomicInteger
 class ReaderPlaybackEffectExecutorTest {
 
     @Test
-    fun `page commit waits for matching typed Core location result`() = runBlocking {
-        val harness = Harness(locationDeferred = CompletableDeferred())
-        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext)
+    fun `page commit waits for matching durable progress row after canonical location`() = runBlocking {
+        val locationDeferred = CompletableDeferred<JSONObject>()
+        val progressDeferred = CompletableDeferred<JSONObject>()
+        val harness = Harness(locationDeferred, progressDeferred)
+        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext())
             as ReaderPlaybackPilotDispatch.Applied
         harness.apply(dispatch, this)
         harness.executor.awaitSerialIdle()
@@ -55,21 +58,149 @@ class ReaderPlaybackEffectExecutorTest {
         eventually { harness.client.methods.contains("reader.location.resolve") }
         assertEquals(0, harness.domain.state.value.committedPageIndex)
 
-        harness.locationDeferred?.complete(locationResult(offset = 4, progress = 0.5))
+        locationDeferred.complete(locationResult(offset = 4, progress = 0.5))
+        eventually { harness.client.methods.contains("reading.progress.update") }
+        assertEquals(0, harness.domain.state.value.committedPageIndex)
+        assertEquals("persisting-progress", harness.domain.state.value.stage)
+        val progressParams = harness.client.params
+            .single { it.first == "reading.progress.update" }.second
+        assertEquals("source-1", progressParams.getString("sourceId"))
+        assertEquals("book-1", progressParams.getString("bookId"))
+        assertEquals(7, progressParams.getInt("chapterIndex"))
+        assertEquals(4L, progressParams.getLong("chapterOffset"))
+        assertEquals(0.5, progressParams.getDouble("chapterProgress"), 0.0)
+        assertEquals("rev-4", progressParams.getString("locationRevision"))
+        progressDeferred.complete(progressResult(progressParams))
         harness.executor.awaitSerialIdle()
         assertEquals(2, harness.domain.state.value.committedPageIndex)
         assertEquals(4L, harness.domain.state.value.committedLocation?.chapterOffset)
         val params = harness.client.params.single { it.first == "reader.location.resolve" }.second
         assertEquals(4, params.getJSONObject("anchor").getInt("chapterOffset"))
         assertEquals(1080, params.getJSONObject("layout").getInt("viewportWidth"))
+        assertOrdered(
+            harness.domain.state.value.effectTrace,
+            "terminal:reader.location.resolve:",
+            "start:reader.progress.update:",
+            "terminal:reader.progress.update:"
+        )
+        assertFalse(
+            harness.coordinator.acceptPageProgressResult(
+                requireNotNull(pending.pageCorrelationId),
+                stored = true
+            ).accepted
+        )
         harness.executor.cancelAll()
+    }
+
+    @Test
+    fun `stale current progress row is terminal and preserves last committed page`() = runBlocking {
+        val progressDeferred = CompletableDeferred<JSONObject>()
+        val harness = Harness(progressDeferred = progressDeferred)
+        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext())
+            as ReaderPlaybackPilotDispatch.Applied
+        harness.apply(dispatch, this)
+        harness.executor.awaitSerialIdle()
+        val correlationId = requireNotNull(harness.domain.state.value.pageCorrelationId)
+        harness.executor.onPageLayoutReady(
+            ReaderPlaybackPageMeasurement(
+                correlationId, 1, CONTENT.length, "next", "chapter:7:char-offset:4",
+                3, 7, 4, 0.5, 1080, 1920, 1.0
+            ),
+            this
+        )
+        eventually { harness.client.methods.contains("reading.progress.update") }
+        val intended = harness.client.params.single { it.first == "reading.progress.update" }.second
+        progressDeferred.complete(
+            progressResult(intended)
+                .put("updatedAt", intended.getLong("updatedAt") + 10L)
+                .put("chapterOffset", 99L)
+        )
+        harness.executor.awaitSerialIdle()
+
+        assertEquals(0, harness.domain.state.value.committedPageIndex)
+        assertEquals(0L, harness.domain.state.value.committedLocation?.chapterOffset)
+        assertEquals(null, harness.domain.state.value.pendingProgress)
+        assertTrue(harness.domain.state.value.error?.contains("PAGE_INVALID_PROGRESS") == true)
+        harness.executor.cancelAll()
+    }
+
+    @Test
+    fun `progress command is not cancelled after commit boundary and mirrors once`() = runBlocking {
+        val progressDeferred = CompletableDeferred<JSONObject>()
+        val mirrored = mutableListOf<ReaderPlaybackPendingProgress>()
+        val harness = Harness(
+            progressDeferred = progressDeferred,
+            progressMirror = ReaderPlaybackProgressMirror { mirrored += it }
+        )
+        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext())
+            as ReaderPlaybackPilotDispatch.Applied
+        harness.apply(dispatch, this)
+        harness.executor.awaitSerialIdle()
+        val correlationId = requireNotNull(harness.domain.state.value.pageCorrelationId)
+        assertFalse(harness.coordinator.acceptPageProgressResult(correlationId, stored = true).accepted)
+        harness.executor.onPageLayoutReady(
+            ReaderPlaybackPageMeasurement(
+                correlationId, 1, CONTENT.length, "next", "chapter:7:char-offset:4",
+                6, 7, 4, 0.5, 1080, 1920, 1.0
+            ),
+            this
+        )
+        eventually { harness.client.methods.contains("reading.progress.update") }
+
+        harness.executor.teardownForReaderExit(this)
+        harness.executor.cancelAll(this)
+        assertFalse("reading.progress.update" in harness.client.cancelledMethods)
+        assertEquals(0, harness.domain.state.value.committedPageIndex)
+
+        val params = harness.client.params.single { it.first == "reading.progress.update" }.second
+        progressDeferred.complete(progressResult(params))
+        harness.executor.awaitSerialIdle()
+        assertEquals(6, harness.domain.state.value.committedPageIndex)
+        assertEquals(1, mirrored.size)
+        assertFalse(harness.coordinator.acceptPageProgressResult(correlationId, stored = true).accepted)
+    }
+
+    @Test
+    fun `route and legacy page mutations are blocked while progress commit is pending`() {
+        val transaction = ReaderUIPageTransaction(
+            correlationId = "commit-boundary",
+            direction = "next",
+            source = "manual",
+            contractEvent = "reader.page.next",
+            stage = "persisting-progress",
+            pendingCanonicalLocation = "book-1:7:4:rev-4",
+            pendingPageIndex = 2
+        )
+        val coordinator = ReaderUiRuntimeCoordinator(
+            runtime = ReaderUIRuntime(
+                ReaderUIState(
+                    routeId = "immersive-reading",
+                    pageTransaction = transaction
+                )
+            ),
+            directoryPilotEnabled = false,
+            bookOpenPilotEnabled = false,
+            playbackPilotEnabled = true
+        )
+        var nativeReducerCalls = 0
+        val viewModel = AppShellViewModel(
+            readerUiRuntimeCoordinator = coordinator,
+            nativeReducer = { state, _ -> nativeReducerCalls += 1; state }
+        )
+
+        viewModel.dispatch(ReaderUiIntent.PopRoute)
+        viewModel.dispatch(ReaderUiIntent.UpdateReaderPage(page = 9, progress = 0.9f))
+
+        assertEquals(0, nativeReducerCalls)
+        assertEquals("commit-boundary", coordinator.playbackRuntimeState.pageTransaction?.correlationId)
+        assertEquals("persisting-progress", coordinator.playbackRuntimeState.pageTransaction?.stage)
     }
 
     @Test
     fun `page identity drift is terminal and preserves last committed page`() = runBlocking {
         val deferred = CompletableDeferred<JSONObject>()
         val harness = Harness(locationDeferred = deferred)
-        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext)
+        val dispatch = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.TurnPageNext())
             as ReaderPlaybackPilotDispatch.Applied
         harness.apply(dispatch, this)
         harness.executor.awaitSerialIdle()
@@ -185,7 +316,7 @@ class ReaderPlaybackEffectExecutorTest {
         harness.executor.awaitSerialIdle()
 
         harness.apply(
-            harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession)
+            harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession())
                 as ReaderPlaybackPilotDispatch.Applied,
             this
         )
@@ -207,7 +338,7 @@ class ReaderPlaybackEffectExecutorTest {
     @Test
     fun `auto page replacement by TTS cancels timer terminal before plan starts`() = runBlocking {
         val harness = Harness()
-        val auto = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession)
+        val auto = harness.coordinator.dispatchPlaybackPilot(ReaderUiIntent.StartAutoPageSession())
             as ReaderPlaybackPilotDispatch.Applied
         harness.apply(auto, this)
         harness.executor.awaitSerialIdle()
@@ -305,6 +436,67 @@ class ReaderPlaybackEffectExecutorTest {
     }
 
     @Test
+    fun `background queued during auto page progress commit prevents stale timer rearm`() = runBlocking {
+        val auto = ReaderUIAutoPageTransaction(
+            correlationId = "auto-background-race",
+            intervalMs = 250,
+            generation = 11
+        )
+        val runtimeState = ReaderUIState(
+            routeId = "immersive-reading",
+            activeSession = "auto-page",
+            autoPageTransaction = auto,
+            playbackGeneration = 11
+        )
+        val coordinator = ReaderUiRuntimeCoordinator(
+            runtime = ReaderUIRuntime(runtimeState),
+            directoryPilotEnabled = false,
+            bookOpenPilotEnabled = false,
+            playbackPilotEnabled = true
+        )
+        val domain = ReaderPlaybackDomainStore()
+        val progressDeferred = CompletableDeferred<JSONObject>()
+        val client = FakeCommandClient(progressDeferred = progressDeferred)
+        val executor = ReaderPlaybackEffectExecutor(
+            domainStore = domain,
+            runtime = coordinator,
+            commandClientFactory = { client },
+            speechEngineFactory = { FakeSpeechEngine() },
+            progressMirror = ReaderPlaybackProgressMirror { }
+        )
+        executor.applyTransition(
+            event = "reader.autoPage.start",
+            state = runtimeState,
+            effects = listOf(timerEffect(auto)),
+            cancelledCorrelationIds = emptyList(),
+            bookOpen = readyBookState(),
+            scope = this
+        )
+        eventually(timeoutMs = 1_000) { domain.state.value.pageCorrelationId != null }
+        val pageCorrelation = requireNotNull(domain.state.value.pageCorrelationId)
+        executor.onPageLayoutReady(
+            ReaderPlaybackPageMeasurement(
+                pageCorrelation, 1, CONTENT.length, "next", "chapter:7:char-offset:4",
+                1, 7, 4, 0.5, 1080, 1920, 1.0
+            ),
+            this
+        )
+        eventually { client.methods.contains("reading.progress.update") }
+
+        executor.onAppBackgrounded(this)
+        val params = client.params.single { it.first == "reading.progress.update" }.second
+        progressDeferred.complete(progressResult(params))
+        executor.awaitSerialIdle()
+
+        assertEquals(1, domain.state.value.committedPageIndex)
+        assertEquals(null, domain.state.value.activeSession)
+        assertEquals(1L, domain.state.value.timerArmCount)
+        kotlinx.coroutines.delay(300)
+        assertEquals(null, domain.state.value.pageCorrelationId)
+        executor.cancelAll()
+    }
+
+    @Test
     fun `paired Pilot bypasses native reducer and legacy HostRequest queue`() {
         val runtime = ReaderUiRuntimeCoordinator(
             runtime = ReaderUIRuntime(ReaderUIState(routeId = "immersive-reading")),
@@ -349,7 +541,9 @@ class ReaderPlaybackEffectExecutorTest {
     }
 
     private class Harness(
-        val locationDeferred: CompletableDeferred<JSONObject>? = null
+        val locationDeferred: CompletableDeferred<JSONObject>? = null,
+        val progressDeferred: CompletableDeferred<JSONObject>? = null,
+        progressMirror: ReaderPlaybackProgressMirror = ReaderPlaybackProgressMirror { }
     ) {
         val coordinator = ReaderUiRuntimeCoordinator(
             runtime = ReaderUIRuntime(ReaderUIState(routeId = "immersive-reading")),
@@ -358,13 +552,14 @@ class ReaderPlaybackEffectExecutorTest {
             playbackPilotEnabled = true
         )
         val domain = ReaderPlaybackDomainStore()
-        val client = FakeCommandClient(locationDeferred)
+        val client = FakeCommandClient(locationDeferred, progressDeferred)
         val speech = FakeSpeechEngine()
         val executor = ReaderPlaybackEffectExecutor(
             domainStore = domain,
             runtime = coordinator,
             commandClientFactory = { client },
-            speechEngineFactory = { speech }
+            speechEngineFactory = { speech },
+            progressMirror = progressMirror
         )
         private val bookOpen = readyBookState()
 
@@ -384,12 +579,14 @@ class ReaderPlaybackEffectExecutorTest {
     }
 
     private class FakeCommandClient(
-        private val locationDeferred: CompletableDeferred<JSONObject>? = null
+        private val locationDeferred: CompletableDeferred<JSONObject>? = null,
+        private val progressDeferred: CompletableDeferred<JSONObject>? = null
     ) : ReaderCorePlaybackCommandClient {
         val methods = mutableListOf<String>()
         val params = mutableListOf<Pair<String, JSONObject>>()
         val concurrent = AtomicInteger(0)
         val maxConcurrent = AtomicInteger(0)
+        val cancelledMethods = mutableListOf<String>()
         private val requestIds = AtomicInteger(0)
 
         override fun beginCommand(method: String, params: JSONObject): ReaderPlaybackCommandHandle {
@@ -406,6 +603,8 @@ class ReaderPlaybackEffectExecutorTest {
                         when (method) {
                             "reader.location.resolve" -> locationDeferred?.await()
                                 ?: locationResult(offset = 4, progress = 0.5)
+                            "reading.progress.update" -> progressDeferred?.await()
+                                ?: progressResult(params)
                             "tts.slice" -> ttsPlanResult()
                             "tts.queue.play" -> queueSnapshot("playing", 0, 0)
                             "tts.queue.report-status" -> queueSnapshot("playing", 0, 1)
@@ -418,7 +617,9 @@ class ReaderPlaybackEffectExecutorTest {
                     }
                 }
                 override fun cancel(): Boolean {
-                    locationDeferred?.cancel()
+                    synchronized(this@FakeCommandClient) { cancelledMethods += method }
+                    if (method == "reader.location.resolve") locationDeferred?.cancel()
+                    if (method == "reading.progress.update") progressDeferred?.cancel()
                     return true
                 }
             }
@@ -521,6 +722,16 @@ class ReaderPlaybackEffectExecutorTest {
                 .put("primaryAnchor", "char-offset")
                 .put("fallbackAnchor", "progress")
                 .put("layoutIndependent", true))
+
+        private fun progressResult(params: JSONObject): JSONObject = JSONObject()
+            .put("sourceId", params.getString("sourceId"))
+            .put("bookId", params.getString("bookId"))
+            .put("updatedAt", params.getLong("updatedAt"))
+            .put("chapterIndex", params.getInt("chapterIndex"))
+            .put("chapterOffset", params.getLong("chapterOffset"))
+            .put("chapterProgress", params.getDouble("chapterProgress"))
+            .put("locationRevision", params.getString("locationRevision"))
+            .put("stored", true)
 
         private fun ttsPlanResult(): JSONObject {
             val plan = JSONObject()

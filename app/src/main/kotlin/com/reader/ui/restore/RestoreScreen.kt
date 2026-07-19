@@ -86,6 +86,33 @@ fun RestoreScreen(
     }
 }
 
+/**
+ * Canonical read-only surface. It reuses native restore primitives while deliberately
+ * omitting route actions and conflict choices because current ScreenGraph nodes have no bindings.
+ */
+@Composable
+internal fun RestoreCanonicalReadOnlyContent(page: RestorePageState) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        RestoreHeader(page = page)
+        RestoreHeroCard(page = page)
+        if (page.scopes.isNotEmpty()) {
+            RestoreScopeCard(
+                scopes = page.scopes,
+                selectedKeys = page.selectedScopeKeys,
+                onScopeToggle = null
+            )
+        }
+        if (page.warningTitle != null && page.warningBody != null) {
+            RestoreWarning(title = page.warningTitle, body = page.warningBody)
+        }
+        if (page.stages.isNotEmpty()) RestoreStageList(stages = page.stages)
+        if (page.resultItems.isNotEmpty()) RestoreResultList(items = page.resultItems)
+    }
+}
+
 @Composable
 private fun RestoreLinearContent(
     page: RestorePageState,
@@ -364,7 +391,7 @@ private fun RestoreSummaryCell(row: RestoreSummaryRow, modifier: Modifier = Modi
 private fun RestoreScopeCard(
     scopes: List<RestoreScopeSpec>,
     selectedKeys: List<String>,
-    onScopeToggle: (String) -> Unit
+    onScopeToggle: ((String) -> Unit)?
 ) {
     RestoreCard(
         title = "选择恢复范围",
@@ -375,7 +402,7 @@ private fun RestoreScopeCard(
                 RestoreScopeRow(
                     scope = scope,
                     selected = scope.key in selectedKeys,
-                    onClick = { onScopeToggle(scope.key) }
+                    onClick = onScopeToggle?.let { toggle -> { toggle(scope.key) } }
                 )
             }
         }
@@ -383,7 +410,7 @@ private fun RestoreScopeCard(
 }
 
 @Composable
-private fun RestoreScopeRow(scope: RestoreScopeSpec, selected: Boolean, onClick: () -> Unit) {
+private fun RestoreScopeRow(scope: RestoreScopeSpec, selected: Boolean, onClick: (() -> Unit)?) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     val borderColor = if (selected) colors.primary.copy(alpha = 0.42f) else extra.hairline.copy(alpha = 0.64f)
@@ -394,7 +421,7 @@ private fun RestoreScopeRow(scope: RestoreScopeSpec, selected: Boolean, onClick:
             .defaultMinSize(minHeight = 52.dp)
             .background(background, ReaderShapes.md)
             .border(1.dp, borderColor, ReaderShapes.md)
-            .clickable(onClick = onClick)
+            .then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically

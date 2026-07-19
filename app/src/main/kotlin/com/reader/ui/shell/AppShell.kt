@@ -659,6 +659,11 @@ fun AppShell(
             onSessionToggle = { vm.dispatch(ReaderUiIntent.ToggleSessionPlaying) },
             onSessionStop = { vm.dispatch(ReaderUiIntent.StopSession) },
             moreMenuOpen = state.moreMenu.open && state.moreMenu.triggerId == "reader-control-more",
+            readerChoices = state.readerChoices,
+            appThemeMode = state.appThemeMode,
+            bookCacheState = state.bookCache,
+            replaceRules = state.replaceRules,
+            replaceMutationState = state.replaceMutation,
             dispatch = vm::dispatch,
             onStartTts = { text ->
                 val ctx = state.readerContext
@@ -876,7 +881,8 @@ fun AppShell(
                 onBackToTopChange = { vm.dispatch(ReaderUiIntent.SetReaderBehaviorToggle("tapBottomBarToTop", it)) },
                 crashLog = state.settings.crashLogEnabled,
                 onCrashLogChange = { vm.dispatch(ReaderUiIntent.SetReaderBehaviorToggle("crashLogEnabled", it)) },
-                onClearCache = { vm.dispatch(ReaderUiIntent.ClearCache) },
+                onClearCache = { vm.dispatch(ReaderUiIntent.ClearCache()) },
+                cacheState = state.bookCache,
                 onRestoreDefault = { vm.dispatch(ReaderUiIntent.RestoreDefaultSettings) },
                 onOpenPermissionSettings = { vm.dispatch(ReaderUiIntent.OpenSystemPermissionSettings) },
                 permissionFileAccess = state.permissions.fileAccess,
@@ -1906,7 +1912,15 @@ internal fun appShellViewModelFactory(
     reducedMotionResolver: ReducedMotionResolver?,
     ttsProgressFlow: kotlinx.coroutines.flow.Flow<com.reader.android.data.adapter.TtsProgressUpdate?>? = null
 ) = viewModelFactory {
-    initializer { AppShellViewModel(reducedMotionResolver, ttsProgressFlow) }
+    initializer {
+        AppShellViewModel(
+            reducedMotionResolver = reducedMotionResolver,
+            ttsProgressFlow = ttsProgressFlow,
+            readerCacheUndoEffectExecutor = ReaderCacheUndoEffectExecutor(
+                undoTokenStore = com.reader.android.AppProvider.readerReplaceUndoTokenStore
+            )
+        )
+    }
 }
 
 /** Timeout for a single HostRequest dispatch in the AppShell effect collector. */

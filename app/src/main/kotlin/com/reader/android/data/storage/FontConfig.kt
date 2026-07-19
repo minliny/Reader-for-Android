@@ -1,5 +1,7 @@
 package com.reader.android.data.storage
 
+import io.reader.ui.contract.ReaderAppearanceSpecRegistry
+
 /**
  * Reader font family selector.
  *
@@ -16,13 +18,18 @@ package com.reader.android.data.storage
  *  - KAI        → --fd-ds-font-kai        (FontFamily.Serif — no native Compose equivalent)
  *  - FANGSONG   → --fd-ds-font-fangsong   (FontFamily.Serif — no native Compose equivalent)
  */
-enum class FontFamily(val displayName: String) {
-    SYSTEM("系统默认"),
-    SERIF("宋体/衬线"),
-    SANS_SERIF("黑体/无衬线"),
-    MONO("等宽"),
-    KAI("楷体"),
-    FANGSONG("仿宋")
+enum class FontFamily(private val appearanceId: String) {
+    SYSTEM("system"),
+    SERIF("serif"),
+    SANS_SERIF("sans"),
+    MONO("mono"),
+    KAI("kai"),
+    FANGSONG("fangsong");
+
+    val displayName: String
+        get() = requireNotNull(ReaderAppearanceSpecRegistry.font(appearanceId)) {
+            "Missing Reader Appearance font: $appearanceId"
+        }.label
 }
 
 data class FontConfig(

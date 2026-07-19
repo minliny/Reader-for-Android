@@ -125,6 +125,7 @@ private fun Motion.allowsMovement(): Boolean = when (visualPattern) {
     MotionVisualPattern.SlideSheetUp,
     MotionVisualPattern.ScaleDialog,
     MotionVisualPattern.MatchedCoverToReader,
+    MotionVisualPattern.SharedLayoutMorph,
     MotionVisualPattern.PageTurn,
     MotionVisualPattern.DirectDrag,
     MotionVisualPattern.CapsuleAnchorMove -> true

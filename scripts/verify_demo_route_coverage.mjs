@@ -9,7 +9,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const demoContractPath =
   process.env.READER_UI_DEMO_ROUTE_CONTRACT ||
-  path.resolve(repoRoot, "../Reader UI/frontend-demo/route-contract.js");
+  path.resolve(repoRoot, "../Reader-UI/frontend-demo-optimized/route-contract.js");
 const androidRouteStatePath = path.join(
   repoRoot,
   "app/src/main/kotlin/com/reader/ui/shell/ReaderUiState.kt"
@@ -84,6 +84,12 @@ const immersiveReaderSource = readFile(
 const discoverRouteScreenSource = readFile(
   path.join(repoRoot, "app/src/main/kotlin/com/reader/ui/discover/DiscoverDemoRouteScreen.kt")
 );
+const demoRouteScreenSource = readFile(
+  path.join(repoRoot, "app/src/main/kotlin/com/reader/ui/demo/DemoRouteScreen.kt")
+);
+const canonicalGraphModelSource = readFile(
+  path.join(repoRoot, "app/src/main/kotlin/com/reader/ui/demo/CanonicalScreenGraphModel.kt")
+);
 
 const mainTabRoutes = ["bookshelf", "discover", "rss", "settings"];
 const contextBoundRoutes = ["immersive-reading"];
@@ -118,11 +124,20 @@ const temporaryFamilyFallbackGroups = Object.fromEntries(
 const familyRoutes = unique(Object.values(familyGroups).flat());
 const nativeFamilyRoutes = unique(Object.values(nativeFamilyGroups).flat());
 const temporaryFamilyFallbackRoutes = unique(Object.values(temporaryFamilyFallbackGroups).flat());
-const coveredRoutes = new Set([
+const legacyCoveredRoutes = new Set([
   ...nativeDirectRoutes,
   ...familyRoutes,
   ...contextBoundRoutes
 ]);
+const canonicalGraphRenderer =
+  demoRouteScreenSource.includes("CanonicalScreenGraphRouteRenderer(") &&
+  demoRouteScreenSource.includes("query = CanonicalScreenGraphQuery(routeId)") &&
+  canonicalGraphModelSource.includes("CanonicalScreenGraphPlanner::loadCanonical") &&
+  canonicalGraphModelSource.includes("ScreenGraphRegistry.loadCanonical()");
+const canonicalGraphRoutes = canonicalGraphRenderer
+  ? difference(demoRoutes, legacyCoveredRoutes)
+  : [];
+const coveredRoutes = new Set([...legacyCoveredRoutes, ...canonicalGraphRoutes]);
 
 const unknownRoutes = difference(demoRoutes, coveredRoutes);
 const androidOnlyDirectRoutes = difference(nativeDirectRoutes, demoRouteSet);
@@ -133,7 +148,8 @@ const mainTabShellStateRoutes = demoRoutes.filter(
 );
 const androidMainTabStateRoutes = unique([
   ...familyGroups.book.filter((routeId) => demoRouteContract[routeId]?.shell === "MainTabShell"),
-  ...familyGroups.discover.filter((routeId) => demoRouteContract[routeId]?.shell === "MainTabShell")
+  ...familyGroups.discover.filter((routeId) => demoRouteContract[routeId]?.shell === "MainTabShell"),
+  ...canonicalGraphRoutes.filter((routeId) => demoRouteContract[routeId]?.shell === "MainTabShell")
 ]);
 const missingMainTabStateRoutes = difference(mainTabShellStateRoutes, new Set(androidMainTabStateRoutes));
 const mainTabShellFrameSignals = [
@@ -155,7 +171,7 @@ const sourceSwitchAsFlowShell =
 const readerSharedSurface =
   immersiveReaderSource.includes("fun ReaderReadingSurface(") &&
   readerControlSource.includes("ReaderReadingSurface(") &&
-  readerControlSource.includes("ImmersiveReadingViewModelFactory(context)");
+  readerControlSource.includes("factory = ImmersiveReadingViewModelFactory(");
 const stableReaderShellHost =
   appShellSource.includes("ReaderShellScreen(") &&
   !appShellSource.includes("ImmersiveReadingScreen(") &&
@@ -193,7 +209,8 @@ Object.entries(temporaryFamilyFallbackGroups).forEach(([name, routes]) => {
   console.log(`[route-coverage]   fallback ${name}: ${routes.length}`);
 });
 console.log(`[route-coverage] context-bound: ${contextBoundRoutes.length}`);
-console.log(`[route-coverage] generic fallback: ${unknownRoutes.length}`);
+console.log(`[route-coverage] canonical screen graph: ${canonicalGraphRoutes.length}`);
+console.log(`[route-coverage] unclassified fallback: ${unknownRoutes.length}`);
 console.log(`[route-coverage] MainTabShell state routes: ${mainTabShellStateRoutes.length}`);
 
 if (

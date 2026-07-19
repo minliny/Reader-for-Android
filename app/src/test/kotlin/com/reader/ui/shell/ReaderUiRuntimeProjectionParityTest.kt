@@ -117,7 +117,7 @@ class ReaderUiRuntimeProjectionParityTest {
         assertTrue(runtimePlan.payload.isEmpty())
         assertEquals("tts-1", runtimePlan.correlationId)
 
-        val nativeAutoPage = ReaderUiReducer.reduce(nativeTts, ReaderUiIntent.StartAutoPageSession)
+        val nativeAutoPage = ReaderUiReducer.reduce(nativeTts, ReaderUiIntent.StartAutoPageSession())
         val runtimeAutoPage = shadow.dispatch(
             "reader.autoPage.start",
             payload = mapOf("intervalMs" to READER_AUTO_PAGE_DEFAULT_INTERVAL_MS.toString()),

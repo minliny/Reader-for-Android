@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -29,12 +31,29 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.reader.android.R
+import com.reader.ui.reading.ReaderFontSettingsScreen
+import com.reader.ui.reading.ReaderFullAppearanceContent
+import com.reader.ui.reading.ReaderFullSettingsContent
+import com.reader.ui.reading.ReaderLayoutSettingsScreen
+import com.reader.ui.reading.ReaderPageTurnSettingsScreen
+import com.reader.ui.reading.ReaderTapZoneCallbacks
+import com.reader.ui.reading.ReaderTapZoneHost
+import com.reader.ui.reading.ReaderTapZoneHostState
+import com.reader.ui.reading.ReaderThemeEditScreen
+import com.reader.ui.reading.ReaderThemeSettingsScreen
+import com.reader.ui.restore.RestoreCanonicalReadOnlyContent
+import com.reader.ui.bookshelf.BookshelfSearchCanonicalReadOnlyContent
+import com.reader.ui.settings.SettingsCanonicalReadOnlyContent
+import com.reader.ui.source.SourceDebugCanonicalContent
+import com.reader.ui.source.SourceDemoCanonicalContent
+import com.reader.ui.source.SourceRuleEditCanonicalContent
 import com.reader.ui.shell.DemoBackBar
 import com.reader.ui.shell.DemoBottomNav
 import com.reader.ui.shell.DemoTopBar
 import com.reader.ui.theme.ReaderTextStyles
-import com.reader.ui.theme.ReaderThemeResolver
 import com.reader.ui.theme.readerExtraColors
+import com.reader.ui.theme.readerThemeHostState
+import io.reader.ui.contract.ComponentType
 import io.reader.ui.contract.ScreenGraphComponentNode
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -44,6 +63,7 @@ import kotlinx.serialization.json.doubleOrNull
 
 private val canonicalPlanner by lazy(CanonicalScreenGraphPlanner::loadCanonical)
 private val canonicalAdapters by lazy(AndroidCanonicalComponentAdapterRegistry::loadCanonical)
+private val LocalCanonicalTapZoneHostState = staticCompositionLocalOf<ReaderTapZoneHostState?> { null }
 
 /**
  * Real generated-contract renderer entry. It is intentionally not production
@@ -55,9 +75,12 @@ internal fun CanonicalScreenGraphRouteRenderer(
     query: CanonicalScreenGraphQuery,
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
-    onAction: (CanonicalComponentAction) -> Unit
+    onAction: (CanonicalComponentAction) -> Unit,
+    /** Required only when a TapZones host-composite is rendered. */
+    tapZoneHostState: ReaderTapZoneHostState? = null
 ) {
     val plan = remember(query) { canonicalPlanner.plan(query) }
+    CompositionLocalProvider(LocalCanonicalTapZoneHostState provides tapZoneHostState) {
     when (plan) {
         is CanonicalRouteRenderPlan.VisibleFailure -> CanonicalRendererFailureSurface(
             code = plan.code,
@@ -88,6 +111,7 @@ internal fun CanonicalScreenGraphRouteRenderer(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -109,7 +133,9 @@ private fun CanonicalComponentNodeRenderer(
             .semantics(mergeDescendants = false) {
                 contentDescription = accessibility.contentDescription
                 accessibility.stateDescription?.let { stateDescription = it }
-                if (accessibility.enabled == false) disabled()
+                if (node.type != io.reader.ui.contract.ComponentType.TapZones && accessibility.enabled == false) {
+                    disabled()
+                }
                 accessibility.selected?.let { selected = it }
                 accessibility.progress?.let {
                     progressBarRangeInfo = ProgressBarRangeInfo(it.toFloat().coerceIn(0f, 1f), 0f..1f)
@@ -117,7 +143,15 @@ private fun CanonicalComponentNodeRenderer(
                 if (node.type == io.reader.ui.contract.ComponentType.Button) role = Role.Button
             }
     ) {
-    when (val entry = canonicalAdapters.entry(node.type)) {
+    if (!model.allowsContractTreeRecursion) {
+        if (node.type == io.reader.ui.contract.ComponentType.TapZones) {
+            CanonicalTapZonesHostComposite(model, onAction)
+        } else if (node.type == ComponentType.ReaderBase) {
+            CanonicalReaderBaseBackgroundBridge(model)
+        } else {
+            CanonicalHostCompositeFailure(model)
+        }
+    } else when (val entry = canonicalAdapters.entry(node.type)) {
         is AndroidCanonicalComponentAdapterEntry.VisibleFailure -> {
             CanonicalRendererFailureSurface(entry.code, entry.reason, node.id)
             CanonicalChildren(model, onBack, onNavigate, onAction)
@@ -202,6 +236,87 @@ private fun CanonicalComponentNodeRenderer(
                 CanonicalBoundButton(model, onAction)
                 CanonicalChildren(model, onBack, onNavigate, onAction)
             }
+            AndroidCanonicalComponentAdapterKind.ReaderFullAppearancePage -> when (model.routeId) {
+                "reader-full-font" -> ReaderFontSettingsScreen(onBack = onBack)
+                "reader-full-theme" -> ReaderThemeSettingsScreen(onBack = onBack, onNavigate = onNavigate)
+                "reader-full-theme-edit" -> ReaderThemeEditScreen(onBack = onBack)
+                "reader-full-layout" -> ReaderLayoutSettingsScreen(onBack = onBack)
+                "reader-full-appearance" -> ReaderFullAppearanceContent(onNavigate = onNavigate)
+                else -> model.invalidRouteFamily("ReaderFullAppearancePage")
+            }
+            AndroidCanonicalComponentAdapterKind.ReaderFullSettingsPage -> when (model.routeId) {
+                "reader-full-page-turn" -> ReaderPageTurnSettingsScreen(onBack = onBack)
+                "reader-full-settings" -> ReaderFullSettingsContent(
+                    onNavigate = onNavigate,
+                    dispatch = {}
+                )
+                else -> model.invalidRouteFamily("ReaderFullSettingsPage")
+            }
+            AndroidCanonicalComponentAdapterKind.SourceDebugResultPage -> {
+                val state = model.sourceDebugResultAdapterState()
+                if (state == null) {
+                    model.invalidProp("variant=search|detail|catalog with matching source-debug route")
+                } else {
+                    SourceDebugCanonicalContent(state = state, onNavigate = onNavigate)
+                }
+            }
+            AndroidCanonicalComponentAdapterKind.SourceRuleEditPage -> {
+                val state = model.sourceRuleEditAdapterState()
+                if (state == null) {
+                    model.invalidProp("strict source-edit/source-rule-edit/source-edit-debug props")
+                } else {
+                    SourceRuleEditCanonicalContent(state = state, onNavigate = onNavigate)
+                }
+            }
+            AndroidCanonicalComponentAdapterKind.SourceDemoContentPage -> {
+                val state = model.sourceDemoContentAdapterState()
+                if (state == null) {
+                    model.invalidProp("strict source content route/props without canonical actions")
+                } else {
+                    SourceDemoCanonicalContent(state = state, onNavigate = onNavigate)
+                }
+            }
+            AndroidCanonicalComponentAdapterKind.RestoreReadOnlyPage -> {
+                val page = model.restoreReadOnlyAdapterPage()
+                if (page == null) {
+                    model.invalidProp("strict restore read-only route/props without canonical actions")
+                } else {
+                    RestoreCanonicalReadOnlyContent(page = page)
+                }
+            }
+            AndroidCanonicalComponentAdapterKind.SettingsReadOnlyPage -> {
+                when (val page = model.settingsReadOnlyAdapterPage()) {
+                    null -> if (model.routeId in DemoRouteRegistry.contract30RouteIds) {
+                        CanonicalGenericSurface(
+                            model = model,
+                            family = AndroidCanonicalComponentAdapterKind.GenericStructure,
+                            onBack = onBack,
+                            onNavigate = onNavigate,
+                            onAction = onAction
+                        )
+                    } else {
+                        model.invalidProp("strict settings read-only route/props without canonical actions")
+                    }
+                    CanonicalSettingsReadOnlyPage.BookshelfSearch -> BookshelfSearchCanonicalReadOnlyContent()
+                    CanonicalSettingsReadOnlyPage.General -> SettingsCanonicalReadOnlyContent("general")
+                    CanonicalSettingsReadOnlyPage.DeveloperMotion ->
+                        SettingsCanonicalReadOnlyContent("developer-motion")
+                    CanonicalSettingsReadOnlyPage.AboutFeedback ->
+                        SettingsCanonicalReadOnlyContent("about-feedback")
+                }
+            }
+            AndroidCanonicalComponentAdapterKind.ReadingBackground -> CanonicalReadingBackgroundLayer(model) {
+                CanonicalRendererFailureSurface(
+                    code = "ANDROID_READING_BACKGROUND_HOST_BOUNDS_REQUIRED",
+                    message = "ReadingBackgroundLayer requires Host-owned bounds",
+                    identity = node.id
+                )
+            }
+            AndroidCanonicalComponentAdapterKind.TapZones -> CanonicalRendererFailureSurface(
+                code = "ANDROID_TAP_ZONES_HOST_BRANCH_REQUIRED",
+                message = "TapZones must render through its non-recursive host-composite branch",
+                identity = node.id
+            )
             AndroidCanonicalComponentAdapterKind.GenericStructure,
             AndroidCanonicalComponentAdapterKind.GenericText -> CanonicalGenericSurface(
                 model = model,
@@ -240,7 +355,6 @@ private fun CanonicalComponentNodeRenderer(
                 onNavigate = onNavigate,
                 onAction = onAction
             )
-            AndroidCanonicalComponentAdapterKind.GenericBackground -> CanonicalBackgroundSurface(model)
             AndroidCanonicalComponentAdapterKind.GenericDialog -> CanonicalDialogSurface(
                 model = model,
                 onBack = onBack,
@@ -249,8 +363,118 @@ private fun CanonicalComponentNodeRenderer(
             )
         }
     }
-        CanonicalEventEvidence(model)
+        if (model.allowsContractTreeRecursion) CanonicalEventEvidence(model)
     }
+}
+
+@Composable
+private fun CanonicalReaderBaseBackgroundBridge(model: CanonicalComponentRenderModel) {
+    val backgrounds = model.node.children.filter { it.type == ComponentType.ReadingBackgroundLayer }
+    when (backgrounds.size) {
+        0 -> CanonicalHostCompositeFailure(model)
+        1 -> CanonicalReadingBackgroundLayer(model.copy(node = backgrounds.single())) {
+            CanonicalHostCompositeFailure(model)
+        }
+        else -> CanonicalRendererFailureSurface(
+            code = "ANDROID_READING_BACKGROUND_SCHEMA_INVALID",
+            message = "ReaderBase must not contain multiple ReadingBackgroundLayer children",
+            identity = model.node.id
+        )
+    }
+}
+
+@Composable
+private fun CanonicalReadingBackgroundLayer(
+    model: CanonicalComponentRenderModel,
+    content: @Composable () -> Unit
+) {
+    val hostTheme = readerThemeHostState()
+    if (hostTheme == null) {
+        CanonicalRendererFailureSurface(
+            code = "ANDROID_READING_BACKGROUND_HOST_STATE_REQUIRED",
+            message = "ReadingBackgroundLayer requires the formal ReaderTheme Host environment",
+            identity = model.node.id
+        )
+        return
+    }
+    val hostPaper = readerExtraColors().paper
+    if (hostPaper != hostTheme.paper) {
+        CanonicalRendererFailureSurface(
+            code = "ANDROID_READING_BACKGROUND_HOST_STATE_INVALID",
+            message = "ReaderTheme identity and paper color disagree",
+            identity = model.node.id
+        )
+        return
+    }
+    when (val adapted = CanonicalReadingBackgroundAdapter.adapt(model, hostTheme)) {
+        is CanonicalReadingBackgroundAdapterResult.Invalid -> CanonicalRendererFailureSurface(
+            code = "ANDROID_READING_BACKGROUND_SCHEMA_INVALID",
+            message = adapted.reason,
+            identity = model.node.id
+        )
+        is CanonicalReadingBackgroundAdapterResult.Ready -> Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(hostPaper)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun CanonicalHostCompositeFailure(model: CanonicalComponentRenderModel) {
+    CanonicalRendererFailureSurface(
+        code = "ANDROID_HOST_COMPOSITE_REQUIRED",
+        message = "${model.node.type} is ${model.node.compositionMode}; authorities=" +
+            model.node.stateAuthorities.joinToString(",") +
+            ". A dedicated host adapter must compose layout and state; children are not recursively rendered.",
+        identity = model.node.id
+    )
+}
+
+@Composable
+private fun CanonicalTapZonesHostComposite(
+    model: CanonicalComponentRenderModel,
+    onAction: (CanonicalComponentAction) -> Unit
+) {
+    val hostState = LocalCanonicalTapZoneHostState.current
+    if (hostState == null) {
+        CanonicalRendererFailureSurface(
+            code = "ANDROID_TAP_ZONES_HOST_STATE_REQUIRED",
+            message = "TapZones requires live reader/runtime/layout state; fixture enabled props are not authority",
+            identity = model.node.id
+        )
+        return
+    }
+    when (val adapted = CanonicalTapZoneHostAdapter.adapt(model, hostState)) {
+        is CanonicalTapZoneHostAdapterResult.Invalid -> CanonicalRendererFailureSurface(
+            code = "ANDROID_TAP_ZONES_SCHEMA_INVALID",
+            message = adapted.reason,
+            identity = model.node.id
+        )
+        is CanonicalTapZoneHostAdapterResult.Ready -> {
+            val plan = adapted.plan
+            ReaderTapZoneHost(
+                state = plan.effectiveState,
+                callbacks = ReaderTapZoneCallbacks(
+                    onPrevious = plan.action("previous")?.let { action -> { onAction(action) } },
+                    onControl = plan.action("control")?.let { action -> { onAction(action) } },
+                    onNext = plan.action("next")?.let { action -> { onAction(action) } }
+                ),
+                modifier = Modifier.fillMaxWidth().height(240.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CanonicalComponentRenderModel.invalidRouteFamily(family: String) {
+    CanonicalRendererFailureSurface(
+        code = "CANONICAL_ROUTE_FAMILY_UNSUPPORTED",
+        message = "$family cannot render route $routeId",
+        identity = node.id
+    )
 }
 
 @Composable
@@ -432,24 +656,6 @@ private fun CanonicalStaticControlSurface(
 }
 
 @Composable
-private fun CanonicalBackgroundSurface(model: CanonicalComponentRenderModel) {
-    val theme = model.requiredString("theme")
-    if (theme == null || ReaderThemeResolver.THEMES.none { it.id == theme }) {
-        model.invalidProp("known theme")
-        return
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .background(ReaderThemeResolver.swatchColor(theme)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(theme, style = ReaderTextStyles.infoLayer)
-    }
-}
-
-@Composable
 private fun CanonicalDialogSurface(
     model: CanonicalComponentRenderModel,
     onBack: () -> Unit,
@@ -488,7 +694,7 @@ private fun CanonicalActionButtons(
 private fun CanonicalEventEvidence(model: CanonicalComponentRenderModel) {
     model.bindingObservations().forEach { observation ->
         Text(
-            text = "executable binding · ${observation.binding.trigger} · " +
+            text = "executable binding · ${observation.binding.target} · ${observation.binding.trigger} · " +
                 "${observation.binding.event.name}: ${observation.binding.payload}",
             style = MaterialTheme.typography.labelSmall,
             color = readerExtraColors().muted

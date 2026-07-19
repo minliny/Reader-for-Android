@@ -65,6 +65,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -218,7 +219,23 @@ class ReaderCoreClient private constructor(
                     val hostRuntime = buildHostRuntime(
                         transport, cookieStore, fs, cache, persistence, logger, context
                     )
-                    ReaderCoreClient(runtime, hostRuntime).also { INSTANCE = it }
+                    val client = ReaderCoreClient(runtime, hostRuntime)
+                    try {
+                        // The Host router is now live, so hydrate Core before
+                        // any UI/storage command can observe its empty startup
+                        // snapshot. Successful restore also enables mutator
+                        // write-through via persistence.put.
+                        runBlocking {
+                            bootstrapCoreStorage(
+                                registeredCapabilities = hostRuntime.adapter().registeredCapabilities(),
+                                command = client::sendAndAwait
+                            )
+                        }
+                        client.also { INSTANCE = it }
+                    } catch (error: Exception) {
+                        client.close()
+                        throw IllegalStateException("Core storage bootstrap failed", error)
+                    }
                 }
             }
         }
@@ -455,6 +472,77 @@ class ReaderCoreClient private constructor(
             INSTANCE = null
         }
     }
+}
+
+internal data class ReaderCoreStorageBootstrapResult(
+    val restored: Boolean,
+    val revision: String?,
+    val schemaVersion: Int,
+    val advertisedCapabilities: Set<String>
+)
+
+private val CORE_HOST_CAPABILITIES_IN_WIRE_ORDER: List<String> = listOf(
+    "host.smoke.echo",
+    "http.execute",
+    "cookie.get",
+    "cookie.set",
+    "webview.evaluateJavaScript",
+    "file.read",
+    "file.write",
+    "cache.get",
+    "cache.put",
+    "log.emit",
+    "time.now",
+    "system.info",
+    "persistence.get",
+    "persistence.put",
+    "media.download"
+)
+
+/**
+ * Advertise only Core's closed capability enum, then perform the one-shot
+ * Host-backed storage restore. Kept as a pure suspend seam so JVM tests can
+ * prove command order and fail-closed validation without loading JNI.
+ */
+internal suspend fun bootstrapCoreStorage(
+    registeredCapabilities: Set<String>,
+    command: suspend (method: String, params: JSONObject, timeoutMillis: Long) -> JSONObject
+): ReaderCoreStorageBootstrapResult {
+    require("persistence.get" in registeredCapabilities && "persistence.put" in registeredCapabilities) {
+        "Core storage bootstrap requires persistence.get and persistence.put"
+    }
+    val advertised = CORE_HOST_CAPABILITIES_IN_WIRE_ORDER
+        .filterTo(linkedSetOf()) { it in registeredCapabilities }
+    val manifestResult = command(
+        "runtime.setHostCapabilities",
+        JSONObject()
+            .put("capabilities", JSONArray(advertised.toList()))
+            .put("platform", "android"),
+        10_000L
+    )
+    require(manifestResult.optBoolean("applied", false)) {
+        "runtime.setHostCapabilities did not apply"
+    }
+    require(manifestResult.optInt("capabilities", -1) == advertised.size) {
+        "runtime.setHostCapabilities count drift"
+    }
+
+    val restore = command("runtime.storage.restore", JSONObject(), 30_000L)
+    require(restore.has("restored") && restore.get("restored") is Boolean) {
+        "runtime.storage.restore missing restored"
+    }
+    val schemaVersion = restore.optInt("schemaVersion", -1)
+    require(schemaVersion > 0) { "runtime.storage.restore invalid schemaVersion" }
+    val revision = if (!restore.has("revision") || restore.isNull("revision")) null else {
+        restore.optString("revision").takeIf(String::isNotBlank)
+            ?: error("runtime.storage.restore blank revision")
+    }
+    return ReaderCoreStorageBootstrapResult(
+        restored = restore.getBoolean("restored"),
+        revision = revision,
+        schemaVersion = schemaVersion,
+        advertisedCapabilities = advertised
+    )
 }
 
 class CoreException(val errorJson: String) : RuntimeException(errorJson)

@@ -52,7 +52,11 @@ class AppShellViewModel internal constructor(
         runtime = readerUiRuntimeCoordinator
     ),
     /** Test seam shared by command, speech and foreground one-shot timer work. */
-    private val readerPlaybackScope: CoroutineScope? = null
+    private val readerPlaybackScope: CoroutineScope? = null,
+    private val readerCacheUndoEffectExecutor: ReaderCacheUndoEffectExecutor =
+        ReaderCacheUndoEffectExecutor(),
+    /** Test seam for Core-backed cache and replace persistence UI work. */
+    private val readerCacheUndoScope: CoroutineScope? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -87,6 +91,9 @@ class AppShellViewModel internal constructor(
         get() = readerPlaybackDomainStore.state
 
     init {
+        readerCacheUndoEffectExecutor.restorePersistedUndoTokenIntent()?.let { restoreIntent ->
+            _state.value = nativeReducer(_state.value, restoreIntent)
+        }
         // P6: attach the motion runtime so dispatch() can fire motion transactions.
         MotionController.setReducedMotionResolver(reducedMotionResolver)
         MotionController.attachToViewModel(this)
@@ -111,12 +118,25 @@ class AppShellViewModel internal constructor(
     fun dispatch(intent: ReaderUiIntent) {
         val productionBefore = _state.value
 
+        if (productionBefore.bookCache.busy && intent.startsCacheCoreAction()) return
+        if (productionBefore.replaceMutation.busy && intent.startsReplaceCoreAction()) return
+
         // A new book replaces every in-flight playback generation before the
         // book.open transaction is admitted. This avoids Runtime emitting
         // playback teardown effects into the book.open-only executor.
         val isBookReplacement = intent is ReaderUiIntent.EnterReaderFromCover ||
             intent is ReaderUiIntent.EnterReaderFromAction
         val playbackBeforeReplacement = readerUiRuntimeCoordinator.playbackRuntimeState
+        if (
+            readerPlaybackPilotEnabled &&
+            playbackBeforeReplacement.pageTransaction?.stage == "persisting-progress" &&
+            intent.isReaderMutationBlockedByProgressCommit()
+        ) {
+            // Reader UI's progress stage is an irreversible Core commit
+            // boundary. Keep both route identity and the visible old page
+            // stable until its correlated terminal callback is projected.
+            return
+        }
         val playbackTeardownQueued = readerPlaybackPilotEnabled && isBookReplacement &&
             (playbackBeforeReplacement.pageTransaction != null ||
                 playbackBeforeReplacement.ttsTransaction != null ||
@@ -237,6 +257,14 @@ class AppShellViewModel internal constructor(
                     )
                 }
                 readerUiRuntimeCoordinator.observe(intent, productionBefore, productionAfter)
+                if (intent.startsCacheCoreAction() || intent.startsReplaceCoreAction()) {
+                    readerCacheUndoEffectExecutor.execute(
+                        intent = intent,
+                        stateBefore = productionBefore,
+                        scope = readerCacheUndoScope ?: viewModelScope,
+                        dispatch = ::dispatch
+                    )
+                }
             }
         }
     }
@@ -308,10 +336,45 @@ class AppShellViewModel internal constructor(
     }
 
     private fun ReaderUiIntent.isPlaybackPilotIntent(): Boolean = when (this) {
-        ReaderUiIntent.TurnPageNext,
-        ReaderUiIntent.TurnPagePrev,
+        is ReaderUiIntent.TurnPageNext,
+        is ReaderUiIntent.TurnPagePrev,
         is ReaderUiIntent.StartTtsSession,
-        ReaderUiIntent.StartAutoPageSession,
+        is ReaderUiIntent.StartAutoPageSession,
+        ReaderUiIntent.StopSession -> true
+        else -> false
+    }
+
+    private fun ReaderUiIntent.startsCacheCoreAction(): Boolean = when (this) {
+        is ReaderUiIntent.RefreshCurrentBookCache,
+        is ReaderUiIntent.PrefetchCurrentBookCache,
+        is ReaderUiIntent.ClearCurrentBookCache,
+        is ReaderUiIntent.ClearCache -> true
+        else -> false
+    }
+
+    private fun ReaderUiIntent.startsReplaceCoreAction(): Boolean = when (this) {
+        is ReaderUiIntent.LoadReplaceRules,
+        is ReaderUiIntent.PersistReplaceRuleCreate,
+        is ReaderUiIntent.PersistReplaceRuleUpdate,
+        is ReaderUiIntent.PersistReplaceRuleDelete,
+        is ReaderUiIntent.PersistReplaceRuleToggle,
+        is ReaderUiIntent.UndoLastReplace -> true
+        else -> false
+    }
+
+    private fun ReaderUiIntent.isReaderMutationBlockedByProgressCommit(): Boolean = when (this) {
+        is ReaderUiIntent.SelectTab,
+        is ReaderUiIntent.EnterReaderFromCover,
+        is ReaderUiIntent.EnterReaderFromAction,
+        is ReaderUiIntent.PushRoute,
+        ReaderUiIntent.PopRoute,
+        is ReaderUiIntent.ReplaceRoute,
+        is ReaderUiIntent.UpdateReaderChapter,
+        is ReaderUiIntent.UpdateReaderPage,
+        is ReaderUiIntent.TurnPageNext,
+        is ReaderUiIntent.TurnPagePrev,
+        is ReaderUiIntent.StartTtsSession,
+        is ReaderUiIntent.StartAutoPageSession,
         ReaderUiIntent.StopSession -> true
         else -> false
     }
@@ -488,7 +551,7 @@ class AppShellViewModel internal constructor(
                 MotionController.contractFor(MotionIdConstants.READER_MODULE_SWITCH)?.defaultDurationMs
                     ?: 160L
             )
-            ReaderUiIntent.StartAutoPageSession -> Tuple4(
+            is ReaderUiIntent.StartAutoPageSession -> Tuple4(
                 MotionIdConstants.READER_SESSION_AUTO_PAGE_START,
                 from,
                 RouteIds.IMMERSIVE_READING,
@@ -524,13 +587,13 @@ class AppShellViewModel internal constructor(
                     ?: 120L
             )
             // ── 翻页 ──
-            ReaderUiIntent.TurnPageNext -> Tuple4(
+            is ReaderUiIntent.TurnPageNext -> Tuple4(
                 MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
                 "page.current", "page.next",
                 MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs
                     ?: 220L
             )
-            ReaderUiIntent.TurnPagePrev -> Tuple4(
+            is ReaderUiIntent.TurnPagePrev -> Tuple4(
                 MotionIdConstants.READER_PAGE_TURN_NEXT_PREV,
                 "page.current", "page.previous",
                 MotionController.contractFor(MotionIdConstants.READER_PAGE_TURN_NEXT_PREV)?.defaultDurationMs

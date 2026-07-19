@@ -2,6 +2,7 @@ package com.reader.ui.shell
 
 import com.reader.api.Book
 import io.reader.ui.contract.RouteShell
+import io.reader.ui.contract.ReaderAppearanceSpecRegistry
 
 /**
  * Single source of truth for the App Shell UI state, aligned with
@@ -66,9 +67,9 @@ data class ReaderContext(
     /** 是否自动亮度。 */
     val brightnessAuto: Boolean = true,
     /** 正文字号 sp。 */
-    val fontSize: Float = 18f,
+    val fontSize: Float = requireNotNull(ReaderAppearanceSpecRegistry.stepper("fontSize")).defaultValue.toFloat(),
     /** 行距倍数。 */
-    val lineSpacing: Float = 1.55f,
+    val lineSpacing: Float = requireNotNull(ReaderAppearanceSpecRegistry.stepper("lineHeight")).defaultValue.toFloat(),
     /** 页边距 dp。 */
     val pageMargin: Float = 16f
 )
@@ -1036,6 +1037,89 @@ data class ReplaceRule(
     val scope: String = "all"
 )
 
+/** Visible lifecycle shared by the native Core-backed cache and replace controls. */
+enum class ReaderCoreActionPhase {
+    IDLE,
+    RUNNING,
+    SUCCEEDED,
+    /** Core mutation committed, but the follow-up projection refresh failed. */
+    PARTIAL,
+    FAILED
+}
+
+enum class ReaderCacheAction {
+    STATUS,
+    PREFETCH_CURRENT,
+    PREFETCH_NEXT,
+    CLEAR_BOOK,
+    CLEAR_GLOBAL
+}
+
+/** UI projection of one chapter returned by `cache.book.status`. */
+data class ReaderCacheChapterUiState(
+    val chapterIndex: Int,
+    val title: String,
+    val state: String,
+    val cachedBytes: Long,
+    val lastError: String? = null
+)
+
+/**
+ * Core-backed cache state. Identity is always copied from the live
+ * [ReaderContext]; ScreenGraph/demo fixtures never populate this state.
+ */
+data class ReaderBookCacheUiState(
+    val phase: ReaderCoreActionPhase = ReaderCoreActionPhase.IDLE,
+    val activeRequestId: String? = null,
+    val lastAction: ReaderCacheAction? = null,
+    val sourceId: String? = null,
+    val bookId: String? = null,
+    val tocAvailable: Boolean = false,
+    val chapterCount: Int = 0,
+    val chapters: List<ReaderCacheChapterUiState> = emptyList(),
+    val cachedCount: Long = 0,
+    val queuedCount: Long = 0,
+    val inProgressCount: Long = 0,
+    val failedCount: Long = 0,
+    val missingCount: Long = 0,
+    val totalContentBytes: Long = 0,
+    val message: String? = null,
+    val error: String? = null
+) {
+    val busy: Boolean get() = phase == ReaderCoreActionPhase.RUNNING
+}
+
+enum class ReaderReplaceMutationAction {
+    LOAD,
+    CREATE,
+    UPDATE,
+    DELETE,
+    TOGGLE,
+    UNDO
+}
+
+/**
+ * Native replace transaction state. [undoTokenJson] is opaque UI state and is
+ * set only by a successful Core `replace.persist` result.
+ */
+data class ReaderReplaceMutationUiState(
+    val phase: ReaderCoreActionPhase = ReaderCoreActionPhase.IDLE,
+    val activeRequestId: String? = null,
+    val lastAction: ReaderReplaceMutationAction? = null,
+    val message: String? = null,
+    val error: String? = null,
+    val undoTokenJson: String? = null,
+    val undoOperation: String? = null,
+    val undoRuleId: Long? = null,
+    val undoExpiresAt: Long? = null,
+    val undoTokenPersisted: Boolean = false,
+    /** Before-image used to roll back the existing optimistic native reducer. */
+    val previousRules: List<ReplaceRule> = emptyList()
+) {
+    val busy: Boolean get() = phase == ReaderCoreActionPhase.RUNNING
+    val canUndo: Boolean get() = !busy && !undoTokenJson.isNullOrBlank()
+}
+
 /**
  * The single UI state. Every field the contract requires is present:
  * `activeTab`, `currentRoute`, `backStack`, `ReaderContext`, `activeSession`,
@@ -1094,7 +1178,11 @@ data class ReaderUiState(
     /** W3: 书源编辑状态（Idle/Editing/Saving/Saved/Error）。 */
     val sourceEdit: SourceEditState = SourceEditState.Idle,
     /** W5: 内容替换规则列表。 */
-    val replaceRules: List<ReplaceRule> = emptyList()
+    val replaceRules: List<ReplaceRule> = emptyList(),
+    /** Core-backed current-book cache projection and visible operation result. */
+    val bookCache: ReaderBookCacheUiState = ReaderBookCacheUiState(),
+    /** Core replace.persist / replace.undo transaction projection. */
+    val replaceMutation: ReaderReplaceMutationUiState = ReaderReplaceMutationUiState()
 ) {
     /** True when the rendered route is the immersive reading surface (no control layer). */
     val isImmersiveReading: Boolean

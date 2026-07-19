@@ -559,7 +559,7 @@ class ReaderUiReducerTest {
     fun `StartAutoPageSession sets activeSession to AUTO_PAGE playing`() {
         val next = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         val session = next.activeSession
         assertNotNull(session)
@@ -583,7 +583,7 @@ class ReaderUiReducerTest {
     fun `activeSession is mutually exclusive - starting TTS replaces AUTO_PAGE`() {
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         assertEquals(SessionType.AUTO_PAGE, withAutoPage.activeSession!!.type)
 
@@ -603,7 +603,7 @@ class ReaderUiReducerTest {
         )
         assertEquals(SessionType.TTS, withTts.activeSession!!.type)
 
-        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession)
+        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession())
         assertEquals(
             "autoPage must replace TTS — only one session at a time",
             SessionType.AUTO_PAGE,
@@ -669,7 +669,7 @@ class ReaderUiReducerTest {
     fun `StopSession clears activeSession`() {
         val withSession = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         assertNotNull(withSession.activeSession)
 
@@ -697,7 +697,7 @@ class ReaderUiReducerTest {
     fun `UpdateCountdown only affects AUTO_PAGE session`() {
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         val updated = ReaderUiReducer.reduce(
             withAutoPage,
@@ -1179,13 +1179,13 @@ class ReaderUiReducerTest {
             ReaderUiState(),
             ReaderUiIntent.EnterReaderFromCover("s", "b", "n")
         )
-        val next = ReaderUiReducer.reduce(withReader, ReaderUiIntent.TurnPageNext)
+        val next = ReaderUiReducer.reduce(withReader, ReaderUiIntent.TurnPageNext())
         assertEquals(1, next.readerContext!!.page)
 
-        val prev = ReaderUiReducer.reduce(next, ReaderUiIntent.TurnPagePrev)
+        val prev = ReaderUiReducer.reduce(next, ReaderUiIntent.TurnPagePrev())
         assertEquals(0, prev.readerContext!!.page)
 
-        val floored = ReaderUiReducer.reduce(prev, ReaderUiIntent.TurnPagePrev)
+        val floored = ReaderUiReducer.reduce(prev, ReaderUiIntent.TurnPagePrev())
         assertEquals(
             "page must not go below 0",
             0,
@@ -2579,7 +2579,7 @@ class ReaderUiReducerTest {
     fun `Slice4 - StartAutoPageSession sets activeSession to AUTO_PAGE playing true`() {
         val next = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         val session = next.activeSession
         assertNotNull("activeSession must be set after StartAutoPageSession", session)
@@ -2591,7 +2591,7 @@ class ReaderUiReducerTest {
     fun `Slice4 - starting TTS while AUTO_PAGE active clears auto-page (mutual exclusion)`() {
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         assertEquals(SessionType.AUTO_PAGE, withAutoPage.activeSession!!.type)
 
@@ -2615,7 +2615,7 @@ class ReaderUiReducerTest {
         )
         assertEquals(SessionType.TTS, withTts.activeSession!!.type)
 
-        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession)
+        val withAutoPage = ReaderUiReducer.reduce(withTts, ReaderUiIntent.StartAutoPageSession())
         assertEquals(
             "AUTO_PAGE must replace TTS — single activeSession field enforces mutual exclusion",
             SessionType.AUTO_PAGE,
@@ -2640,7 +2640,7 @@ class ReaderUiReducerTest {
     fun `Slice4 - StopSession on AUTO_PAGE also clears activeSession`() {
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         assertNotNull(withAutoPage.activeSession)
 
@@ -2726,7 +2726,7 @@ class ReaderUiReducerTest {
         // （reducer 仅在原会话为 TTS 时才入队 stop dispatch）
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         assertEquals(
             "StartAutoPageSession must not enqueue any HostRequest",
@@ -2763,7 +2763,7 @@ class ReaderUiReducerTest {
     fun `Slice4 - UpdateCountdown records seconds on AUTO_PAGE session`() {
         val withAutoPage = ReaderUiReducer.reduce(
             ReaderUiState(),
-            ReaderUiIntent.StartAutoPageSession
+            ReaderUiIntent.StartAutoPageSession()
         )
         val updated = ReaderUiReducer.reduce(
             withAutoPage,

@@ -61,6 +61,22 @@ fun SourceDemoRouteScreen(
     )
 }
 
+/**
+ * Content-only entry for canonical ScreenGraph nodes. Shell-level bottom actions,
+ * sheets, and dialogs intentionally remain outside this adapter boundary.
+ */
+@Composable
+internal fun SourceDemoCanonicalContent(
+    state: SourceDemoRouteState,
+    onNavigate: (String) -> Unit
+) {
+    when (state) {
+        is SourceManagementRouteState -> SourceManagementContent(state, onNavigate)
+        is SourceRuleEditRouteState -> SourceRuleEditContent(state, onNavigate)
+        is SourceDebugRouteState -> SourceDebugContent(state, onNavigate)
+    }
+}
+
 @Composable
 fun SourceDemoRouteScreen(
     state: SourceDemoRouteState,
@@ -217,6 +233,15 @@ private fun SourceRuleEditContent(
     )
 }
 
+/** Content-only rule-edit entry; canonical BackTopBar remains a separate ScreenGraph node. */
+@Composable
+internal fun SourceRuleEditCanonicalContent(
+    state: SourceRuleEditRouteState,
+    onNavigate: (String) -> Unit
+) {
+    SourceDemoCanonicalContent(state = state, onNavigate = onNavigate)
+}
+
 @Composable
 private fun SourceDebugContent(
     state: SourceDebugRouteState,
@@ -229,6 +254,15 @@ private fun SourceDebugContent(
             SourceDebugLinearContent(state = state, onNavigate = onNavigate)
         }
     }
+}
+
+/** Content-only entry for the canonical ScreenGraph renderer, whose shell/top bar are separate nodes. */
+@Composable
+internal fun SourceDebugCanonicalContent(
+    state: SourceDebugRouteState,
+    onNavigate: (String) -> Unit
+) {
+    SourceDemoCanonicalContent(state = state, onNavigate = onNavigate)
 }
 
 @Composable

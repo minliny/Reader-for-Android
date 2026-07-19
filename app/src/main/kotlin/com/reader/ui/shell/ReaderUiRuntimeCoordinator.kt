@@ -1,6 +1,7 @@
 package com.reader.ui.shell
 
 import com.reader.android.BuildConfig
+import com.reader.ui.motion.MotionIdConstants
 import io.reader.ui.runtime.GeneratedRuntimeActions
 import io.reader.ui.runtime.ReaderUIEffect
 import io.reader.ui.runtime.ReaderUIEffectKind
@@ -62,6 +63,27 @@ internal val READER_UI_RUNTIME_DIRECTORY_PILOT_EVENTS: Set<String> = linkedSetOf
     "reader.directory.close"
 )
 
+/**
+ * Schema-3 Reader control actions that are intentionally outside the current
+ * schema-2 consumer lock. They may only run through the explicit local
+ * candidate seam below; [AppShellViewModel] never dispatches them in
+ * production while the lock remains on schema 2.
+ */
+internal val READER_UI_RUNTIME_READER_CONTROL_LOCAL_CANDIDATE_EVENTS: Set<String> = linkedSetOf(
+    "reader.control.toggle",
+    "reader.module.switch"
+)
+
+private val READER_CONTROL_MODULES: Set<String> = setOf(
+    "directory",
+    "tts",
+    "appearance",
+    "settings"
+)
+
+private val READER_CONTROL_OVERLAY_FAMILY: Set<String> =
+    READER_CONTROL_MODULES + "reader-control"
+
 /** Retained alias for source compatibility with the R7 live-shadow tests. */
 internal val READER_UI_RUNTIME_SHADOW_EVENTS: Set<String> = READER_UI_RUNTIME_COVERED_EVENTS
 
@@ -88,7 +110,7 @@ internal fun canonicalBookOpenSourceKind(sourceId: String, bookId: String): Stri
         "remote"
     }
 
-enum class ReaderUiRuntimeDispatchMode { SHADOW, PILOT }
+enum class ReaderUiRuntimeDispatchMode { SHADOW, PILOT, LOCAL_CANDIDATE }
 
 /** Runtime counters. Pilot and shadow both count as covered canonical events. */
 data class ReaderUiRuntimeShadowMetrics(
@@ -138,6 +160,28 @@ internal sealed interface ReaderUiRuntimePilotResult {
     data object FailedClosed : ReaderUiRuntimePilotResult
 }
 
+/** Semantic delta derived from the canonical Runtime state transition. */
+internal enum class ReaderControlCandidateDelta { SHOW, HIDE, SWITCH, NO_OP }
+
+/**
+ * Result of the schema-3 local candidate adapter. This result contains no
+ * extra overlay/module state: [productionState] is produced exclusively by
+ * the existing [ReaderUiReducer] and its Reader control intents.
+ */
+internal sealed interface ReaderControlCandidateDispatch {
+    data object NotEnabled : ReaderControlCandidateDispatch
+
+    data class Applied(
+        val productionState: ReaderUiState,
+        val delta: ReaderControlCandidateDelta,
+        val motionId: String?,
+        val changed: Boolean
+    ) : ReaderControlCandidateDispatch
+
+    /** Runtime or projection rejected the candidate; native state is unchanged. */
+    data object FailedClosed : ReaderControlCandidateDispatch
+}
+
 /** Separate, opt-in transaction Pilot; it is intentionally absent from the lock-backed directory cohort. */
 internal sealed interface ReaderBookOpenPilotDispatch {
     data object NotEnabled : ReaderBookOpenPilotDispatch
@@ -183,6 +227,11 @@ internal class ReaderUiRuntimeCoordinator(
      * sync event/executor wiring, so the seven covered events remain Shadow.
      */
     val syncPilotEnabled: Boolean = BuildConfig.READER_UI_SYNC_PILOT_ENABLED,
+    /**
+     * Local/test-only schema-3 reader-control seam. It deliberately has no
+     * BuildConfig or production caller so it cannot bypass the schema-2 lock.
+     */
+    val readerControlLocalCandidateEnabled: Boolean = false,
     private val runtimeDispatchOverride: ((
         event: String,
         payload: ReaderUIJSONPayload,
@@ -283,6 +332,114 @@ internal class ReaderUiRuntimeCoordinator(
         }
         require(READER_UI_RUNTIME_SYNC_PILOT_EVENTS.all(this.coveredEvents::contains)) {
             "Android sync Pilot events must remain covered as one cohort"
+        }
+        require(
+            READER_UI_RUNTIME_READER_CONTROL_LOCAL_CANDIDATE_EVENTS
+                .intersect(this.coveredEvents)
+                .isEmpty()
+        ) {
+            "Schema-3 Reader control candidates must stay outside the schema-2 production allowlist"
+        }
+        if (readerControlLocalCandidateEnabled) {
+            require(GeneratedRuntimeActions.schemaVersion >= 3) {
+                "Reader control local candidates require Runtime Actions schema 3"
+            }
+            require(
+                READER_UI_RUNTIME_READER_CONTROL_LOCAL_CANDIDATE_EVENTS
+                    .all(GeneratedRuntimeActions.byEvent::containsKey)
+            ) {
+                "Reader control local candidates must be generated Runtime actions"
+            }
+        }
+    }
+
+    /**
+     * Consumes the two schema-3 Reader control actions through a deliberately
+     * explicit local-candidate entry point. The current production dispatch
+     * path cannot reach this method and the candidate events remain absent
+     * from [coveredEvents]/[pilotEvents] while the consumer lock is schema 2.
+     *
+     * Runtime owns the atomic overlay transition. Android then projects only
+     * that delta through the existing Reader control intents and reducer.
+     * Route/tab/stack changes, effects, foreign overlays, and wrong routes all
+     * fail closed with [productionBefore] left untouched.
+     */
+    @Synchronized
+    internal fun dispatchReaderControlLocalCandidate(
+        event: String,
+        payload: ReaderUIJSONPayload,
+        productionBefore: ReaderUiState
+    ): ReaderControlCandidateDispatch {
+        if (!readerControlLocalCandidateEnabled) return ReaderControlCandidateDispatch.NotEnabled
+        if (event !in READER_UI_RUNTIME_READER_CONTROL_LOCAL_CANDIDATE_EVENTS) {
+            return ReaderControlCandidateDispatch.NotEnabled
+        }
+
+        val canonical = CanonicalRuntimeDispatch(event = event, payload = payload)
+        var candidateRuntime: ReaderUIRuntime? = null
+        return try {
+            if (productionBefore.currentRoute.routeId != RouteIds.IMMERSIVE_READING) {
+                throw ReaderUIRuntimeException(
+                    "READER_ROUTE_GUARD",
+                    "$event requires the Android immersive-reading route"
+                )
+            }
+
+            val hydratedState = hydrateReaderControlCandidateState(productionBefore)
+            candidateRuntime = ReaderUIRuntime(hydratedState)
+            val transition = candidateRuntime.dispatchJSON(
+                event = canonical.event,
+                jsonPayload = canonical.payload,
+                correlationId = canonical.correlationId
+            )
+            if (transition.effects.isNotEmpty()) {
+                throw ReaderUIRuntimeException(
+                    "READER_CONTROL_EFFECT_BOUNDARY",
+                    "$event unexpectedly emitted Core/Host effects"
+                )
+            }
+            validateReaderControlRuntimeBoundary(event, transition)
+            val delta = deriveReaderControlCandidateDelta(event, transition)
+            val productionAfter = projectReaderControlCandidate(
+                delta = delta,
+                runtimeAfter = transition.state,
+                productionBefore = productionBefore
+            )
+            if (productionAfter.copy(readerControl = productionBefore.readerControl) != productionBefore) {
+                throw ReaderUIRuntimeException(
+                    "READER_CONTROL_PROJECTION_BOUNDARY",
+                    "$event mutated Android state outside ReaderControlState"
+                )
+            }
+
+            val motionId = when (delta) {
+                ReaderControlCandidateDelta.SHOW -> MotionIdConstants.READER_CONTROL_SHOW
+                ReaderControlCandidateDelta.HIDE -> MotionIdConstants.READER_CONTROL_HIDE
+                ReaderControlCandidateDelta.SWITCH -> MotionIdConstants.READER_MODULE_SWITCH
+                ReaderControlCandidateDelta.NO_OP -> null
+            }
+            observationSnapshot = ReaderUiRuntimeShadowObservation(
+                event = event,
+                correlationId = null,
+                runtimeState = transition.state,
+                runtimeEffects = transition.effects,
+                mismatches = emptyList(),
+                mode = ReaderUiRuntimeDispatchMode.LOCAL_CANDIDATE
+            )
+            ReaderControlCandidateDispatch.Applied(
+                productionState = productionAfter,
+                delta = delta,
+                motionId = motionId,
+                changed = productionAfter != productionBefore
+            )
+        } catch (error: Exception) {
+            recordRuntimeError(
+                canonical = canonical,
+                mode = ReaderUiRuntimeDispatchMode.LOCAL_CANDIDATE,
+                error = error,
+                runtimeState = candidateRuntime?.state ?: runtime.state
+            )
+            ReaderControlCandidateDispatch.FailedClosed
         }
     }
 
@@ -908,16 +1065,133 @@ internal class ReaderUiRuntimeCoordinator(
             correlationId = canonical.correlationId
         )
 
+    private fun validateReaderControlRuntimeBoundary(
+        event: String,
+        transition: ReaderUITransition
+    ) {
+        if (transition.event != event) {
+            throw ReaderUIRuntimeException(
+                "READER_CONTROL_EVENT_BOUNDARY",
+                "$event returned transition ${transition.event}"
+            )
+        }
+        if (
+            transition.previous.routeId != RouteIds.IMMERSIVE_READING ||
+            transition.state.routeId != transition.previous.routeId ||
+            transition.state.routeStack != transition.previous.routeStack ||
+            transition.state.tab != transition.previous.tab
+        ) {
+            throw ReaderUIRuntimeException(
+                "READER_CONTROL_ROUTE_BOUNDARY",
+                "$event must keep the Runtime route, stack, and tab unchanged"
+            )
+        }
+        if (transition.state.copy(overlay = transition.previous.overlay) != transition.previous) {
+            throw ReaderUIRuntimeException(
+                "READER_CONTROL_STATE_BOUNDARY",
+                "$event may mutate only the Runtime overlay"
+            )
+        }
+    }
+
+    /**
+     * One-way admission projection from the existing native state into an
+     * isolated Runtime candidate. The long-lived schema-2 Runtime is never
+     * trusted to be coincidentally synchronized and is never mutated here.
+     */
+    private fun hydrateReaderControlCandidateState(production: ReaderUiState): ReaderUIState {
+        if (production.overlayState !is OverlayState.None) {
+            throw ReaderUIRuntimeException(
+                "READER_CONTROL_OVERLAY_GUARD",
+                "Reader control candidate cannot replace ${production.overlayState::class.java.simpleName}"
+            )
+        }
+        if (production.readerControl.activeModule !in READER_CONTROL_MODULES) {
+            throw ReaderUIRuntimeException(
+                "READER_CONTROL_NATIVE_STATE_GUARD",
+                "Unknown native Reader module ${production.readerControl.activeModule}"
+            )
+        }
+        val semanticOverlay = when {
+            !production.readerControl.visible -> null
+            production.readerControl.phase == MotionPhase.LEAVING -> null
+            else -> production.readerControl.activeModule
+        }
+        return runtime.state.copy(
+            routeId = production.currentRoute.routeId,
+            routeStack = production.backStack.map { it.routeId },
+            tab = production.activeTab.routeId,
+            overlay = semanticOverlay,
+            reducedMotion = production.reducedMotion
+        )
+    }
+
+    private fun deriveReaderControlCandidateDelta(
+        event: String,
+        transition: ReaderUITransition
+    ): ReaderControlCandidateDelta {
+        val before = transition.previous.overlay
+        val after = transition.state.overlay
+        return when (event) {
+            "reader.control.toggle" -> when {
+                before == null && after == "reader-control" -> ReaderControlCandidateDelta.SHOW
+                before in READER_CONTROL_OVERLAY_FAMILY && after == null -> ReaderControlCandidateDelta.HIDE
+                else -> throw ReaderUIRuntimeException(
+                    "READER_CONTROL_DELTA_BOUNDARY",
+                    "$event produced unsupported overlay delta $before -> $after"
+                )
+            }
+            "reader.module.switch" -> {
+                if (before !in READER_CONTROL_OVERLAY_FAMILY || after !in READER_CONTROL_OVERLAY_FAMILY) {
+                    throw ReaderUIRuntimeException(
+                        "READER_CONTROL_DELTA_BOUNDARY",
+                        "$event produced unsupported overlay delta $before -> $after"
+                    )
+                }
+                if (before == after) {
+                    ReaderControlCandidateDelta.NO_OP
+                } else {
+                    ReaderControlCandidateDelta.SWITCH
+                }
+            }
+            else -> throw ReaderUIRuntimeException(
+                "READER_CONTROL_EVENT_BOUNDARY",
+                "$event is not a Reader control candidate"
+            )
+        }
+    }
+
+    private fun projectReaderControlCandidate(
+        delta: ReaderControlCandidateDelta,
+        runtimeAfter: ReaderUIState,
+        productionBefore: ReaderUiState
+    ): ReaderUiState = when (delta) {
+        ReaderControlCandidateDelta.SHOW -> ReaderUiReducer.reduce(
+            productionBefore,
+            ReaderUiIntent.ShowReaderControl
+        )
+        ReaderControlCandidateDelta.HIDE -> ReaderUiReducer.reduce(
+            productionBefore,
+            ReaderUiIntent.HideReaderControl
+        )
+        ReaderControlCandidateDelta.SWITCH -> ReaderUiReducer.reduce(
+            productionBefore,
+            ReaderUiIntent.SwitchReaderModule(module = requireNotNull(runtimeAfter.overlay))
+        )
+        ReaderControlCandidateDelta.NO_OP -> productionBefore
+    }
+
     private fun recordRuntimeError(
         canonical: CanonicalRuntimeDispatch,
         mode: ReaderUiRuntimeDispatchMode,
-        error: Exception
+        error: Exception,
+        runtimeState: ReaderUIState = runtime.state
     ) {
         metricsSnapshot = metricsSnapshot.copy(runtimeError = metricsSnapshot.runtimeError + 1)
         observationSnapshot = ReaderUiRuntimeShadowObservation(
             event = canonical.event,
             correlationId = canonical.correlationId,
-            runtimeState = runtime.state,
+            runtimeState = runtimeState,
             runtimeEffects = emptyList(),
             mismatches = emptyList(),
             mode = mode,
@@ -1012,16 +1286,16 @@ internal class ReaderUiRuntimeCoordinator(
             payload = emptyMap(),
             correlationId = intent.requestId
         )
-        ReaderUiIntent.StartAutoPageSession -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.StartAutoPageSession -> CanonicalRuntimeDispatch(
             event = "reader.autoPage.start",
             payload = mapOf("intervalMs" to JsonPrimitive(READER_AUTO_PAGE_DEFAULT_INTERVAL_MS)),
             correlationId = intent.requestId
         )
-        ReaderUiIntent.TurnPageNext -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.TurnPageNext -> CanonicalRuntimeDispatch(
             event = "reader.page.next",
             correlationId = intent.requestId
         )
-        ReaderUiIntent.TurnPagePrev -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.TurnPagePrev -> CanonicalRuntimeDispatch(
             event = "reader.page.prev",
             correlationId = intent.requestId
         )
@@ -1051,11 +1325,11 @@ internal class ReaderUiRuntimeCoordinator(
     }
 
     private fun canonicalPlaybackDispatch(intent: ReaderUiIntent): CanonicalRuntimeDispatch? = when (intent) {
-        ReaderUiIntent.TurnPageNext -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.TurnPageNext -> CanonicalRuntimeDispatch(
             "reader.page.next",
             correlationId = intent.requestId
         )
-        ReaderUiIntent.TurnPagePrev -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.TurnPagePrev -> CanonicalRuntimeDispatch(
             "reader.page.prev",
             correlationId = intent.requestId
         )
@@ -1063,7 +1337,7 @@ internal class ReaderUiRuntimeCoordinator(
             "reader.tts.start",
             correlationId = intent.requestId
         )
-        ReaderUiIntent.StartAutoPageSession -> CanonicalRuntimeDispatch(
+        is ReaderUiIntent.StartAutoPageSession -> CanonicalRuntimeDispatch(
             "reader.autoPage.start",
             payload = mapOf("intervalMs" to JsonPrimitive(READER_AUTO_PAGE_DEFAULT_INTERVAL_MS)),
             correlationId = intent.requestId
@@ -1398,6 +1672,21 @@ internal class ReaderUiRuntimeCoordinator(
             canonicalLocation,
             pageIndex,
             error
+        )
+    )
+
+    @Synchronized
+    override fun acceptPageProgressResult(
+        correlationId: String,
+        stored: Boolean?,
+        error: String?
+    ): ReaderPlaybackRuntimeAdvance = recordPlaybackAdvance(
+        event = "reader.page.progress",
+        correlationId = correlationId,
+        transition = runtime.acceptPageProgressResult(
+            correlationId = correlationId,
+            stored = stored,
+            error = error
         )
     )
 

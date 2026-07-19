@@ -41,6 +41,34 @@ import com.reader.ui.shell.ReaderUiIntent
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
 import com.reader.ui.theme.readerExtraColors
+import io.reader.ui.contract.ReaderAppearanceFont
+import io.reader.ui.contract.ReaderAppearanceSpecRegistry
+import io.reader.ui.contract.ReaderAppearanceStepper
+import io.reader.ui.contract.ReaderAppearanceTheme
+import kotlin.math.pow
+import kotlin.math.round
+
+/** Reader 2 / Full / AppearanceContent 的共享投影，供两套历史全屏入口复用。 */
+internal val readerFullAppearanceFonts: List<ReaderAppearanceFont> =
+    ReaderAppearanceSpecRegistry.fonts.filterNot { it.importAction }
+
+internal val readerFullAppearanceThemes: List<ReaderAppearanceTheme> =
+    ReaderAppearanceSpecRegistry.themes
+
+internal fun readerFullAppearanceStepper(id: String): ReaderAppearanceStepper =
+    requireNotNull(ReaderAppearanceSpecRegistry.stepper(id)) {
+        "Missing Reader Appearance stepper: $id"
+    }
+
+internal fun nextReaderAppearanceValue(current: Float, spec: ReaderAppearanceStepper): Float {
+    val raw = if (current + spec.step > spec.maximum + 0.0001) {
+        spec.minimum
+    } else {
+        (current + spec.step).coerceAtMost(spec.maximum)
+    }
+    val factor = 10.0.pow(spec.precision)
+    return (round(raw * factor) / factor).toFloat()
+}
 
 /**
  * W4: 字体设置全屏页（reader-full-font）。
@@ -52,39 +80,50 @@ fun ReaderFontSettingsScreen(
     context: ReaderContext? = null,
     dispatch: (ReaderUiIntent) -> Unit = {}
 ) {
+    val fontSizeSpec = readerFullAppearanceStepper("fontSize")
+    val lineHeightSpec = readerFullAppearanceStepper("lineHeight")
+    val letterSpacingSpec = readerFullAppearanceStepper("letterSpacing")
     FullSettingsScaffold(title = "字体设置", onBack = onBack) {
         FullSettingsSection("字号") {
-            FullSettingsRow(title = "正文字号", value = "${(context?.fontSize ?: 18f).toInt()}pt")
+            FullSettingsRow(title = "正文字号", value = "${(context?.fontSize ?: fontSizeSpec.defaultValue.toFloat()).toInt()}px")
             FullSettingsDivider()
-            FullSettingsRow(title = "字号步进", value = "1pt")
+            FullSettingsRow(title = "字号步进", value = "${fontSizeSpec.step.toInt()}px")
         }
         FullSettingsSection("字体族") {
-            val fonts = listOf("系统默认", "思源宋体", "思源黑体", "霞鹜文楷")
-            var selectedFont by remember { mutableStateOf(0) }
-            fonts.forEachIndexed { index, label ->
+            var selectedFontId by remember { mutableStateOf(ReaderAppearanceSpecRegistry.defaults.fontId) }
+            readerFullAppearanceFonts.forEachIndexed { index, font ->
                 FullSettingsRow(
-                    title = label,
-                    value = if (index == selectedFont) "已选" else "",
-                    onClick = { selectedFont = index }
+                    title = font.label,
+                    value = if (font.id == selectedFontId) "已选" else "",
+                    onClick = {
+                        selectedFontId = font.id
+                        dispatch(ReaderUiIntent.SetReaderChoice("fontFamily", font.id))
+                    }
                 )
-                if (index < fonts.lastIndex) FullSettingsDivider()
+                if (index < readerFullAppearanceFonts.lastIndex) FullSettingsDivider()
             }
         }
         FullSettingsSection("自定义字体") {
             FullSettingsRow(title = "已导入字体", value = "2 个", onClick = { })
             FullSettingsDivider()
-            FullSettingsRow(title = "导入字体文件", value = "", onClick = { })
+            FullSettingsRow(
+                title = ReaderAppearanceSpecRegistry.fonts.first { it.importAction }.label,
+                value = "",
+                onClick = { }
+            )
         }
         FullSettingsSection("排版微调") {
-            var lineSpacing by remember { mutableStateOf(context?.lineSpacing ?: 1.55f) }
-            var letterSpacing by remember { mutableStateOf(0f) }
+            var lineSpacing by remember {
+                mutableStateOf(context?.lineSpacing ?: lineHeightSpec.defaultValue.toFloat())
+            }
+            var letterSpacing by remember { mutableStateOf(letterSpacingSpec.defaultValue.toFloat()) }
             FullSettingsRow(
-                title = "行距",
-                value = String.format("%.2f", lineSpacing),
+                title = lineHeightSpec.label,
+                value = String.format("%.${lineHeightSpec.precision}f", lineSpacing),
                 onClick = {
-                    lineSpacing = if (lineSpacing >= 2.0f) 1.0f else lineSpacing + 0.1f
+                    lineSpacing = nextReaderAppearanceValue(lineSpacing, lineHeightSpec)
                     dispatch(ReaderUiIntent.UpdateReaderTypography(
-                        fontSize = context?.fontSize ?: 18f,
+                        fontSize = context?.fontSize ?: fontSizeSpec.defaultValue.toFloat(),
                         lineSpacing = lineSpacing,
                         pageMargin = context?.pageMargin ?: 16f
                     ))
@@ -92,10 +131,11 @@ fun ReaderFontSettingsScreen(
             )
             FullSettingsDivider()
             FullSettingsRow(
-                title = "字距",
-                value = String.format("%.1f", letterSpacing),
+                title = letterSpacingSpec.label,
+                value = String.format("%.${letterSpacingSpec.precision}f", letterSpacing),
                 onClick = {
-                    letterSpacing = if (letterSpacing >= 2.0f) 0f else letterSpacing + 0.5f
+                    letterSpacing = nextReaderAppearanceValue(letterSpacing, letterSpacingSpec)
+                    dispatch(ReaderUiIntent.SetReaderChoice("letterSpacing", letterSpacing.toString()))
                 }
             )
         }
@@ -116,21 +156,13 @@ fun ReaderThemeSettingsScreen(
 ) {
     FullSettingsScaffold(title = "主题设置", onBack = onBack) {
         FullSettingsSection("阅读主题") {
-            val themes = listOf(
-                "paper" to "纸张",
-                "warm" to "暖色",
-                "green" to "护眼",
-                "blue" to "海蓝",
-                "paper-night" to "夜间",
-                "warm-night" to "暖夜"
-            )
-            val currentBase = (context?.themeId ?: "paper").removeSuffix("-night")
-            themes.forEach { (id, label) ->
+            val currentThemeId = context?.themeId ?: ReaderAppearanceSpecRegistry.defaults.dayThemeId
+            readerFullAppearanceThemes.forEach { theme ->
                 FullSettingsRow(
-                    title = label,
-                    value = if ((context?.themeId ?: "paper") == id) "已选" else "",
+                    title = theme.label,
+                    value = if (currentThemeId == theme.id) "已选" else "",
                     onClick = {
-                        dispatch(ReaderUiIntent.UpdateReaderTheme(themeId = id))
+                        dispatch(ReaderUiIntent.UpdateReaderTheme(themeId = theme.id))
                     }
                 )
             }
@@ -234,7 +266,8 @@ fun ReaderLayoutSettingsScreen(
                     pageMargin = if (pageMargin >= 32f) 8f else pageMargin + 4f
                     dispatch(ReaderUiIntent.UpdateReaderTypography(
                         fontSize = context?.fontSize ?: 18f,
-                        lineSpacing = context?.lineSpacing ?: 1.55f,
+                        lineSpacing = context?.lineSpacing
+                            ?: readerFullAppearanceStepper("lineHeight").defaultValue.toFloat(),
                         pageMargin = pageMargin
                     ))
                 }
