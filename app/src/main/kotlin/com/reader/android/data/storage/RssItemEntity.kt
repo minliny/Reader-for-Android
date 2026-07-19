@@ -8,11 +8,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 
 /**
- * P4: Room entity for cached RSS articles.
- *
- * Closes the `TODO(core-blocker)` gap in [com.reader.android.data.network.RoomSubscriptionRepository]
- * by giving the Host a local cache of parsed RSS items so `rss.list` /
- * `rss.item.read` work as a fallback until Core lands these protocol methods.
+ * Legacy Room entity retained so existing installations can migrate without
+ * destructive schema changes. Slice 11 production does not read or write it
+ * as a fallback for Core RSS state.
  *
  * The item GUID is the natural primary key (unique per article within a feed).
  * `feedUrl` links the item back to its parent [RssSubscriptionEntity].

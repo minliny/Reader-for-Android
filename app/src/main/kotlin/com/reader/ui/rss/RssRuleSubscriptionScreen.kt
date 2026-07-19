@@ -27,7 +27,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -40,6 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
+import com.reader.android.data.adapter.CoreSlice11Service
+import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
+import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
@@ -51,7 +58,39 @@ fun RssRuleSubscriptionScreen(
     onOpenDetail: () -> Unit,
     onCreate: () -> Unit
 ) {
-    val subscriptions = remember { rssRuleSubscriptions() }
+    var subscriptions by remember { mutableStateOf<List<RssRuleSubscriptionItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        when (val outcome = CoreSlice11Service(ReaderCoreSlice11CommandClient()).listRuleSubscriptions()) {
+            is Slice11Outcome.Failed -> {
+                subscriptions = emptyList()
+                error = outcome.failure.message
+                loading = false
+            }
+            is Slice11Outcome.Success -> {
+                subscriptions = outcome.value.map { sub ->
+                    RssRuleSubscriptionItem(
+                        name = sub.name.ifBlank { "未命名规则订阅" },
+                        type = when (sub.type) {
+                            1 -> "RSS 源"
+                            2 -> "替换规则"
+                            else -> "书源"
+                        },
+                        url = sub.displayUrl,
+                        update = if (sub.autoUpdate) "自动更新" else "手动",
+                        iconRes = when (sub.type) {
+                            1 -> R.drawable.reader_ic_rss
+                            2 -> R.drawable.reader_ic_replace
+                            else -> R.drawable.reader_ic_source_stack
+                        }
+                    )
+                }
+                error = null
+                loading = false
+            }
+        }
+    }
     RssRuleScaffold(
         title = "规则订阅",
         onBack = onBack,
@@ -60,8 +99,34 @@ fun RssRuleSubscriptionScreen(
         item {
             RssRuleModeRow()
         }
-        item {
-            RssRuleSubscriptionList(subscriptions = subscriptions, onOpenDetail = onOpenDetail)
+        when {
+            loading -> item {
+                Text(
+                    text = "正在从 Reader Core 加载规则订阅…",
+                    style = rssRuleMetaStyle(),
+                    color = readerExtraColors().muted,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            error != null -> item {
+                Text(
+                    text = error ?: "规则订阅加载失败",
+                    style = rssRuleMetaStyle(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            subscriptions.isEmpty() -> item {
+                Text(
+                    text = "暂无规则订阅",
+                    style = rssRuleMetaStyle(),
+                    color = readerExtraColors().muted,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            else -> item {
+                RssRuleSubscriptionList(subscriptions = subscriptions, onOpenDetail = onOpenDetail)
+            }
         }
         item {
             RssRuleActionRow(onOpenDetail = onOpenDetail, onCreate = onCreate)
@@ -807,12 +872,6 @@ private data class RssRuleEditField(
 )
 
 private enum class RssRuleTone { Good, Warn, Muted }
-
-private fun rssRuleSubscriptions() = listOf(
-    RssRuleSubscriptionItem("社区 RSS 源订阅", "RSS 源", "https://example.com/rss-source.json", "自动更新", R.drawable.reader_ic_rss),
-    RssRuleSubscriptionItem("默认书源订阅", "书源", "https://example.com/book-source.json", "手动", R.drawable.reader_ic_source_stack),
-    RssRuleSubscriptionItem("替换规则同步", "替换规则", "https://example.com/replace-rule.json", "自动更新", R.drawable.reader_ic_replace)
-)
 
 private fun rssRuleChangeEntries() = listOf(
     RssRuleChange("社区 RSS 源合集", "新增 · 12 个源", selected = true, status = "新增", tone = RssRuleTone.Good),

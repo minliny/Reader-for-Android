@@ -145,7 +145,7 @@ class MediaDownloadSavePathJvmTest {
     }
 
     @Test
-    fun `savePath with rootDir null keeps bytes in memory`() {
+    fun `savePath with rootDir null fails closed`() {
         val payload = "no-root".toByteArray()
         server.enqueue(
             MockResponse()
@@ -153,8 +153,8 @@ class MediaDownloadSavePathJvmTest {
                 .setBody(okio.Buffer().write(payload))
         )
 
-        // rootDir = null: executor must ignore savePath and keep
-        // alpha in-memory behavior (this is the JVM test path).
+        // A requested persistent destination without a configured Host root
+        // must not be acknowledged as a successful download.
         val executor = OkHttpMediaDownloadExecutor(
             client = OkHttpHostTransport.defaultClient(),
             rootDir = null
@@ -163,9 +163,71 @@ class MediaDownloadSavePathJvmTest {
             url = server.url("/no-root.bin").toString(),
             savePath = "downloads/ignored.bin"
         )
-        val result = executor.execute(request)
+        try {
+            executor.execute(request)
+            error("expected IOException for missing host storage root")
+        } catch (error: java.io.IOException) {
+            assertTrue(error.message!!.contains("storage root"))
+        }
+    }
+
+    @Test
+    fun `savePath sibling prefix collision is rejected`() {
+        val payload = "prefix-collision".toByteArray()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(okio.Buffer().write(payload))
+        )
+
+        val rootDir = tempFolder.newFolder("media")
+        val sibling = tempFolder.newFolder("media-escape")
+        val executor = OkHttpMediaDownloadExecutor(
+            client = OkHttpHostTransport.defaultClient(),
+            rootDir = rootDir
+        )
+
+        try {
+            executor.execute(
+                MediaDownloadRequest(
+                    url = server.url("/prefix.bin").toString(),
+                    savePath = "../${sibling.name}/escaped.bin"
+                )
+            )
+            error("expected SecurityException for sibling prefix collision")
+        } catch (error: SecurityException) {
+            assertTrue(error.message!!.contains("escape"))
+        }
+        assertFalse(File(sibling, "escaped.bin").exists())
+    }
+
+    @Test
+    fun `HTTP error body cannot overwrite canonical media asset`() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(404)
+                .setBody("not found")
+        )
+
+        val rootDir = tempFolder.newFolder("media-error")
+        val target = File(rootDir, "downloads/asset.bin")
+        target.parentFile.mkdirs()
+        target.writeText("previous-good-asset")
+        val executor = OkHttpMediaDownloadExecutor(
+            client = OkHttpHostTransport.defaultClient(),
+            rootDir = rootDir
+        )
+
+        val result = executor.execute(
+            MediaDownloadRequest(
+                url = server.url("/missing.bin").toString(),
+                savePath = "downloads/asset.bin"
+            )
+        )
+
+        assertEquals(404, result.statusCode)
         assertEquals(null, result.tempPath)
-        assertEquals(sha256Hex(payload), result.sha256)
+        assertEquals("previous-good-asset", target.readText())
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

@@ -24,8 +24,6 @@ import com.reader.android.data.repository.BookSourceRepository
 import com.reader.android.data.repository.DataStoreBookSourceRepository
 import com.reader.android.data.repository.FakeBookSourceRepository
 import com.reader.android.data.repository.ReadingProgressRepository
-import com.reader.android.data.repository.RoomSearchHistoryRepository
-import com.reader.android.data.repository.SearchHistoryRepository
 import com.reader.android.data.storage.AppDatabase
 import com.reader.android.data.storage.BookGroupDao
 import com.reader.android.data.storage.BookmarkDao
@@ -34,7 +32,6 @@ import com.reader.android.data.storage.ChapterCacheManager
 import com.reader.android.data.storage.RssItemDao
 import com.reader.android.data.storage.RssSubscriptionDao
 import com.reader.android.data.storage.ReadingProgressDao
-import com.reader.android.data.storage.SearchHistoryDao
 
 /**
  * P1 Runtime Wiring: Central dependency provider.
@@ -55,7 +52,6 @@ object AppProvider {
     private var _permissionRuntimeAdapter: PermissionRuntimeAdapter? = null
     private var _subscriptionRepo: SubscriptionRepository? = null
     private var _rssItemRepo: RssItemRepository? = null
-    private var _searchHistoryRepo: SearchHistoryRepository? = null
     private var _webDavClient: com.reader.android.data.adapter.AndroidWebDavClient? = null
     private var _backupRestoreManager: com.reader.android.data.adapter.BackupRestoreManager? = null
     private var _ttsEngine: AndroidTtsEngine? = null
@@ -261,12 +257,9 @@ object AppProvider {
         get() = requireDb().rssItemDao()
 
     /**
-     * P4: RSS subscription repository. On-device this is
-     * [RoomSubscriptionRepository] (wired in [init]); tests inject a fake
-     * via [initForSubscriptionRepository]. The repository persists
-     * subscription metadata only — article content is cached separately in
-     * [rssItemRepository] (a local fallback until Core lands `rss.list` /
-     * `rss.item.read`).
+     * Legacy RSS subscription cache retained for Room schema/migration and
+     * compatibility-handler tests. Slice 11 production UI reads Core through
+     * CoreSlice11Service and never treats this cache as business truth.
      */
     val subscriptionRepository: SubscriptionRepository
         get() = _subscriptionRepo ?: RoomSubscriptionRepository(rssSubscriptionDao).also {
@@ -278,12 +271,9 @@ object AppProvider {
     }
 
     /**
-     * P4: RSS item repository — local cache of parsed RSS articles so
-     * `rss.list` / `rss.item.read` work as a fallback until Core lands
-     * these protocol methods. On-device this is [RoomRssItemRepository];
-     * tests inject a fake via [initForRssItemRepository]. Populated by
-     * `rss.refresh`; read state (`isRead`) is owned here, not on the
-     * subscription entity.
+     * Legacy RSS item cache retained for Room schema/migration and old JVM
+     * handler tests. Core owns rss.subscription.items and scoped read state
+     * in production.
      */
     val rssItemRepository: RssItemRepository
         get() = _rssItemRepo ?: RoomRssItemRepository(rssItemDao).also {
@@ -292,25 +282,6 @@ object AppProvider {
 
     fun initForRssItemRepository(repo: RssItemRepository) {
         _rssItemRepo = repo
-    }
-
-    val searchHistoryDao: SearchHistoryDao
-        get() = requireDb().searchHistoryDao()
-
-    /**
-     * P2: Search history repository — local Room-backed fallback until Core
-     * lands `search.history.list` / `add` / `clear` protocol methods. On-device
-     * this is [RoomSearchHistoryRepository]; tests inject a fake via
-     * [initForSearchHistoryRepository]. Exposed through the Host capability
-     * surface (`search.history.*`) so the UI dispatches through HostAdapter.
-     */
-    val searchHistoryRepository: SearchHistoryRepository
-        get() = _searchHistoryRepo ?: RoomSearchHistoryRepository(searchHistoryDao).also {
-            _searchHistoryRepo = it
-        }
-
-    fun initForSearchHistoryRepository(repo: SearchHistoryRepository) {
-        _searchHistoryRepo = repo
     }
 
     // ── Repository ──
@@ -386,7 +357,6 @@ object AppProvider {
         _permissionRuntimeAdapter = null
         _subscriptionRepo = null
         _rssItemRepo = null
-        _searchHistoryRepo = null
         _readingProgressRepo = null
         _chapterCacheManager = null
         _bookGroupRepo = null

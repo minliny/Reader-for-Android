@@ -4,19 +4,10 @@ import com.reader.android.data.storage.RssItemDao
 import com.reader.android.data.storage.RssItemEntity
 
 /**
- * P4: Repository for cached RSS articles.
- *
- * Closes the `TODO(core-blocker)` gap in [RoomSubscriptionRepository]: Core
- * protocol does not yet expose `rss.list` / `rss.item.read`, so the Host
- * caches parsed feed items locally (populated by `rss.refresh`) and serves
- * `rss.list` / `rss.item.read` from this cache as a local fallback. Once
- * Core lands the protocol methods this repository remains the persistence
- * layer (Core dispatches through the Host either way).
- *
- * Persists article metadata + read state across process death via Room. The
- * `feedUrl` links each item back to its parent [RssSubscription]. Read state
- * is the field [RssSubscriptionEntity] deliberately does not own (per-item,
- * not per-feed).
+ * Legacy Room cache retained for database migration and compatibility tests.
+ * Slice 11 production uses Core `rss.subscription.items` and scoped
+ * `rss.item.read`; this repository must not be used as a business-data
+ * fallback when Core is unavailable.
  */
 interface RssItemRepository {
     suspend fun listByFeed(feedUrl: String): List<RssItem>
@@ -29,7 +20,7 @@ interface RssItemRepository {
 }
 
 /**
- * Room-backed [RssItemRepository]. Maps [RssItem] <-> [RssItemEntity].
+ * Room-backed legacy [RssItemRepository]. Maps [RssItem] <-> [RssItemEntity].
  */
 class RoomRssItemRepository(
     private val dao: RssItemDao

@@ -36,7 +36,9 @@ internal fun resolveSafely(root: File, path: String): File {
     }
     val resolved = File(root, path).canonicalFile
     val canonicalRoot = root.canonicalFile
-    if (!resolved.path.startsWith(canonicalRoot.path)) {
+    val rootPath = canonicalRoot.toPath()
+    val resolvedPath = resolved.toPath()
+    if (resolvedPath != rootPath && !resolvedPath.startsWith(rootPath)) {
         throw SecurityException("path escapes host sandbox: $path")
     }
     return resolved

@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
@@ -59,11 +60,21 @@ import android.content.Intent
 import android.net.Uri
 import com.reader.android.R
 import com.reader.android.data.adapter.AuthMethod
+import com.reader.android.data.adapter.ContentResolverLocalBookDocumentReader
+import com.reader.android.data.adapter.CoreLocalBookImportService
+import com.reader.android.data.adapter.CoreSlice11Service
+import com.reader.android.data.adapter.LocalBookImportOutcome
+import com.reader.android.data.adapter.LocalBookReaderAdmission
+import com.reader.android.data.adapter.LocalBookSelectedDocument
+import com.reader.android.data.adapter.ReaderCoreLocalBookCommandClient
+import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
+import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.android.data.adapter.WebDavCredential
 import com.reader.host.HostReply
 import com.reader.host.HostRequest
 import com.reader.ui.shell.WebDavSaveStatus
 import com.reader.ui.shell.WebDavTestStatus
+import org.json.JSONArray
 import org.json.JSONObject
 import com.reader.api.Book
 import com.reader.api.ReaderCoreClient
@@ -85,6 +96,9 @@ import com.reader.ui.bookshelf.BookshelfListModeRouteScreen
 import com.reader.ui.bookshelf.BookshelfBookMoreMenuRouteScreen
 import com.reader.ui.bookshelf.BookshelfSearchSettingsScreen
 import com.reader.ui.bookshelf.GroupManagementScreen
+import com.reader.ui.bookshelf.LocalImportPresentation
+import com.reader.ui.bookshelf.LocalImportPresentationItem
+import com.reader.ui.bookshelf.LocalImportPresentationTone
 import com.reader.ui.bookshelf.LocalImportScreen
 import com.reader.ui.demo.DemoRouteRegistry
 import com.reader.ui.demo.DemoRouteScreen
@@ -114,6 +128,7 @@ import com.reader.ui.source.SourceEditScreen
 import com.reader.ui.reading.ReaderSettingsScreen
 import com.reader.ui.reading.ReaderShellScreen
 import com.reader.ui.rss.RssReadRecordScreen
+import com.reader.ui.rss.RssArticle
 import com.reader.ui.rss.RssArticleHubScreen
 import com.reader.ui.rss.RssDetailScreen
 import com.reader.ui.rss.RssRemainingDemoRouteScreen
@@ -126,6 +141,7 @@ import com.reader.ui.rss.RssRuleSubscriptionScreen
 import com.reader.ui.rss.RssRuleSubscriptionTestScreen
 import com.reader.ui.rss.RssScreen
 import com.reader.ui.rss.RssTabState
+import com.reader.ui.rss.RssCoreLoadStatus
 import com.reader.ui.rss.RssTabTopBar
 import com.reader.ui.rss.RssSearchScreen
 import com.reader.ui.rss.RssSourceActionsScreen
@@ -164,6 +180,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -206,6 +223,86 @@ fun AppShell(
     val playbackDomainState by vm.readerPlaybackDomainState.collectAsStateWithLifecycle()
     val reducedMotion = state.reducedMotion
     var restoreUiState by remember { mutableStateOf(RestoreUiState()) }
+    val appContext = LocalContext.current
+    val localImportScope = rememberCoroutineScope()
+    val localImportService = remember(appContext) {
+        CoreLocalBookImportService(
+            documentReader = ContentResolverLocalBookDocumentReader(appContext.contentResolver),
+            core = ReaderCoreLocalBookCommandClient()
+        )
+    }
+    var selectedLocalImportDocuments by remember {
+        mutableStateOf<List<LocalBookSelectedDocument>>(emptyList())
+    }
+    var localImportPresentation by remember { mutableStateOf(LocalImportPresentation()) }
+
+    // `file.select` is Host-owned and returns opaque content URIs. Consume the
+    // result only while the local-import route is active, classify it with the
+    // five-format contract, and never write the URI into ReaderUiState.
+    val localImportHostResult = state.lastHostRequestResult
+    LaunchedEffect(localImportHostResult?.dispatchId, state.currentRoute) {
+        val result = localImportHostResult ?: return@LaunchedEffect
+        if (result.capability != "file.select" || state.currentRoute != ReaderRoute.LocalImport) {
+            return@LaunchedEffect
+        }
+        if (!result.success) {
+            selectedLocalImportDocuments = emptyList()
+            localImportPresentation = LocalImportPresentation(
+                message = result.errorMessage?.takeIf { it.isNotBlank() }
+                    ?: "文件选择失败，请重试",
+                items = emptyList(),
+                busy = false,
+                canImport = false
+            )
+            vm.dispatch(ReaderUiIntent.ClearHostRequestResult)
+            return@LaunchedEffect
+        }
+
+        val documents = runCatching {
+            val payload = JSONObject(result.resultJson ?: "{}")
+            if (!payload.optBoolean("selected", false)) return@runCatching emptyList()
+            val files = payload.optJSONArray("files") ?: JSONArray()
+            (0 until files.length()).map { index ->
+                val file = files.getJSONObject(index)
+                LocalBookSelectedDocument(
+                    uri = file.getString("path"),
+                    displayName = file.getString("name"),
+                    mimeType = file.optString("mimeType", "").takeIf { it.isNotBlank() },
+                    declaredSize = if (file.has("size") && !file.isNull("size")) {
+                        file.getLong("size")
+                    } else {
+                        null
+                    }
+                )
+            }
+        }.getOrElse {
+            emptyList()
+        }
+        val scan = localImportService.scan(documents)
+        selectedLocalImportDocuments = scan.filter { it.isCandidate }.map { it.document }
+        localImportPresentation = LocalImportPresentation(
+            message = when {
+                documents.isEmpty() -> "已取消文件选择"
+                selectedLocalImportDocuments.isEmpty() -> "没有可导入的受支持文件"
+                else -> "已选择 ${selectedLocalImportDocuments.size} 个文件，确认后交由 Reader Core 导入"
+            },
+            items = scan.map { item ->
+                LocalImportPresentationItem(
+                    title = item.document.displayName,
+                    detail = item.failure?.message ?: "${item.format!!.name} · Reader Core 解析与入库",
+                    status = if (item.isCandidate) "待导入" else "已拒绝",
+                    tone = if (item.isCandidate) {
+                        LocalImportPresentationTone.Good
+                    } else {
+                        LocalImportPresentationTone.Danger
+                    }
+                )
+            },
+            busy = false,
+            canImport = selectedLocalImportDocuments.isNotEmpty()
+        )
+        vm.dispatch(ReaderUiIntent.ClearHostRequestResult)
+    }
 
     // The auto-page contract is foreground-only. Lifecycle backgrounding is
     // routed directly to the paired Pilot executor; it never becomes a
@@ -677,6 +774,84 @@ fun AppShell(
 
         ReaderRoute.LocalImport -> {
             LocalImportScreen(
+                state = localImportPresentation,
+                onSelect = {
+                    localImportPresentation = localImportPresentation.copy(
+                        message = "等待系统文件选择器",
+                        busy = true,
+                        completed = false
+                    )
+                    vm.dispatch(
+                        ReaderUiIntent.DispatchHostRequest(
+                            capability = "file.select",
+                            paramsJson = JSONObject()
+                                .put("mimeTypes", JSONArray(CoreLocalBookImportService.supportedMimeTypes()))
+                                .put("allowsMultiple", true)
+                                .toString()
+                        )
+                    )
+                },
+                onImport = {
+                    if (selectedLocalImportDocuments.isEmpty() || localImportPresentation.busy) {
+                        return@LocalImportScreen
+                    }
+                    localImportPresentation = localImportPresentation.copy(
+                        message = "Reader Core 正在解析并写入本地书",
+                        busy = true,
+                        canImport = false,
+                        completed = false
+                    )
+                    localImportScope.launch {
+                        val results = selectedLocalImportDocuments.map { document ->
+                            document to localImportService.import(document)
+                        }
+                        val importedCount = results.count { it.second is LocalBookImportOutcome.Imported }
+                        val blockedReaderCount = results.count { (_, outcome) ->
+                            outcome is LocalBookImportOutcome.Imported &&
+                                outcome.value.readerAdmission is LocalBookReaderAdmission.Blocked
+                        }
+                        localImportPresentation = LocalImportPresentation(
+                            message = buildString {
+                                append("已导入 $importedCount/${results.size} 个文件")
+                                if (blockedReaderCount > 0) {
+                                    append("；$blockedReaderCount 个格式等待专属阅读器，未降级到文本阅读")
+                                }
+                            },
+                            items = results.map { (document, outcome) ->
+                                when (outcome) {
+                                    is LocalBookImportOutcome.Imported -> {
+                                        val imported = outcome.value
+                                        val blocked = imported.readerAdmission as? LocalBookReaderAdmission.Blocked
+                                        LocalImportPresentationItem(
+                                            title = imported.title,
+                                            detail = if (blocked == null) {
+                                                "${imported.format.name} · ${imported.chapterCount} 章 · ${imported.encoding}"
+                                            } else {
+                                                "${imported.format.name} · ${imported.chapterCount} 章 · ${blocked.failure.message}"
+                                            },
+                                            status = if (blocked == null) "已导入" else "已入库",
+                                            tone = if (blocked == null) {
+                                                LocalImportPresentationTone.Good
+                                            } else {
+                                                LocalImportPresentationTone.Warn
+                                            }
+                                        )
+                                    }
+                                    is LocalBookImportOutcome.Failed -> LocalImportPresentationItem(
+                                        title = document.displayName,
+                                        detail = outcome.failure.message,
+                                        status = "失败",
+                                        tone = LocalImportPresentationTone.Danger
+                                    )
+                                }
+                            },
+                            busy = false,
+                            canImport = false,
+                            completed = true
+                        )
+                        selectedLocalImportDocuments = emptyList()
+                    }
+                },
                 onBack = handleBack,
                 onDone = { vm.dispatch(ReaderUiIntent.PopRoute) }
             )
@@ -1416,12 +1591,92 @@ fun AppShell(
         is ReaderRoute.TabShell -> {
             val discoverState = remember { DiscoverTabState() }
             val rssState = remember { RssTabState() }
-            // P1-5: load real RSS subscriptions from RoomSubscriptionRepository
-            // so the RSS tab renders real data instead of rssDemoSources().
-            LaunchedEffect(Unit) {
-                if (com.reader.android.AppProvider.isInitialized) {
-                    runCatching {
-                        rssState.subscriptions = com.reader.android.AppProvider.subscriptionRepository.getAll()
+            // Slice 11: RSS subscriptions, unread state, and cached items are
+            // Core-owned. A failed Core call leaves one explicit error state;
+            // production never fills a partial page from Room/demo fixtures.
+            LaunchedEffect(rssState.reloadGeneration) {
+                val service = CoreSlice11Service(ReaderCoreSlice11CommandClient())
+                var subscriptionsOutcome = service.listRssSubscriptions()
+                if (subscriptionsOutcome is Slice11Outcome.Success && rssState.reloadGeneration > 0) {
+                    var refreshFailure: String? = null
+                    for (subscription in subscriptionsOutcome.value.filter { it.enabled }) {
+                        when (val refreshed = service.refreshRssSubscription(subscription.subscriptionId)) {
+                            is Slice11Outcome.Success -> Unit
+                            is Slice11Outcome.Failed -> {
+                                refreshFailure = refreshed.failure.message
+                                break
+                            }
+                        }
+                    }
+                    if (refreshFailure != null) {
+                        rssState.subscriptions = emptyList()
+                        rssState.ruleSubscriptions = emptyList()
+                        rssState.articles = emptyList()
+                        rssState.loadError = refreshFailure
+                        rssState.loadStatus = RssCoreLoadStatus.Failed
+                        return@LaunchedEffect
+                    }
+                    subscriptionsOutcome = service.listRssSubscriptions()
+                }
+
+                val ruleSubscriptionsOutcome = if (subscriptionsOutcome is Slice11Outcome.Success) {
+                    service.listRuleSubscriptions()
+                } else {
+                    null
+                }
+                if (ruleSubscriptionsOutcome is Slice11Outcome.Failed) {
+                    rssState.subscriptions = emptyList()
+                    rssState.ruleSubscriptions = emptyList()
+                    rssState.articles = emptyList()
+                    rssState.loadError = ruleSubscriptionsOutcome.failure.message
+                    rssState.loadStatus = RssCoreLoadStatus.Failed
+                    return@LaunchedEffect
+                }
+
+                when (subscriptionsOutcome) {
+                    is Slice11Outcome.Failed -> {
+                        rssState.subscriptions = emptyList()
+                        rssState.ruleSubscriptions = emptyList()
+                        rssState.articles = emptyList()
+                        rssState.loadError = subscriptionsOutcome.failure.message
+                        rssState.loadStatus = RssCoreLoadStatus.Failed
+                    }
+                    is Slice11Outcome.Success -> {
+                        val articles = mutableListOf<RssArticle>()
+                        var itemFailure: String? = null
+                        for (subscription in subscriptionsOutcome.value) {
+                            when (val items = service.listRssItems(subscription.subscriptionId, limit = 100)) {
+                                is Slice11Outcome.Failed -> {
+                                    itemFailure = items.failure.message
+                                    break
+                                }
+                                is Slice11Outcome.Success -> items.value.forEach { item ->
+                                    articles += RssArticle(
+                                        title = item.title,
+                                        source = subscription.title,
+                                        time = item.publishedAt ?: "",
+                                        group = "RSS",
+                                        desc = item.summary ?: "",
+                                        unread = !item.read,
+                                        starred = false
+                                    )
+                                }
+                            }
+                        }
+                        if (itemFailure != null) {
+                            rssState.subscriptions = emptyList()
+                            rssState.ruleSubscriptions = emptyList()
+                            rssState.articles = emptyList()
+                            rssState.loadError = itemFailure
+                            rssState.loadStatus = RssCoreLoadStatus.Failed
+                        } else {
+                            rssState.subscriptions = subscriptionsOutcome.value
+                            rssState.ruleSubscriptions =
+                                (ruleSubscriptionsOutcome as Slice11Outcome.Success).value
+                            rssState.articles = articles
+                            rssState.loadError = null
+                            rssState.loadStatus = RssCoreLoadStatus.Loaded
+                        }
                     }
                 }
             }

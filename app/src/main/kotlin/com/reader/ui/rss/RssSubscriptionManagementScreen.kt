@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
+import com.reader.android.data.adapter.CoreSlice11Service
+import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
+import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
@@ -64,7 +68,35 @@ fun RssSubscriptionManagementScreen(
     var activeFilter by remember { mutableStateOf("全部") }
     var autoRefresh by remember { mutableStateOf(true) }
     var unreadNotice by remember { mutableStateOf(true) }
-    val sources = remember { rssManagedSources() }
+    var sources by remember { mutableStateOf<List<RssManagedSource>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        when (val outcome = CoreSlice11Service(ReaderCoreSlice11CommandClient()).listRssSubscriptions()) {
+            is Slice11Outcome.Failed -> {
+                sources = emptyList()
+                error = outcome.failure.message
+                loading = false
+            }
+            is Slice11Outcome.Success -> {
+                sources = outcome.value.map { subscription ->
+                    RssManagedSource(
+                        name = subscription.title,
+                        group = "",
+                        unread = subscription.unreadCount,
+                        latest = subscription.lastFetchAt?.toString() ?: "未刷新",
+                        status = if (subscription.enabled) "正常" else "暂停",
+                        tone = if (subscription.enabled) RssManageTone.Good else RssManageTone.Muted,
+                        enabled = subscription.enabled,
+                        articleStyle = "列表",
+                        login = false
+                    )
+                }
+                error = null
+                loading = false
+            }
+        }
+    }
     val filteredSources = sources.filter { source ->
         when (activeFilter) {
             "全部" -> true
@@ -98,11 +130,37 @@ fun RssSubscriptionManagementScreen(
                         onFilter = { activeFilter = it }
                     )
                 }
-                item {
-                    RssManageSourceList(
-                        sources = filteredSources,
-                        onSourceActions = onSourceActions
-                    )
+                when {
+                    loading -> item {
+                        Text(
+                            text = "正在从 Reader Core 加载 RSS 订阅…",
+                            style = rssManageMetaStyle(),
+                            color = readerExtraColors().muted,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                    error != null -> item {
+                        Text(
+                            text = error ?: "RSS 订阅加载失败",
+                            style = rssManageMetaStyle(),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                    filteredSources.isEmpty() -> item {
+                        Text(
+                            text = "当前筛选下没有 RSS 订阅",
+                            style = rssManageMetaStyle(),
+                            color = readerExtraColors().muted,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                    else -> item {
+                        RssManageSourceList(
+                            sources = filteredSources,
+                            onSourceActions = onSourceActions
+                        )
+                    }
                 }
                 item {
                     RssManageBatchRow(
@@ -525,13 +583,6 @@ private data class RssManagedSource(
 )
 
 private enum class RssManageTone { Good, Warn, Muted }
-
-private fun rssManagedSources() = listOf(
-    RssManagedSource("GitHub Releases", "开源项目", 6, "10:18", "正常", RssManageTone.Good, true, "列表", false),
-    RssManagedSource("阅读器版本讨论", "社区", 12, "09:42", "有更新", RssManageTone.Good, true, "图文", false),
-    RssManagedSource("书源维护公告", "维护", 2, "昨天", "需登录", RssManageTone.Warn, true, "紧凑", true),
-    RssManagedSource("本地系统通知", "", 0, "周二", "暂停", RssManageTone.Muted, false, "列表", false)
-)
 
 private fun rssManageSectionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,

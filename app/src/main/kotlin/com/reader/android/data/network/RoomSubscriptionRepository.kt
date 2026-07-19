@@ -4,18 +4,9 @@ import com.reader.android.data.storage.RssSubscriptionDao
 import com.reader.android.data.storage.RssSubscriptionEntity
 
 /**
- * P4: Room-backed [SubscriptionRepository].
- *
- * Persists RSS subscriptions across process death via Room. The subscription
- * metadata (feed URL, title, last-updated timestamp, last seen item GUID) is
- * the only piece the host owns; the actual feed content (article list) is
- * DomainState owned by Core (`rss.list` / `rss.item.read`) and is fetched
- * on demand through the Core bridge.
- *
- * TODO(core-blocker): Core protocol does not yet expose `rss.list` /
- * `rss.item.read` / `rss.subscription.*` / `rss.source.*`. Until those
- * land, the UI can only manage subscription metadata here; fetching
- * articles requires the Core methods to be implemented.
+ * Legacy Room-backed [SubscriptionRepository] retained for schema migration
+ * and compatibility tests. Core `rss.subscription.*` is the sole production
+ * subscription owner; Core failure must never fall back to this table.
  */
 class RoomSubscriptionRepository(
     private val dao: RssSubscriptionDao

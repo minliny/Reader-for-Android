@@ -16,14 +16,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 // ════════════════════════════════════════════════════════════════════════════
-// P1-5: Source / RSS capability handlers.
+// Legacy source / RSS Host-handler compatibility harness.
 //
-// These handlers close the "data layer exists but UI uses demo data" gap by
-// exposing BookSourceRepository + SubscriptionRepository + RssParser through
-// the Host capability surface so the reducer/UI can dispatch real CRUD +
-// debug + import/export + RSS fetch operations through the same
-// `HostRequest → HostAdapter.dispatch → HostReply` round-trip used by TTS,
-// permission, notification, etc.
+// Slice 11 production does not register this set: source.*, rule-sub.*, and
+// rss.* are Core commands and Core is the sole business-data owner. These
+// pure-JVM handlers remain only for legacy capability-shape unit tests while
+// those tests are migrated to CoreSlice11Service.
 //
 // Core has landed `rss.list` and `rss.item.read` protocol methods (backed by
 // reader-storage). `RssListHandler` / `RssItemReadHandler` now delegate to
@@ -35,16 +33,13 @@ import org.json.JSONObject
 // feed XML and returns items, it is not a "list cached articles" operation,
 // so requests without `xml` always go to the Room cache.
 //
-// All handlers are pure-JVM (no Android Context required) so they can be
-// exercised in JVM unit tests with FakeBookSourceRepository /
-// FakeSubscriptionRepository. Production wires the real DataStore /
-// Room-backed implementations via AppProvider.
+// No production caller may use the repository fallback below. Core failure is
+// surfaced by CoreSlice11Service as CORE_UNAVAILABLE/CORE_REJECTED.
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
  * Bundles the repositories + parser that the source/RSS handlers need.
- * Created once in `ReaderCoreClient.buildHostRuntime` and injected into
- * each handler so the handler has no Android/Context dependency.
+ * Test-only repository bundle for the legacy compatibility harness.
  */
 class SourceRssContext(
     val bookSourceRepository: BookSourceRepository,
@@ -574,10 +569,8 @@ private fun rssItemToJson(item: RssItem): JSONObject = JSONObject()
     .put("guid", item.guid ?: JSONObject.NULL)
 
 /**
- * Convenience entry point: registers the full source/RSS capability set
- * onto a [HostRuntime] / [HostAdapter] chain. Called from
- * `ReaderCoreClient.buildHostRuntime` so production + JVM tests share the
- * same registration code (mirrors `HostFacade.registerHandlers`).
+ * Registers the legacy source/RSS compatibility set on a JVM test runtime.
+ * ReaderCoreClient intentionally calls this only when Android Context is null.
  */
 fun SourceRssContext.registerHandlers(runtime: HostRuntime): HostRuntime = runtime
     .register(SourceListHandler.CAPABILITY, SourceListHandler(this))
@@ -597,7 +590,6 @@ fun SourceRssContext.registerHandlers(runtime: HostRuntime): HostRuntime = runti
 
 /**
  * Builds a [SourceRssContext] backed by fake repositories for JVM tests.
- * Production wires the real DataStore + Room impls via AppProvider.
  */
 fun fakeSourceRssContext(
     bookSources: List<BookSource> = emptyList(),

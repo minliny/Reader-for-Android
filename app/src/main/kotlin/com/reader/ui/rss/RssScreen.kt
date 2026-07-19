@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.R
+import com.reader.android.data.adapter.CoreSlice11Service
+import com.reader.android.data.adapter.CoreRssSubscriptionSummary
+import com.reader.android.data.adapter.CoreRuleSubSummary
+import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
+import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.ui.shell.LibraryShellFrame
 import com.reader.ui.theme.ReaderShapes
 import com.reader.ui.theme.ReaderTextStyles
@@ -53,23 +59,36 @@ import com.reader.ui.theme.readerExtraColors
 import com.reader.ui.tokens.ReaderColorToken
 import com.reader.ui.tokens.ReaderTokenAdapter
 
+enum class RssCoreLoadStatus { Loading, Loaded, Failed }
+
 class RssTabState {
     var activeMode by mutableStateOf("源列表")
     var activeFilter by mutableStateOf("全部")
-    var refreshing by mutableStateOf(false)
-    // P1-5: real subscriptions loaded from RoomSubscriptionRepository via
-    // AppProvider. Falls back to demo data when AppProvider is not
-    // initialized (preview / JVM test).
-    var subscriptions by mutableStateOf<List<com.reader.android.data.network.RssSubscription>>(emptyList())
+    var loadStatus by mutableStateOf(RssCoreLoadStatus.Loading)
         internal set
-    val sources = rssDemoSources()
-    val articles = rssDemoArticles()
+    var loadError by mutableStateOf<String?>(null)
+        internal set
+    var reloadGeneration by mutableStateOf(0)
+        internal set
+    var subscriptions by mutableStateOf<List<CoreRssSubscriptionSummary>>(emptyList())
+        internal set
+    var ruleSubscriptions by mutableStateOf<List<CoreRuleSubSummary>>(emptyList())
+        internal set
+    var articles by mutableStateOf<List<RssArticle>>(emptyList())
+        internal set
 
-    /**
-     * Returns true if real subscription data has been loaded (de-demo'd).
-     * When true, the UI should render [subscriptions] instead of [sources].
-     */
-    fun hasRealSubscriptions(): Boolean = subscriptions.isNotEmpty()
+    val refreshing: Boolean get() = loadStatus == RssCoreLoadStatus.Loading
+    val sources: List<RssSource>
+        get() = subscriptions.map(::coreSubscriptionToRssSource)
+
+    fun requestReload() {
+        loadStatus = RssCoreLoadStatus.Loading
+        loadError = null
+        subscriptions = emptyList()
+        ruleSubscriptions = emptyList()
+        articles = emptyList()
+        reloadGeneration += 1
+    }
 }
 
 @Composable
@@ -123,16 +142,40 @@ fun RssScreen(
                 RssSummaryCard(
                     enabledCount = sources.count { it.enabled },
                     unreadCount = sources.sumOf { it.unread },
-                    lastRefresh = "10:18",
-                    onRefresh = { refreshing = true }
+                    lastRefresh = subscriptions.mapNotNull { it.lastFetchAt }.maxOrNull()?.toString() ?: "未刷新",
+                    onRefresh = { requestReload() }
                 )
             }
             if (refreshing) {
                 item { RssRefreshLine() }
             }
+            if (loadStatus == RssCoreLoadStatus.Failed) {
+                item {
+                    Text(
+                        text = loadError ?: "RSS 数据加载失败",
+                        style = rssMetaStyle(),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                    )
+                }
+            }
+            if (loadStatus == RssCoreLoadStatus.Loaded && sources.isEmpty()) {
+                item {
+                    Text(
+                        text = "暂无 RSS 订阅，请先添加订阅源",
+                        style = rssMetaStyle(),
+                        color = readerExtraColors().muted,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                    )
+                }
+            }
             when (activeMode) {
                 "规则订阅" -> {
-                    item { RssRuleSubscriptionList() }
+                    item { RssRuleSubscriptionList(ruleSubscriptions) }
                 }
                 "源列表" -> {
                     item {
@@ -186,12 +229,74 @@ fun RssArticleHubScreen(
     onOpenArticle: () -> Unit,
     onManageSources: () -> Unit
 ) {
-    val sources = remember { rssDemoSources() }
-    val articles = remember { rssDemoArticles() }
-    val visibleArticles = if (activeMode == "收藏") {
-        articles.filter { it.starred }
-    } else {
-        articles
+    var sources by remember { mutableStateOf<List<RssSource>>(emptyList()) }
+    var visibleArticles by remember { mutableStateOf<List<RssArticle>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(activeMode) {
+        val service = CoreSlice11Service(ReaderCoreSlice11CommandClient())
+        when (val subscriptions = service.listRssSubscriptions()) {
+            is Slice11Outcome.Failed -> {
+                sources = emptyList()
+                visibleArticles = emptyList()
+                error = subscriptions.failure.message
+                loading = false
+            }
+            is Slice11Outcome.Success -> {
+                val mappedSources = subscriptions.value.map(::coreSubscriptionToRssSource)
+                val mappedArticles = mutableListOf<RssArticle>()
+                var itemError: String? = null
+                if (activeMode == "收藏") {
+                    when (val favorites = service.listRssFavorites(limit = 200)) {
+                        is Slice11Outcome.Failed -> itemError = favorites.failure.message
+                        is Slice11Outcome.Success -> favorites.value.forEach { item ->
+                            val sourceTitle = subscriptions.value
+                                .firstOrNull { it.subscriptionId == item.subscriptionId }
+                                ?.title ?: "RSS"
+                            mappedArticles += RssArticle(
+                                title = item.title,
+                                source = sourceTitle,
+                                time = item.publishedAt ?: "",
+                                group = "RSS",
+                                desc = item.summary ?: "",
+                                unread = false,
+                                starred = true
+                            )
+                        }
+                    }
+                } else {
+                    for (subscription in subscriptions.value) {
+                        when (val items = service.listRssItems(subscription.subscriptionId, limit = 200)) {
+                            is Slice11Outcome.Failed -> {
+                                itemError = items.failure.message
+                                break
+                            }
+                            is Slice11Outcome.Success -> items.value.forEach { item ->
+                                mappedArticles += RssArticle(
+                                    title = item.title,
+                                    source = subscription.title,
+                                    time = item.publishedAt ?: "",
+                                    group = "RSS",
+                                    desc = item.summary ?: "",
+                                    unread = !item.read,
+                                    starred = false
+                                )
+                            }
+                        }
+                    }
+                }
+                if (itemError == null) {
+                    sources = mappedSources
+                    visibleArticles = mappedArticles
+                    error = null
+                } else {
+                    sources = emptyList()
+                    visibleArticles = emptyList()
+                    error = itemError
+                }
+                loading = false
+            }
+        }
     }
 
     LibraryShellFrame(
@@ -217,7 +322,29 @@ fun RssArticleHubScreen(
                         }
                     )
                 }
-                item { RssSourceStrip(sources = sources) }
+                if (loading) {
+                    item { RssRefreshLine() }
+                } else if (error != null) {
+                    item {
+                        Text(
+                            text = error ?: "RSS 数据加载失败",
+                            style = rssMetaStyle(),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                } else if (sources.isEmpty()) {
+                    item {
+                        Text(
+                            text = "暂无 RSS 订阅",
+                            style = rssMetaStyle(),
+                            color = readerExtraColors().muted,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                } else {
+                    item { RssSourceStrip(sources = sources) }
+                }
                 item {
                     RssArticleSection(
                         title = title,
@@ -297,7 +424,7 @@ fun RssTabTopBar(
             RssTopIconButton(
                 iconRes = R.drawable.reader_ic_refresh,
                 contentDescription = "刷新",
-                onClick = { state.refreshing = !state.refreshing }
+                onClick = state::requestReload
             )
             RssTopIconButton(
                 iconRes = R.drawable.reader_ic_nav_list,
@@ -708,15 +835,24 @@ private fun RssArticleList(articles: List<RssArticle>, onOpenArticle: () -> Unit
             .background(colors.surface.copy(alpha = 0.92f), ReaderShapes.md)
             .border(1.dp, extra.hairline.copy(alpha = 0.72f), ReaderShapes.md)
     ) {
-        articles.forEachIndexed { index, article ->
-            RssArticleRow(article = article, onClick = onOpenArticle)
-            if (index != articles.lastIndex) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(extra.hairline.copy(alpha = 0.48f))
-                )
+        if (articles.isEmpty()) {
+            Text(
+                text = "暂无条目",
+                style = rssMetaStyle(),
+                color = extra.muted,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)
+            )
+        } else {
+            articles.forEachIndexed { index, article ->
+                RssArticleRow(article = article, onClick = onOpenArticle)
+                if (index != articles.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(extra.hairline.copy(alpha = 0.48f))
+                    )
+                }
             }
         }
     }
@@ -778,7 +914,7 @@ private fun RssArticleRow(article: RssArticle, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RssRuleSubscriptionList() {
+private fun RssRuleSubscriptionList(subscriptions: List<CoreRuleSubSummary>) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     Column(
@@ -790,7 +926,10 @@ private fun RssRuleSubscriptionList() {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(text = "规则订阅", style = rssSectionTitleStyle(), color = colors.onBackground)
-        rssRuleSubscriptions().forEach { item ->
+        if (subscriptions.isEmpty()) {
+            Text(text = "暂无规则订阅", style = rssMetaStyle(), color = extra.muted)
+        }
+        subscriptions.forEach { item ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -802,7 +941,7 @@ private fun RssRuleSubscriptionList() {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(text = item.name, style = rssTitleStyle(), color = colors.onBackground, maxLines = 1)
                     Text(
-                        text = "${item.type} · ${item.update}",
+                        text = "类型 ${item.type} · ${if (item.autoUpdate) "自动更新" else "手动"}",
                         style = rssMetaStyle(),
                         color = extra.muted,
                         maxLines = 1,
@@ -941,34 +1080,22 @@ data class RssArticle(
     val starred: Boolean
 )
 
-private data class RssRuleSubscription(
-    val name: String,
-    val type: String,
-    val update: String
-)
-
 enum class RssTone { Good, Warn, Muted }
 
-private fun rssDemoSources() = listOf(
-    RssSource("GitHub Releases", "开源项目", 6, "10:18", "正常", RssTone.Good, true, 3, "列表", "默认 RSS", false),
-    RssSource("阅读器版本讨论", "社区", 12, "09:42", "有更新", RssTone.Good, true, 4, "图文", "自定义列表", false),
-    RssSource("书源维护公告", "维护", 2, "昨天", "需登录", RssTone.Warn, true, 2, "紧凑", "正文规则", true),
-    RssSource("本地系统通知", "系统", 0, "周二", "暂停", RssTone.Muted, false, 1, "列表", "单 URL", false)
-)
-
-private fun rssDemoArticles() = listOf(
-    RssArticle("Reader UI 前端输入件更新说明", "GitHub Releases", "10:18", "开源项目", "新增发现页状态路由、阅读控制层响应式约束，并补充 RSS 页面结构规划。", true, true),
-    RssArticle("订阅源规则解析失败排查", "书源维护公告", "09:52", "维护", "部分订阅源返回 HTML 而不是 XML，已建议检查 Cookie、登录态和正文提取规则。", true, false),
-    RssArticle("Legado 订阅源配置经验整理", "阅读器版本讨论", "昨天", "社区", "社区整理了单 URL 源、分类入口、文章样式和 WebView 正文处理的常见配置方式。", true, false),
-    RssArticle("本地导入完成解析", "本地系统通知", "周二", "系统", "本地 OPML 导入完成，4 个订阅源已启用，1 个订阅源需要补全图标。", false, false),
-    RssArticle("阅读器路线图讨论摘要", "阅读器版本讨论", "周一", "社区", "围绕 RSS 收藏、源分组、正文阅读和同步备份的交互关系做了讨论。", false, true)
-)
-
-private fun rssRuleSubscriptions() = listOf(
-    RssRuleSubscription("社区 RSS 源订阅", "RSS 源", "自动更新"),
-    RssRuleSubscription("默认书源订阅", "书源", "手动"),
-    RssRuleSubscription("替换规则同步", "替换规则", "自动更新")
-)
+private fun coreSubscriptionToRssSource(subscription: CoreRssSubscriptionSummary): RssSource =
+    RssSource(
+        name = subscription.title,
+        group = "未分组",
+        unread = subscription.unreadCount,
+        latest = subscription.lastFetchAt?.toString() ?: "未刷新",
+        status = if (subscription.enabled) "正常" else "暂停",
+        tone = if (subscription.enabled) RssTone.Good else RssTone.Muted,
+        enabled = subscription.enabled,
+        categories = 0,
+        articleStyle = "列表",
+        rule = "Core RSS",
+        login = false
+    )
 
 private fun rssSectionTitleStyle() = TextStyle(
     fontFamily = FontFamily.Default,

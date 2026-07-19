@@ -50,7 +50,6 @@ import com.reader.host.SharedPreferencesHostPersistence
 import com.reader.host.SearchHistoryContext
 import com.reader.host.SourceGetVariableHandler
 import com.reader.host.SourceLoginHeaderMapHandler
-import com.reader.host.SourceRssContext
 import com.reader.host.SourceSetVariableHandler
 import com.reader.host.SourceVariableStore
 import com.reader.host.SystemInfoHandler
@@ -326,21 +325,17 @@ class ReaderCoreClient private constructor(
                 .register(LogEmitHandler.CAPABILITY, LogEmitHandler(logger))
                 .register(TimeNowHandler.CAPABILITY, TimeNowHandler())
                 .register(SystemInfoHandler.CAPABILITY, SystemInfoHandler())
-            // ── P1-5: Source / RSS capability handlers ──
-            // Pure-JVM (no Android Context) so registered on both paths
-            // (JVM tests + production). Production wires the real DataStore +
-            // Room-backed repositories via AppProvider; JVM tests pass a fake
-            // SourceRssContext via buildHostRuntimeForTest.
-            val sourceRssContext = if (context != null) {
-                SourceRssContext(
-                    bookSourceRepository = AppProvider.bookSourceRepository,
-                    subscriptionRepository = AppProvider.subscriptionRepository,
-                    rssItemRepository = AppProvider.rssItemRepository
-                )
-            } else {
-                com.reader.host.fakeSourceRssContext()
+            // ── Slice 11: Source / RSS single-owner boundary ──
+            // `source.*`, `rule-sub.*`, and `rss.*` are Core commands, not
+            // production Host capabilities. Register the old in-memory fake
+            // only on the pure-JVM registry path so legacy handler unit tests
+            // remain deterministic. Production UI calls CoreSlice11Service
+            // and must fail closed when Core is unavailable; it never falls
+            // back to Android DataStore/Room business data.
+            if (context == null) {
+                hostRuntimeBuilder = com.reader.host.fakeSourceRssContext()
+                    .registerCapabilityHandlers(hostRuntimeBuilder)
             }
-            hostRuntimeBuilder = sourceRssContext.registerCapabilityHandlers(hostRuntimeBuilder)
             // ── P1-6: WebDAV / backup capability handlers ──
             // Pure-JVM (no Android Context) so registered on both paths
             // (JVM tests + production). Production wires the real
@@ -360,15 +355,12 @@ class ReaderCoreClient private constructor(
                 com.reader.host.fakeWebDavContext()
             }
             hostRuntimeBuilder = webDavContext.registerCapabilityHandlers(hostRuntimeBuilder)
-            // ── P2: Search history capability handlers ──
-            // Pure-JVM (no Android Context) so registered on both paths
-            // (JVM tests + production). Production wires the Room-backed
-            // [com.reader.android.data.repository.RoomSearchHistoryRepository]
-            // via AppProvider; JVM tests get a [com.reader.host.fakeSearchHistoryContext]
-            // backed by FakeSearchHistoryRepository. Local fallback until Core
-            // lands `search.history.*` protocol methods.
+            // ── Slice 10: Core-owned search history ──
+            // Production never falls back to Room/DataStore: if Core is not
+            // available, handlers return CORE_UNAVAILABLE and preserve the
+            // single business-data source of truth.
             val searchHistoryContext = if (context != null) {
-                SearchHistoryContext(repository = AppProvider.searchHistoryRepository)
+                SearchHistoryContext(core = com.reader.host.ReaderCoreSearchHistoryGateway())
             } else {
                 com.reader.host.fakeSearchHistoryContext()
             }

@@ -122,24 +122,31 @@ fun GroupManagementScreen(
 
 @Composable
 fun LocalImportScreen(
+    state: LocalImportPresentation,
+    onSelect: () -> Unit,
+    onImport: () -> Unit,
     onBack: () -> Unit,
     onDone: () -> Unit
 ) {
-    val imports = remember { localImportItems() }
     BookshelfManagementScaffold(
         title = "本地书导入",
         onBack = onBack,
         bottom = {
             BookshelfManagementBottomActions(
                 secondary = "继续选择",
-                primary = "完成导入",
-                onSecondary = {},
-                onPrimary = onDone
+                primary = if (state.completed) "完成" else "完成导入",
+                primaryEnabled = state.completed || state.canImport,
+                onSecondary = onSelect,
+                onPrimary = if (state.completed) onDone else onImport
             )
         }
     ) {
         item {
-            LocalImportEntryCard()
+            LocalImportEntryCard(
+                message = state.message,
+                busy = state.busy,
+                onSelect = onSelect
+            )
         }
         item {
             BookshelfManagementList(title = "导入设置") {
@@ -159,10 +166,40 @@ fun LocalImportScreen(
             }
         }
         item {
-            BookshelfImportResultList(imports = imports)
+            BookshelfImportResultList(
+                imports = state.items.map { item ->
+                    LocalImportItem(
+                        title = item.title,
+                        meta = item.detail,
+                        state = item.status,
+                        tone = when (item.tone) {
+                            LocalImportPresentationTone.Good -> BookshelfImportTone.Good
+                            LocalImportPresentationTone.Warn -> BookshelfImportTone.Warn
+                            LocalImportPresentationTone.Danger -> BookshelfImportTone.Danger
+                        }
+                    )
+                }
+            )
         }
     }
 }
+
+data class LocalImportPresentation(
+    val message: String = "支持 TXT、EPUB、PDF、MOBI、UMD；解析与入库由 Reader Core 完成",
+    val items: List<LocalImportPresentationItem> = emptyList(),
+    val busy: Boolean = false,
+    val canImport: Boolean = false,
+    val completed: Boolean = false
+)
+
+data class LocalImportPresentationItem(
+    val title: String,
+    val detail: String,
+    val status: String,
+    val tone: LocalImportPresentationTone
+)
+
+enum class LocalImportPresentationTone { Good, Warn, Danger }
 
 @Composable
 fun BookshelfSearchSettingsScreen(
@@ -483,7 +520,11 @@ private fun BookshelfAssignmentList(assignments: List<BookshelfAssignmentItem>) 
 }
 
 @Composable
-private fun LocalImportEntryCard() {
+private fun LocalImportEntryCard(
+    message: String,
+    busy: Boolean,
+    onSelect: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val extra = readerExtraColors()
     Row(
@@ -492,6 +533,7 @@ private fun LocalImportEntryCard() {
             .defaultMinSize(minHeight = 76.dp)
             .background(colors.surface.copy(alpha = 0.92f), ReaderShapes.md)
             .border(1.dp, extra.hairline.copy(alpha = 0.72f), ReaderShapes.md)
+            .clickable(enabled = !busy, onClick = onSelect)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -506,14 +548,14 @@ private fun LocalImportEntryCard() {
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "选择后识别分组并确认导入",
+                text = message,
                 style = bookshelfManagementMetaStyle(),
                 color = extra.muted,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        BookshelfSmallPill(label = "选择")
+        BookshelfSmallPill(label = if (busy) "处理中" else "选择")
     }
 }
 
@@ -781,6 +823,7 @@ private fun BookshelfManagementBottomActions(
     secondary: String,
     primary: String,
     dangerPrimary: Boolean = false,
+    primaryEnabled: Boolean = true,
     onSecondary: () -> Unit,
     onPrimary: () -> Unit
 ) {
@@ -812,6 +855,7 @@ private fun BookshelfManagementBottomActions(
                 label = primary,
                 primary = true,
                 danger = dangerPrimary,
+                enabled = primaryEnabled,
                 onClick = onPrimary,
                 modifier = Modifier.weight(1f)
             )
@@ -824,6 +868,7 @@ private fun BookshelfBottomButton(
     label: String,
     primary: Boolean,
     danger: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -843,7 +888,7 @@ private fun BookshelfBottomButton(
             .defaultMinSize(minHeight = 44.dp)
             .background(background, ReaderShapes.pill)
             .border(1.dp, if (primary) background else extra.hairline, ReaderShapes.pill)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1054,12 +1099,6 @@ private fun bookshelfAssignments() = listOf(
     BookshelfAssignmentItem("诡秘之主", "爱潜水的乌贼 · 当前分组", "追更"),
     BookshelfAssignmentItem("明朝那些事儿", "当年明月 · 当前分组", "本地书"),
     BookshelfAssignmentItem("三体", "刘慈欣 · 当前分组", "资料")
-)
-
-private fun localImportItems() = listOf(
-    LocalImportItem("雨夜.epub", "作者已识别 · 加入默认分组", "可导入", BookshelfImportTone.Good),
-    LocalImportItem("旧书扫描.txt", "编码 UTF-8 · 章节识别中", "72%", BookshelfImportTone.Warn),
-    LocalImportItem("缺失章节.mobi", "格式不支持 · 可移除后重选", "失败", BookshelfImportTone.Danger)
 )
 
 private fun bookshelfSectionStyle() = TextStyle(

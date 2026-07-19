@@ -9,7 +9,12 @@ data class LocalBookSource(
 )
 
 enum class LocalBookFormat {
-    TXT, EPUB, UNKNOWN
+    TXT,
+    EPUB,
+    PDF,
+    MOBI,
+    UMD,
+    UNKNOWN
 }
 
 data class LocalBookMetadata(

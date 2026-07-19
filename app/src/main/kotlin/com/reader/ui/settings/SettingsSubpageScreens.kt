@@ -45,6 +45,9 @@ import com.reader.ui.tokens.ReaderTypeToken
 import com.reader.android.AppProvider
 import com.reader.android.R
 import com.reader.android.data.adapter.AuthMethod
+import com.reader.android.data.adapter.CoreSlice11Service
+import com.reader.android.data.adapter.ReaderCoreSlice11CommandClient
+import com.reader.android.data.adapter.Slice11Outcome
 import com.reader.android.data.adapter.WebDavCredential
 import com.reader.ui.shell.PermissionStatus
 import com.reader.ui.shell.SettingsShellFrame
@@ -415,15 +418,40 @@ fun SourceManagementScreen(
     batchEnabled: Boolean = true,
     onBatchEnabledChange: (Boolean) -> Unit = {}
 ) {
-    val sources = remember { settingsSourceItems() }
+    var sources by remember { mutableStateOf<List<SettingsSourceItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        when (val outcome = CoreSlice11Service(ReaderCoreSlice11CommandClient()).listSources()) {
+            is Slice11Outcome.Failed -> {
+                sources = emptyList()
+                error = outcome.failure.message
+                loading = false
+            }
+            is Slice11Outcome.Success -> {
+                sources = outcome.value.map { source ->
+                    SettingsSourceItem(
+                        id = source.sourceId,
+                        title = source.name,
+                        meta = source.displayOrigin,
+                        status = if (source.enabled) "已启用" else "已停用",
+                        tone = if (source.enabled) SettingsSubTone.Good else SettingsSubTone.Muted,
+                        enabled = source.enabled
+                    )
+                }
+                error = null
+                loading = false
+            }
+        }
+    }
     SettingsSubpageScaffold(title = "书源管理", onBack = onBack) {
         item {
             SettingsMetricGrid(
                 metrics = listOf(
-                    SettingsMetric(R.drawable.reader_ic_source, "个书源", "12"),
-                    SettingsMetric(R.drawable.reader_ic_check, "个启用", "8"),
-                    SettingsMetric(R.drawable.reader_ic_warning, "个异常", "4"),
-                    SettingsMetric(R.drawable.reader_ic_clock, "刚刚检测", "10:30")
+                    SettingsMetric(R.drawable.reader_ic_source, "个书源", sources.size.toString()),
+                    SettingsMetric(R.drawable.reader_ic_check, "个启用", sources.count { it.enabled }.toString()),
+                    SettingsMetric(R.drawable.reader_ic_warning, "个异常", "—"),
+                    SettingsMetric(R.drawable.reader_ic_clock, "检测状态", "未运行")
                 )
             )
         }
@@ -471,7 +499,33 @@ fun SourceManagementScreen(
                 )
             }
         }
-        item { SettingsSourceList(sources = sources, onToggleSource = onToggleSource) }
+        when {
+            loading -> item {
+                Text(
+                    text = "正在从 Reader Core 加载书源…",
+                    style = settingsSubMetaStyle(),
+                    color = readerExtraColors().muted,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            error != null -> item {
+                Text(
+                    text = error ?: "书源加载失败",
+                    style = settingsSubMetaStyle(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            sources.isEmpty() -> item {
+                Text(
+                    text = "暂无书源，请先导入",
+                    style = settingsSubMetaStyle(),
+                    color = readerExtraColors().muted,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+            else -> item { SettingsSourceList(sources = sources, onToggleSource = onToggleSource) }
+        }
         item {
             SettingsSubFloatingAction(
                 iconRes = R.drawable.reader_ic_add,
@@ -896,7 +950,7 @@ private fun SettingsChipRow(items: List<String>, active: String) {
 @Composable
 private fun SettingsSourceList(
     sources: List<SettingsSourceItem>,
-    onToggleSource: (String, Boolean) -> Unit = { _, _ -> }
+    @Suppress("UNUSED_PARAMETER") onToggleSource: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     SettingsSubSection(title = "书源列表") {
         sources.forEachIndexed { index, source ->
@@ -908,7 +962,9 @@ private fun SettingsSourceList(
                 side = {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         SettingsSubBadge(source.status, source.tone)
-                        SettingsSubSwitch(source.enabled) { onToggleSource(source.id, !source.enabled) }
+                        // Core exposes source import/list/delete/export but no
+                        // frozen partial enabled-state mutation. Keep this row
+                        // read-only instead of mutating an Android shadow copy.
                     }
                 }
             )
@@ -1004,13 +1060,6 @@ private fun settingsBackupItems() = listOf(
     SettingsBackupItem(R.drawable.reader_ic_folder, "本地", "手动备份", "2026-06-23 10:30", "完整备份", "12.8 MB", "本机", SettingsSubTone.Info),
     SettingsBackupItem(R.drawable.reader_ic_sync, "WebDAV", "夜间备份", "2026-06-21 22:30", "书架与设置", "8.6 MB", "局部", SettingsSubTone.Warn),
     SettingsBackupItem(R.drawable.reader_ic_folder, "本地", "阅读进度快照", "2026-06-20 09:40", "阅读进度", "2.4 MB", "进度", SettingsSubTone.Muted)
-)
-
-private fun settingsSourceItems() = listOf(
-    SettingsSourceItem(id = "src-1", title = "起点中文网", meta = "qidian.com · 起点导入", status = "可用", tone = SettingsSubTone.Good, enabled = true),
-    SettingsSourceItem(id = "src-2", title = "笔趣阁", meta = "biquge.example · 玄幻书源", status = "异常", tone = SettingsSubTone.Warn, enabled = true),
-    SettingsSourceItem(id = "src-3", title = "本地导入源", meta = "本地文件导入 · 自定义", status = "未检测", tone = SettingsSubTone.Muted, enabled = false),
-    SettingsSourceItem(id = "src-4", title = "测试书源", meta = "test.example · 测试书源", status = "可用", tone = SettingsSubTone.Good, enabled = true)
 )
 
 private fun settingsSubSectionStyle() = TextStyle(

@@ -9,9 +9,8 @@ import org.junit.Test
  * JVM proof for the P2 search history capability handlers.
  *
  * Verifies the `search.history.list` / `add` / `clear` round-trip against
- * a [fakeSearchHistoryContext] (FakeSearchHistoryRepository). Production
- * wires the same handlers over the Room-backed RoomSearchHistoryRepository,
- * so a regression in the handler logic fails this test.
+ * a Core-shaped in-memory gateway. Production uses the real Reader Core
+ * gateway and has no Room/DataStore fallback.
  *
  * Capability coverage:
  *  - search.history.list (empty + populated)
@@ -87,7 +86,7 @@ class SearchHistoryCapabilityHandlersJvmTest {
         val reply = SearchHistoryAddHandler(ctx).handle(req(SearchHistoryAddHandler.CAPABILITY,
             JSONObject().put("keyword", "   ")))
         assertTrue(reply.isError())
-        assertEquals("INTERNAL", (reply as HostReply.Error).code())
+        assertEquals("INVALID_PARAMS", (reply as HostReply.Error).code())
     }
 
     // ── search.history.clear ─────────────────────────────────────────────
@@ -128,5 +127,24 @@ class SearchHistoryCapabilityHandlersJvmTest {
         expected.forEach { cap ->
             assertTrue("$cap must be registered", adapter.isRegistered(cap))
         }
+    }
+
+    @Test
+    fun `Core failure is visible and never acknowledged by a local fallback`() {
+        val ctx = SearchHistoryContext(
+            SearchHistoryCoreGateway { _, _ -> error("Core offline") }
+        )
+
+        val reply = SearchHistoryAddHandler(ctx).handle(
+            req(
+                SearchHistoryAddHandler.CAPABILITY,
+                JSONObject().put("keyword", "must-not-be-stored-locally")
+            )
+        )
+
+        assertTrue(reply.isError())
+        reply as HostReply.Error
+        assertEquals("CORE_UNAVAILABLE", reply.code())
+        assertTrue(reply.retryable())
     }
 }

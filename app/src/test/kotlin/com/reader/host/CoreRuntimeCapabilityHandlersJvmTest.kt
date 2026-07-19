@@ -5,7 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 /**
  * JVM unit tests for the Slice B Core Runtime capability handlers.
@@ -16,6 +18,9 @@ import org.junit.Test
  * are NOT touched — those are proven at the instrumented/App tier.
  */
 class CoreRuntimeCapabilityHandlersJvmTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
 
     // ── file.read / file.write / file.delete ──────────────────────────────
 
@@ -143,6 +148,20 @@ class CoreRuntimeCapabilityHandlersJvmTest {
         )
         assertTrue("must error", reply.isError())
         assertEquals("SECURITY", (reply as HostReply.Error).code())
+    }
+
+    @Test
+    fun `filesystem root prefix collision is rejected`() {
+        val root = tempFolder.newFolder("sandbox")
+        val sibling = tempFolder.newFolder("sandbox-escape")
+        val relativeEscape = "../${sibling.name}/secret.txt"
+
+        try {
+            resolveSafely(root, relativeEscape)
+            error("expected SecurityException for sibling prefix collision")
+        } catch (error: SecurityException) {
+            assertTrue(error.message!!.contains("escape"))
+        }
     }
 
     @Test

@@ -396,13 +396,48 @@ class OkHttpMediaDownloadExecutor(
             // traversal can't escape). On success, tempPath is the
             // savePath string so Core can reference it; on I/O failure we
             // throw IOException (mapped to INTERNAL by the handler).
-            val tempPath: String? = request.savePath?.takeIf { it.isNotBlank() && rootDir != null }?.let { sp ->
-                val target = resolveSafely(rootDir!!, sp)
-                target.parentFile?.mkdirs()
-                if (!target.parentFile.exists()) {
+            val requestedSavePath = request.savePath?.takeIf { it.isNotBlank() }
+            if (requestedSavePath != null && rootDir == null) {
+                throw IOException("media.download savePath requires a configured host storage root")
+            }
+            val tempPath: String? = requestedSavePath?.let { sp ->
+                // A non-success response is still returned to Core for policy
+                // handling, but its error body must never overwrite the
+                // requested offline asset.
+                if (resp.code !in 200..299) return@let null
+
+                val target = resolveSafely(requireNotNull(rootDir), sp)
+                val parent = target.parentFile
+                    ?: throw IOException("savePath has no parent: $sp")
+                if (!parent.exists() && !parent.mkdirs()) {
                     throw IOException("cannot create parent dir for savePath: $sp")
                 }
-                target.writeBytes(bytes)
+                if (!parent.isDirectory) {
+                    throw IOException("savePath parent is not a directory: $sp")
+                }
+
+                // Write to a sibling temporary file first. A cancelled/failed
+                // write therefore leaves the previous canonical asset intact.
+                val staging = java.io.File.createTempFile(".reader-media-", ".partial", parent)
+                try {
+                    staging.outputStream().use { it.write(bytes) }
+                    try {
+                        java.nio.file.Files.move(
+                            staging.toPath(),
+                            target.toPath(),
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                        )
+                    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                        java.nio.file.Files.move(
+                            staging.toPath(),
+                            target.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                        )
+                    }
+                } finally {
+                    if (staging.exists()) staging.delete()
+                }
                 sp
             }
 
@@ -430,7 +465,9 @@ class OkHttpMediaDownloadExecutor(
         val resolved = java.io.File(root, path)
         val rootCanonical = root.canonicalFile
         val resolvedCanonical = resolved.canonicalFile
-        if (!resolvedCanonical.path.startsWith(rootCanonical.path)) {
+        val rootPath = rootCanonical.toPath()
+        val resolvedPath = resolvedCanonical.toPath()
+        if (resolvedPath != rootPath && !resolvedPath.startsWith(rootPath)) {
             throw SecurityException("savePath escapes root: $path")
         }
         return resolvedCanonical
