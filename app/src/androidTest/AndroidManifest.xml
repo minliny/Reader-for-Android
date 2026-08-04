@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <!--
-            WebViewHostActivity moved to main src/manifest so
-            ActivityScenario.launch resolves it to the target process.
-        -->
-    </application>
-</manifest>
