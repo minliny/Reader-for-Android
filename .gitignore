@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Gradle
+.gradle/
+.kotlin/
+build/
+*/build/
+
+# IDE
+*.iml
+.idea/
+
+# Android
+local.properties
+
+# Test artifacts
+**/test-results/
+**/test-output/
+
+# Claude cron runtime
+.claude/scheduled_tasks.*
+
+# Misc
+*.log
+*.tmp
