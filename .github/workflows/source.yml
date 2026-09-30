@@ -1,0 +1,39 @@
+name: Android Source Checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Tracked JSON fixtures
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          paths = subprocess.check_output(['git', 'ls-files', '-z', '*.json']).decode().split('\0')
+          count = 0
+          for path in filter(None, paths):
+              json.loads(Path(path).read_text())
+              count += 1
+          assert count > 0, 'Expected checked-in design fixtures'
+          print(f'PASS: {count} JSON fixtures; no Android compile or APK claim')
+          PY
+      - uses: ./.github/actions/source-hygiene
+        if: always()
+        with:
+          directory: .
+      - name: Readiness boundary
+        run: echo 'Source checks only. Gradle project, Kotlin tests, Core binding and APK validation remain OPEN.' >> "$GITHUB_STEP_SUMMARY"
