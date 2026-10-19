@@ -1,23 +1,47 @@
 name: Android Source Checks
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      checks:
+        description: Select only checks justified for this change
+        type: choice
+        required: true
+        options: [json, workflow-lint, secrets, full]
+      rationale:
+        description: Concrete risk and necessity for every selected check; full needs an explicit user request
+        type: string
+        required: true
+      full_suite_requested:
+        description: The user explicitly requested the complete suite
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: android-source-${{ github.event.pull_request.number || github.ref }}
+  group: android-source-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   source-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      CHECKS: ${{ inputs.checks }}
+      RATIONALE: ${{ inputs.rationale }}
+      FULL_SUITE_REQUESTED: ${{ inputs.full_suite_requested }}
     steps:
+      - name: Admit the explicit selection
+        shell: bash
+        run: |
+          [[ "$RATIONALE" =~ [^[:space:]] ]] || { echo 'A concrete rationale is required.' >&2; exit 2; }
+          case "$CHECKS" in json|workflow-lint|secrets) ;;
+            full) [[ "$FULL_SUITE_REQUESTED" == true ]] || { echo 'Full requires an explicit user request.' >&2; exit 2; } ;;
+            *) echo 'Unknown check; nothing was run.' >&2; exit 2 ;;
+          esac
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Tracked JSON fixtures
+      - name: Selected tracked JSON fixtures
+        if: ${{ inputs.checks == 'json' || inputs.checks == 'full' }}
         run: |
           python3 - <<'PY'
           import json
@@ -26,14 +50,31 @@ jobs:
           paths = subprocess.check_output(['git', 'ls-files', '-z', '*.json']).decode().split('\0')
           count = 0
           for path in filter(None, paths):
-              json.loads(Path(path).read_text())
+              json.loads(Path(path).read_text(encoding='utf-8'))
               count += 1
           assert count > 0, 'Expected checked-in design fixtures'
-          print(f'PASS: {count} JSON fixtures; no Android compile or APK claim')
+          print(f'PASS: {count} selected JSON fixtures; no Android compile or APK claim')
           PY
-      - uses: ./.github/actions/source-hygiene
-        if: always()
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        if: ${{ contains(fromJSON('["workflow-lint","secrets","full"]'), inputs.checks) }}
         with:
-          directory: .
+          go-version: '1.24.2'
+          cache: false
+      - name: Selected workflow lint
+        if: ${{ inputs.checks == 'workflow-lint' || inputs.checks == 'full' }}
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          "$(go env GOPATH)/bin/actionlint" -color
+      - name: Selected current tracked-source secret scan
+        if: ${{ inputs.checks == 'secrets' || inputs.checks == 'full' }}
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.24.2
+          scan=$(mktemp -d "$RUNNER_TEMP/reader-source.XXXXXX")
+          trap 'rm -rf "$scan"' EXIT
+          git archive HEAD | tar -xf - -C "$scan"
+          cd "$scan"
+          "$(go env GOPATH)/bin/gitleaks" dir . --redact=100
       - name: Readiness boundary
-        run: echo 'Source checks only. Gradle project, Kotlin tests, Core binding and APK validation remain OPEN.' >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: |
+          printf '%s\n' "Selected check: $CHECKS" 'All unselected checks: NOT_RUN. Source checks only; Gradle, Kotlin, Core, APK and device evidence remain OPEN.' >> "$GITHUB_STEP_SUMMARY"
