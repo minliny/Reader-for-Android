@@ -98,6 +98,16 @@ class ReaderOperationOwnerTest {
                 val unresolved = IllegalStateException("original cleanup outcome is unconfirmed")
                 val owner = owner(dispatcher) {}
                 val first = owner.activateClient(UUID(0, 1), 7)
+                fun assertOriginalCleanup(pending: ReaderOperationOwner.PendingCleanup) {
+                    assertEquals(first, pending.lease)
+                    assertEquals("cursor", pending.id)
+                    val failure = checkNotNull(pending.failure)
+                    assertEquals(unresolved.javaClass, failure.javaClass)
+                    assertEquals(unresolved.message, failure.message)
+                    // withTimeout may recover a stack trace in a copy whose cause is the original exception.
+                    assertTrue("The exact original cleanup failure must remain in the cause chain",
+                        generateSequence(failure) { it.cause }.take(16).any { it === unresolved })
+                }
                 lateinit var oldTurn: ReaderOperationOwner.Turn
                 owner.withTurn(first) {
                     oldTurn = this
@@ -114,14 +124,13 @@ class ReaderOperationOwnerTest {
                 owner.withTurn(second) { } // The current client remains admissible.
                 assertEquals(listOf("old"), cleanupEvents)
                 val pending = owner.pendingCleanups().single()
-                assertEquals(first, pending.lease); assertSame(unresolved, pending.failure)
+                assertOriginalCleanup(pending)
                 rejected { owner.retryCleanup(first, pending) }
-                assertSame(unresolved, owner.retryCleanup(second, pending)?.failure)
+                assertOriginalCleanup(checkNotNull(owner.retryCleanup(second, pending)))
                 assertEquals(listOf("old", "old"), cleanupEvents) // One explicit retry, no automatic replay.
                 val closed = owner.close().await()
                 assertEquals(listOf("old", "old", "new"), cleanupEvents)
-                assertEquals(first, closed.unresolvedCleanups.single().lease)
-                assertSame(unresolved, closed.unresolvedCleanups.single().failure)
+                assertOriginalCleanup(closed.unresolvedCleanups.single())
             }
         }
     }
