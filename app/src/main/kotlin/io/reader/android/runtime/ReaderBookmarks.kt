@@ -285,6 +285,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         try {
             send(record, "bookmark.$action", params, "mutation")
         } catch (error: Throwable) {
+            if (error.coreProtocolPending() != null) throw error
             consumeMutationTerminal(record)
             if (record.optBoolean("completed")) throw error
             throw PendingOperationException(record.getString("id"), "bookmark.$action")
@@ -367,7 +368,10 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
                 val settled = send(record, "bookmark.operation.settle", receipt.getJSONObject("binding"), "settle")
                 BookmarkReceiptPolicy.receipt(record, settled, settled = true)
                 record.put("receipt", settled)
-            } catch (_: Throwable) { throw PendingOperationException(id, "bookmark.operation.settle") }
+            } catch (error: Throwable) {
+                if (error.coreProtocolPending() != null) throw error
+                throw PendingOperationException(id, "bookmark.operation.settle")
+            }
         }
         record.put("completed", true)
         persist(record)

@@ -431,7 +431,8 @@ internal class ReaderBookshelfManagement(private val transport: CoreTransport, p
                 if (!record.optBoolean("completed") && record.optLong("requestId", -1) == event.getLong("requestId")) record.put("wireTerminal", event)
                 journal.terminal(id, event.getLong("requestId"), transport.session, event)
             })
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            if (error.coreProtocolPending() != null) throw error
             // A callback may have durably captured this exact result before another failure.
             consumeWire(record)
             throw PendingOperationException(id, "bookshelf.management.mutation.apply")

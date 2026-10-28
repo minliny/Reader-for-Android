@@ -16,6 +16,28 @@ import java.util.concurrent.Executors
 
 /** Unapplied JVM failure regression. Synthetic Core DTOs only; no book text, Android storage or Native execution. */
 class BookmarkWarmIntentTest {
+    @Test fun originalProtocolAckFailuresStayTypedThroughMutationAndSettlement(): Unit = runBlocking {
+        for (method in listOf("bookmark.create", "bookmark.operation.settle")) harness { h ->
+            val lease = h.client()
+            h.core.failAfterTerminalFor = method
+            h.turn(lease) {
+                val failure = assertThrows(CoreProtocolPending::class.java) { h.service.create(h.chapter, "", "", 0, "", "") }
+                assertSame(h.core.protocolFailure, failure)
+                assertSame(failure, failure.coreProtocolPending())
+                assertEquals(CoreProtocolStage.CONSUMED_ACK_FAILED, failure.stage)
+                assertEquals("bookmark-warm-test-runtime", failure.original.runtimeSession)
+                assertEquals(h.store.records.values.single().getLong("requestId"), failure.original.originalRequestId)
+                assertEquals(method, h.core.commands.last().first)
+                assertEquals(1, h.core.mutationCalls)
+                val original = h.store.records.values.single()
+                assertFalse(original.getBoolean("completed"))
+                assertTrue(original.has("wireTerminal"))
+                assertEquals(listOf(original.getString("id")), h.service.pending().map { it.id })
+                assertEquals(if (method == "bookmark.create") 2 else 4, h.core.commands.size)
+            }
+        }
+    }
+
     @Test fun firstJournalFailureSurvivesClientReplacementAndCompletedFinalizationClearsWarmOnce(): Unit = runBlocking {
         harness { h ->
             val old = h.client()
@@ -114,6 +136,8 @@ class BookmarkWarmIntentTest {
         val commands = mutableListOf<Pair<String, JSONObject>>()
         val seenLeases = mutableListOf<ReaderOperationOwner.ClientLease>()
         var mutationCalls = 0
+        var failAfterTerminalFor: String? = null
+        var protocolFailure: CoreProtocolPending? = null
         private var requestId = 1_000L
         private var receipt: JSONObject? = null
         override val session: String get() { seenLeases += heldLease(); return "bookmark-warm-test-runtime" }
@@ -140,6 +164,13 @@ class BookmarkWarmIntentTest {
                 else -> throw AssertionError("Unexpected business command $method")
             }
             terminal?.invoke(wireTerminal(id, result))
+            if (method == failAfterTerminalFor) {
+                failAfterTerminalFor = null
+                val failure = CoreProtocolPending(CoreProtocolReference("bookmark-warm-test-runtime",
+                    "fixture-original-$id", id, "fixture-token-$id", id + 10_000), CoreProtocolStage.CONSUMED_ACK_FAILED)
+                protocolFailure = failure
+                throw failure
+            }
             return clone(result)
         }
         override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = Unit
