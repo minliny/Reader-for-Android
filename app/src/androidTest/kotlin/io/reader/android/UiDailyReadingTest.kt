@@ -9,18 +9,20 @@ import android.graphics.Rect
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -164,7 +166,8 @@ class UiDailyReadingTest {
     private fun existingBookmarkJumpDeleteAndSearch(model: ReaderViewModel, created: ReaderBookmark,
         retainedIds: Set<String>, retiredBookmarkOwner: Long, query: String) {
         marker("bookmark-row-scroll-request")
-        compose.onNodeWithTag("reader_bookmark_list").performScrollToNode(hasTestTag("reader_bookmark_${created.id}"))
+        scrollToolRow(R.id.reader_native_bookmark_list, model.state.value.bookmarks.indexOfFirst { it.id == created.id },
+            "reader_bookmark_${created.id}", "reader_bookmark_${created.id}")
         marker("bookmark-jump-request")
         compose.onNodeWithTag("reader_bookmark_${created.id}").performClick()
         marker("bookmark-jump-click-returned")
@@ -182,7 +185,8 @@ class UiDailyReadingTest {
         compose.onNodeWithTag("reader_open_bookmarks").performClick()
         compose.waitUntil(20_000) { !model.state.value.busy }
         val deleteRevision = model.state.value.bookmarkRevision
-        compose.onNodeWithTag("reader_bookmark_list").performScrollToNode(hasTestTag("reader_delete_bookmark_${created.id}"))
+        scrollToolRow(R.id.reader_native_bookmark_list, model.state.value.bookmarks.indexOfFirst { it.id == created.id },
+            "reader_bookmark_${created.id}", "reader_delete_bookmark_${created.id}")
         compose.onNodeWithTag("reader_delete_bookmark_${created.id}").performClick()
         compose.onNodeWithTag("reader_confirmation_confirm").performClick()
         compose.waitUntil(20_000) {
@@ -202,7 +206,10 @@ class UiDailyReadingTest {
         val firstPage = model.state.value.searchResults.map { it.id }
         marker("search-first-page-confirmed", Bundle().apply { putInt("count", firstPage.size) })
         assertTrue("The supplied real query must expose an actual next cursor", model.state.value.searchHasMore)
-        compose.onNodeWithTag("reader_content_results").performScrollToNode(hasTestTag("reader_content_search_next"))
+        val firstSession = model.state.value.searchSession ?: throw AssertionError("Original search session missing")
+        val firstCursor = model.state.value.searchCursor ?: throw AssertionError("Original next cursor missing")
+        scrollToolRow(R.id.reader_native_search_list, firstPage.size,
+            "reader_content_search_next:${firstSession.id}:$firstCursor", "reader_content_search_next")
         marker("search-next-page-request")
         compose.onNodeWithTag("reader_content_search_next").performClick()
         searchTerminal(model)
@@ -212,7 +219,8 @@ class UiDailyReadingTest {
         val hit = model.state.value.searchResults[firstPage.size]
         val searchOwner = model.state.value.reading!!.identity
         marker("search-cursor-page-confirmed")
-        compose.onNodeWithTag("reader_content_results").performScrollToNode(hasTestTag("reader_content_hit_${hit.id}"))
+        scrollToolRow(R.id.reader_native_search_list, firstPage.size,
+            "reader_content_hit_${hit.id}", "reader_content_hit_${hit.id}")
         marker("search-jump-request")
         compose.onNodeWithTag("reader_content_hit_${hit.id}").performClick()
         marker("search-jump-click-returned")
@@ -374,6 +382,32 @@ class UiDailyReadingTest {
     private fun controls(model: ReaderViewModel) {
         if (!model.state.value.controlsVisible) compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
         compose.waitUntil(5_000) { model.state.value.controlsVisible }
+    }
+
+    /** One standard native scroll, then bounded observation of the exact bound row and real action. */
+    private fun scrollToolRow(resourceId: Int, position: Int, expectedKey: String, actionTag: String) {
+        assertTrue("The original target must exist in the admitted projection", position >= 0)
+        compose.waitUntil(5_000) {
+            compose.runOnUiThread {
+                val list = compose.activity.findViewById<RecyclerView>(resourceId)
+                list != null && list.isAttachedToWindow && position < (list.adapter?.itemCount ?: 0)
+            }
+        }
+        compose.runOnUiThread {
+            val list = compose.activity.findViewById<RecyclerView>(resourceId)
+            (list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(position, 0)
+        }
+        compose.waitUntil(5_000) {
+            compose.runOnUiThread {
+                val list = compose.activity.findViewById<RecyclerView>(resourceId)
+                val row = list?.findViewHolderForAdapterPosition(position)?.itemView
+                row != null && row.isAttachedToWindow && row.height > 0 && row.tag == expectedKey
+            }
+        }
+        compose.waitUntil(5_000) {
+            val nodes = compose.onAllNodes(hasTestTag(actionTag)).fetchSemanticsNodes()
+            nodes.size == 1 && SemanticsProperties.Disabled !in nodes.single().config
+        }
     }
 
     private fun searchTerminal(model: ReaderViewModel) {

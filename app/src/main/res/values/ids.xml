@@ -3,4 +3,6 @@
     <item name="reader_native_scroll" type="id" />
     <item name="reader_native_text" type="id" />
     <item name="reader_native_title" type="id" />
+    <item name="reader_native_bookmark_list" type="id" />
+    <item name="reader_native_search_list" type="id" />
 </resources>
