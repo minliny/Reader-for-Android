@@ -151,9 +151,84 @@ internal object BookmarkReceiptPolicy {
     }
 }
 
-/** Invoked only inside ReaderLibrary's existing IO mutex; owns no poller or business store. */
-internal class ReaderBookmarks(private val transport: CoreTransport, private val journal: DurableJournal) {
+/** Narrow journal seam for deterministic first-write failure coverage; production uses DurableJournal unchanged. */
+internal interface BookmarkJournalPort {
+    fun readAll(): List<JSONObject>
+    fun exact(id: String, includeCompleted: Boolean = false): JSONObject?
+    fun write(record: JSONObject)
+    fun terminal(id: String, requestId: Long, session: String, event: JSONObject)
+}
+
+/** Warm facts may outlive a VM or a failed archive/fsync. They never create a new mutation. */
+internal object BookmarkWarmIntentPolicy {
+    fun retainOriginal(disk: JSONObject?, retained: JSONObject?): JSONObject? {
+        if (disk == null) return retained
+        if (retained == null) return disk
+        check(listOf("id", "kind", "bookId", "action", "sessionToken").all { disk.getString(it) == retained.getString(it) } &&
+            disk.getString("kind") == "bookmark" && disk.getInt("journalSchema") == retained.getInt("journalSchema") &&
+            disk.getJSONObject("parameters").toString() == retained.getJSONObject("parameters").toString() &&
+            BookmarkReceiptPolicy.sameScope(disk.getJSONObject("ownerScope"), retained.getJSONObject("ownerScope"))) {
+            "BOOKMARK_DURABLE_INTENT_CHANGED"
+        }
+        if (retained.getString("action") == "delete") check(disk.getLong("targetTime") == retained.getLong("targetTime") &&
+            BookmarkReceiptPolicy.sameScope(disk.getJSONObject("targetScope"), retained.getJSONObject("targetScope"))) {
+            "BOOKMARK_DELETE_TARGET_CHANGED"
+        }
+        disk.optJSONObject("mutationResult")?.let { incoming ->
+            BookmarkReceiptPolicy.validateResult(retained, incoming)
+            if (!retained.has("mutationResult")) retained.put("mutationResult", incoming)
+        }
+        disk.optJSONObject("receipt")?.let { incoming ->
+            check(!retained.has("rejection")) { "BOOKMARK_RECEIPT_REJECTION_CONTRADICTION" }
+            val result = BookmarkReceiptPolicy.receipt(retained, incoming)
+            if (!retained.has("mutationResult")) retained.put("mutationResult", result)
+            // A stale committed disk record cannot downgrade an already settled warm receipt.
+            if (retained.optJSONObject("receipt")?.optString("phase") != "settled") retained.put("receipt", incoming)
+        }
+        val sameDispatch = disk.optLong("requestId", -1) == retained.optLong("requestId", -2) &&
+            disk.optString("runtimeSession").isNotEmpty() && disk.optString("runtimeSession") == retained.optString("runtimeSession")
+        if (sameDispatch) disk.optJSONObject("wireTerminal")?.let { incoming ->
+            check(incoming.getLong("requestId") == retained.getLong("requestId")) { "BOOKMARK_LATE_WIRE_IDENTITY" }
+            retained.optJSONObject("wireTerminal")?.let { current ->
+                check(current.toString() == incoming.toString()) { "BOOKMARK_ORIGINAL_WIRE_CHANGED" }
+            } ?: retained.put("wireTerminal", incoming)
+        }
+        disk.optJSONObject("rejection")?.let { incoming ->
+            check(sameDispatch && !retained.has("receipt") && disk.optBoolean("completed") &&
+                disk.optJSONObject("wireTerminal")?.let { BookmarkReceiptPolicy.definiteRejection(disk, it) } == true) {
+                "BOOKMARK_REJECTION_UNQUALIFIED"
+            }
+            retained.optJSONObject("rejection")?.let { check(it.toString() == incoming.toString()) }
+            retained.put("rejection", incoming)
+        }
+        if (disk.optBoolean("completed")) {
+            if (!disk.has("rejection")) BookmarkReceiptPolicy.receipt(retained, disk.getJSONObject("receipt"), settled = true)
+            retained.put("completed", true)
+        }
+        return retained // Never replace a newer warm stage/request/history with an older disk object.
+    }
+}
+
+/** App-owned singleton, invoked only on an actually held Library/maintenance lane. */
+internal class ReaderBookmarks(private val transport: CoreTransport, private val journal: BookmarkJournalPort) {
+    constructor(transport: CoreTransport, journal: DurableJournal) : this(transport, object : BookmarkJournalPort {
+        override fun readAll() = journal.readAll()
+        override fun exact(id: String, includeCompleted: Boolean) = journal.exact(id, includeCompleted)
+        override fun write(record: JSONObject) = journal.write(record)
+        override fun terminal(id: String, requestId: Long, session: String, event: JSONObject) = journal.terminal(id, requestId, session, event)
+    })
+    private val ownerSession = transport.session // Constructor is reached only from a real held client lane.
+    private var warm: JSONObject? = null
+    private fun checkOwner() { check(transport.session == ownerSession) { "BOOKMARK_RUNTIME_OWNER_CHANGED" } }
+    private fun persist(record: JSONObject) {
+        checkOwner()
+        warm = record // Assign BEFORE the first attempted durable write, including Completed finalization.
+        journal.write(record)
+        if (record.optBoolean("completed") && warm === record) warm = null
+    }
+
     fun list(bookId: String, title: String, author: String, query: String? = null): List<ReaderBookmark> {
+        checkOwner()
         val params = JSONObject().put("bookName", title).put("bookAuthor", author).put("sortBy", "bookLocation")
         query?.takeIf { it.isNotBlank() }?.let { params.put("query", it) }
         val rows = transport.request("bookmark.list", params).getJSONArray("bookmarks")
@@ -178,9 +253,17 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         mutate("delete", chapter, JSONObject().put("time", bookmark.time), bookmark).deletion
             ?: error("ORIGINAL_BOOKMARK_DELETE_RESULT_MISSING")
 
-    fun pending(): List<PendingBookmark> = journal.readAll().filter {
-        it.getString("kind") == "bookmark" && !it.optBoolean("completed")
-    }.map { PendingBookmark(it.getString("id"), it.getString("bookId"), it.getString("action")) }
+    fun pending(): List<PendingBookmark> {
+        checkOwner()
+        val records = journal.readAll().filter { it.getString("kind") == "bookmark" && !it.optBoolean("completed") }.toMutableList()
+        warm?.let { original ->
+            val index = records.indexOfFirst { it.getString("id") == original.getString("id") }
+            if (index < 0) records += original
+            else records[index] = BookmarkWarmIntentPolicy.retainOriginal(records[index], original)!!
+        }
+        // A warm completed record still blocks until its failed durable finalization is repaired.
+        return records.map { PendingBookmark(it.getString("id"), it.getString("bookId"), it.getString("action")) }
+    }
 
     fun requireWritable() {
         pending().firstOrNull()?.let { throw PendingOperationException(it.id, "bookmark.${it.action}") }
@@ -198,6 +281,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         target?.let { record.put("targetTime", it.time).put("targetScope", JSONObject().put("sourceId", it.sourceId)
             .put("bookId", it.bookId).put("chapterIndex", it.chapterIndex).put("bodyVersion", it.bodyVersion)
             .put("processingVersion", it.processingVersion)) }
+        warm = record
         try {
             send(record, "bookmark.$action", params, "mutation")
         } catch (error: Throwable) {
@@ -210,11 +294,21 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
     }
 
     fun reconcile(bookId: String, id: String): BookmarkOperationResult {
-        val record = journal.exact(id, includeCompleted = true) ?: throw PendingOperationException(id, "bookmark.operation.query")
+        checkOwner()
+        pending().firstOrNull { it.id != id }?.let { throw PendingOperationException(it.id, "bookmark.operation.query") }
+        val retained = warm?.takeIf { it.getString("id") == id }
+        val record = BookmarkWarmIntentPolicy.retainOriginal(journal.exact(id, includeCompleted = true), retained)
+            ?: throw PendingOperationException(id, "bookmark.operation.query")
         check(record.getString("kind") == "bookmark" && record.getString("bookId") == bookId) { "ORIGINAL_BOOKMARK_OWNER_MISMATCH" }
         validateOwner(record)
+        if (record.optBoolean("completed")) {
+            // A prior archive/fsync failure is repaired once; an already durable Completed record is read-only.
+            if (retained != null) persist(record)
+            record.optJSONObject("rejection")?.let { throw CoreCommandException("bookmark.${record.getString("action")}", it) }
+            return result(record, BookmarkReceiptPolicy.receipt(record, record.getJSONObject("receipt"), settled = true))
+        }
+        warm = record
         if (record.optJSONObject("rejection") != null) throw CoreCommandException("bookmark.${record.getString("action")}", record.getJSONObject("rejection"))
-        if (record.optBoolean("completed")) return result(record, BookmarkReceiptPolicy.receipt(record, record.getJSONObject("receipt"), settled = true))
         if (record.optString("stage") == "mutation") consumeMutationTerminal(record)
         // Only exact original query can recover a lost mutation ACK. No mutation replay.
         return finish(record)
@@ -228,7 +322,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
             val error = event.getJSONObject("error")
             if (BookmarkReceiptPolicy.definiteRejection(record, event)) {
                 record.put("rejection", error).put("completed", true)
-                journal.write(record)
+                persist(record)
                 throw CoreCommandException("bookmark.${record.getString("action")}", error)
             }
             return
@@ -237,7 +331,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         val data = event.getJSONObject("data")
         BookmarkReceiptPolicy.validateResult(record, data)
         record.put("mutationTerminal", event).put("mutationResult", data)
-        journal.write(record)
+        persist(record)
     }
 
     private fun finish(record: JSONObject): BookmarkOperationResult {
@@ -251,10 +345,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         // query's single poll owner may have just consumed a late original ACK.
         // Merge that exact generation before this older in-memory record is saved.
         val latest = journal.exact(id)
-        if (latest != null && latest.optLong("requestId", -1) == record.optLong("requestId", -2) &&
-            latest.optString("runtimeSession") == record.optString("runtimeSession")) {
-            latest.optJSONObject("wireTerminal")?.let { record.put("wireTerminal", it) }
-        }
+        BookmarkWarmIntentPolicy.retainOriginal(latest, record)
         val receipt = query.optJSONObject("receipt")
         if (receipt == null) {
             consumeMutationTerminal(record)
@@ -270,7 +361,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
         val original = BookmarkReceiptPolicy.receipt(record, receipt)
         // Persist original terminal facts and exact Core fingerprint before metadata settlement.
         record.put("mutationResult", original).put("receipt", receipt)
-        journal.write(record)
+        persist(record)
         if (receipt.getString("phase") != "settled") {
             try {
                 val settled = send(record, "bookmark.operation.settle", receipt.getJSONObject("binding"), "settle")
@@ -279,7 +370,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
             } catch (_: Throwable) { throw PendingOperationException(id, "bookmark.operation.settle") }
         }
         record.put("completed", true)
-        journal.write(record)
+        persist(record)
         return result(record, original)
     }
 
@@ -322,7 +413,7 @@ internal class ReaderBookmarks(private val transport: CoreTransport, private val
             record.put("requestId", requestId).put("runtimeSession", transport.session)
             record.getJSONArray("dispatchHistory").put(JSONObject().put("requestId", requestId)
                 .put("runtimeSession", transport.session).put("method", method).put("stage", stage).put("params", params))
-            journal.write(record)
+            persist(record)
         }, terminal = { event ->
             if (record.optLong("requestId", -1) == event.getLong("requestId")) record.put("wireTerminal", event)
             journal.terminal(record.getString("id"), event.getLong("requestId"), transport.session, event)

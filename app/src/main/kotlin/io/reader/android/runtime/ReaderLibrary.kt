@@ -56,7 +56,8 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val staging get() = client.staging
     private val journal get() = client.journal
     private val transport: CoreTransport = client.transport
-    private val bookmarkService by lazy { ReaderBookmarks(transport, journal) }
+    private val bookmarkService get() = client.bookmarks
+    private val managementService get() = client.management
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()

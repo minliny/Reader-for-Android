@@ -64,12 +64,30 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         transport
     }
 
+    // One shared service transport resolves ONLY the actually held lane, including old-original maintenance.
+    // Construction has no session access and never fabricates a lease or creates Native.
+    private val serviceTransport: CoreTransport = object : CoreTransport {
+        private fun bound(): CoreTransport {
+            requireHeldLane()
+            return bridgeDelegate.value.forClient(lane.get()!!.lease)
+        }
+        override val session get() = bound().session
+        override fun request(method: String, params: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
+            terminal: ((JSONObject) -> Unit)?) = bound().request(method, params, timeoutMs, beforeSend, terminal)
+        override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = bound().drainOriginalTerminal(requestId, timeoutMs)
+        override fun close() { error("SHARED_SERVICE_CANNOT_CLOSE_NATIVE") }
+    }
+    private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
+    private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
+
     internal class Client internal constructor(internal val owner: AppCoreOwner, val lease: ReaderOperationOwner.ClientLease) {
         private val retired = AtomicBoolean(false)
         val root get() = owner.root
         val originals get() = owner.originals
         val staging get() = owner.staging
         val journal get() = owner.journal
+        val bookmarks: ReaderBookmarks get() { owner.requireLane(lease); return owner.bookmarkService }
+        val management: ReaderBookshelfManagement get() { owner.requireLane(lease); return owner.managementService }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {
