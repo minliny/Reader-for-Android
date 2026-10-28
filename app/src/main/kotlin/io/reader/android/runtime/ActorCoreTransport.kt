@@ -1,6 +1,9 @@
 package io.reader.android.runtime
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -18,6 +21,7 @@ internal class ActorCoreTransport(
     private val owner: CoreTransportLane,
     private val actor: ReaderCoreEventActor,
     private val nonAdmissionSink: HostNonAdmissionSink,
+    private val readLane: CoreReadRequestLane = CoreReadRequestLane.RetainAll,
 ) : ProtocolRecoveryBindings {
     data class OriginalKey(val lease: ReaderOperationOwner.ClientLease, val originalId: String)
     private class Original(val route: Route, val plan: ReaderCoreEventActor.PreparedRequest,
@@ -50,33 +54,16 @@ internal class ActorCoreTransport(
             beforeSend: (Long) -> Unit, terminal: ((JSONObject) -> Unit)?): JSONObject {
             owner.requireRequestLane(lease, method, params)
             require(timeoutMs > 0)
-            // Conservative whole-turn retention is intentional in this version.
-            // Actor READ_ONLY deadlines work; VM retirement cancellation is still OPEN.
-            val kind = if (terminal == null) ReaderCoreEventActor.Kind.READ_ONLY else ReaderCoreEventActor.Kind.DURABLE_WRITE
-            return runBlocking {
-                val plan = try { actor.prepare(method, params.toString(), kind) }
-                catch (error: IllegalStateException) {
-                    if (error.message !in setOf("EVENT_ACTOR_ADMISSION_BLOCKED", "EVENT_ACTOR_CLOSED")) throw error
-                    throw CoreProtocolPending(owner.protocolReference(), CoreProtocolStage.OWNER_QUARANTINED, error)
-                }
-                val key = OriginalKey(lease, "core:${plan.runtimeSession}:${plan.requestId}:${plan.token}")
-                val route = Route(key, plan.runtimeSession, plan.requestId, plan.token)
-                val original = Original(route, plan, terminal)
-                check(routes.putIfAbsent(plan.token, route) == null)
-                check(requestRoutes.putIfAbsent(plan.requestId, route) == null)
-                check(originals.putIfAbsent(plan.requestId, original) == null)
-                when (val sent = actor.dispatch(plan) { beforeSend(it.requestId) }) {
+            val observer = readLane.observer(lease)
+            val kind = actorKindForObserver(observer, method, terminal != null)
+            return blockingObserverRequest(observer) {
+                val admission = prepareAndDispatch(lease, method, params, kind, terminal, beforeSend, observer)
+                val original = admission.first
+                val plan = original.plan
+                when (val sent = admission.second) {
                     is ReaderCoreEventActor.DispatchOutcome.Rejected -> {
-                        val fact = HostNonAdmissionFact.from(key, plan, sent)
-                        original.nonAdmission = fact
-                        synchronizeRoutes(actor.snapshot())
-                        try { nonAdmissionSink.record(fact) }
-                        catch (error: Exception) {
-                            original.failure = "NON_ADMISSION_RECORD_FAILED"
-                            throw pending(original, CoreProtocolStage.HOST_NON_ADMISSION_UNRECORDED, error)
-                        }
-                        actor.admissionRejectionRecorded(plan)
-                        nonAdmissionRecorded(fact) // Separate Host fact; business intent stays untouched.
+                        withContext(NonCancellable) { recordNonAdmission(original, sent) }
+                        observer?.ensureActive()
                         throw pending(original, CoreProtocolStage.HOST_NON_ADMISSION_RECORDED)
                     }
                     is ReaderCoreEventActor.DispatchOutcome.Unknown -> {
@@ -87,7 +74,9 @@ internal class ActorCoreTransport(
                 }
                 when (val observed = actor.observe(plan, timeoutMs)) {
                     is ReaderCoreEventActor.Observation.Terminal -> {
-                        consumeFirst(original, observed.delivery)
+                        if (observer == null) consumeFirst(original, observed.delivery)
+                        else withContext(NonCancellable) { consumeFirst(original, observed.delivery) }
+                        observer?.ensureActive() // ACK the actual pure wire once, then refuse delivery to a retired observer.
                         CoreTerminal.result(method, JSONObject(observed.delivery.rawEvent))
                     }
                     is ReaderCoreEventActor.Observation.ReadExpired -> throw CoreReadTimeoutException(method)
@@ -100,6 +89,7 @@ internal class ActorCoreTransport(
         }
         override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) {
             owner.requireLane(lease)
+            check(readLane.observer(lease) == null) { "ORIGINAL_RECEIPT_DRAIN_REQUIRES_RETAINED_TURN" }
             require(timeoutMs in 0..1_000)
             runBlocking {
                 val original = originals[requestId] ?: return@runBlocking
@@ -116,6 +106,97 @@ internal class ActorCoreTransport(
             }
         }
         override fun close() { error("CLIENT_TRANSPORT_CANNOT_CLOSE_NATIVE") }
+    }
+
+    private suspend fun prepareOriginal(lease: ReaderOperationOwner.ClientLease, method: String, params: JSONObject,
+        kind: ReaderCoreEventActor.Kind, terminal: ((JSONObject) -> Unit)?): Original {
+        val plan = try { actor.prepare(method, params.toString(), kind) }
+        catch (error: IllegalStateException) {
+            if (error.message !in setOf("EVENT_ACTOR_ADMISSION_BLOCKED", "EVENT_ACTOR_CLOSED")) throw error
+            throw CoreProtocolPending(owner.protocolReference(), CoreProtocolStage.OWNER_QUARANTINED, error)
+        }
+        val key = OriginalKey(lease, "core:${plan.runtimeSession}:${plan.requestId}:${plan.token}")
+        val route = Route(key, plan.runtimeSession, plan.requestId, plan.token)
+        val original = Original(route, plan, terminal)
+        check(routes.putIfAbsent(plan.token, route) == null)
+        check(requestRoutes.putIfAbsent(plan.requestId, route) == null)
+        check(originals.putIfAbsent(plan.requestId, original) == null)
+        return original
+    }
+
+    private suspend fun prepareAndDispatch(lease: ReaderOperationOwner.ClientLease, method: String, params: JSONObject,
+        kind: ReaderCoreEventActor.Kind, terminal: ((JSONObject) -> Unit)?, beforeSend: (Long) -> Unit,
+        observer: ReaderReadObservers.ReadObserver?): Pair<Original, ReaderCoreEventActor.DispatchOutcome> {
+        if (observer == null) {
+            val original = prepareOriginal(lease, method, params, kind, terminal)
+            return original to actor.dispatch(original.plan) { beforeSend(it.requestId) }
+        }
+        var original: Original? = null
+        var sent: ReaderCoreEventActor.DispatchOutcome? = null
+        try {
+            // Capture registration/admission inside this boundary, so prompt caller
+            // cancellation cannot orphan a prepared plan or lose a known send status.
+            return withContext(NonCancellable) {
+                val exact = prepareOriginal(lease, method, params, kind, terminal).also { original = it }
+                observer.ensureActive() // Also qualifies cancellation while the plan is still PREPARED.
+                actor.dispatch(exact.plan) {
+                    observer.ensureActive()
+                    beforeSend(it.requestId)
+                    observer.ensureActive()
+                }.also { sent = it }.let { exact to it }
+            }
+        } catch (failure: Exception) {
+            val cancelled = if (failure is CancellationException) failure else {
+                val retired = try { observer.ensureActive(); null } catch (cancellation: CancellationException) { cancellation }
+                if (retired == null) throw failure
+                retired.also { it.addSuppressed(failure) }
+            }
+            withContext(NonCancellable) {
+                original?.let { exact ->
+                    try { settleCancelledReadAdmission(exact, sent) }
+                    catch (recordFailure: Throwable) { cancelled.addSuppressed(recordFailure) }
+                }
+            }
+            throw cancelled
+        }
+    }
+
+    private suspend fun settleCancelledReadAdmission(original: Original, sent: ReaderCoreEventActor.DispatchOutcome?) {
+        check(original.plan.kind == ReaderCoreEventActor.Kind.READ_ONLY && original.terminalSink == null)
+        if (sent is ReaderCoreEventActor.DispatchOutcome.Rejected) {
+            recordNonAdmission(original, sent)
+            return
+        }
+        val snapshot = actor.snapshot()
+        val request = snapshot.requests.single { it.request === original.plan }
+        when (request.phase) {
+            ReaderCoreEventActor.Phase.PREPARED -> recordNonAdmission(original, actor.rejectPreparedReadObserver(original.plan))
+            ReaderCoreEventActor.Phase.REJECTION_NOT_RECORDED -> {
+                check(snapshot.faults.any { it.requestId == original.plan.requestId && it.kind == "BEFORE_SEND_NOT_DISPATCHED" }) {
+                    "READ_NON_ADMISSION_FACT_NOT_PROVEN"
+                }
+                recordNonAdmission(original, ReaderCoreEventActor.DispatchOutcome.Rejected(
+                    original.plan, "BEFORE_SEND_NOT_DISPATCHED", null))
+            }
+            ReaderCoreEventActor.Phase.SENT, ReaderCoreEventActor.Phase.SEND_UNKNOWN, ReaderCoreEventActor.Phase.TERMINAL_RETAINED -> {
+                if (request.phase == ReaderCoreEventActor.Phase.SEND_UNKNOWN) original.failure = "SEND_UNKNOWN"
+                actor.cancelRead(original.plan) // Same original only. status0 is not a fabricated terminal or worker join.
+            }
+            else -> error("READ_CANCELLATION_ADMISSION_NOT_QUALIFIED")
+        }
+    }
+
+    private suspend fun recordNonAdmission(original: Original, rejected: ReaderCoreEventActor.DispatchOutcome.Rejected) {
+        val fact = HostNonAdmissionFact.from(original.route.key, original.plan, rejected)
+        original.nonAdmission = fact
+        synchronizeRoutes(actor.snapshot())
+        try { nonAdmissionSink.record(fact) }
+        catch (error: Exception) {
+            original.failure = "NON_ADMISSION_RECORD_FAILED"
+            throw pending(original, CoreProtocolStage.HOST_NON_ADMISSION_UNRECORDED, error)
+        }
+        actor.admissionRejectionRecorded(original.plan)
+        nonAdmissionRecorded(fact) // Exact separate Host fact; no wire terminal, business intent clearing or automatic resume.
     }
 
     /** Immutable route lookup only. The caller must recheck it AFTER obtaining the exact original maintenance gate. */

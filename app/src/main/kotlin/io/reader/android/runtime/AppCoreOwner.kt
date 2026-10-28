@@ -3,6 +3,8 @@ package io.reader.android.runtime
 import android.app.Application
 import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asContextElement
@@ -22,6 +24,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     val journal by lazy { DurableJournal(File(root, "Operations")) }
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lane = ThreadLocal<Lane?>()
+    private val readObservers = ReaderReadObservers()
     private val publicationLease = AtomicReference<ReaderOperationOwner.ClientLease?>()
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
@@ -45,7 +48,10 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         }
     })
     private val bridgeDelegate = lazy {
-        val transport = ActorCoreTransport(this, actor, HostNonAdmissionJournalSink(journal))
+        val transport = ActorCoreTransport(this, actor, HostNonAdmissionJournalSink(journal), CoreReadRequestLane { lease ->
+            requireLane(lease)
+            lane.get()!!.observer
+        })
         val protocolLane = object : ProtocolRecoveryLane {
             override fun assertHeld() = requireHeldLane()
             override suspend fun <T> exclusive(ref: CoreProtocolReference, block: suspend () -> T): T {
@@ -69,6 +75,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val serviceTransport: CoreTransport = object : CoreTransport {
         private fun bound(): CoreTransport {
             requireHeldLane()
+            lane.get()!!.observer?.ensureActive()
             return bridgeDelegate.value.forClient(lane.get()!!.lease)
         }
         override val session get() = bound().session
@@ -92,6 +99,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {
                 owner.requireLane(lease)
+                owner.lane.get()!!.observer?.ensureActive()
                 return owner.bridgeDelegate.value.forClient(lease)
             }
             override val session get() = bound().session
@@ -101,20 +109,39 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
             override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = bound().drainOriginalTerminal(requestId, timeoutMs)
             override fun close() { error("CLIENT_TRANSPORT_CANNOT_CLOSE_NATIVE") }
         }
-        suspend fun <T> wholeTurn(block: suspend ReaderOperationOwner.Turn.() -> T): T {
+        suspend fun <T> wholeTurn(mode: WholeTurnMode, block: suspend ReaderOperationOwner.Turn.() -> T,
+            protectedFinally: suspend ReaderOperationOwner.Turn.() -> Unit): T {
             check(!retired.get()) { "LIBRARY_CLIENT_RETIRED" }
-            return owner.operations.withTurn(lease) {
+            if (mode == WholeTurnMode.RETAIN_ORIGINAL) return owner.operations.withTurn(lease) {
                 val exactTurn = this
                 withContext(Dispatchers.IO + owner.lane.asContextElement(
                     Lane(lease, Purpose.Business, { exactTurn.assertActive() }, exactTurn),
                 )) {
                     try { block(exactTurn) }
-                    finally { owner.publishIfInitialized() }
+                    finally { try { protectedFinally(exactTurn) } finally { owner.publishIfInitialized() } }
                 }
             }
+            val caller = currentCoroutineContext()[Job] ?: error("READ_OBSERVER_REQUIRES_CALLER_JOB")
+            val observer = owner.readObservers.open(lease, caller)
+            return try {
+                owner.operations.withObservedRead(lease, observer, body = {
+                    val exactTurn = this
+                    withContext(Dispatchers.IO + owner.lane.asContextElement(
+                        Lane(lease, Purpose.Business, { exactTurn.assertActive() }, exactTurn, observer),
+                    )) { block(exactTurn) }
+                }, protectedFinally = {
+                    val exactTurn = this
+                    withContext(Dispatchers.IO + owner.lane.asContextElement(
+                        Lane(lease, Purpose.TurnFinally, { exactTurn.assertActive() }, exactTurn),
+                    )) { try { protectedFinally(exactTurn) } finally { owner.publishIfInitialized() } }
+                })
+            } finally { observer.closeObservation() }
         }
         fun retire() {
-            if (retired.compareAndSet(false, true)) owner.operations.retireClient(lease)
+            if (retired.compareAndSet(false, true)) {
+                owner.readObservers.retire(lease) // Direct Job cancellation; never waits for the read's gate.
+                owner.operations.retireClient(lease)
+            }
             // An admitted whole turn, its original callbacks and finally survive UI cancellation/retirement.
         }
         fun currentTurn(): ReaderOperationOwner.Turn {
@@ -135,12 +162,14 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     }
     fun newClient(clientId: UUID = UUID.randomUUID(), localGeneration: Long = 0): Client {
         val lease = operations.activateClient(clientId, localGeneration)
+        readObservers.activate(lease) // Monotonic owner generation prevents a delayed old activation.
         publicationLease.set(lease) // An actually issued lease, never a made-up entity/book owner.
         return Client(this, lease)
     }
-    private enum class Purpose { Business, Maintenance, Cleanup }
+    private enum class Purpose { Business, TurnFinally, Maintenance, Cleanup }
     private class Lane(val lease: ReaderOperationOwner.ClientLease, val purpose: Purpose,
-        val assertHeld: () -> Unit, val turn: ReaderOperationOwner.Turn?)
+        val assertHeld: () -> Unit, val turn: ReaderOperationOwner.Turn?,
+        val observer: ReaderReadObservers.ReadObserver? = null)
     override fun requireHeldLane() {
         check(Looper.myLooper() != Looper.getMainLooper()) { "CORE_TRANSPORT_ON_MAIN" }
         val held = lane.get() ?: error("CORE_TRANSPORT_OUTSIDE_OWNER_LANE")
@@ -156,7 +185,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     }
     override fun requireRequestLane(lease: ReaderOperationOwner.ClientLease, method: String, params: JSONObject) {
         requireLane(lease)
-        if (lane.get()!!.purpose != Purpose.Business) check(lane.get()!!.purpose == Purpose.Cleanup &&
+        if (lane.get()!!.purpose != Purpose.Business) check(lane.get()!!.purpose in setOf(Purpose.Cleanup, Purpose.TurnFinally) &&
             method == "search.content" && params.optBoolean("closeCursor") && params.optString("cursor").isNotBlank()) {
             "MAINTENANCE_CANNOT_DISPATCH_NEW_BUSINESS"
         }

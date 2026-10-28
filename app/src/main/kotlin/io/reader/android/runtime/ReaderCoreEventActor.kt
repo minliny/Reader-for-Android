@@ -264,6 +264,12 @@ internal class ReaderCoreEventActor(
         }
     }
 
+    /** Exact no-Native outcome for a cancelled pure observer whose plan never acquired dispatch reservation. */
+    suspend fun rejectPreparedReadObserver(plan: PreparedRequest): DispatchOutcome.Rejected = call {
+        check(plan.kind == Kind.READ_ONLY && state(plan).phase == Phase.PREPARED) { "READ_OBSERVER_ALREADY_RESERVED_OR_SENT" }
+        rejectBeforeNative(plan, CancellationException("READ_OBSERVER_RETIRED_BEFORE_SEND"))
+    }
+
     /** cancel=0 may be a no-op; it never creates a terminal or retires raw events. */
     suspend fun cancelRead(plan: PreparedRequest) = call {
         require(plan.kind == Kind.READ_ONLY) { "DURABLE_WRITE_CANNOT_BE_CANCELLED_BY_OBSERVER" }

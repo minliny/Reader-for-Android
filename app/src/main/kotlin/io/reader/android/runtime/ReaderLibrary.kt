@@ -69,7 +69,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         keyword: String? = null,
         sort: LibrarySort = LibrarySort.LAST_READ,
         direction: LibrarySortDirection = LibrarySortDirection.DESCENDING,
-    ): List<LibraryBook> = onIO {
+    ): List<LibraryBook> = onIO(WholeTurnMode.OBSERVER_READ) {
         val result = mutableListOf<LibraryBook>()
         var offset = 0
         repeat(10_000) {
@@ -93,7 +93,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         error("BOOKSHELF_PAGE_LIMIT")
     }
 
-    suspend fun toc(bookId: String): List<ChapterItem> = onIO { readLocalToc(bookId) }
+    suspend fun toc(bookId: String): List<ChapterItem> = onIO(WholeTurnMode.OBSERVER_READ) { readLocalToc(bookId) }
 
     /** Pure materialized Core TOC read; callers already own the library mutex. */
     private fun readLocalToc(bookId: String): List<ChapterItem> {
@@ -109,7 +109,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }
     }
 
-    suspend fun chapter(bookId: String, index: Int): ReaderChapter = onIO { readChapter(bookId, index) }
+    suspend fun chapter(bookId: String, index: Int): ReaderChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) { readChapter(bookId, index) }
 
     /** Validate a jump before publishing its new session; stale targets leave the old session usable. */
     private fun readChapter(bookId: String, index: Int, validate: (ReaderChapter) -> Unit = {}): ReaderChapter {
@@ -129,7 +129,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         return content
     }
 
-    suspend fun bookmarks(bookId: String, query: String? = null): List<ReaderBookmark> = onIO {
+    suspend fun bookmarks(bookId: String, query: String? = null): List<ReaderBookmark> = onIO(WholeTurnMode.OBSERVER_READ) {
         val book = readShelfEntry(bookId)
         bookmarkService.list(bookId, book.getString("title"), book.getString("author"), query)
     }
@@ -141,14 +141,14 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         sessionToken: String,
         excerpt: String = "",
         note: String = "",
-    ): ReaderBookmark = onIO {
+    ): ReaderBookmark = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         val chapter = activeChapter(bookId, sessionToken, index)
         bookmarkService.requireWritable()
         val book = readShelfEntry(bookId)
         bookmarkService.create(chapter, book.getString("title"), book.getString("author"), scalarOffset, excerpt, note)
     }
 
-    suspend fun deleteBookmark(bookId: String, time: Long, sessionToken: String): BookmarkDeleteResult = onIO {
+    suspend fun deleteBookmark(bookId: String, time: Long, sessionToken: String): BookmarkDeleteResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         val chapter = activeChapter(bookId, sessionToken)
         bookmarkService.requireWritable()
         val book = readShelfEntry(bookId)
@@ -157,14 +157,14 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         bookmarkService.delete(chapter, target)
     }
 
-    suspend fun pendingBookmarks(): List<PendingBookmark> = onIO { bookmarkService.pending() }
+    suspend fun pendingBookmarks(): List<PendingBookmark> = onIO(WholeTurnMode.OBSERVER_READ) { bookmarkService.pending() }
 
-    suspend fun reconcilePendingBookmark(bookId: String, operationId: String): BookmarkOperationResult = onIO {
+    suspend fun reconcilePendingBookmark(bookId: String, operationId: String): BookmarkOperationResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         localIdentity(bookId)
         bookmarkService.reconcile(bookId, operationId)
     }
 
-    suspend fun openBookmark(bookmark: ReaderBookmark): ReaderChapter = onIO {
+    suspend fun openBookmark(bookmark: ReaderBookmark): ReaderChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         check(bookmark.sourceId == "local") { "LOCAL_BOOKMARK_REQUIRED" }
         readChapter(bookmark.bookId, bookmark.chapterIndex) { chapter ->
             if (chapter.bodyVersion != bookmark.bodyVersion || chapter.processingVersion != bookmark.processingVersion ||
@@ -172,7 +172,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }
     }
 
-    suspend fun startContentSearch(bookId: String, keyword: String, limit: Int = 50): ReaderContentSearchPage = onIO {
+    suspend fun startContentSearch(bookId: String, keyword: String, limit: Int = 50): ReaderContentSearchPage = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         localIdentity(bookId)
         val originalService = searchService
         try {
@@ -190,17 +190,17 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }
     }
 
-    suspend fun nextContentSearch(session: ReaderContentSearchSession, cursor: String): ReaderContentSearchPage = onIO {
+    suspend fun nextContentSearch(session: ReaderContentSearchSession, cursor: String): ReaderContentSearchPage = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         searchService.next(session, cursor)
     }
 
-    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO {
+    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         searchService.close(session) // Returns only after the exact original cursor close is confirmed.
         client.currentTurn().cleanupCompleted("search:${session.id}")
         registeredSearchCleanups.remove(session.id)
     }
 
-    suspend fun openContentSearchHit(session: ReaderContentSearchSession, hit: ReaderContentSearchHit): ReaderChapter = onIO {
+    suspend fun openContentSearchHit(session: ReaderContentSearchSession, hit: ReaderContentSearchHit): ReaderChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         readChapter(hit.bookId, hit.chapterIndex) { chapter -> searchService.validateJump(session, hit, chapter) }
     }
 
@@ -219,7 +219,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         return entry
     }
 
-    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): Unit = onIO {
+    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         localIdentity(bookId)
         val session = readingSessions[bookId] ?: error("READING_SESSION_MISSING")
         check(session.chapter.index == index) { "RETIRED_READING_SESSION" }
@@ -280,13 +280,13 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }
     }
 
-    suspend fun pendingPositions(): List<PendingPosition> = onIO {
+    suspend fun pendingPositions(): List<PendingPosition> = onIO(WholeTurnMode.OBSERVER_READ) {
         journal.readAll().filter { it.getString("kind") == "progress" && !it.optBoolean("completed") }
             .map { PendingPosition(it.getString("id"), it.getString("bookId"), "reading.progress.update") }
     }
 
     /** Explicitly inspect one original ACK. No get, new save, cancellation or replay. */
-    suspend fun reconcilePendingPosition(bookId: String, operationId: String): Unit = onIO {
+    suspend fun reconcilePendingPosition(bookId: String, operationId: String): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         localIdentity(bookId)
         var record = journal.exact(operationId, includeCompleted = true)
             ?: throw PendingOperationException(operationId, "reading.progress.update")
@@ -311,17 +311,17 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         Unit
     }
 
-    suspend fun pendingImports(): List<PendingImport> = onIO {
+    suspend fun pendingImports(): List<PendingImport> = onIO(WholeTurnMode.OBSERVER_READ) {
         pendingImportRecords().map { PendingImport(it.getString("id"), it.getString("fileName"),
             it.optString("inFlightStage", it.getString("nextStage"))) }
     }
 
     /** Explicit recovery queries and, only when Core admits it, replays the same binding. */
-    suspend fun reconcilePendingImports(): List<LibraryBook> = onIO {
+    suspend fun reconcilePendingImports(): List<LibraryBook> = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         pendingImportRecords().map { continueImport(it, explicitRecovery = true) }
     }
 
-    suspend fun importDocument(uri: Uri): LibraryBook = onIO {
+    suspend fun importDocument(uri: Uri): LibraryBook = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         val pending = pendingImportRecords().firstOrNull()
         if (pending != null) throw PendingOperationException(pending.getString("id"), pending.getString("nextStage"))
         val filename = displayName(uri)
@@ -592,15 +592,13 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         require(bookId.matches(Regex("local:[a-f0-9]{64}"))) { "LOCAL_BOOK_ID_REQUIRED" }
     }
 
-    private suspend fun <T> onIO(block: suspend () -> T): T {
+    private suspend fun <T> onIO(mode: WholeTurnMode, block: suspend () -> T): T {
         check(!closed.get()) { "LIBRARY_CLIENT_RETIRED" }
-        return client.wholeTurn {
-            // This App-scope block and finally are not children of the VM caller.
-            // Retirement closes NEW admission, never interrupts accepted stages.
-            try { block() } finally {
-                if (searchServiceDelegate.isInitialized()) searchService.finishOwnerTurn()
-            }
-        }
+        return client.wholeTurn(mode, block = { block() }, protectedFinally = {
+            // Even a pure-read body can reveal a retired search's original cursor.
+            // This exact existing service cleanup never inherits the read observer Job.
+            if (searchServiceDelegate.isInitialized()) searchService.finishOwnerTurn()
+        })
     }
 
     override fun close() {
