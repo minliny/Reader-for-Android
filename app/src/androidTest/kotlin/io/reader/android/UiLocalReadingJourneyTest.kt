@@ -23,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import io.reader.android.runtime.ReaderTextCoordinates
+import io.reader.android.runtime.LibraryBook
 import io.reader.android.ui.ReaderViewModel
 import io.reader.android.ui.ReaderRoute
 import org.junit.Assert.assertEquals
@@ -99,6 +100,38 @@ class UiLocalReadingJourneyTest {
         assertEquals("Imported Core identity must bind the exact original bytes", "local:$expectedHash", book.id)
         assertTrue("Real Core catalog must contain chapters", book.chapterCount > 1)
         marker("import-ACK", Bundle().apply { putString("bookId", book.id); putInt("chapterCount", book.chapterCount) })
+        readReturnAndRecreateExisting(book, model)
+        marker("method-exit")
+    }
+
+    /** Continues the already-confirmed original import without invoking SAF or importing again. */
+    @Test
+    fun existingRealTxtReadReturnAndRecreateRetainsPosition() = withMethodCleanup {
+        marker("method-enter")
+        val args = InstrumentationRegistry.getArguments()
+        val hash = args.getString("expectedSHA")
+            ?: throw AssertionError("expectedSHA must bind the already imported original")
+        val expectedCount = args.getString("expectedChapterCount")?.toIntOrNull()
+            ?: throw AssertionError("expectedChapterCount must come from the retained original persist receipt")
+        assertTrue("Expected original SHA256 is invalid", hash.matches(Regex("[a-f0-9]{64}")))
+        assertTrue("This journey requires the original catalog's second chapter", expectedCount > 1)
+        val model = compose.activity.readerViewModel
+        marker("activity-owner-ready")
+        compose.waitUntil(20_000) { model.state.value.ready && !model.state.value.busy }
+        marker("startup-core-ready")
+        assertEquals("Existing-book journey must not import any input", 0L, model.state.value.importRevision)
+        assertTrue("Existing original import cannot remain unknown", model.state.value.pendingImports.isEmpty())
+        assertTrue("Existing position cannot remain unknown", model.state.value.pendingPositions.isEmpty())
+        val book = model.state.value.books.singleOrNull { it.id == "local:$hash" }
+            ?: throw AssertionError("The exact already imported original is absent")
+        assertEquals("Existing original's catalog differs from its persist receipt", expectedCount, book.chapterCount)
+        marker("existing-book-admitted", Bundle().apply { putString("bookId", book.id); putInt("chapterCount", book.chapterCount) })
+        readReturnAndRecreateExisting(book, model)
+        marker("method-exit")
+    }
+
+    /** Shared unchanged reading suffix; import and existing-book admission stay separate. */
+    private fun readReturnAndRecreateExisting(book: LibraryBook, model: ReaderViewModel) {
         marker("reader-open-request")
         compose.onNodeWithTag("reader_book_${book.id}").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
@@ -159,7 +192,6 @@ class UiLocalReadingJourneyTest {
             compose.activity.readerViewModel.state.value.reading?.visibleScalarOffset)
         compose.onNodeWithTag("reader_body").assertExists()
         exitToBookshelfAndAwaitSave(compose.activity.readerViewModel, book.id, persisted.progressChapter, persisted.progressOffset)
-        marker("method-exit")
     }
 
     /** Controller force-stops and proves no old PID before launching this separate method. */

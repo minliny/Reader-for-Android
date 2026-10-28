@@ -75,7 +75,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
                 check(entry.getString("sourceId") == "local") { "UNEXPECTED_SOURCE_IN_LOCAL_LIBRARY" }
                 val id = entry.getString("bookId")
                 val progress = readProgress(id).optJSONObject("progress")
-                result += decodeBook(entry, progress)
+                result += decodeBook(entry, progress, readLocalToc(id).size)
             }
             offset += entries.length()
             if (entries.length() == 0 || offset >= page.getInt("total")) return@onIO result
@@ -83,12 +83,19 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         error("BOOKSHELF_PAGE_LIMIT")
     }
 
-    suspend fun toc(bookId: String): List<ChapterItem> = onIO {
+    suspend fun toc(bookId: String): List<ChapterItem> = onIO { readLocalToc(bookId) }
+
+    /** Pure materialized Core TOC read; callers already own the library mutex. */
+    private fun readLocalToc(bookId: String): List<ChapterItem> {
         localIdentity(bookId)
-        val entries = transport.request("local_book.toc", JSONObject().put("bookId", bookId)).getJSONArray("toc")
-        (0 until entries.length()).map { index ->
+        val data = transport.request("local_book.toc", JSONObject().put("bookId", bookId))
+        check(data.getString("sourceId") == "local" && data.getString("bookId") == bookId) { "LOCAL_TOC_IDENTITY_CHANGED" }
+        val entries = data.getJSONArray("toc")
+        return (0 until entries.length()).map { index ->
             val item = entries.getJSONObject(index)
-            ChapterItem(item.getInt("index"), item.getString("title"))
+            val chapterIndex = item.getLong("index")
+            check(chapterIndex in 0..Int.MAX_VALUE.toLong()) { "LOCAL_TOC_INDEX_OUT_OF_RANGE" }
+            ChapterItem(chapterIndex.toInt(), item.getString("title"))
         }
     }
 
@@ -248,7 +255,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             if (!existing.isNull("book")) {
                 commitOriginal(staged, hash, size)
                 val entry = existing.getJSONObject("book")
-                return@onIO decodeBook(entry, readProgress(bookId).optJSONObject("progress"))
+                return@onIO decodeBook(entry, readProgress(bookId).optJSONObject("progress"), readLocalToc(bookId).size)
             }
             val capabilities = transport.request("core.info").getJSONArray("capabilities")
             check((0 until capabilities.length()).any { capabilities.getString(it) == "import.local.receipts.v2" }) {
@@ -472,9 +479,9 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private fun readProgress(bookId: String) = transport.request("reading.progress.get", JSONObject()
         .put("sourceId", "local").put("bookId", bookId))
 
-    private fun decodeBook(entry: JSONObject, progress: JSONObject?): LibraryBook = LibraryBook(
+    private fun decodeBook(entry: JSONObject, progress: JSONObject?, chapterCount: Int): LibraryBook = LibraryBook(
         entry.getString("bookId"), entry.optString("title"), entry.optString("author"),
-        entry.optInt("chapterCount"), progress?.optInt("chapterIndex") ?: 0,
+        chapterCount, progress?.optInt("chapterIndex") ?: 0,
         (progress?.optLong("chapterOffset") ?: 0).also { check(it in 0..Int.MAX_VALUE.toLong()) }.toInt(),
     )
 
