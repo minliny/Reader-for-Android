@@ -112,6 +112,7 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
     private var epoch = 0L
     private var rawVerifiedEpoch = -1L
     private var finishEpoch = -1L
+    private var finishPostedEpoch = -1L
     private var userGestureObserved = false
     private var userMoved = false
     private var anchor: (Int) -> Unit = {}
@@ -125,16 +126,26 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         }
     }
     private val finish: Runnable = Runnable {
-        if (!released && finishEpoch == epoch && rawVerifiedEpoch == epoch && isAttachedToWindow &&
+        if (!released && finishEpoch == epoch && finishPostedEpoch == epoch && rawVerifiedEpoch == epoch && isAttachedToWindow &&
             !bodyView.isLayoutRequested && logicalLineIntersectsViewport()) {
             restoring = false
             userGestureObserved = false
             userMoved = false
             phase(NativeLayoutPhase.Ready)
             removeCallbacks(timeout)
-        } else if (!released && finishEpoch == epoch) {
+        } else if (!released && finishEpoch == epoch && finishPostedEpoch == epoch) {
             pendingPlacement = true
             requestLayout()
+        }
+    }
+    private val drawObserver = ViewTreeObserver.OnDrawListener {
+        if (!released && restoring && !pendingPlacement && finishEpoch == epoch &&
+            rawVerifiedEpoch == epoch && finishPostedEpoch != epoch) {
+            finishPostedEpoch = epoch
+            // Handler work posted from OnDraw runs after this frame's pre-draw
+            // caret requests. Keep restoration ownership until then; an animation
+            // callback would release it before those TextView requests execute.
+            post(finish)
         }
     }
     private val layoutObserver = ViewTreeObserver.OnGlobalLayoutListener {
@@ -154,8 +165,9 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
             pendingPlacement = false
             scrollTo(0, bodyView.top + bodyView.totalPaddingTop + layout.getLineTop(line))
             finishEpoch = epoch
+            finishPostedEpoch = -1L
             removeCallbacks(finish)
-            postOnAnimation(finish)
+            invalidate()
         }
     }
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
@@ -185,6 +197,7 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
             addView(bodyView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         viewTreeObserver.addOnGlobalLayoutListener(layoutObserver)
+        viewTreeObserver.addOnDrawListener(drawObserver)
     }
 
     // Core/ReadingSession owns the logical position. AndroidView otherwise
@@ -250,6 +263,7 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         userMoved = false
         phase(NativeLayoutPhase.Restoring)
         removeCallbacks(finish)
+        finishPostedEpoch = -1L
         removeCallbacks(timeout)
         postDelayed(timeout, 5_000)
         requestLayout()
@@ -327,7 +341,10 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         epoch++
         removeCallbacks(timeout)
         removeCallbacks(finish)
-        if (viewTreeObserver.isAlive) viewTreeObserver.removeOnGlobalLayoutListener(layoutObserver)
+        if (viewTreeObserver.isAlive) {
+            viewTreeObserver.removeOnGlobalLayoutListener(layoutObserver)
+            viewTreeObserver.removeOnDrawListener(drawObserver)
+        }
         bodyView.clearFocus()
         bodyView.setTextIsSelectable(false)
         anchor = {}; tap = {}; phase = {}
