@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "https://github.com/minliny/Reader-Core",
-  "commit": "a8eb35081e892a4201582de18c8622a961c43f4e",
+  "commit": "1fe86c34e426e0288523850e3b87600f1efcaf3d",
   "license": "MIT OR Apache-2.0",
   "minimumAndroidApi": 24,
   "abis": [
@@ -14,22 +14,27 @@
     {
       "source": "bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java",
       "destination": "app/src/core/java/com/reader/core/NativeCoreBridge.java",
-      "sha256": "5641561db61642fffcff5638a59b09ee02b6c94a58af9fe85d6bab6f267055fe"
+      "sha256": "dd67fa441a30f60f517d414de886f3c213a4fb7321ca30faa4ca6e4cb5e6f996"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreAssetException.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreAssetException.java",
+      "sha256": "25b215e26790b5bb68ebadf39818393d673a625ba525483f029fa5df0b42cb44"
     },
     {
       "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreException.java",
       "destination": "app/src/core/java/com/reader/core/ReaderCoreException.java",
-      "sha256": "12870ad57534b50f09abff844d87af42c42e7de284d1bcc3ac2c66c6e2265936"
+      "sha256": "e60b4abb853212292cc4b79052c79efa79e2b76ad046bc28d18d8b53408136d1"
     },
     {
       "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java",
       "destination": "app/src/core/java/com/reader/core/ReaderCoreLastError.java",
-      "sha256": "18278d21867503c9e2a1b69ca109f67132864cb77a1a042b7012ecd8ade9f824"
+      "sha256": "427a2988d5d2fff74f5d81b39136c83daac5e3c1581dab95b083d8f0cbc0e894"
     },
     {
       "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java",
       "destination": "app/src/core/java/com/reader/core/ReaderCoreRuntime.java",
-      "sha256": "20b0c77dddcf157a1edc2022bb6b4ca7c2c1bb225e77dd1c702e9d17617fe293"
+      "sha256": "0959a38a0e71ee12523865e8e6001688006564c76537865fcd5ab9b3fd7609fc"
     }
   ],
   "compatibility": {
@@ -47,7 +52,7 @@
     "JNI shared library via CMake"
   ],
   "businessTests": "NOT_RUN",
-  "previousCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
+  "previousCommit": "a8eb35081e892a4201582de18c8622a961c43f4e",
   "buildPatch": {
     "baseCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
     "changedFiles": [
@@ -64,5 +69,26 @@
     "businessAbiSchemaProductVersion": "UNCHANGED",
     "cargoLock": "UNCHANGED; bindgen 0.69.5 already locked and available in offline cache",
     "hostTool": "LIBCLANG_PATH must select a real host libclang; NDK target/sysroot arguments remain canonical"
+  },
+  "androidBindingPatch": {
+    "baseCommit": "a8eb35081e892a4201582de18c8622a961c43f4e",
+    "changedFiles": [
+      "bindings/android/README.md",
+      "bindings/android/jni/reader_jni.cpp",
+      "bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreAssetException.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreException.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java"
+    ],
+    "reason": "Expose existing binary ebook resource and explicit event-delivery acknowledgement C APIs through thin Java/JNI; preserve original bytes across allocation failure; capture send diagnostics on its native calling thread.",
+    "sameGitObjects": {
+      "crates": true,
+      "Cargo.toml": true,
+      "Cargo.lock": true,
+      "rust-toolchain.toml": true
+    },
+    "rustBusinessCargoCAbiSchemaProductVersion": "UNCHANGED",
+    "nativeBuildAndDevice": "SEPARATE_EVIDENCE_REQUIRED"
   }
 }

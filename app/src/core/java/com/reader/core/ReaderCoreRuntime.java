@@ -5,11 +5,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 public final class ReaderCoreRuntime implements Closeable {
+    public static final int DELIVERY_JSON_ACK = 1;
     private static final int PROTOCOL_VERSION = 1;
     private static final long FIRST_GENERATED_REQUEST_ID = 1000L;
 
     private long handle;
     private long nextRequestId = FIRST_GENERATED_REQUEST_ID;
+    // Native has already copied this event. Keep the sole Java copy if String
+    // allocation fails; either poll API can resume this same delivery.
+    private byte[] undecodedEventBytes;
 
     public ReaderCoreRuntime() {
         this("{}");
@@ -28,6 +32,33 @@ public final class ReaderCoreRuntime implements Closeable {
         return NativeCoreBridge.abiVersion();
     }
 
+    public static int deliveryCapabilities() {
+        return NativeCoreBridge.deliveryCapabilities();
+    }
+
+    /** Explicit opt-in before sending commands. Legacy constructors do not enable it. */
+    public synchronized void enableEventAcknowledgements() {
+        int status = NativeCoreBridge.enableEventAck(requireHandle());
+        if (status != 0) {
+            throw synchronousFailure("rc_runtime_enable_event_ack", status);
+        }
+    }
+
+    /** Release delivery credit only after the Host actually consumes the original event. */
+    public synchronized void ackEvent(long deliveryId) {
+        long runtimeHandle = requireHandle();
+        if (deliveryId <= 0) {
+            throw new IllegalArgumentException("deliveryId must be positive");
+        }
+        int status = NativeCoreBridge.ackEvent(runtimeHandle, deliveryId);
+        if (status != 0) {
+            // The ordinary ACK path does not set last_error. A prior
+            // thread-local diagnostic must never be attributed to this ACK.
+            throw new ReaderCoreException("rc_runtime_ack_event", status,
+                    "rc_runtime_ack_event failed with status " + status, null);
+        }
+    }
+
     public static String pingSmoke() {
         try (ReaderCoreRuntime runtime = new ReaderCoreRuntime("{}")) {
             long requestId = 42L;
@@ -44,9 +75,7 @@ public final class ReaderCoreRuntime implements Closeable {
         long runtimeHandle = requireHandle();
         int status = NativeCoreBridge.send(runtimeHandle, utf8(commandJson));
         if (status != 0) {
-            throw new ReaderCoreException(
-                    status,
-                    "rc_runtime_send failed with status " + status);
+            throw synchronousFailure("rc_runtime_send", status);
         }
     }
 
@@ -78,6 +107,15 @@ public final class ReaderCoreRuntime implements Closeable {
 
     public synchronized byte[] pollEventBytes(long timeout, TimeUnit unit) {
         long runtimeHandle = requireHandle();
+        if (undecodedEventBytes != null) {
+            byte[] bytes = undecodedEventBytes;
+            undecodedEventBytes = null;
+            return bytes;
+        }
+        return pollNativeEvent(runtimeHandle, timeout, unit);
+    }
+
+    private byte[] pollNativeEvent(long runtimeHandle, long timeout, TimeUnit unit) {
         long timeoutMillis = unit == null ? timeout : unit.toMillis(timeout);
         if (timeoutMillis < 0) {
             timeoutMillis = 0;
@@ -86,11 +124,16 @@ public final class ReaderCoreRuntime implements Closeable {
     }
 
     public synchronized String pollEvent(long timeout, TimeUnit unit) {
-        byte[] bytes = pollEventBytes(timeout, unit);
-        if (bytes == null) {
+        long runtimeHandle = requireHandle();
+        if (undecodedEventBytes == null) {
+            undecodedEventBytes = pollNativeEvent(runtimeHandle, timeout, unit);
+        }
+        if (undecodedEventBytes == null) {
             return null;
         }
-        return new String(bytes, StandardCharsets.UTF_8);
+        String event = new String(undecodedEventBytes, StandardCharsets.UTF_8);
+        undecodedEventBytes = null;
+        return event;
     }
 
     public synchronized long sendHostComplete(long operationId, String resultJson) {
@@ -136,6 +179,15 @@ public final class ReaderCoreRuntime implements Closeable {
             NativeCoreBridge.destroy(handle);
             handle = 0;
         }
+        undecodedEventBytes = null;
+    }
+
+    private static ReaderCoreException synchronousFailure(String operation, int status) {
+        // No other Core call may intervene between the failed entry point and
+        // this peek on the same calling thread.
+        ReaderCoreLastError error = NativeCoreBridge.lastError();
+        return new ReaderCoreException(operation, status,
+                operation + " failed with status " + status, error);
     }
 
     private long requireHandle() {
