@@ -13,8 +13,10 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiSelector
+import androidx.test.uiautomator.UiWatcher
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import io.reader.android.runtime.ReaderTextCoordinates
@@ -247,35 +249,71 @@ class UiLocalReadingJourneyTest {
 
     private fun selectRealDocument(name: String) {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val provider = "com\\.(google\\.)?android\\.documentsui"
-        val providerSelector = UiSelector().packageNameMatches(provider)
-        assertTrue("System document picker must actually open",
-            device.findObject(providerSelector).waitForExists(10_000))
-        marker("picker-visible")
-        val file = providerSelector.text(name)
-        val folder = providerSelector.text("Reader")
-        val drawer = providerSelector.resourceIdMatches(".*:id/roots_list")
-        val downloads = drawer.childSelector(UiSelector().textMatches("Downloads|下载|下载内容"))
-        if (!device.findObject(file).exists()) {
-            // The previous picker can retain its drawer. Do not toggle an already
-            // open drawer, and never carry UiObject2 across its animation.
-            if (device.findObject(drawer).exists()) {
-                marker("picker-drawer-ready")
-                clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
-            } else if (!device.findObject(folder).exists()) {
-                val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
-                clickPickerOnce(device, roots, "picker-roots", drawer)
-                marker("picker-drawer-ready")
-                clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+        val watcherName = "reader-original-picker-open-consent"
+        val consentPackage = "com.oplus.securitypermission"
+        val consentTitle = "“Reader”想要打开“io.reader.minliny.test”"
+        var consentClickAttempted = false
+        device.registerWatcher(watcherName, UiWatcher {
+            val title = By.pkg(consentPackage).res("$consentPackage:id/alertTitle").text(consentTitle)
+            val checkbox = By.pkg(consentPackage).res("$consentPackage:id/coui_security_alert_dialog_checkbox")
+                .text("始终允许打开").checkable(true).checked(false).enabled(true)
+            val open = By.pkg(consentPackage).res("android:id/button1").text("打开").enabled(true)
+            if (consentClickAttempted || device.findObjects(title).size != 1 ||
+                device.findObjects(checkbox).size != 1 || device.findObjects(open).size != 1) {
+                false
+            } else {
+                val titleSelector = UiSelector().packageName(consentPackage)
+                    .resourceId("$consentPackage:id/alertTitle").text(consentTitle)
+                val checkboxSelector = UiSelector().packageName(consentPackage)
+                    .resourceId("$consentPackage:id/coui_security_alert_dialog_checkbox").text("始终允许打开")
+                val openSelector = UiSelector().packageName(consentPackage)
+                    .resourceId("android:id/button1").text("打开").enabled(true)
+                if (!device.findObject(titleSelector).exists() || device.findObject(checkboxSelector).isChecked ||
+                    !device.findObject(openSelector).isEnabled) false else {
+                    consentClickAttempted = true // At most one dispatch, including a failed click.
+                    marker("oem-open-observed", Bundle().apply { putString("dialogTitle", consentTitle); putBoolean("checkboxChecked", false) })
+                    val clicked = device.findObject(openSelector).click()
+                    val gone = device.findObject(titleSelector).waitUntilGone(2_000)
+                    marker("oem-open-ACK", Bundle().apply { putBoolean("clickDispatched", clicked); putBoolean("dialogGone", gone) })
+                    clicked
+                }
             }
-            if (!device.findObject(file).exists()) clickPickerOnce(device, folder, "picker-folder", file)
+        })
+        try {
+            val provider = "com\\.(google\\.)?android\\.documentsui"
+            val providerSelector = UiSelector().packageNameMatches(provider)
+            assertTrue("System document picker must actually open",
+                device.findObject(providerSelector).waitForExists(10_000))
+            marker("picker-visible")
+            val file = providerSelector.text(name)
+            val folder = providerSelector.text("Reader")
+            val drawer = providerSelector.resourceIdMatches(".*:id/roots_list")
+            val downloads = drawer.childSelector(UiSelector().textMatches("Downloads|下载|下载内容"))
+            if (!device.findObject(file).exists()) {
+                // The previous picker can retain its drawer. Do not toggle an already
+                // open drawer, and never carry UiObject2 across its animation.
+                if (device.findObject(drawer).exists()) {
+                    marker("picker-drawer-ready")
+                    clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+                } else if (!device.findObject(folder).exists()) {
+                    val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
+                    clickPickerOnce(device, roots, "picker-roots", drawer)
+                    marker("picker-drawer-ready")
+                    clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+                }
+                if (!device.findObject(file).exists()) clickPickerOnce(device, folder, "picker-folder", file)
+            }
+            assertTrue("Original input missing: $name", device.findObject(file).waitForExists(5_000))
+            marker("picker-file-click")
+            // UiObject stores a selector and resolves its live node during this one click.
+            assertTrue("Original document click was not dispatched", device.findObject(file).click())
+            assertTrue("System picker did not return to Reader", device.findObject(providerSelector).waitUntilGone(10_000))
+            assertTrue("Original picker return did not expose Reader's actual window",
+                device.findObject(UiSelector().packageName("io.reader.minliny")).waitForExists(10_000))
+            marker("picker-returned")
+        } finally {
+            device.removeWatcher(watcherName)
         }
-        assertTrue("Original input missing: $name", device.findObject(file).waitForExists(5_000))
-        marker("picker-file-click")
-        // UiObject stores a selector and resolves its live node during this one click.
-        assertTrue("Original document click was not dispatched", device.findObject(file).click())
-        assertTrue("System picker did not return to Reader", device.findObject(providerSelector).waitUntilGone(10_000))
-        marker("picker-returned")
     }
 
     private fun clickPickerOnce(device: UiDevice, selector: UiSelector, stage: String, next: UiSelector, gone: UiSelector? = null) {
