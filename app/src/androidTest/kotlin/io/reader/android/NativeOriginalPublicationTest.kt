@@ -73,7 +73,7 @@ class NativeOriginalPublicationTest {
                     operation("cleanup.$label.lstat") {
                         sameIdentity(Os.lstat(path.absolutePath), requireNotNull(identity) { "Probe ownership unavailable; retain file" }, written)
                     }
-                    operation("cleanup.$label.unlink") { Os.unlink(path.absolutePath) }
+                    operation("cleanup.$label.remove") { Os.remove(path.absolutePath) }
                 }
             }
             if (targetCreated) cleanup { syncDirectory(originals, "cleanup.originals") }
