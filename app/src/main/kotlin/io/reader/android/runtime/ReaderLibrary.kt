@@ -3,9 +3,6 @@ package io.reader.android.runtime
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.system.ErrnoException
-import android.system.Os
-import android.system.OsConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -55,6 +52,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val application = context.applicationContext
     private val root = File(application.filesDir, "Reader")
     private val originals = File(root, "Originals")
+    private val sourcePublisher = OriginalSourcePublisher(originals)
     private val staging = File(root, "ImportStaging")
     private val journal by lazy { DurableJournal(File(root, "Operations")) }
     private val transport: CoreTransport = NativeCoreTransport(File(root, "Core"), File(application.cacheDir, "ReaderCore"))
@@ -331,7 +329,12 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             if (stage == "publish") {
                 try { commitOriginal(stagedSource(record), record.getString("hash"), record.getLong("sourceBytes")) }
                 catch (failure: Exception) {
-                    record.put("nextStage", "rollback").put("resourceFailure", failure.javaClass.simpleName)
+                    val publication = failure as? OriginalSourcePublisher.Failure
+                    val rootClass = publication?.rootClass ?: failure.javaClass.simpleName
+                    val detail = JSONObject().put("operation", publication?.operation ?: "original.publish")
+                        .put("rootClass", rootClass).put("errno", publication?.errno ?: JSONObject.NULL)
+                    record.put("nextStage", "rollback").put("resourceFailure", rootClass)
+                        .put("resourceFailureDetail", detail)
                     record.remove("replayAuthorised")
                     journal.write(record)
                     return@repeat
@@ -450,30 +453,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     private fun commitOriginal(staged: File, hash: String, size: Long) {
-        check(originals.mkdirs() || originals.isDirectory)
-        verifyOriginal(staged, hash, size)
-        val target = File(originals, "$hash.source")
-        if (target.exists()) { verifyOriginal(target, hash, size); return }
-        try { Os.link(staged.absolutePath, target.absolutePath) }
-        catch (error: ErrnoException) { if (error.errno != OsConstants.EEXIST) throw error }
-        verifyOriginal(target, hash, size)
-        syncDirectory(originals)
+        sourcePublisher.publish(staged, hash, size)
     }
 
     private fun verifyOriginal(file: File, hash: String, size: Long) {
-        require(hash.matches(Regex("[a-f0-9]{64}")))
-        val stat = Os.lstat(file.absolutePath)
-        check(OsConstants.S_ISREG(stat.st_mode) && stat.st_size == size) { "ORIGINAL_SOURCE_IDENTITY" }
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (count > 0) digest.update(buffer, 0, count)
-            }
-        }
-        check(digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) } == hash) { "ORIGINAL_SOURCE_HASH" }
+        OriginalSourcePublisher.verify(file, hash, size)
     }
 
     private fun displayName(uri: Uri): String {
