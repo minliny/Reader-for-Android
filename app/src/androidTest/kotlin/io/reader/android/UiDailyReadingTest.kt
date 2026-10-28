@@ -29,7 +29,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiSelector
+import androidx.test.uiautomator.Until
 import io.reader.android.runtime.ReaderTextCoordinates
 import io.reader.android.runtime.ReaderBookmark
 import io.reader.android.ui.ReaderRoute
@@ -48,6 +48,7 @@ import org.junit.runners.model.Statement
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.regex.Pattern
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -310,19 +311,28 @@ class UiDailyReadingTest {
             }
             compose.waitUntil(5_000) { ownsSelection() }
             marker("native-selection-owner-ready")
-            val selectAll = device.findObject(UiSelector().textMatches("全选|Select all|SELECT ALL").enabled(true))
-            if (!selectAll.waitForExists(5_000)) {
-                val overflowId = "android:id/floating_toolbar_overflow_button"
+            // The observed floating toolbar has its own non-active window.
+            // By searches all window roots; match its clickable action container,
+            // rather than the separate non-clickable text child.
+            val selectAll = By.pkg("io.reader.minliny").clazz("android.widget.LinearLayout")
+                .desc(Pattern.compile("全选|Select all|SELECT ALL")).clickable(true).enabled(true)
+            if (device.wait(Until.hasObject(selectAll), 5_000) != true) {
+                val overflow = By.pkg("io.reader.minliny").res("android:id/overflow")
+                    .desc(Pattern.compile("更多选项|More options|MORE OPTIONS")).clickable(true).enabled(true)
                 assertTrue("Native Select all is absent and no unique observed toolbar overflow is available",
-                    device.findObjects(By.res(overflowId).enabled(true)).size == 1)
+                    device.findObjects(overflow).size == 1)
                 assertTrue("The observed overflow must belong to the original native selection", ownsSelection())
                 marker("native-selection-overflow-observed")
-                assertTrue("Observed native toolbar overflow click failed",
-                    device.findObject(UiSelector().resourceId(overflowId).enabled(true)).click())
+                val overflowActions = device.findObjects(overflow)
+                assertEquals("The observed toolbar overflow must remain unique", 1, overflowActions.size)
+                overflowActions.single().click()
                 assertTrue("Opening overflow must retain the original native selection", ownsSelection())
             }
-            assertTrue("Native Select all action did not appear", selectAll.waitForExists(5_000))
-            assertTrue("Native Select all action failed", selectAll.click())
+            assertTrue("Native Select all action did not appear", device.wait(Until.hasObject(selectAll), 5_000) == true)
+            assertTrue("Select all must retain the original native selection owner", ownsSelection())
+            val selectAllActions = device.findObjects(selectAll)
+            assertEquals("Native Select all must identify one clickable action", 1, selectAllActions.size)
+            selectAllActions.single().click()
             compose.waitUntil(5_000) {
                 ownsSelection() && compose.runOnUiThread {
                     minOf(selectionView.selectionStart, selectionView.selectionEnd) == 0 &&
@@ -330,10 +340,13 @@ class UiDailyReadingTest {
                 }
             }
             marker("native-selection-whole-chapter-ready")
-            val copy = device.findObject(
-                UiSelector().textMatches("复制|Copy|COPY").enabled(true))
-            assertTrue("Native selection Copy action did not appear", copy.waitForExists(5_000))
-            assertTrue("Native Copy action failed", copy.click())
+            val copy = By.pkg("io.reader.minliny").clazz("android.widget.LinearLayout")
+                .desc(Pattern.compile("复制|Copy|COPY")).clickable(true).enabled(true)
+            assertTrue("Native selection Copy action did not appear", device.wait(Until.hasObject(copy), 5_000) == true)
+            assertTrue("Copy must retain the original native selection owner", ownsSelection())
+            val copyActions = device.findObjects(copy)
+            assertEquals("Native Copy must identify one clickable action", 1, copyActions.size)
+            copyActions.single().click()
             var copied: String? = null
             var copiedTimestamp: Long? = null
             compose.runOnUiThread {
