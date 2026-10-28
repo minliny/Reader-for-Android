@@ -25,6 +25,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiSelector
 import io.reader.android.runtime.ReaderTextCoordinates
+import io.reader.android.runtime.ReaderBookmark
 import io.reader.android.ui.ReaderRoute
 import io.reader.android.ui.ReaderViewModel
 import org.junit.Assert.assertEquals
@@ -85,7 +86,12 @@ class UiDailyReadingTest {
         compose.onNodeWithTag("reader_add_bookmark").performClick()
         compose.waitUntil(20_000) {
             val state = model.state.value
-            !state.busy && (state.bookmarkRevision > createRevision || state.bookmarkError != null || state.pendingBookmarks.isNotEmpty())
+            !state.busy && (state.bookmarkRevision > createRevision || state.bookmarkError != null ||
+                state.pendingBookmarks.isNotEmpty() || state.error != null)
+        }
+        if (model.state.value.bookmarkRevision == createRevision && model.state.value.error != null) {
+            marker("bookmark-create-terminal-failure", Bundle().apply { putString("reportedError", model.state.value.error) })
+            throw AssertionError(model.state.value.error)
         }
         assertEquals(null, model.state.value.bookmarkError)
         assertTrue(model.state.value.pendingBookmarks.isEmpty())
@@ -105,10 +111,65 @@ class UiDailyReadingTest {
         controls(model)
         compose.onNodeWithTag("reader_open_bookmarks").performClick()
         compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.bookmarksReady }
+        existingBookmarkJumpDeleteAndSearch(model, created, originalIds, captured.identity, query)
+        marker("method-exit")
+    }
+
+    /** Consumes exactly the original retained create receipt; never creates another bookmark. */
+    @Test fun existingRealTxtExistingBookmarkAndSearchPagination() = cleanup {
+        marker("method-enter")
+        val args = InstrumentationRegistry.getArguments()
+        val expectedId = args.getString("expectedBookmarkId")
+            ?: throw AssertionError("expectedBookmarkId must bind the retained original create receipt")
+        val expectedChapter = args.getString("expectedChapter")?.toIntOrNull()
+            ?: throw AssertionError("expectedChapter must come from the retained bookmark scope")
+        val expectedOffset = args.getString("expectedOffset")?.toIntOrNull()
+            ?: throw AssertionError("expectedOffset must come from the retained bookmark scope")
+        val bodyVersion = args.getString("expectedBodyVersion")?.takeIf { it.isNotBlank() }
+            ?: throw AssertionError("expectedBodyVersion required")
+        val processingVersion = args.getString("expectedProcessingVersion")?.takeIf { it.isNotBlank() }
+            ?: throw AssertionError("expectedProcessingVersion required")
+        val query = args.getString("contentQuery")?.takeIf { it.isNotBlank() }
+            ?: throw AssertionError("contentQuery must bind an actual abundant original keyword")
+        assertTrue(expectedId.toLongOrNull()?.let { it > 0 } == true && expectedChapter >= 0 && expectedOffset >= 0)
+        val model = openExistingOriginal()
+        val originalReaderOwner = model.state.value.reading!!.identity
+        marker("bookmark-continuation-scroll-away-request")
+        compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 500) }
+        compose.waitForIdle()
+        compose.waitUntil(10_000) { model.state.value.reading!!.visibleScalarOffset != expectedOffset }
+        marker("bookmark-continuation-scrolled-away")
+        controls(model)
+        compose.onNodeWithTag("reader_open_bookmarks").performClick()
+        compose.waitUntil(20_000) { !model.state.value.busy }
+        assertTrue(model.state.value.bookmarksReady && model.state.value.pendingBookmarks.isEmpty())
+        assertEquals(null, model.state.value.bookmarkError)
+        val bookmark = model.state.value.bookmarks.singleOrNull { it.id == expectedId }
+            ?: throw AssertionError("The exact retained bookmark is absent; do not create a replacement")
+        assertEquals(model.state.value.reading!!.book.id, bookmark.bookId)
+        assertEquals(expectedChapter, bookmark.chapterIndex)
+        assertEquals(expectedOffset, bookmark.scalarOffset)
+        assertEquals(bodyVersion, bookmark.bodyVersion)
+        assertEquals(processingVersion, bookmark.processingVersion)
+        val retainedIds = model.state.value.bookmarks.map { it.id }.toSet() - expectedId
+        marker("existing-bookmark-admitted", Bundle().apply {
+            putString("bookmarkId", bookmark.id); putInt("chapter", bookmark.chapterIndex); putInt("scalarOffset", bookmark.scalarOffset)
+        })
+        existingBookmarkJumpDeleteAndSearch(model, bookmark, retainedIds, originalReaderOwner, query)
+        marker("method-exit")
+    }
+
+    private fun existingBookmarkJumpDeleteAndSearch(model: ReaderViewModel, created: ReaderBookmark,
+        retainedIds: Set<String>, retiredBookmarkOwner: Long, query: String) {
+        marker("bookmark-row-scroll-request")
         compose.onNodeWithTag("reader_bookmark_list").performScrollToNode(hasTestTag("reader_bookmark_${created.id}"))
+        marker("bookmark-jump-request")
         compose.onNodeWithTag("reader_bookmark_${created.id}").performClick()
+        marker("bookmark-jump-click-returned")
         compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.readerPanel == null }
+        marker("bookmark-core-session-ready")
         nativeRestored()
+        marker("bookmark-native-restored-before-anchor")
         val jumped = model.state.value.reading!!
         assertEquals(created.chapterIndex, jumped.chapter.index)
         assertEquals(created.scalarOffset, jumped.restoreScalarOffset)
@@ -127,16 +188,19 @@ class UiDailyReadingTest {
         }
         assertEquals(null, model.state.value.bookmarkError)
         assertTrue(model.state.value.pendingBookmarks.isEmpty())
-        assertEquals("Only this method's bookmark may be removed", originalIds, model.state.value.bookmarks.map { it.id }.toSet())
+        assertEquals("Only the admitted bookmark may be removed", retainedIds, model.state.value.bookmarks.map { it.id }.toSet())
         marker("bookmark-delete-ACK")
         compose.onNodeWithTag("reader_close_panel").performClick()
         compose.onNodeWithTag("reader_open_content_search").performClick()
         compose.onNodeWithTag("reader_content_query").performTextReplacement(query)
+        marker("search-first-page-request")
         compose.onNodeWithTag("reader_content_search_submit").performClick()
         searchTerminal(model)
         val firstPage = model.state.value.searchResults.map { it.id }
+        marker("search-first-page-confirmed", Bundle().apply { putInt("count", firstPage.size) })
         assertTrue("The supplied real query must expose an actual next cursor", model.state.value.searchHasMore)
         compose.onNodeWithTag("reader_content_results").performScrollToNode(hasTestTag("reader_content_search_next"))
+        marker("search-next-page-request")
         compose.onNodeWithTag("reader_content_search_next").performClick()
         searchTerminal(model)
         assertTrue(model.state.value.searchResults.size > firstPage.size)
@@ -146,7 +210,9 @@ class UiDailyReadingTest {
         val searchOwner = model.state.value.reading!!.identity
         marker("search-cursor-page-confirmed")
         compose.onNodeWithTag("reader_content_results").performScrollToNode(hasTestTag("reader_content_hit_${hit.id}"))
+        marker("search-jump-request")
         compose.onNodeWithTag("reader_content_hit_${hit.id}").performClick()
+        marker("search-jump-click-returned")
         compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.readerPanel == null }
         nativeRestored()
         val searched = model.state.value.reading!!
@@ -155,11 +221,10 @@ class UiDailyReadingTest {
         assertEquals(hit.positionScope.bodyVersion, searched.chapter.bodyVersion)
         assertEquals(hit.positionScope.processingVersion, searched.chapter.processingVersion)
         assertNativeAnchorVisible(hit.chapterOffset)
-        compose.runOnUiThread { model.openContentSearchHit(hit, searchOwner); model.openBookmark(created, captured.identity) }
+        compose.runOnUiThread { model.openContentSearchHit(hit, searchOwner); model.openBookmark(created, retiredBookmarkOwner) }
         assertEquals("Old query/bookmark callbacks cannot move the new session", searched.identity, model.state.value.reading!!.identity)
         marker("search-native-jump-and-retired-callbacks")
         exitAndAssertReceipt(model)
-        marker("method-exit")
     }
 
     @Test fun existingRealTxtNativeSelectionCopiesOriginal() = cleanup {
