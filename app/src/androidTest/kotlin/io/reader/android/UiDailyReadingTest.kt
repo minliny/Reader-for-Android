@@ -6,6 +6,9 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.graphics.Rect
+import android.util.TypedValue
+import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.compose.ui.geometry.Offset
@@ -31,6 +34,8 @@ import io.reader.android.runtime.ReaderTextCoordinates
 import io.reader.android.runtime.ReaderBookmark
 import io.reader.android.ui.ReaderRoute
 import io.reader.android.ui.ReaderViewModel
+import io.reader.android.ui.ReaderChapterIndexKey
+import io.reader.android.ui.ReaderScalarOffsetKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -42,13 +47,17 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.io.File
+import kotlin.math.abs
 
 /** Exact existing-book A2 selectors. No import, fixtures, data reset or business retries. */
 @RunWith(AndroidJUnit4::class)
 class UiDailyReadingTest {
     private val compose = createAndroidComposeRule<MainActivity>()
     private var method = "unassigned"
+    private var observedNativeOwner: Long? = null
+    private var observedNativeScroll: ScrollView? = null
     private val phases = TestRule { base, description -> object : Statement() {
         override fun evaluate() {
             method = description.methodName
@@ -160,6 +169,28 @@ class UiDailyReadingTest {
             putString("bookmarkId", bookmark.id); putInt("chapter", bookmark.chapterIndex); putInt("scalarOffset", bookmark.scalarOffset)
         })
         existingBookmarkJumpDeleteAndSearch(model, bookmark, retainedIds, originalReaderOwner, query)
+        marker("method-exit")
+    }
+
+    /** Exit-only continuation after an independently retained current-position receipt. */
+    @Test fun existingRealTxtCurrentPositionControlsAndExit() = cleanup {
+        marker("method-enter")
+        val args = InstrumentationRegistry.getArguments()
+        val expectedChapter = args.getString("expectedChapter")?.toIntOrNull()
+            ?: throw AssertionError("expectedChapter must come from the retained current-position receipt")
+        val expectedOffset = args.getString("expectedOffset")?.toIntOrNull()
+            ?: throw AssertionError("expectedOffset must come from the retained current-position receipt")
+        assertTrue(expectedChapter >= 0 && expectedOffset >= 0)
+        val model = openExistingOriginal()
+        val reading = model.state.value.reading!!
+        assertEquals(expectedChapter, reading.chapter.index)
+        assertEquals(expectedOffset, reading.restoreScalarOffset)
+        assertEquals(expectedOffset, reading.visibleScalarOffset)
+        assertNativeAnchorVisible(expectedOffset)
+        marker("current-position-admitted", Bundle().apply {
+            putInt("chapter", expectedChapter); putInt("scalarOffset", expectedOffset)
+        })
+        exitAndAssertReceipt(model)
         marker("method-exit")
     }
 
@@ -380,8 +411,24 @@ class UiDailyReadingTest {
     }
 
     private fun controls(model: ReaderViewModel) {
+        val owner = model.state.value.reading!!.identity
         if (!model.state.value.controlsVisible) compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
-        compose.waitUntil(5_000) { model.state.value.controlsVisible }
+        // Native GestureDetector uses the real main Handler; a model flag alone
+        // does not prove that StateFlow collection has committed the controls.
+        compose.waitUntil(5_000) {
+            model.state.value.reading?.identity == owner && model.state.value.controlsVisible && enabledExitPresent()
+        }
+        marker("controls-exit-enabled")
+        awaitAttachedDraw(compose.activity.window.decorView)
+        assertEquals(owner, model.state.value.reading!!.identity)
+        assertTrue("Actual enabled exit must survive the attached draw", enabledExitPresent())
+        marker("controls-draw-ACK")
+    }
+
+    private fun enabledExitPresent(): Boolean {
+        val nodes = compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes()
+        return nodes.size == 1 && SemanticsProperties.Disabled !in nodes.single().config &&
+            nodes.single().boundsInRoot.width > 0f && nodes.single().boundsInRoot.height > 0f
     }
 
     /** One standard native scroll, then bounded observation of the exact bound row and real action. */
@@ -419,7 +466,76 @@ class UiDailyReadingTest {
     }
 
     private fun nativeRestored() {
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("reader_restore_loading")).fetchSemanticsNodes().isEmpty() }
+        val model = compose.activity.readerViewModel
+        val expected = model.state.value
+        val reading = expected.reading ?: throw AssertionError("No current reading session to restore")
+        val previousOwner = observedNativeOwner
+        val previousView = observedNativeScroll
+        var actualView: ScrollView? = null
+        compose.waitUntil(10_000) {
+            val roots = compose.onAllNodes(hasTestTag("reader_reading")).fetchSemanticsNodes()
+            val semanticsMatch = roots.size == 1 && ReaderChapterIndexKey in roots.single().config &&
+                ReaderScalarOffsetKey in roots.single().config &&
+                roots.single().config[ReaderChapterIndexKey] == reading.chapter.index &&
+                roots.single().config[ReaderScalarOffsetKey] == reading.visibleScalarOffset
+            val controlsMatch = compose.onAllNodes(hasTestTag("reader_controls")).fetchSemanticsNodes().isNotEmpty() == expected.controlsVisible
+            val panelGone = expected.readerPanel != null ||
+                compose.onAllNodes(hasTestTag("reader_tools_panel")).fetchSemanticsNodes().isEmpty()
+            val loadingGone = compose.onAllNodes(hasTestTag("reader_restore_loading")).fetchSemanticsNodes().isEmpty()
+            val nativeMatch = compose.runOnUiThread {
+                val activity = compose.activity
+                val scroll = activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+                val body = activity.findViewById<TextView>(R.id.reader_native_text)
+                val layout = body?.layout
+                val replaced = previousOwner == null || previousOwner == reading.identity ||
+                    (scroll !== previousView && previousView?.isAttachedToWindow != true)
+                val panelsRetired = expected.readerPanel != null ||
+                    listOf(R.id.reader_native_bookmark_list, R.id.reader_native_search_list).all { id ->
+                        activity.findViewById<RecyclerView>(id)?.isAttachedToWindow != true
+                    }
+                val ready = scroll != null && body != null && scroll.isAttachedToWindow && body.isAttachedToWindow &&
+                    scroll.isShown && body.isShown && scroll.isLaidOut && body.isLaidOut &&
+                    !scroll.isLayoutRequested && !body.isLayoutRequested && layout != null &&
+                    layout.width == body.width - body.totalPaddingLeft - body.totalPaddingRight &&
+                    reading.chapter.text.contentEquals(body.text) && abs(body.textSize - TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_SP, expected.fontSize.toFloat(), body.resources.displayMetrics)) < .5f &&
+                    replaced && panelsRetired
+                if (ready) actualView = scroll
+                ready
+            }
+            model.state.value.reading?.identity == reading.identity && semanticsMatch && controlsMatch && panelGone && loadingGone && nativeMatch
+        }
+        val native = actualView ?: throw AssertionError("Current native viewport did not become ready")
+        awaitAttachedDraw(native)
+        assertEquals("The native draw must still belong to the admitted reading session", reading.identity, model.state.value.reading!!.identity)
+        observedNativeOwner = reading.identity
+        observedNativeScroll = native
+        marker("native-session-draw-ACK", Bundle().apply {
+            putLong("readingOwner", reading.identity); putInt("chapter", reading.chapter.index)
+            putInt("scalarOffset", reading.visibleScalarOffset)
+        })
+    }
+
+    /** A real attached tree draw acknowledgement, without sleeps or business input. */
+    private fun awaitAttachedDraw(view: View) {
+        val drawn = AtomicBoolean(false)
+        lateinit var observer: ViewTreeObserver
+        val listener = ViewTreeObserver.OnDrawListener {
+            if (view.isAttachedToWindow && view.isShown && view.width > 0 && view.height > 0) drawn.set(true)
+        }
+        compose.runOnUiThread {
+            assertTrue("The draw target must be attached", view.isAttachedToWindow && view.isShown)
+            observer = view.viewTreeObserver
+            observer.addOnDrawListener(listener)
+            view.invalidate()
+        }
+        try {
+            compose.waitUntil(5_000) { drawn.get() }
+            // This main-queue observation runs after the OnDraw dispatch returns.
+            compose.runOnUiThread { assertTrue("The acknowledged view must remain attached", view.isAttachedToWindow && view.isShown) }
+        } finally {
+            compose.runOnUiThread { if (observer.isAlive) observer.removeOnDrawListener(listener) }
+        }
     }
 
     private fun assertNativeAnchorVisible(scalar: Int) {
