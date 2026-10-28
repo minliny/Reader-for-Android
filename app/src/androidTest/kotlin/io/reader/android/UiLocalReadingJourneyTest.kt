@@ -1,6 +1,10 @@
 package io.reader.android
 
+import android.os.Bundle
+import android.os.Process as AndroidProcess
+import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -9,17 +13,24 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
+import androidx.test.uiautomator.UiSelector
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import io.reader.android.runtime.ReaderTextCoordinates
+import io.reader.android.ui.ReaderViewModel
 import io.reader.android.ui.ReaderRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
+import org.junit.rules.TestRule
+import org.junit.rules.Timeout
 import org.junit.runner.RunWith
-import java.util.regex.Pattern
+import org.junit.runners.model.Statement
+import java.util.concurrent.TimeUnit
 
 /**
  * Selector: io.reader.android.UiLocalReadingJourneyTest#realTxtPickerReadReturnAndRecreateRetainsPosition
@@ -29,10 +40,27 @@ import java.util.regex.Pattern
  */
 @RunWith(AndroidJUnit4::class)
 class UiLocalReadingJourneyTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private val compose = createAndroidComposeRule<MainActivity>()
+    private var currentMethod = "unassigned"
+    private val phaseMarker = TestRule { base, description ->
+        object : Statement() {
+            override fun evaluate() {
+                currentMethod = description.methodName
+                marker("rule-enter")
+                try { base.evaluate() }
+                finally { marker("rule-exit") }
+            }
+        }
+    }
+    // Unlike @Test(timeout), this deadline also surrounds Compose/Activity
+    // setup and teardown. The external controller retains its own client bound.
+    @get:Rule val rules: TestRule = RuleChain.outerRule(
+        Timeout.builder().withTimeout(240, TimeUnit.SECONDS).withLookingForStuckThread(true).build()
+    ).around(phaseMarker).around(compose)
 
-    @Test(timeout = 240_000)
+    @Test
     fun realTxtPickerReadReturnAndRecreateRetainsPosition() {
+        marker("method-enter") // Before the first potentially blocking compose.activity lookup.
         val args = InstrumentationRegistry.getArguments()
         val inputName = args.getString("readerInputName")
             ?: throw AssertionError("readerInputName must name the existing real TXT in Download/Reader")
@@ -40,8 +68,11 @@ class UiLocalReadingJourneyTest {
             ?: throw AssertionError("expectedSHA must bind the original pre-transfer SHA256")
         assertTrue("A SHA256 identity is required", expectedHash.matches(Regex("[a-f0-9]{64}")))
         val model = compose.activity.readerViewModel
+        marker("activity-owner-ready")
         compose.waitUntil(20_000) { model.state.value.ready && !model.state.value.busy }
+        marker("startup-core-ready")
         val originalImportRevision = model.state.value.importRevision
+        marker("picker-request")
         compose.onNodeWithTag("reader_import").performClick()
         selectRealDocument(inputName)
         compose.waitUntil(120_000) { model.state.value.importRevision > originalImportRevision && !model.state.value.busy }
@@ -50,35 +81,48 @@ class UiLocalReadingJourneyTest {
             ?: throw AssertionError("Imported original title absent; actual=${model.state.value.books.map { it.title }}")
         assertEquals("Imported Core identity must bind the exact original bytes", "local:$expectedHash", book.id)
         assertTrue("Real Core catalog must contain chapters", book.chapterCount > 1)
+        marker("import-ACK", Bundle().apply { putString("bookId", book.id); putInt("chapterCount", book.chapterCount) })
+        marker("reader-open-request")
         compose.onNodeWithTag("reader_book_${book.id}").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
         waitForNativeRestore()
+        marker("reader-native-restored")
         compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
+        marker("directory-open-request")
         compose.onNodeWithTag("reader_open_directory").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Directory && !model.state.value.busy }
         val targetChapter = model.state.value.chapters.getOrNull(1)
             ?: throw AssertionError("Real original's second catalog entry is absent")
+        marker("directory-ready")
         compose.onNodeWithTag("reader_chapter_${targetChapter.index}").performClick()
         compose.waitUntil(20_000) {
             model.state.value.route == ReaderRoute.Reading && model.state.value.reading?.chapter?.index == targetChapter.index && !model.state.value.busy
         }
         waitForNativeRestore()
+        marker("directory-selected-reader-restored")
         compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 550) }
+        compose.waitForIdle() // Capture the settled real fling anchor, not an intermediate frame.
         compose.waitUntil(10_000) { (model.state.value.reading?.visibleScalarOffset ?: 0) > 0 }
         val beforeExit = model.state.value.reading ?: throw AssertionError("Missing actual reading session")
+        marker("visible-anchor-recorded", Bundle().apply { putInt("scalarOffset", beforeExit.visibleScalarOffset) })
         compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
         compose.onNodeWithTag("reader_controls").assertIsDisplayed()
         compose.onNodeWithTag("reader_font_larger").performClick()
         waitForNativeRestore()
+        marker("font-reflow-complete")
+        marker("exit-request")
         compose.onNodeWithTag("reader_exit").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
         val persisted = model.state.value.books.single { it.id == book.id }
         assertEquals(beforeExit.chapter.index, persisted.progressChapter)
         assertTrue("Actual visible text anchor must persist", persisted.progressOffset > 0)
         assertEquals("Reflow must preserve the original scalar anchor", beforeExit.visibleScalarOffset, persisted.progressOffset)
+        marker("exit-save-ACK")
 
+        marker("activity-recreate-request")
         compose.activityRule.scenario.recreate()
         compose.waitUntil(20_000) { compose.activity.readerViewModel.state.value.ready }
+        marker("activity-recreate-ready")
         compose.onNodeWithTag("reader_book_${book.id}").performClick()
         compose.waitUntil(20_000) {
             val state = compose.activity.readerViewModel.state.value
@@ -88,6 +132,7 @@ class UiLocalReadingJourneyTest {
         val restored = compose.activity.readerViewModel.state.value.reading ?: throw AssertionError("Missing reopened reader")
         assertEquals(persisted.progressChapter, restored.chapter.index)
         assertEquals(persisted.progressOffset, restored.restoreScalarOffset)
+        assertNativeAnchorVisible(persisted.progressOffset)
         assertNotEquals("Activity reconstruction must create a fresh reader owner", beforeExit.identity, restored.identity)
         val currentOffset = restored.visibleScalarOffset
         compose.runOnUiThread {
@@ -96,6 +141,101 @@ class UiLocalReadingJourneyTest {
         assertEquals("Retired reader callback cannot overwrite current position", currentOffset,
             compose.activity.readerViewModel.state.value.reading?.visibleScalarOffset)
         compose.onNodeWithTag("reader_body").assertExists()
+        exitToBookshelfAndAwaitSave(compose.activity.readerViewModel, book.id, persisted.progressChapter, persisted.progressOffset)
+        marker("method-exit")
+    }
+
+    /** Controller force-stops and proves no old PID before launching this separate method. */
+    @Test
+    fun coldLaunchExistingRealTxtRetainsPosition() {
+        marker("method-enter") // The first method marker precedes compose.activity.
+        val args = InstrumentationRegistry.getArguments()
+        val hash = args.getString("expectedSHA")
+            ?: throw AssertionError("expectedSHA must come from the prior stopped-data proof")
+        val chapter = args.getString("expectedChapter")?.toIntOrNull()
+            ?: throw AssertionError("expectedChapter must come from the prior stopped-data proof")
+        val scalar = args.getString("expectedOffset")?.toIntOrNull()
+            ?: throw AssertionError("expectedOffset must come from the prior stopped-data proof")
+        assertTrue("Expected original SHA256 is invalid", hash.matches(Regex("[a-f0-9]{64}")))
+        assertTrue("Expected Core coordinates must be nonnegative", chapter >= 0 && scalar >= 0)
+        if (args.containsKey("previousProcessPid")) {
+            val previous = args.getString("previousProcessPid")?.toIntOrNull()
+                ?: throw AssertionError("previousProcessPid must be an actual positive prior PID")
+            assertTrue("Previous PID must be positive", previous > 0)
+            assertNotEquals("Cold launch must use a different process", previous, AndroidProcess.myPid())
+        }
+        marker("cold-process-observed")
+        val model = compose.activity.readerViewModel
+        compose.waitUntil(20_000) { model.state.value.ready && !model.state.value.busy }
+        assertEquals("Cold method must not import any input", 0L, model.state.value.importRevision)
+        assertTrue("Cold startup must expose no unknown import", model.state.value.pendingImports.isEmpty())
+        assertTrue("Cold startup must expose no unknown position", model.state.value.pendingPositions.isEmpty())
+        val book = model.state.value.books.singleOrNull { it.id == "local:$hash" }
+            ?: throw AssertionError("The original existing book is absent after Core startup")
+        assertEquals("Cold Core chapter differs from the prior proof", chapter, book.progressChapter)
+        assertEquals("Cold Core scalar differs from the prior proof", scalar, book.progressOffset)
+        marker("cold-core-restored", Bundle().apply { putString("bookId", book.id); putInt("chapter", chapter); putInt("scalarOffset", scalar) })
+        compose.onNodeWithTag("reader_book_${book.id}").performClick()
+        compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
+        waitForNativeRestore()
+        val reading = model.state.value.reading ?: throw AssertionError("Cold reader is absent")
+        assertEquals(chapter, reading.chapter.index)
+        assertEquals(scalar, reading.restoreScalarOffset)
+        assertNativeAnchorVisible(scalar)
+        marker("cold-native-restored")
+        exitToBookshelfAndAwaitSave(model, book.id, chapter, scalar)
+        marker("method-exit")
+    }
+
+    private fun marker(step: String, details: Bundle = Bundle()) {
+        details.putString("readerStep", step)
+        details.putString("readerMethod", currentMethod)
+        details.putInt("readerProcessPid", AndroidProcess.myPid())
+        details.putLong("readerProcessStartElapsedMs", AndroidProcess.getStartElapsedRealtime())
+        details.putLong("readerElapsedMs", SystemClock.elapsedRealtime())
+        InstrumentationRegistry.getInstrumentation().sendStatus(2, details)
+    }
+
+    private fun exitToBookshelfAndAwaitSave(model: ReaderViewModel, bookId: String, chapter: Int, scalar: Int) {
+        if (!model.state.value.controlsVisible) {
+            compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
+        }
+        marker("final-exit-request")
+        compose.onNodeWithTag("reader_exit").performClick()
+        compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
+        assertEquals("Final exit must retain no failure", null, model.state.value.error)
+        assertTrue("Final save cannot remain unknown", model.state.value.pendingPositions.none { it.bookId == bookId })
+        val saved = model.state.value.books.single { it.id == bookId }
+        assertEquals(chapter, saved.progressChapter)
+        assertEquals(scalar, saved.progressOffset)
+        marker("final-exit-save-ACK", Bundle().apply { putInt("chapter", chapter); putInt("scalarOffset", scalar) })
+    }
+
+    /** Confirm the expected content's actual native laid-out line intersects the visible body. */
+    private fun assertNativeAnchorVisible(scalar: Int) {
+        val reading = compose.activity.readerViewModel.state.value.reading
+            ?: throw AssertionError("No reader owns the native anchor")
+        val text = reading.chapter.text
+        val utf16 = ReaderTextCoordinates.utf16Offset(text, scalar)
+        val start = if (utf16 == 0) 0 else text.lastIndexOf('\n', utf16 - 1) + 1
+        val end = text.indexOf('\n', utf16).let { if (it < 0) text.length else it }
+        val paragraph = text.substring(start, end)
+        val viewport = compose.onNodeWithTag("reader_body").fetchSemanticsNode().boundsInRoot
+        val nodes = compose.onAllNodes(hasText(paragraph.ifEmpty { "\u200B" }), useUnmergedTree = true).fetchSemanticsNodes()
+        val visible = nodes.any { node ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            val action = if (SemanticsActions.GetTextLayoutResult in node.config)
+                node.config[SemanticsActions.GetTextLayoutResult].action else null
+            val obtained = compose.runOnUiThread { action?.invoke(layouts) == true }
+            val layout = layouts.singleOrNull()
+            if (!obtained || layout == null) false else {
+                val line = layout.getLineForOffset((utf16 - start).coerceIn(0, paragraph.length))
+                val top = node.positionInRoot.y + layout.getLineTop(line)
+                val bottom = node.positionInRoot.y + layout.getLineBottom(line)
+                bottom > viewport.top && top < viewport.bottom
+            }
+        }
+        assertTrue("Expected original scalar's native text line is outside the actual viewport", visible)
     }
 
     private fun waitForNativeRestore() {
@@ -107,22 +247,44 @@ class UiLocalReadingJourneyTest {
 
     private fun selectRealDocument(name: String) {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val provider = Pattern.compile("com\\.(google\\.)?android\\.documentsui")
+        val provider = "com\\.(google\\.)?android\\.documentsui"
+        val providerSelector = UiSelector().packageNameMatches(provider)
         assertTrue("System document picker must actually open",
-            device.wait(Until.hasObject(By.pkg(provider)), 10_000))
-        var file = device.findObject(By.text(name))
-        if (file == null) {
-            val roots = device.findObject(By.desc(Pattern.compile("Show roots|显示根目录|显示位置|导航抽屉")))
-                ?: throw AssertionError("Document picker root selector is unavailable; no coordinate fallback")
-            roots.click()
-            val downloads = device.wait(Until.findObject(By.text(Pattern.compile("Downloads|下载|下载内容"))), 5_000)
-                ?: throw AssertionError("Downloads provider absent")
-            downloads.click()
-            val folder = device.wait(Until.findObject(By.text("Reader")), 5_000)
-                ?: throw AssertionError("Existing Download/Reader folder absent")
-            folder.click()
-            file = device.wait(Until.findObject(By.text(name)), 5_000)
+            device.findObject(providerSelector).waitForExists(10_000))
+        marker("picker-visible")
+        val file = providerSelector.text(name)
+        val folder = providerSelector.text("Reader")
+        val drawer = providerSelector.resourceIdMatches(".*:id/roots_list")
+        val downloads = drawer.childSelector(UiSelector().textMatches("Downloads|下载|下载内容"))
+        if (!device.findObject(file).exists()) {
+            // The previous picker can retain its drawer. Do not toggle an already
+            // open drawer, and never carry UiObject2 across its animation.
+            if (device.findObject(drawer).exists()) {
+                marker("picker-drawer-ready")
+                clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+            } else if (!device.findObject(folder).exists()) {
+                val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
+                clickPickerOnce(device, roots, "picker-roots", drawer)
+                marker("picker-drawer-ready")
+                clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+            }
+            if (!device.findObject(file).exists()) clickPickerOnce(device, folder, "picker-folder", file)
         }
-        (file ?: throw AssertionError("Original input missing: $name")).click()
+        assertTrue("Original input missing: $name", device.findObject(file).waitForExists(5_000))
+        marker("picker-file-click")
+        // UiObject stores a selector and resolves its live node during this one click.
+        assertTrue("Original document click was not dispatched", device.findObject(file).click())
+        assertTrue("System picker did not return to Reader", device.findObject(providerSelector).waitUntilGone(10_000))
+        marker("picker-returned")
+    }
+
+    private fun clickPickerOnce(device: UiDevice, selector: UiSelector, stage: String, next: UiSelector, gone: UiSelector? = null) {
+        assertTrue("$stage target absent", device.findObject(selector).waitForExists(5_000))
+        marker("$stage-click")
+        // Reacquire from the exact selector immediately before the only click.
+        assertTrue("$stage click was not dispatched", device.findObject(selector).click())
+        if (gone != null) assertTrue("$stage did not retire its drawer", device.findObject(gone).waitUntilGone(5_000))
+        assertTrue("$stage did not expose the next state", device.findObject(next).waitForExists(5_000))
+        marker("$stage-ready")
     }
 }

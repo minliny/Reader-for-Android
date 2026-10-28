@@ -26,6 +26,15 @@ python3 scripts/apk_artifact.py verify --manifest /absolute/run/manifest.json
 
 The App entry explicitly runs `:app:writeDebugRuntimeArtifacts` and `:app:assembleDebug`. The first exports the exact resolved runtime AAR inventory for this run; neither runs business tests. The entry captures selected sources, resources, Gradle and build scripts plus the matching Core receipt. Inputs must remain unchanged. Publication verifies package/SDK identity, one APK signer, exact embedded native bytes and ZIP alignment. Every packaged Native library must belong to the fixed Core or a specific resolved AAR, with source SHA and 16KB ELF evidence; duplicate and unknown libraries are rejected. Original Native bytes are retained by the debug package. The run is then frozen under `.artifacts/<uuid>/`. `.build/app-build.json` points to the immutable manifest. A manifest proves its stated build, not an installation or interaction.
 
+For a test-only correction, reuse the admitted production APK and compile only the separate Runner:
+
+```sh
+python3 scripts/build-tests.py --host-manifest /absolute/run/manifest.json \
+  --rationale "Concrete failure and test-only correction"
+```
+
+This offline entry selects `:app:assembleDebugAndroidTest` under the same build lease. It checks that production compiler inputs and the existing App APK remain identical, captures the test sources, and publishes a separate test APK with its signer. It neither installs nor runs tests, and does not rebuild Core. Changed production inputs require the ordinary App build lane.
+
 ## Explicit device operations
 
 ```sh
