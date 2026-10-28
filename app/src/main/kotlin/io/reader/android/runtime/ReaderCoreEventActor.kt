@@ -38,8 +38,8 @@ import java.util.concurrent.ConcurrentHashMap
  * must capture status + last_error immediately on the SAME native call thread.
  * No port method may wait for a business gate, UI thread, or Host handler.
  *
- * OPEN RESOURCE LIMIT: successful controls retain minimal routing identities
- * until exact control-error ACK or runtime close. Their COUNT is not bounded by
+ * OPEN RESOURCE LIMIT: retired originals retain minimal identities until close;
+ * successful controls retain theirs until exact control-error ACK or close. Their COUNT is not bounded by
  * Core delivery credits once earlier events were ACKed. Fixed1fe has no success
  * control event and may publish a control error after the primary terminal, so
  * no TTL/count eviction is justified. This unwired draft does not claim bounded
@@ -68,7 +68,8 @@ internal class ReaderCoreEventActor(
     enum class Kind { READ_ONLY, DURABLE_WRITE }
     enum class Origin { ORIGINAL_TERMINAL, HOST_REQUEST, CONTROL_ERROR }
     enum class Phase { PREPARED, PREPARING, SENT, SEND_UNKNOWN, REJECTION_NOT_RECORDED, TERMINAL_RETAINED }
-    enum class DeliveryPhase { RETAINED, CONSUMING, CONSUMER_FAILED, CONSUMED_ACK_FAILED }
+    enum class DeliveryPhase { RETAINED, CONSUMING, CONSUMER_FAILED, CONSUMED_ACK_FAILED, QUARANTINED }
+    enum class LateHostDisposition { CANCELLED_ORIGINAL_DISCARDED, QUARANTINED }
 
     class PreparedRequest internal constructor(
         val runtimeSession: String, val requestId: Long, val token: String,
@@ -113,7 +114,15 @@ internal class ReaderCoreEventActor(
     }
     fun interface HostHandler { suspend fun execute(original: HostEnvelope): HostReply }
     data class RequestSummary(val request: PreparedRequest, val phase: Phase, val readRetired: Boolean)
-    data class RetainedDelivery(val delivery: Delivery, val phase: DeliveryPhase)
+    /** Historical identity only: never retains PreparedRequest, params, terminal raw or consumer. */
+    data class RetiredOriginalRoute(
+        val runtimeSession: String, val requestId: Long, val requestToken: String, val kind: Kind,
+        val terminalDeliveryId: Long, val terminalType: String, val terminalErrorCode: String?,
+        val terminalAcknowledged: Boolean,
+        val lateHostDiscardCount: Long = 0, val lateHostAckCount: Long = 0,
+    )
+    data class RetainedDelivery(val delivery: Delivery, val phase: DeliveryPhase,
+        val retiredOriginalRoute: RetiredOriginalRoute? = null, val lateHostDisposition: LateHostDisposition? = null)
     data class HostSummary(
         val envelope: HostEnvelope, val phase: String, val fixedResponse: HostReply?, val controlRequestId: Long?,
     )
@@ -121,6 +130,7 @@ internal class ReaderCoreEventActor(
         val admissionOpen: Boolean, val requests: List<RequestSummary>, val deliveries: List<RetainedDelivery>,
         val hostOperations: List<HostSummary>, val faults: List<Fault>, val unparsedOriginals: List<String>,
         val controlRoutingIdentityCount: Int,
+        val retiredOriginalRouteCount: Int = 0,
     )
     data class CloseReport(
         val retained: Snapshot, val nativeCloseFailure: String?, val hostHandlersDrained: Boolean,
@@ -129,10 +139,12 @@ internal class ReaderCoreEventActor(
     )
 
     private data class RequestState(val plan: PreparedRequest, var phase: Phase = Phase.PREPARED,
-        var readRetired: Boolean = false, var terminalDelivery: Long? = null, var terminalAcked: Boolean = false)
+        var readRetired: Boolean = false, var terminalDelivery: Long? = null, var terminalAcked: Boolean = false,
+        var terminalType: String? = null, var terminalErrorCode: String? = null)
     private data class Route(val requestId: Long, val requestToken: String)
     private data class Frame(val delivery: Delivery, val primary: Route,
-        var phase: DeliveryPhase = DeliveryPhase.RETAINED, var claim: String? = null)
+        var phase: DeliveryPhase = DeliveryPhase.RETAINED, var claim: String? = null,
+        val lateHostDisposition: LateHostDisposition? = null)
     private data class HostKey(val requestId: Long, val operationId: Long)
     private data class HostWork(val envelope: HostEnvelope, val deliveries: MutableList<Long>,
         var phase: String = "RUNNING", var job: Job? = null, var response: HostReply? = null, var controlId: Long? = null)
@@ -149,6 +161,8 @@ internal class ReaderCoreEventActor(
     private val closed = CompletableDeferred<CloseReport>()
     private val waitingCalls = ConcurrentHashMap.newKeySet<CompletableDeferred<*>>()
     private val requests = linkedMapOf<Long, RequestState>()
+    // OPEN like control history: exact routes persist until close; no TTL/count eviction.
+    private val retiredOriginalRoutes = linkedMapOf<Long, RetiredOriginalRoute>()
     private val frames = linkedMapOf<Long, Frame>()
     private val hosts = linkedMapOf<HostKey, HostWork>()
     private val controls = linkedMapOf<Long, Control>()
@@ -331,6 +345,11 @@ internal class ReaderCoreEventActor(
 
     suspend fun snapshot(): Snapshot = call { snapshotOnActor() }
 
+    /** O(1) immutable identity inspection; no admission, Native call or route registration. */
+    suspend fun inspectRetiredOriginal(requestId: Long, requestToken: String): RetiredOriginalRoute? = call {
+        retiredOriginalRoutes[requestId]?.takeIf { it.requestToken == requestToken }
+    }
+
     /** Explicit owner recovery of an unhandled/uncertain Host outcome, not another I/O execution. */
     suspend fun supplyOriginalHostResponse(envelope: HostEnvelope, response: HostReply) = call {
         val work = hosts[HostKey(envelope.requestId, envelope.operationId)] ?: error("ORIGINAL_HOST_MISSING")
@@ -482,7 +501,12 @@ internal class ReaderCoreEventActor(
             notifyChanged()
             return
         }
-        val request = requests[requestId] ?: error("UNOWNED_EVENT")
+        val request = requests[requestId]
+        if (request == null) {
+            val retired = retiredOriginalRoutes[requestId] ?: error("UNOWNED_EVENT")
+            receiveRetiredHost(retired, event, type, deliveryId, raw)
+            return
+        }
         check(request.phase in setOf(Phase.SENT, Phase.SEND_UNKNOWN, Phase.TERMINAL_RETAINED)) { "EVENT_BEFORE_OR_WITHOUT_SEND" }
         when (type) {
             "result", "error" -> {
@@ -491,6 +515,8 @@ internal class ReaderCoreEventActor(
                 val delivery = Delivery(runtimeSession, deliveryId, requestId, request.plan.token, Origin.ORIGINAL_TERMINAL, raw)
                 frames[deliveryId] = Frame(delivery, Route(requestId, request.plan.token))
                 request.terminalDelivery = deliveryId; request.phase = Phase.TERMINAL_RETAINED
+                request.terminalType = type
+                request.terminalErrorCode = if (type == "error") event.getJSONObject("error").opt("code") as? String else null
                 request.plan.terminal.complete(delivery)
             }
             "host.request" -> {
@@ -515,6 +541,32 @@ internal class ReaderCoreEventActor(
                 }
             }
             else -> error("UNSUPPORTED_EVENT_TYPE")
+        }
+        notifyChanged()
+    }
+
+    private fun receiveRetiredHost(route: RetiredOriginalRoute, event: JSONObject, type: String,
+        deliveryId: Long, raw: String) {
+        check(route.runtimeSession == runtimeSession && type == "host.request") { "RETIRED_ORIGINAL_FRAME_CONTRACT" }
+        val operationId = integer(event, "operationId").also { check(it > 0) }
+        check(event.opt("capability") is String && event.opt("params") is JSONObject)
+        val discarded = route.terminalAcknowledged && route.terminalType == "error" &&
+            route.terminalErrorCode == "CANCELLED" && deliveryId < route.terminalDeliveryId
+        val disposition = if (discarded) LateHostDisposition.CANCELLED_ORIGINAL_DISCARDED else LateHostDisposition.QUARANTINED
+        val delivery = Delivery(runtimeSession, deliveryId, route.requestId, route.requestToken, Origin.HOST_REQUEST, raw)
+        val frame = Frame(delivery, Route(route.requestId, route.requestToken),
+            phase = if (discarded) DeliveryPhase.RETAINED else DeliveryPhase.QUARANTINED,
+            lateHostDisposition = disposition)
+        frames[deliveryId] = frame
+        if (discarded) {
+            // The original cancellation already ended Core's Host operation.
+            // This internal owner records discard before ACK, without Host I/O,
+            // any new client callback, or a fabricated host.complete success.
+            retiredOriginalRoutes[route.requestId] = route.copy(lateHostDiscardCount = nextDiagnosticCount(route.lateHostDiscardCount))
+            acknowledgeConsumed(frame) // Failure retains exact raw/route/consumed phase for ACK-only recovery.
+        } else {
+            // Other terminal outcomes or impossible delivery order prove no discard qualification.
+            fail("LATE_HOST_QUARANTINED", route.requestId, deliveryId, operationId = operationId)
         }
         notifyChanged()
     }
@@ -592,6 +644,13 @@ internal class ReaderCoreEventActor(
     }
 
     private fun acknowledgeConsumed(frame: Frame): Acknowledgement {
+        // Prepare optional diagnostic metadata before ACK. Count saturation is
+        // not an event qualification and cannot turn a successful ACK into failure.
+        val acknowledgedRoute = if (frame.lateHostDisposition == LateHostDisposition.CANCELLED_ORIGINAL_DISCARDED) {
+            val route = retiredOriginalRoutes.getValue(frame.primary.requestId)
+            check(route.requestToken == frame.primary.requestToken)
+            route.copy(lateHostAckCount = nextDiagnosticCount(route.lateHostAckCount))
+        } else null
         // Internal Host consumption and explicit caller consumption share this
         // transition. Core ACK is NOT idempotent; never call it after success.
         frame.phase = DeliveryPhase.CONSUMED_ACK_FAILED
@@ -600,6 +659,7 @@ internal class ReaderCoreEventActor(
             if (status.operation != "rc_runtime_ack_event" || status.status != 0)
                 Acknowledgement.Failed(fail("DELIVERY_ACK", frame.delivery.requestId, frame.delivery.deliveryId, status))
             else {
+                if (acknowledgedRoute != null) retiredOriginalRoutes[acknowledgedRoute.requestId] = acknowledgedRoute
                 frames.remove(frame.delivery.deliveryId)
                 resolveDeliveryFaults(frame.delivery.deliveryId)
                 if (frame.delivery.origin == Origin.ORIGINAL_TERMINAL) {
@@ -629,14 +689,23 @@ internal class ReaderCoreEventActor(
             if (work.phase == "ORIGINAL_TERMINAL_RECORDED") resolveHostOutcomeFaults(work.envelope)
             work.controlId?.let { resolveRequestFaults(it, setOf("HOST_CONTROL_ERROR", "CONTROL_NOT_ADMITTED", "CONTROL_SEND_UNKNOWN")) }
         }
+        val terminalId = checkNotNull(request.terminalDelivery)
+        val terminalType = checkNotNull(request.terminalType)
+        check(requestId !in retiredOriginalRoutes) { "ORIGINAL_REQUEST_ID_REBOUND" }
+        retiredOriginalRoutes[requestId] = RetiredOriginalRoute(runtimeSession, requestId, request.plan.token,
+            request.plan.kind, terminalId, terminalType, request.terminalErrorCode, terminalAcknowledged = true)
         requests.remove(requestId)
         hosts.entries.removeAll { it.key.requestId == requestId }
-        // Only small control identity tombstones survive to route late errors.
+        // Small original/control identities survive; parameters/consumer/terminal raw do not.
     }
+    // Pure diagnostic counters saturate; they never grant or revoke discard/ACK eligibility.
+    private fun nextDiagnosticCount(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1
+
     private fun snapshotOnActor() = Snapshot(!closing && faults.isEmpty(),
         requests.values.map { RequestSummary(it.plan, it.phase, it.readRetired) },
-        frames.values.map { RetainedDelivery(it.delivery, it.phase) },
-        hosts.values.map { HostSummary(it.envelope, it.phase, it.response, it.controlId) }, faults.values.toList(), unparsed.toList(), controls.size)
+        frames.values.map { RetainedDelivery(it.delivery, it.phase,
+            retiredOriginalRoutes[it.primary.requestId]?.takeIf { route -> route.requestToken == it.primary.requestToken }, it.lateHostDisposition) },
+        hosts.values.map { HostSummary(it.envelope, it.phase, it.response, it.controlId) }, faults.values.toList(), unparsed.toList(), controls.size, retiredOriginalRoutes.size)
     private fun finishClose() {
         if (nativeClosed) return
         closing = true
@@ -654,6 +723,7 @@ internal class ReaderCoreEventActor(
         waitingCalls.clear()
         while (mailbox.tryReceive().isSuccess) { /* reject queued commands; never execute after destroy */ }
         controls.clear()
+        retiredOriginalRoutes.clear()
     }
 
     companion object {

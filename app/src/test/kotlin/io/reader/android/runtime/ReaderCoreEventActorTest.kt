@@ -429,6 +429,56 @@ class ReaderCoreEventActorTest {
         }
     }
 
+    @Test fun cancelledTerminalAckBeforeOlderHostRetainsExactOldRouteWithoutIoOrAckReplay(): Unit = runBlocking {
+        val handlerCalls = AtomicInteger()
+        harness(handler = ReaderCoreEventActor.HostHandler {
+            handlerCalls.incrementAndGet()
+            throw AssertionError("Retired cancelled request must never start Host I/O")
+        }, configure = { port ->
+            port.ackStatus = { id -> if (id == 91L) ReaderCoreEventActor.NativeStatus("rc_runtime_ack_event", 4)
+                else ok("rc_runtime_ack_event") }
+        }) { (actor, port, _) ->
+            val original = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.READ_ONLY)
+            actor.dispatch(original) {}
+            actor.cancelRead(original)
+            // Models an earlier registered Host delivery whose JNI callback is delayed.
+            port.emit(error(original.requestId, 92, "CANCELLED"))
+            val terminal = (actor.observe(original, 2_000) as ReaderCoreEventActor.Observation.Terminal).delivery
+            assertEquals(ReaderCoreEventActor.Acknowledgement.Succeeded, actor.consume(terminal) {})
+            val retired = actor.inspectRetiredOriginal(original.requestId, original.token)
+                ?: throw AssertionError("Exact old route disappeared after terminal ACK")
+            assertEquals(1, actor.snapshot().retiredOriginalRouteCount)
+            assertTrue(actor.inspectRetiredOriginal(original.requestId, "foreign-token") == null)
+            assertTrue(actor.snapshot().requests.isEmpty())
+            assertEquals(original.token, retired.requestToken)
+            assertEquals(92L, retired.terminalDeliveryId)
+            assertTrue(retired.terminalAcknowledged)
+
+            val next = actor.prepare("runtime.ping", kind = ReaderCoreEventActor.Kind.READ_ONLY)
+            assertTrue(actor.inspectRetiredOriginal(next.requestId, next.token) == null)
+            port.emit(host(original.requestId, 91, 7))
+            val snapshot = waitFor(actor) { state -> state.deliveries.any { it.delivery.deliveryId == 91L } }
+            val held = snapshot.deliveries.single()
+            assertEquals(original.requestId, held.delivery.requestId)
+            assertEquals(original.token, held.delivery.requestToken)
+            assertEquals(original.token, held.retiredOriginalRoute!!.requestToken)
+            assertEquals(ReaderCoreEventActor.LateHostDisposition.CANCELLED_ORIGINAL_DISCARDED, held.lateHostDisposition)
+            assertEquals(ReaderCoreEventActor.DeliveryPhase.CONSUMED_ACK_FAILED, held.phase)
+            assertEquals(1L, held.retiredOriginalRoute!!.lateHostDiscardCount)
+            assertEquals(0L, held.retiredOriginalRoute!!.lateHostAckCount)
+            assertEquals(listOf(92L, 91L), port.acknowledgements.toList())
+            assertFalse(snapshot.admissionOpen)
+            assertTrue(snapshot.requests.single().request === next)
+            assertFalse(next.terminal.isCompleted)
+            assertEquals(0, handlerCalls.get())
+            assertEquals(1, port.commands.size) // No host.complete/error, no new client dispatch.
+            assertTrue(snapshot.unparsedOriginals.isEmpty())
+            val afterOwnerTurn = actor.snapshot()
+            assertEquals(1, port.acknowledgements.count { it == 91L }) // Failure did not auto-retry.
+            assertEquals(91L, afterOwnerTurn.deliveries.single().delivery.deliveryId)
+        }
+    }
+
     companion object {
         private fun ok(operation: String) = ReaderCoreEventActor.NativeStatus(operation, 0)
         private fun result(id: Long, delivery: Long, data: String): String =
