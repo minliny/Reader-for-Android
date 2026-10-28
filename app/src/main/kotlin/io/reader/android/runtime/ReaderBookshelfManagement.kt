@@ -3,6 +3,7 @@ package io.reader.android.runtime
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import java.util.Collections
 
 data class ShelfGroup(
     val groupId: Long,
@@ -15,6 +16,30 @@ data class ShelfGroup(
 
 data class ShelfGroupDeletion(val groupId: Long, val deleted: Boolean)
 data class ShelfGroupAssignment(val sourceId: String, val bookId: String, val group: String?)
+data class ShelfBookKey(val sourceId: String, val bookId: String)
+data class ShelfSingleRemoval(val target: ShelfBookKey, val removed: Boolean)
+data class ShelfBatchRemoval(
+    val requestedCount: Long,
+    val uniqueCount: Long,
+    val removedTargets: List<ShelfBookKey>,
+    val missingTargets: List<ShelfBookKey>,
+    val duplicateTargets: List<ShelfBookKey>,
+)
+
+/** Core evidence only. Its presence NEVER authorizes deletion of a Host file. */
+data class ShelfRemovalCoreReceipt(
+    val hostOperationId: String,
+    val coreOperationId: String,
+    val sequence: Long,
+    val payloadFingerprint: String,
+    val ackFingerprint: String,
+    val method: String,
+    val confirmation: ManagementConfirmation,
+    val originalTargetsJson: String,
+    val originalParametersJson: String,
+    val receiptJson: String,
+    val originalDispatchHistoryJson: String,
+)
 enum class ManagementConfirmation { UNKNOWN, APPLIED, REJECTED }
 data class ManagementRejection(val code: String, val message: String, val originalErrorJson: String)
 data class PendingManagement(
@@ -32,9 +57,13 @@ data class ManagementResult(
     val deletion: ShelfGroupDeletion? = null,
     val assignment: ShelfGroupAssignment? = null,
     val rejection: ManagementRejection? = null,
+    val removal: ShelfSingleRemoval? = null,
+    val batchRemoval: ShelfBatchRemoval? = null,
+    // Attached by the service only AFTER its exact qualified receipt was persisted.
+    val coreRemovalReceipt: ShelfRemovalCoreReceipt? = null,
 )
 
-/** Future removal owner data only. This service exposes no removal/asset-cleanup action. */
+/** Future Host owner data only. This service never executes cleanup or marks it completed. */
 data class ShelfRemovalOwner(
     val operationId: String,
     val originalTargetsJson: String,
@@ -47,7 +76,8 @@ data class ShelfRemovalOwner(
 internal object ManagementReceiptPolicy {
     const val KIND = "bookshelfManagement"
     private const val MAX_SEQUENCE = 9_007_199_254_740_991L
-    private val supported = setOf("book-group.create", "book-group.update", "book-group.delete", "bookshelf.group.assign")
+    private val supported = setOf("book-group.create", "book-group.update", "book-group.delete", "bookshelf.group.assign",
+        "bookshelf.remove", "bookshelf.removeBatch")
     private val fingerprint = Regex("[a-f0-9]{64}")
     private val operation = Regex("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}/[1-9][0-9]*")
 
@@ -73,7 +103,8 @@ internal object ManagementReceiptPolicy {
         val mutation = params.getJSONObject("mutation")
         val method = string(mutation, "method")
         check(method in supported && record.getString("method") == method) { "MANAGEMENT_METHOD_REQUIRES_ITS_OWN_OWNER" }
-        mutation.getJSONObject("params")
+        val business = mutation.getJSONObject("params")
+        if (method == "bookshelf.remove" || method == "bookshelf.removeBatch") removalTargets(method, business)
         return params
     }
 
@@ -129,6 +160,10 @@ internal object ManagementReceiptPolicy {
                 ManagementResult(record.getString("id"), method, ManagementConfirmation.APPLIED,
                     assignment = ShelfGroupAssignment(string(book, "sourceId"), string(book, "bookId"), optionalString(book, "group")))
             }
+            "bookshelf.remove" -> ManagementResult(record.getString("id"), method, ManagementConfirmation.APPLIED,
+                removal = ShelfSingleRemoval(removalTargets(method, business).single(), boolean(data, "removed")))
+            "bookshelf.removeBatch" -> ManagementResult(record.getString("id"), method, ManagementConfirmation.APPLIED,
+                batchRemoval = batchRemoval(business, data))
             else -> error("MANAGEMENT_METHOD_REQUIRES_ITS_OWN_OWNER")
         }
         record.optString("receiptJson").takeIf { it.isNotEmpty() }?.let { originalJson ->
@@ -150,10 +185,60 @@ internal object ManagementReceiptPolicy {
                         "MANAGEMENT_ORIGINAL_ASSIGNMENT_CHANGED"
                     }
                 }
+                "bookshelf.remove" -> check(ShelfSingleRemoval(removalTargets(method, business).single(), boolean(originalData, "removed")) == result.removal) {
+                    "MANAGEMENT_ORIGINAL_REMOVED_FACT_CHANGED"
+                }
+                "bookshelf.removeBatch" -> check(batchRemoval(business, originalData) == result.batchRemoval) {
+                    "MANAGEMENT_ORIGINAL_BATCH_REMOVAL_CHANGED"
+                }
             }
         }
         return result
     }
+
+    /** Literal request order and duplicates are frozen; Core alone performs the atomic removal. */
+    fun removalTargets(method: String, business: JSONObject): List<ShelfBookKey> = when (method) {
+        "bookshelf.remove" -> immutable(listOf(target(business)))
+        "bookshelf.removeBatch" -> {
+            val values = business.getJSONArray("targets")
+            check(values.length() > 0) { "MANAGEMENT_REMOVAL_TARGETS_EMPTY" }
+            immutable((0 until values.length()).map { target(values.getJSONObject(it)) })
+        }
+        else -> error("MANAGEMENT_NOT_A_REMOVAL")
+    }
+
+    fun targetsJson(targets: List<ShelfBookKey>): String = JSONArray().apply {
+        targets.forEach { put(JSONObject().put("sourceId", it.sourceId).put("bookId", it.bookId)) }
+    }.toString()
+
+    private fun target(value: JSONObject) = ShelfBookKey(string(value, "sourceId"), string(value, "bookId"))
+
+    private fun batchRemoval(original: JSONObject, data: JSONObject): ShelfBatchRemoval {
+        val requested = removalTargets("bookshelf.removeBatch", original)
+        val unique = requested.distinct() // Verification only, never a changed dispatch DTO.
+        val seen = mutableSetOf<ShelfBookKey>()
+        val expectedDuplicates = requested.filter { !seen.add(it) }
+        fun targets(key: String): List<ShelfBookKey> {
+            val values = data.getJSONArray(key)
+            return immutable((0 until values.length()).map { target(values.getJSONObject(it)) })
+        }
+        val removed = targets("removedTargets")
+        val missing = targets("missingTargets")
+        val duplicates = targets("duplicateTargets")
+        check(integer(data, "requestedCount") == requested.size.toLong() && integer(data, "uniqueCount") == unique.size.toLong()) {
+            "MANAGEMENT_REMOVAL_COUNT_CHANGED"
+        }
+        val removedSet = removed.toSet()
+        val missingSet = missing.toSet()
+        check(removedSet.size == removed.size && missingSet.size == missing.size && removedSet.intersect(missingSet).isEmpty() &&
+            removedSet + missingSet == unique.toSet() && removed == unique.filter { it in removedSet } &&
+            missing == unique.filter { it in missingSet } && duplicates == expectedDuplicates) {
+            "MANAGEMENT_REMOVAL_EXACT_TARGETS_CHANGED"
+        }
+        return ShelfBatchRemoval(requested.size.toLong(), unique.size.toLong(), removed, missing, duplicates)
+    }
+
+    private fun <T> immutable(values: List<T>): List<T> = Collections.unmodifiableList(ArrayList(values))
 
     /** The caller sends this query with expected=parameters(record), never a shelf/group list. */
     fun query(record: JSONObject, queryData: JSONObject): JSONObject? {
@@ -262,6 +347,17 @@ internal class ReaderBookshelfManagement(private val transport: CoreTransport, p
         JSONObject().put("sourceId", sourceId).put("bookId", bookId).put("group", group))).assignment
         ?: error("MANAGEMENT_ASSIGNMENT_RESULT_MISSING")
 
+    /** Core-only single removal. removed=false is the original known idempotent no-op, not a rejection. */
+    fun removeBook(sourceId: String, bookId: String): ManagementResult = execute("bookshelf.remove",
+        JSONObject().put("sourceId", sourceId).put("bookId", bookId))
+
+    /** One literal batch / one Core transaction; never loops over removeBook or deduplicates its intent. */
+    fun removeBooks(targets: List<ShelfBookKey>): ManagementResult {
+        require(targets.isNotEmpty()) { "MANAGEMENT_REMOVAL_TARGETS_EMPTY" }
+        val literal = targets.map { it.copy() }
+        return execute("bookshelf.removeBatch", JSONObject().put("targets", JSONArray(ManagementReceiptPolicy.targetsJson(literal))))
+    }
+
     fun pending(): List<PendingManagement> {
         checkOwner()
         val records = journal.readAll().filter { ManagementReceiptPolicy.isActive(it) }.toMutableList()
@@ -290,7 +386,7 @@ internal class ReaderBookshelfManagement(private val transport: CoreTransport, p
                 persist(record)
             }
             if (warm?.optString("id") == operationId) warm = null
-            return ManagementReceiptPolicy.receipt(record, JSONObject(record.getString("receiptJson")))
+            return durableResult(record, ManagementReceiptPolicy.receipt(record, JSONObject(record.getString("receiptJson"))))
         }
         warm = record
         mergeOriginalWire(record)
@@ -366,7 +462,7 @@ internal class ReaderBookshelfManagement(private val transport: CoreTransport, p
             record.put("receiptJson", receipt.toString()).put("queryQualified", true).put("completed", true)
             persist(record)
             if (warm?.optString("id") == id) warm = null
-            return result
+            return durableResult(record, result)
         }
         val canReplay = ManagementReceiptPolicy.canReplay(record, query)
         if (continueOriginal && canReplay) {
@@ -381,6 +477,26 @@ internal class ReaderBookshelfManagement(private val transport: CoreTransport, p
     private fun mergeOriginalWire(record: JSONObject) {
         val latest = journal.exact(record.getString("id")) ?: return
         ManagementReceiptPolicy.retainOriginal(latest, record)
+    }
+
+    private fun durableResult(record: JSONObject, result: ManagementResult): ManagementResult {
+        if (result.method !in setOf("bookshelf.remove", "bookshelf.removeBatch")) return result
+        check(record.get("completed") == true && record.get("queryQualified") == true) { "MANAGEMENT_REMOVAL_NOT_DURABLE" }
+        val parameters = ManagementReceiptPolicy.parameters(record)
+        val receiptJson = record.getString("receiptJson")
+        val receipt = JSONObject(receiptJson)
+        // Revalidate the exact original saved result; no list/query of current books can substitute.
+        ManagementReceiptPolicy.receipt(record, receipt)
+        val binding = receipt.getJSONObject("binding")
+        val targets = ManagementReceiptPolicy.removalTargets(result.method,
+            parameters.getJSONObject("mutation").getJSONObject("params"))
+        return result.copy(coreRemovalReceipt = ShelfRemovalCoreReceipt(
+            record.getString("id"), binding.getString("operationId"), binding.getLong("sequence"),
+            binding.getString("payloadFingerprint"), receipt.getString("ackFingerprint"), result.method,
+            result.confirmation,
+            ManagementReceiptPolicy.targetsJson(targets), record.getString("parametersJson"), receiptJson,
+            record.getJSONArray("dispatchHistory").toString(),
+        ))
     }
 
     private fun persist(record: JSONObject) {
