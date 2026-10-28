@@ -89,7 +89,8 @@ def inspect_apk(path, expected_native):
                 raise RuntimeError("Native library lacks exact-byte 16KB ELF evidence: " + name)
     badging = subprocess.check_output([str(selected["aapt2"]), "dump", "badging", str(path)], text=True, stderr=subprocess.STDOUT)
     package = re.search(r"^package: name='([^']+)' versionCode='(\d+)'(?: versionName='([^']*)')?", badging, re.M)
-    minimum, target = re.search(r"^sdkVersion:'(\d+)'", badging, re.M), re.search(r"^targetSdkVersion:'(\d+)'", badging, re.M)
+    minimum = re.search(r"^(?:minSdkVersion|sdkVersion):'(\d+)'", badging, re.M)
+    target = re.search(r"^targetSdkVersion:'(\d+)'", badging, re.M)
     if package is None or minimum is None or target is None:
         raise RuntimeError("Cannot read APK package/SDK metadata")
     if (package.group(1) != expected["applicationId"] or int(minimum.group(1)) != expected["minimumSdk"]
