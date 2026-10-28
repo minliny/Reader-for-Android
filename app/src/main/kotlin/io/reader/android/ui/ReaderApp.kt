@@ -70,6 +70,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 fun ReaderApp(model: ReaderViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     val protocol by model.coreProtocolRecoveries.collectAsStateWithLifecycle()
+    val management by model.shelfManagement.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current
     val view = LocalView.current
     DisposableEffect(lifecycle, model) {
@@ -102,7 +103,7 @@ fun ReaderApp(model: ReaderViewModel) {
                             Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (state.route == ReaderRoute.Directory) {
+                            if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management) {
                                 IconButton(onClick = model::back, enabled = !state.busy,
                                     modifier = Modifier.testTag("reader_back")) {
                                     Icon(painterResource(R.drawable.reader_back), "返回")
@@ -112,6 +113,7 @@ fun ReaderApp(model: ReaderViewModel) {
                                 ReaderRoute.Bookshelf -> "书架"
                                 ReaderRoute.Settings -> "设置"
                                 ReaderRoute.Directory -> "目录"
+                                ReaderRoute.Management -> "书架管理"
                                 else -> "阅读"
                             }, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
                             if (state.route == ReaderRoute.Bookshelf) {
@@ -143,6 +145,7 @@ fun ReaderApp(model: ReaderViewModel) {
             ) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding)) {
                     ReaderProtocolRecoveryHost(model)
+                    if (state.route == ReaderRoute.Management) ReaderShelfManagementRecovery(management, model.shelfManagement)
                     if (state.pendingImports.isNotEmpty() || (!state.pendingReady && state.ready)) {
                         ReaderRecoveryNotice("有一次导入尚未确认。核对原操作后再导入新的书籍。", state.busy,
                             model::reconcilePendingImports)
@@ -161,6 +164,7 @@ fun ReaderApp(model: ReaderViewModel) {
                         ReaderRoute.Bookshelf -> BookshelfScreen(state, model, requestImport)
                         ReaderRoute.Settings -> SettingsScreen(state, model)
                         ReaderRoute.Directory -> DirectoryScreen(state, model)
+                        ReaderRoute.Management -> ReaderShelfManagementScreen(management, model.shelfManagement)
                         else -> Unit
                     }
                 }
@@ -182,7 +186,11 @@ private fun TabAction(label: String, icon: Int, selected: Boolean, enabled: Bool
 @Composable
 private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImport: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        if (state.ready) ShelfSearchAndOrder(state, model)
+        if (state.ready) {
+            ShelfSearchAndOrder(state, model)
+            TextButton(onClick = model::showShelfManagement, enabled = !state.busy,
+                modifier = Modifier.padding(horizontal = 19.dp).testTag("reader_shelf_management")) { Text("管理分组和书架") }
+        }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             when {
                 !state.ready && state.busy -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

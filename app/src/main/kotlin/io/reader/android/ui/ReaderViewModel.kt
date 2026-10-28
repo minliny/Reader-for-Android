@@ -39,7 +39,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-enum class ReaderRoute { Bookshelf, Settings, Directory, Reading }
+enum class ReaderRoute { Bookshelf, Settings, Directory, Reading, Management }
 enum class ReaderAppTheme { System, Light, Dark }
 enum class ReaderPaper { Paper, Warm, Night }
 enum class ReaderPanel { Bookmarks, Search }
@@ -123,6 +123,34 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         )
     )
     val state = mutableState.asStateFlow()
+
+    private var managementBusyGeneration: Long? = null
+    private val managementDelegate = lazy {
+        ReaderShelfManagement(viewModelScope, { library }, { state.value.route == ReaderRoute.Management },
+            onVmLane = { action -> gate.withLock {
+                if (managementBusyGeneration != generation) return@withLock
+                withContext(Dispatchers.IO) { library }; action()
+            } },
+            mainBusy = { value ->
+                if (value) {
+                    managementBusyGeneration = ++generation
+                    shelfRead?.cancel(); delayedSave?.cancel()
+                    mutableState.update { it.copy(busy = true) }
+                } else {
+                    val original = managementBusyGeneration
+                    managementBusyGeneration = null
+                    if (original == generation) mutableState.update { it.copy(busy = false) }
+                }
+            },
+            retainProtocol = ::retainProtocolPending)
+    }
+    internal val shelfManagement get() = managementDelegate.value // Constructor/status observation never reads Library/Native.
+    fun showShelfManagement() {
+        if (state.value.busy || state.value.route != ReaderRoute.Bookshelf) return
+        ++generation; shelfRead?.cancel(); delayedSave?.cancel()
+        mutableState.update { it.copy(route = ReaderRoute.Management, error = null) }
+        shelfManagement.open()
+    }
 
     init {
         viewModelScope.launch {
@@ -298,12 +326,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun showSettings() {
-        if (!state.value.busy) mutableState.update { it.copy(route = ReaderRoute.Settings, error = null) }
+        if (!state.value.busy) {
+            if (state.value.route == ReaderRoute.Management) shelfManagement.retirePresentation()
+            mutableState.update { it.copy(route = ReaderRoute.Settings, error = null) }
+        }
     }
 
     fun showBookshelf() {
         if (state.value.reading != null) { exitReading(); return }
-        if (!state.value.busy) mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
+        if (!state.value.busy) {
+            val fromManagement = state.value.route == ReaderRoute.Management
+            if (fromManagement) shelfManagement.retirePresentation()
+            mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
+            if (fromManagement) refreshBooks()
+        }
     }
 
     fun showBookmarks() {
@@ -662,7 +698,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         when (state.value.route) {
             ReaderRoute.Reading -> if (state.value.controlsVisible) toggleControls() else exitReading()
             ReaderRoute.Directory -> mutableState.update { it.copy(route = directoryReturn, error = null) }
-            ReaderRoute.Settings -> showBookshelf()
+            ReaderRoute.Settings, ReaderRoute.Management -> showBookshelf()
             ReaderRoute.Bookshelf -> Unit
         }
     }
@@ -719,6 +755,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         delayedSave?.cancel()
         shelfRead?.cancel()
+        if (managementDelegate.isInitialized()) shelfManagement.close()
         if (libraryDelegate.isInitialized()) library.close()
         super.onCleared()
     }

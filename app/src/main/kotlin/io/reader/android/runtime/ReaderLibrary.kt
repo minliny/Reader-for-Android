@@ -22,6 +22,7 @@ data class LibraryBook(
     val progressChapter: Int = 0,
     val progressOffset: Int = 0,
     val sourceId: String = "local",
+    val group: String? = null,
 )
 
 data class ChapterItem(val index: Int, val title: String)
@@ -64,6 +65,24 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<String, Session>()
+
+    suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
+    suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }
+    suspend fun reconcileShelfManagement(id: String, continueOriginal: Boolean = false): ManagementResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { managementService.reconcile(id, continueOriginal) }
+    suspend fun createShelfGroup(name: String): ShelfGroup = onIO(WholeTurnMode.RETAIN_ORIGINAL) { managementService.createGroup(name) }
+    suspend fun renameShelfGroup(id: Long, name: String): ShelfGroup = onIO(WholeTurnMode.RETAIN_ORIGINAL) { managementService.updateGroup(id, groupName = name) }
+    suspend fun deleteShelfGroup(id: Long): ShelfGroupDeletion = onIO(WholeTurnMode.RETAIN_ORIGINAL) { managementService.deleteGroup(id) }
+    suspend fun assignShelfGroup(target: ShelfBookKey, group: String): ShelfGroupAssignment = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        requireLocalShelfKey(target); managementService.assignGroup(target.sourceId, target.bookId, group)
+    }
+    suspend fun removeShelfBooks(targets: List<ShelfBookKey>): ManagementResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        targets.forEach(::requireLocalShelfKey)
+        managementService.removeBooks(targets.map { it.copy() }) // One literal Core batch; preserve composite identity and order.
+    }
+    private fun requireLocalShelfKey(target: ShelfBookKey) {
+        require(target.sourceId == "local") { "LOCAL_MANAGEMENT_SCOPE_REQUIRED" }; localIdentity(target.bookId)
+    }
 
     suspend fun books(
         keyword: String? = null,
@@ -586,6 +605,8 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         entry.getString("bookId"), entry.optString("title"), entry.optString("author"),
         chapterCount, progress?.optInt("chapterIndex") ?: 0,
         (progress?.optLong("chapterOffset") ?: 0).also { check(it in 0..Int.MAX_VALUE.toLong()) }.toInt(),
+        sourceId = entry.getString("sourceId"),
+        group = if (entry.isNull("group")) null else entry.getString("group"),
     )
 
     private fun localIdentity(bookId: String) {
