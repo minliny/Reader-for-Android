@@ -58,6 +58,8 @@ internal class ReaderOperationOwner private constructor(
     private var generation = 0L
     private var client: ClientLease? = null
     private var activeTurn: Turn? = null
+    private var activeMaintenance: OriginalMaintenance? = null
+    private var activeCleanup: CleanupKey? = null
     private var closeResult: Deferred<CloseState>? = null
 
     /** A new owner generation retires previous admission, even if two VMs use the same local number. */
@@ -107,6 +109,42 @@ internal class ReaderOperationOwner private constructor(
         return result.await()
     }
 
+    /** AppCoreOwner alone calls this after exact actor-route lookup; never a native poller. */
+    suspend fun <T> withOriginalMaintenance(
+        lease: ClientLease, originalId: String, block: suspend OriginalMaintenance.() -> T,
+    ): T {
+        val caller = currentCoroutineContext()
+        caller.ensureActive()
+        require(originalId.isNotBlank() && originalId.length <= 200)
+        val result = appScope.async {
+            operationMutex.withLock {
+                val maintenance = synchronized(stateLock) {
+                    caller.ensureActive()
+                    requireOpen()
+                    check(lease.ownerId == ownerId) { "FOREIGN_ORIGINAL_MAINTENANCE" }
+                    // Retired client is intentional; it must never become current again.
+                    OriginalMaintenance(lease, originalId).also { activeMaintenance = it }
+                }
+                try { block(maintenance) }
+                finally {
+                    synchronized(stateLock) { activeMaintenance = null }
+                    runRetiredCleanup()
+                }
+            }
+        }
+        return result.await() // Cancellation stops observation, not an admitted original turn.
+    }
+
+    inner class OriginalMaintenance internal constructor(val lease: ClientLease, val originalId: String) {
+        fun assertActive() = synchronized(stateLock) {
+            check(activeMaintenance === this) { "ORIGINAL_MAINTENANCE_LANE_RETIRED" }
+        }
+    }
+
+    fun assertCleanupActive(lease: ClientLease, id: String) = synchronized(stateLock) {
+        check(activeCleanup == CleanupKey(lease, id)) { "FOREIGN_OR_RETIRED_CLEANUP_LANE" }
+    }
+
     /** Read-only observation; failed cleanup stays here and is never silently replayed. */
     fun pendingCleanups(): List<PendingCleanup> = synchronized(stateLock) { unresolvedCleanups() }
 
@@ -147,6 +185,9 @@ internal class ReaderOperationOwner private constructor(
     }
 
     inner class Turn internal constructor(val lease: ClientLease) {
+        fun assertActive() = synchronized(stateLock) {
+            check(activeTurn === this) { "BUSINESS_TURN_RETIRED" }
+        }
         /** Register the exact original resource cleanup; never a generic "close current cursor" callback. */
         fun registerRetiringCleanup(id: String, action: suspend () -> Unit) {
             require(id.isNotEmpty() && id.length <= 128)
@@ -190,12 +231,14 @@ internal class ReaderOperationOwner private constructor(
     }
 
     private suspend fun attemptCleanup(key: CleanupKey, cleanup: Cleanup) {
-        synchronized(stateLock) { cleanup.attempted = true }
+        synchronized(stateLock) { cleanup.attempted = true; activeCleanup = key }
         try {
             withTimeout(cleanupTimeoutMs) { cleanup.action() }
             synchronized(stateLock) { if (cleanups[key] === cleanup) cleanups.remove(key) }
         } catch (error: Throwable) {
             synchronized(stateLock) { cleanup.failure = error }
+        } finally {
+            synchronized(stateLock) { if (activeCleanup == key) activeCleanup = null }
         }
     }
 
