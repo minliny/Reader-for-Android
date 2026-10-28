@@ -81,8 +81,19 @@ class UiLocalReadingJourneyTest {
         marker("picker-request")
         compose.onNodeWithTag("reader_import").performClick()
         selectRealDocument(inputName)
-        compose.waitUntil(120_000) { model.state.value.importRevision > originalImportRevision && !model.state.value.busy }
-        assertEquals("Original picker import must report no failure", null, model.state.value.error)
+        compose.waitUntil(120_000) {
+            val state = model.state.value
+            !state.busy && (state.importRevision > originalImportRevision || state.error != null || state.pendingImports.isNotEmpty())
+        }
+        val importTerminal = model.state.value
+        if (importTerminal.error != null || importTerminal.pendingImports.isNotEmpty()) {
+            marker("import-terminal-failure", Bundle().apply {
+                putString("reportedError", importTerminal.error)
+                putInt("pendingOriginalCount", importTerminal.pendingImports.size)
+            })
+        }
+        assertEquals("Original picker import must report no failure", null, importTerminal.error)
+        assertTrue("Original picker import must not remain unknown", importTerminal.pendingImports.isEmpty())
         val book = model.state.value.books.singleOrNull { it.id == model.state.value.lastImportedBookId }
             ?: throw AssertionError("Imported original title absent; actual=${model.state.value.books.map { it.title }}")
         assertEquals("Imported Core identity must bind the exact original bytes", "local:$expectedHash", book.id)
