@@ -14,6 +14,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -26,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /** UNAPPLIED JVM draft: real actor/whole-turn gate/bridge/recovery; only the JNI port is synthetic.
- * No Android Context, book, database, socket or Native contract claim. Exactly six wiring risks.
+ * No Android Context, book, database, socket or Native contract claim. Six original wiring risks plus the isolated progress-finally precedence.
  */
 class ProtocolBridgeIntegrationTest {
     @Test fun unknownSendLaterOriginalTerminalUsesRetiredOriginalSinkAndLease(): Unit = runBlocking {
@@ -277,6 +278,97 @@ class ProtocolBridgeIntegrationTest {
             assertEquals(1, consumers.get())
             assertEquals(1, h.port.commands.size)
             assertTrue(h.actor.snapshot().deliveries.isEmpty())
+        }
+    }
+
+    @Test fun progressCompletionPreservesExactProtocolAckFailureAndBusinessPendingPriority(): Unit = runBlocking {
+        harness { h ->
+            val lease = h.client()
+            val method = "reading.progress.update"
+            val parameters = JSONObject().put("sourceId", "local").put("bookId", "local:protocol-progress-fixture")
+                .put("chapterIndex", 1).put("chapterOffset", 210)
+                .put("expectedBodyVersion", "synthetic-body").put("expectedProcessingVersion", "synthetic-processing")
+                .put("expectedProgressRevision", "reader-progress-v1:synthetic-original")
+            val record = JSONObject().put("kind", "progress").put("parameters", parameters).put("completed", false)
+            val consumers = AtomicInteger()
+            val completions = AtomicInteger()
+            val requestFailure = AtomicReference<Throwable?>()
+            val completionFailure = AtomicReference<CoreCommandException?>()
+            val originalWire = AtomicReference<String?>()
+            h.port.throwBeforeAck.set(161)
+            h.port.sendStatus = { command ->
+                assertEquals(method, command.getString("method"))
+                assertEquals(parameters.toString(), command.getJSONObject("params").toString())
+                error(command.getLong("requestId"), 161, "INVALID_PARAMS").also {
+                    originalWire.set(it)
+                    h.port.emit(it)
+                }
+                ok("rc_runtime_send")
+            }
+            val actual = fails<CoreProtocolPending> {
+                h.business(lease) {
+                    withProgressTerminalCompletion(request = {
+                        try {
+                            h.bridge.forClient(lease).request(method, parameters, beforeSend = { id ->
+                                record.put("requestId", id).put("runtimeSession", h.actor.runtimeSession)
+                            }, terminal = { terminal ->
+                                consumers.incrementAndGet()
+                                record.put("wireTerminal", terminal) // Original sink persists evidence, not business interpretation.
+                            })
+                        } catch (failure: Throwable) {
+                            requestFailure.set(failure)
+                            throw failure
+                        }
+                    }, complete = {
+                        completions.incrementAndGet()
+                        record.put("completed", true) // Synthetic business rejection completion still runs.
+                        try { CoreTerminal.result(method, record.getJSONObject("wireTerminal")) }
+                        catch (failure: CoreCommandException) {
+                            completionFailure.set(failure)
+                            throw failure
+                        }
+                    })
+                }
+            }
+            assertSame(requestFailure.get(), actual)
+            assertSame(actual, actual.coreProtocolPending())
+            assertEquals(CoreProtocolStage.CONSUMED_ACK_FAILED, actual.stage)
+            assertEquals(h.actor.runtimeSession, actual.original.runtimeSession)
+            assertEquals(record.getLong("requestId"), actual.original.originalRequestId)
+            assertEquals(161L, actual.original.deliveryId)
+            assertEquals(lease, h.bridge.routeLease(actual.original))
+            assertEquals("INVALID_PARAMS", completionFailure.get()!!.error.getString("code"))
+            assertEquals(method, completionFailure.get()!!.method)
+            assertEquals(1, actual.suppressed.size)
+            assertSame(completionFailure.get(), actual.suppressed.single())
+            assertEquals(1, consumers.get())
+            assertEquals(1, completions.get())
+            assertEquals(JSONObject(originalWire.get()!!).toString(), record.getJSONObject("wireTerminal").toString())
+            h.refresh(actual.original)
+            val frame = h.actor.snapshot().deliveries.single()
+            assertEquals(ReaderCoreEventActor.DeliveryPhase.CONSUMED_ACK_FAILED, frame.phase)
+            assertEquals(ReaderCoreEventActor.Origin.ORIGINAL_TERMINAL, frame.delivery.origin)
+            assertEquals(originalWire.get(), frame.delivery.rawEvent)
+            assertEquals(actual.original.requestToken, frame.delivery.requestToken)
+            val notice = h.feed.view.value.items.single { it.action == CoreProtocolAction.ACK_SAME_DELIVERY }
+            assertEquals(actual.original, notice.original)
+            assertEquals(CoreProtocolStage.CONSUMED_ACK_FAILED, notice.stage)
+            assertFalse(h.actor.snapshot().admissionOpen)
+            assertEquals(1, h.port.commands.size)
+            assertEquals(1, h.port.ackAttempts.get()) // Fixture failed BEFORE Native invocation; no automatic retry.
+            assertTrue(h.port.nativeAcks.isEmpty())
+            assertTrue(h.port.cancels.isEmpty())
+            assertTrue(record.getBoolean("completed"))
+
+            // With no typed protocol cause, keep the old finally priority: the
+            // business owner can still surface its original unknown outcome.
+            val knownRequestFailure = CoreCommandException(method, JSONObject().put("code", "INVALID_PARAMS"))
+            val originalBusinessPending = PendingOperationException("synthetic-original-progress", method)
+            val businessPending = fails<PendingOperationException> {
+                withProgressTerminalCompletion(request = { throw knownRequestFailure }, complete = { throw originalBusinessPending })
+            }
+            assertSame(originalBusinessPending, businessPending)
+            assertTrue(businessPending.suppressed.isEmpty())
         }
     }
 

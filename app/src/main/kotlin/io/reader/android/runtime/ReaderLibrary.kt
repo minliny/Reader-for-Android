@@ -261,7 +261,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         val record = JSONObject().put("journalSchema", 1).put("kind", "progress")
             .put("id", "android-progress-${UUID.randomUUID()}").put("bookId", bookId)
             .put("parameters", parameters).put("completed", false)
-        try {
+        withProgressTerminalCompletion(request = {
             transport.request("reading.progress.update", parameters,
                 beforeSend = { id ->
                     record.put("requestId", id).put("runtimeSession", transport.session)
@@ -270,9 +270,9 @@ class ReaderLibrary(context: Context) : AutoCloseable {
                     record.put("wireTerminal", event)
                     journal.terminal(record.getString("id"), record.getLong("requestId"), transport.session, event)
                 })
-        } finally {
+        }, complete = {
             record.optJSONObject("wireTerminal")?.let { consumeProgressTerminal(record, it) }
-        }
+        })
         Unit
     }
 
