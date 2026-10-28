@@ -1,10 +1,12 @@
 package io.reader.android
 
 import android.os.Bundle
+import android.graphics.Rect
+import android.widget.ScrollView
+import android.widget.TextView
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -17,8 +19,6 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.UiWatcher
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -138,6 +138,7 @@ class UiLocalReadingJourneyTest {
         waitForNativeRestore()
         marker("reader-native-restored")
         compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
+        compose.waitUntil(5_000) { model.state.value.controlsVisible }
         marker("directory-open-request")
         compose.onNodeWithTag("reader_open_directory").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Directory && !model.state.value.busy }
@@ -151,11 +152,12 @@ class UiLocalReadingJourneyTest {
         waitForNativeRestore()
         marker("directory-selected-reader-restored")
         compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 550) }
-        compose.waitForIdle() // Capture the settled real fling anchor, not an intermediate frame.
+        compose.waitForIdle() // Native control entry below stops the platform fling and captures its actual final line.
         compose.waitUntil(10_000) { (model.state.value.reading?.visibleScalarOffset ?: 0) > 0 }
+        compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
+        compose.waitUntil(5_000) { model.state.value.controlsVisible }
         val beforeExit = model.state.value.reading ?: throw AssertionError("Missing actual reading session")
         marker("visible-anchor-recorded", Bundle().apply { putInt("scalarOffset", beforeExit.visibleScalarOffset) })
-        compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
         compose.onNodeWithTag("reader_controls").assertIsDisplayed()
         compose.onNodeWithTag("reader_font_larger").performClick()
         waitForNativeRestore()
@@ -321,6 +323,7 @@ class UiLocalReadingJourneyTest {
         if (!model.state.value.controlsVisible) {
             compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
         }
+        compose.waitUntil(5_000) { model.state.value.controlsVisible }
         marker("final-exit-request")
         compose.onNodeWithTag("reader_exit").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
@@ -336,27 +339,29 @@ class UiLocalReadingJourneyTest {
     private fun assertNativeAnchorVisible(scalar: Int) {
         val reading = compose.activity.readerViewModel.state.value.reading
             ?: throw AssertionError("No reader owns the native anchor")
-        val text = reading.chapter.text
-        val utf16 = ReaderTextCoordinates.utf16Offset(text, scalar)
-        val start = if (utf16 == 0) 0 else text.lastIndexOf('\n', utf16 - 1) + 1
-        val end = text.indexOf('\n', utf16).let { if (it < 0) text.length else it }
-        val paragraph = text.substring(start, end)
-        val viewport = compose.onNodeWithTag("reader_body").fetchSemanticsNode().boundsInRoot
-        val nodes = compose.onAllNodes(hasText(paragraph.ifEmpty { "\u200B" }), useUnmergedTree = true).fetchSemanticsNodes()
-        val visible = nodes.any { node ->
-            val layouts = mutableListOf<TextLayoutResult>()
-            val action = if (SemanticsActions.GetTextLayoutResult in node.config)
-                node.config[SemanticsActions.GetTextLayoutResult].action else null
-            val obtained = compose.runOnUiThread { action?.invoke(layouts) == true }
-            val layout = layouts.singleOrNull()
-            if (!obtained || layout == null) false else {
-                val line = layout.getLineForOffset((utf16 - start).coerceIn(0, paragraph.length))
-                val top = node.positionInRoot.y + layout.getLineTop(line)
-                val bottom = node.positionInRoot.y + layout.getLineBottom(line)
-                bottom > viewport.top && top < viewport.bottom
-            }
+        val utf16 = ReaderTextCoordinates.utf16Offset(reading.chapter.text, scalar)
+        compose.runOnUiThread {
+            val body = compose.activity.findViewById<TextView>(R.id.reader_native_text)
+                ?: throw AssertionError("Actual native body is absent")
+            val scroll = compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+                ?: throw AssertionError("Actual native viewport is absent")
+            assertTrue(body.isAttachedToWindow && scroll.isAttachedToWindow)
+            assertEquals("Native text must retain the complete original UTF-16 body", reading.chapter.text, body.text.toString())
+            val layout = body.layout ?: throw AssertionError("Actual native Layout is absent")
+            val line = layout.getLineForOffset(utf16)
+            val viewport = Rect()
+            assertTrue(scroll.getGlobalVisibleRect(viewport))
+            val scrollLocation = IntArray(2)
+            scroll.getLocationOnScreen(scrollLocation)
+            assertTrue("Native content clip must exclude ScrollView padding", viewport.intersect(
+                scrollLocation[0] + scroll.paddingLeft, scrollLocation[1] + scroll.paddingTop,
+                scrollLocation[0] + scroll.width - scroll.paddingRight, scrollLocation[1] + scroll.height - scroll.paddingBottom))
+            val location = IntArray(2)
+            body.getLocationOnScreen(location)
+            val top = location[1] + body.totalPaddingTop + layout.getLineTop(line)
+            val bottom = location[1] + body.totalPaddingTop + layout.getLineBottom(line)
+            assertTrue("Original scalar's actual native line must intersect the viewport", top < viewport.bottom && bottom > viewport.top)
         }
-        assertTrue("Expected original scalar's native text line is outside the actual viewport", visible)
     }
 
     private fun waitForNativeRestore() {

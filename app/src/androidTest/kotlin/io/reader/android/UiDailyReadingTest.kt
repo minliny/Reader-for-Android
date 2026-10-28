@@ -5,8 +5,10 @@ import android.content.ClipData
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Rect
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -17,7 +19,6 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -39,6 +40,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.io.File
 
 /** Exact existing-book A2 selectors. No import, fixtures, data reset or business retries. */
 @RunWith(AndroidJUnit4::class)
@@ -64,8 +66,8 @@ class UiDailyReadingTest {
             ?.takeIf { it.isNotBlank() } ?: throw AssertionError("contentQuery must bind an actual abundant original keyword")
         compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 500) }
         compose.waitForIdle()
-        val beforeFont = model.state.value.reading!!
         controls(model)
+        val beforeFont = model.state.value.reading!!
         val oldFont = model.state.value.fontSize
         compose.onNodeWithTag(if (oldFont < 32) "reader_font_larger" else "reader_font_smaller").performClick()
         nativeRestored()
@@ -75,9 +77,9 @@ class UiDailyReadingTest {
         compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 500) }
         compose.waitForIdle()
         compose.waitUntil(10_000) { model.state.value.reading!!.visibleScalarOffset != beforeFont.visibleScalarOffset }
+        controls(model)
         val captured = model.state.value.reading!!
         marker("post-font-user-anchor", Bundle().apply { putInt("scalarOffset", captured.visibleScalarOffset) })
-        controls(model)
         compose.onNodeWithTag("reader_open_bookmarks").performClick()
         compose.waitUntil(20_000) { !model.state.value.busy }
         assertEquals(null, model.state.value.bookmarkError)
@@ -175,6 +177,7 @@ class UiDailyReadingTest {
         assertEquals(created.scalarOffset, jumped.restoreScalarOffset)
         assertNativeAnchorVisible(created.scalarOffset)
         marker("bookmark-native-jump")
+        captureNativeEvidence("bookmark-jump")
         controls(model)
         compose.onNodeWithTag("reader_open_bookmarks").performClick()
         compose.waitUntil(20_000) { !model.state.value.busy }
@@ -221,6 +224,7 @@ class UiDailyReadingTest {
         assertEquals(hit.positionScope.bodyVersion, searched.chapter.bodyVersion)
         assertEquals(hit.positionScope.processingVersion, searched.chapter.processingVersion)
         assertNativeAnchorVisible(hit.chapterOffset)
+        captureNativeEvidence("search-jump")
         compose.runOnUiThread { model.openContentSearchHit(hit, searchOwner); model.openBookmark(created, retiredBookmarkOwner) }
         assertEquals("Old query/bookmark callbacks cannot move the new session", searched.identity, model.state.value.reading!!.identity)
         marker("search-native-jump-and-retired-callbacks")
@@ -242,18 +246,21 @@ class UiDailyReadingTest {
             val model = openExistingOriginal()
             val reading = model.state.value.reading!!
             val text = reading.chapter.text
-            val utf16 = ReaderTextCoordinates.utf16Offset(text, reading.visibleScalarOffset)
-            val start = if (utf16 == 0) 0 else text.lastIndexOf('\n', utf16 - 1) + 1
-            val paragraph = compose.onNodeWithTag("reader_paragraph_$start")
-            val bounds = paragraph.fetchSemanticsNode().boundsInRoot
-            val viewport = compose.onNodeWithTag("reader_body").fetchSemanticsNode().boundsInRoot
-            val visibleTop = maxOf(bounds.top, viewport.top)
-            val visibleBottom = minOf(bounds.bottom, viewport.bottom)
-            assertTrue("Actual original paragraph must be visible", visibleBottom > visibleTop)
-            paragraph.performTouchInput {
-                longClick(Offset((bounds.width * .35f).coerceAtLeast(1f), (visibleTop + visibleBottom) / 2f - bounds.top))
+            val beforeCopyScrollY = compose.runOnUiThread {
+                compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll).scrollY
             }
-            val copy = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).findObject(
+            assertTrue("The original chapter must contain real line breaks", text.contains('\n'))
+            marker("native-copy-source-shape", Bundle().apply {
+                putBoolean("hasLineBreak", text.contains('\n'))
+                putBoolean("hasBlankLine", text.contains("\n\n") || text.contains("\r\n\r\n"))
+            })
+            val point = visibleNativeCharacter()
+            compose.onNodeWithTag("reader_body").performTouchInput { longClick(point) }
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val selectAll = device.findObject(UiSelector().textMatches("全选|Select all|SELECT ALL").enabled(true))
+            assertTrue("Native Select all action did not appear", selectAll.waitForExists(5_000))
+            assertTrue("Native Select all action failed", selectAll.click())
+            val copy = device.findObject(
                 UiSelector().textMatches("复制|Copy|COPY").enabled(true))
             assertTrue("Native selection Copy action did not appear", copy.waitForExists(5_000))
             assertTrue("Native Copy action failed", copy.click())
@@ -267,8 +274,17 @@ class UiDailyReadingTest {
             val selected = copied?.takeIf { it.isNotEmpty() } ?: throw AssertionError("Native selection produced no clipboard text")
             ownedText = selected
             ownedTimestamp = copiedTimestamp
-            assertTrue("Clipboard must be an exact substring of original Core body; no title or display placeholder", text.contains(selected))
-            marker("native-copy-original-substring", Bundle().apply { putInt("utf16Length", selected.length) })
+            assertEquals("Native whole-chapter copy must retain original UTF-16, line breaks and blank lines without the title", text, selected)
+            marker("native-copy-original-whole-chapter", Bundle().apply { putInt("utf16Length", selected.length) })
+            assertEquals("Native selection/copy must not rebase the logical reading scalar", reading.visibleScalarOffset,
+                model.state.value.reading!!.visibleScalarOffset)
+            val afterCopyScrollY = compose.runOnUiThread {
+                compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll).scrollY
+            }
+            marker("native-copy-logical-anchor-preserved", Bundle().apply {
+                putInt("scalarOffset", reading.visibleScalarOffset)
+                putBoolean("nativeViewportMoved", afterCopyScrollY != beforeCopyScrollY)
+            })
             exitAndAssertReceipt(model)
             marker("method-exit")
         } catch (failure: Throwable) {
@@ -314,6 +330,47 @@ class UiDailyReadingTest {
         return model
     }
 
+    /** Coordinates come from the attached platform Layout and its real clipped viewport. */
+    private fun visibleNativeCharacter(): Offset = compose.runOnUiThread {
+        val body = compose.activity.findViewById<TextView>(R.id.reader_native_text)
+        val scroll = compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+        val layout = body.layout ?: throw AssertionError("Native Layout is absent")
+        val viewport = Rect()
+        assertTrue(scroll.getGlobalVisibleRect(viewport))
+        val bodyLocation = IntArray(2); body.getLocationOnScreen(bodyLocation)
+        val scrollLocation = IntArray(2); scroll.getLocationOnScreen(scrollLocation)
+        assertTrue("Native selection must use the content clip without ScrollView padding", viewport.intersect(
+            scrollLocation[0] + scroll.paddingLeft, scrollLocation[1] + scroll.paddingTop,
+            scrollLocation[0] + scroll.width - scroll.paddingRight, scrollLocation[1] + scroll.height - scroll.paddingBottom))
+        val origin = bodyLocation[1] + body.totalPaddingTop
+        val first = layout.getLineForVertical((viewport.top - origin).coerceAtLeast(0))
+        val last = layout.getLineForVertical((viewport.bottom - origin - 1).coerceAtLeast(0))
+        val raw = body.text.toString()
+        val line = (first..last).firstOrNull { index ->
+            origin + layout.getLineTop(index) >= viewport.top && origin + layout.getLineBottom(index) <= viewport.bottom &&
+                (layout.getLineStart(index) until layout.getLineEnd(index)).any { !raw[it].isWhitespace() }
+        } ?: throw AssertionError("No original character is visible for native selection")
+        val offset = (layout.getLineStart(line) until layout.getLineEnd(line)).first { !raw[it].isWhitespace() }
+        val next = offset + Character.charCount(raw.codePointAt(offset))
+        val x = bodyLocation[0] + body.totalPaddingLeft + (layout.getPrimaryHorizontal(offset) + layout.getPrimaryHorizontal(next)) / 2f
+        val y = origin + (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
+        Offset(x - scrollLocation[0], y - scrollLocation[1])
+    }
+
+    private fun captureNativeEvidence(phase: String) {
+        val name = "reader-evidence-$method-$phase.png"
+        val details = Bundle().apply { putString("fileName", name) }
+        try {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val saved = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(context.cacheDir, name))
+            details.putBoolean("saved", saved)
+        } catch (failure: Exception) {
+            details.putBoolean("saved", false)
+            details.putString("failureClass", failure.javaClass.name)
+        }
+        try { marker("native-screenshot-$phase", details) } catch (_: Exception) { /* Independent evidence only. */ }
+    }
+
     private fun controls(model: ReaderViewModel) {
         if (!model.state.value.controlsVisible) compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
         compose.waitUntil(5_000) { model.state.value.controlsVisible }
@@ -332,19 +389,31 @@ class UiDailyReadingTest {
     }
 
     private fun assertNativeAnchorVisible(scalar: Int) {
-        val reading = compose.activity.readerViewModel.state.value.reading!!
+        val reading = compose.activity.readerViewModel.state.value.reading
+            ?: throw AssertionError("No reader owns the native anchor")
         val utf16 = ReaderTextCoordinates.utf16Offset(reading.chapter.text, scalar)
-        val start = if (utf16 == 0) 0 else reading.chapter.text.lastIndexOf('\n', utf16 - 1) + 1
-        val node = compose.onNodeWithTag("reader_paragraph_$start").fetchSemanticsNode()
-        val layouts = mutableListOf<TextLayoutResult>()
-        val action = node.config[SemanticsActions.GetTextLayoutResult].action
-        assertTrue(compose.runOnUiThread { action?.invoke(layouts) == true })
-        val result = layouts.single()
-        val line = result.getLineForOffset((utf16 - start).coerceAtMost(result.layoutInput.text.length))
-        val viewport = compose.onNodeWithTag("reader_body").fetchSemanticsNode().boundsInRoot
-        val top = node.positionInRoot.y + result.getLineTop(line)
-        val bottom = node.positionInRoot.y + result.getLineBottom(line)
-        assertTrue("Native target line must intersect real viewport", top < viewport.bottom && bottom > viewport.top)
+        compose.runOnUiThread {
+            val body = compose.activity.findViewById<TextView>(R.id.reader_native_text)
+                ?: throw AssertionError("Actual native body is absent")
+            val scroll = compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+                ?: throw AssertionError("Actual native viewport is absent")
+            assertTrue(body.isAttachedToWindow && scroll.isAttachedToWindow)
+            assertEquals("Native text must retain the complete original UTF-16 body", reading.chapter.text, body.text.toString())
+            val layout = body.layout ?: throw AssertionError("Actual native Layout is absent")
+            val line = layout.getLineForOffset(utf16)
+            val viewport = Rect()
+            assertTrue(scroll.getGlobalVisibleRect(viewport))
+            val scrollLocation = IntArray(2)
+            scroll.getLocationOnScreen(scrollLocation)
+            assertTrue("Native content clip must exclude ScrollView padding", viewport.intersect(
+                scrollLocation[0] + scroll.paddingLeft, scrollLocation[1] + scroll.paddingTop,
+                scrollLocation[0] + scroll.width - scroll.paddingRight, scrollLocation[1] + scroll.height - scroll.paddingBottom))
+            val location = IntArray(2)
+            body.getLocationOnScreen(location)
+            val top = location[1] + body.totalPaddingTop + layout.getLineTop(line)
+            val bottom = location[1] + body.totalPaddingTop + layout.getLineBottom(line)
+            assertTrue("Original scalar's actual native line must intersect the viewport", top < viewport.bottom && bottom > viewport.top)
+        }
     }
 
     private fun exitAndAssertReceipt(model: ReaderViewModel) {
