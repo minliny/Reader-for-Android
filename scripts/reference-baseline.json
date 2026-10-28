@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fixed product behavior and design reference for the Android candidate; source reference is separate from runtime and user acceptance",
+  "harmony": {
+    "repository": "https://github.com/minliny/Reader-for-HarmonyOS",
+    "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+    "dirtyWorktreeIncluded": false,
+    "role": "Reference product source; not a claim of complete or accepted product"
+  },
+  "ui": {
+    "repository": "https://github.com/minliny/Reader-UI",
+    "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+    "dirtyWorktreeIncluded": false,
+    "role": "Contract and assets reference"
+  },
+  "core": {
+    "metadata": "scripts/core-dependency.json",
+    "initialCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
+    "role": "The current exact runtime pin and any narrowly scoped build patch are governed by the dependency metadata"
+  },
+  "iosImplementationReference": {
+    "repository": "https://github.com/minliny/Reader-for-iOS",
+    "commit": "71773e7cd10e05effa6fe0ea4b6512038362f4f8",
+    "role": "Contract, lifecycle, original receipts and delivery method; not the Android visual reference or transferable test evidence"
+  },
+  "legacyAndroidDocs": {
+    "role": "Historical retained material; not the new target or reachable product"
+  },
+  "evidencePolicy": "Exact manifests and run receipts describe builds and device observations; current tasks and progress remain only in the workspace DEVELOPMENT_BACKLOG.md"
+}

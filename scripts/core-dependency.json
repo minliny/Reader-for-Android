@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/minliny/Reader-Core",
+  "commit": "a8eb35081e892a4201582de18c8622a961c43f4e",
+  "license": "MIT OR Apache-2.0",
+  "minimumAndroidApi": 24,
+  "abis": [
+    "arm64-v8a"
+  ],
+  "rustTarget": "aarch64-linux-android",
+  "ndkVersion": "26.3.11579264",
+  "cmakeVersion": "3.22.1",
+  "files": [
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java",
+      "destination": "app/src/core/java/com/reader/core/NativeCoreBridge.java",
+      "sha256": "5641561db61642fffcff5638a59b09ee02b6c94a58af9fe85d6bab6f267055fe"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreException.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreException.java",
+      "sha256": "12870ad57534b50f09abff844d87af42c42e7de284d1bcc3ac2c66c6e2265936"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreLastError.java",
+      "sha256": "18278d21867503c9e2a1b69ca109f67132864cb77a1a042b7012ecd8ade9f824"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreRuntime.java",
+      "sha256": "20b0c77dddcf157a1edc2022bb6b4ca7c2c1bb225e77dd1c702e9d17617fe293"
+    }
+  ],
+  "compatibility": {
+    "cAbi": 1,
+    "protocol": 1,
+    "runtimeConfig": 1,
+    "storage": "Base SQLite user_version38 plus physical local-import extension schema2; portable snapshot16. Local authority and Host snapshot-only persistence are mutually exclusive. No migration or existing Android data acceptance is claimed.",
+    "nativePageSize": "Explicit max-page-size=16384/common-page-size=16384 final-link options and ELF LOAD alignment inspection. Runtime 16KB device validation remains NOT_RUN."
+  },
+  "canonicalBuild": "build-android-jni.sh",
+  "nestedCompilations": [
+    "Java wrapper and Java sample compile when javac is available",
+    "Kotlin sample compile when kotlinc is available",
+    "reader-ffi release staticlib via cargo rustc",
+    "JNI shared library via CMake"
+  ],
+  "businessTests": "NOT_RUN",
+  "previousCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
+  "buildPatch": {
+    "baseCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
+    "changedFiles": [
+      "build-android-jni.sh"
+    ],
+    "reason": "The canonical Android cargo rustc command explicitly enables the already-existing reader-ffi bindgen feature. rquickjs 0.8.1 has no shipped Android bindings.",
+    "featurePath": [
+      "reader-ffi/bindgen",
+      "reader-js/bindgen",
+      "rquickjs/bindgen",
+      "rquickjs-sys/bindgen"
+    ],
+    "defaultOtherPlatformBehavior": "UNCHANGED",
+    "businessAbiSchemaProductVersion": "UNCHANGED",
+    "cargoLock": "UNCHANGED; bindgen 0.69.5 already locked and available in offline cache",
+    "hostTool": "LIBCLANG_PATH must select a real host libclang; NDK target/sysroot arguments remain canonical"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "purpose": "A1 Android fixed-reference fonts, theme and vector assets",
+  "harmonyReference": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+  "uiReference": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+  "vectorConversion": "SVG path geometry, strokes and full-viewport clip retained as Android VectorDrawable; tint follows Reader semantic role.",
+  "inputs": [
+    {
+      "repository": "Reader-UI",
+      "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+      "path": "fonts/NotoSerifSC-Regular.ttf",
+      "sha256": "9502147ceba7b5bc7fd3415083f6a5d133f22d8f9efb4974d4b85f3a97ea2d3a",
+      "output": "res/font/reader_serif_regular.ttf"
+    },
+    {
+      "repository": "Reader-UI",
+      "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+      "path": "fonts/NotoSerifSC-Bold.ttf",
+      "sha256": "3fb07709c24ed05993636d0b137917ea0bae5cf976f157d5e258fd068399a894",
+      "output": "res/font/reader_serif_bold.ttf"
+    },
+    {
+      "repository": "Reader-UI",
+      "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+      "path": "fonts/NotoSansSC-VF.otf",
+      "sha256": "d13ed01ec8aa45d6178999b648e96fb92150683e9f8e2a581f2acf208dcbe44b",
+      "output": "res/font/reader_sans.otf"
+    },
+    {
+      "repository": "Reader-UI",
+      "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+      "path": "fonts/OFL.txt",
+      "sha256": "5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6",
+      "output": "assets/provenance/Noto-OFL.txt"
+    },
+    {
+      "repository": "Reader-UI",
+      "commit": "95366cd93775ea0ad3ecbc0f60e8882717f93169",
+      "path": "theme/registry.json",
+      "sha256": "1a3ea68f162a2e440b60fa0dfe0001bc9c3051b6adba7700a60fdc73024a798f",
+      "output": "assets/provenance/reader-theme-registry.json"
+    },
+    {
+      "repository": "Reader-for-HarmonyOS",
+      "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+      "path": "entry/src/main/resources/base/media/bookshelf_library_outline.svg",
+      "sha256": "7b7208a08c5f77a474fac7f713e9db46401ae5a0da8071bc2eadf20dab1203cb",
+      "output": "assets/provenance/bookshelf_library_outline.svg"
+    },
+    {
+      "repository": "Reader-for-HarmonyOS",
+      "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+      "path": "entry/src/main/resources/base/media/bookshelf_more_settings.svg",
+      "sha256": "28a64e0209009f9f83a3f6c454537afb97c8abce6561de5d6922ab1151162bfd",
+      "output": "assets/provenance/bookshelf_more_settings.svg"
+    },
+    {
+      "repository": "Reader-for-HarmonyOS",
+      "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+      "path": "entry/src/main/resources/base/media/bookshelf_more_import.svg",
+      "sha256": "c268570c99df72ac82cd222fe94fd58322d8f4529db4a654fceb4093a69bd02f",
+      "output": "assets/provenance/bookshelf_more_import.svg"
+    },
+    {
+      "repository": "Reader-for-HarmonyOS",
+      "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+      "path": "entry/src/main/resources/base/media/reader_directory_back.svg",
+      "sha256": "08253f6ff4975aca842e7c89249a62517543ffee57ffe20c2dd9d5c2874739c0",
+      "output": "assets/provenance/reader_directory_back.svg"
+    },
+    {
+      "repository": "Reader-for-HarmonyOS",
+      "commit": "3b297fdc7e724cf655eca3bac2a8efeda2001c56",
+      "path": "entry/src/main/resources/base/media/reader_directory_directory.svg",
+      "sha256": "74c8a8378ca5c3b3e80c66520c2f960af1ab019b54c86b7af57a4195cfbb7bc2",
+      "output": "assets/provenance/reader_directory_directory.svg"
+    }
+  ]
+}
