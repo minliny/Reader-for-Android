@@ -117,14 +117,14 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
     private var anchor: (Int) -> Unit = {}
     private var tap: () -> Unit = {}
     private var phase: (NativeLayoutPhase) -> Unit = {}
-    private val timeout = Runnable {
+    private val timeout: Runnable = Runnable {
         if (!released && restoring) {
             pendingPlacement = false
             removeCallbacks(finish)
             phase(NativeLayoutPhase.Failed)
         }
     }
-    private val finish = Runnable {
+    private val finish: Runnable = Runnable {
         if (!released && finishEpoch == epoch && rawVerifiedEpoch == epoch && isAttachedToWindow &&
             !bodyView.isLayoutRequested && logicalLineIntersectsViewport()) {
             restoring = false
