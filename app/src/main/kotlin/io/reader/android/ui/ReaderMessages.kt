@@ -47,12 +47,12 @@ fun ReaderRecoveryNotice(message: String, busy: Boolean, onReconcile: (() -> Uni
 }
 
 @Composable
-fun ReaderPageState(title: String, detail: String, action: String, onAction: () -> Unit) {
+fun ReaderPageState(title: String, detail: String = "", action: String? = null, onAction: (() -> Unit)? = null) {
     Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(title, style = MaterialTheme.typography.titleLarge)
-        Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onAction) { Text(action) }
+        if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (action != null && onAction != null) Button(onClick = onAction) { Text(action) }
     }
 }
 
@@ -69,7 +69,7 @@ fun ReaderNativeConfirmation(
     AlertDialog(
         onDismissRequest = { onDismiss(presentation.identity) },
         title = { Text(presentation.title) }, text = { Text(presentation.body) },
-        confirmButton = { TextButton(onClick = { onConfirm(presentation.identity) }) { Text(presentation.confirmLabel) } },
-        dismissButton = { TextButton(onClick = { onDismiss(presentation.identity) }) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(presentation.identity) }, modifier = Modifier.testTag("reader_confirmation_confirm")) { Text(presentation.confirmLabel) } },
+        dismissButton = { TextButton(onClick = { onDismiss(presentation.identity) }, modifier = Modifier.testTag("reader_confirmation_dismiss")) { Text("取消") } },
     )
 }

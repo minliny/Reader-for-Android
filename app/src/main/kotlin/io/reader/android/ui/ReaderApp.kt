@@ -27,6 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +42,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -55,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
 import io.reader.android.R
 import io.reader.android.runtime.LibraryBook
+import io.reader.android.runtime.LibrarySort
+import io.reader.android.runtime.LibrarySortDirection
 import androidx.compose.ui.ExperimentalComposeUiApi
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -140,6 +148,12 @@ fun ReaderApp(model: ReaderViewModel) {
                         ReaderRecoveryNotice("原进度保存尚未确认，原记录会继续保留。", state.busy,
                             { model.reconcilePendingPosition(pending) }, "核对原保存", "reader_reconcile_position")
                     }
+                    state.pendingBookmarks.firstOrNull()?.let { pending ->
+                        ReaderRecoveryNotice("原书签操作尚未确认，原记录会继续保留。", state.busy,
+                            { model.reconcileBookmark(pending) }, "核对原书签操作", "reader_reconcile_bookmark")
+                    }
+                    if (state.pendingSearchClose != null) ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。",
+                        state.searchBusy, model::reconcileSearchClose, "核对原搜索", "reader_reconcile_search")
                     when (state.route) {
                         ReaderRoute.Bookshelf -> BookshelfScreen(state, model, requestImport)
                         ReaderRoute.Settings -> SettingsScreen(state, model)
@@ -164,35 +178,72 @@ private fun TabAction(label: String, icon: Int, selected: Boolean, enabled: Bool
 
 @Composable
 private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImport: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        when {
-            !state.ready && state.busy -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(28.dp))
-            }
-            !state.ready -> ReaderPageState("书架暂时不可用", "请重试读取已有书籍。", "重试", model::refreshBooks)
-            state.books.isEmpty() -> Column(Modifier.widthIn(max = 480.dp).padding(24.dp).testTag("reader_empty_shelf")) {
-                Text("我的书架", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(18.dp))
-                Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
-                    Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(painterResource(R.drawable.reader_library), null, Modifier.size(52.dp), tint = MaterialTheme.colorScheme.primary)
-                        Text("让阅读从这里开始", style = MaterialTheme.typography.titleLarge)
-                        Text("导入本地 TXT，将喜欢的书放进书架。", style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = onImport, enabled = !state.busy && state.pendingReady && state.pendingImports.isEmpty(),
-                            modifier = Modifier.testTag("reader_empty_import")) {
-                            Text("导入本地书")
+    Column(Modifier.fillMaxSize()) {
+        if (state.ready) ShelfSearchAndOrder(state, model)
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            when {
+                !state.ready && state.busy -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp))
+                }
+                !state.ready -> ReaderPageState("书架暂时不可用", "请重试读取已有书籍。", "重试", model::refreshBooks)
+                state.books.isEmpty() && state.shelfQuery.isNotBlank() -> ReaderPageState("没有符合条件的书籍",
+                    "试试其他书名或作者。", "清空搜索", { model.setShelfQuery("") })
+                state.books.isEmpty() -> Column(Modifier.widthIn(max = 480.dp).padding(24.dp).testTag("reader_empty_shelf")) {
+                    Text("我的书架", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(18.dp))
+                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+                        Column(Modifier.fillMaxWidth().padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Icon(painterResource(R.drawable.reader_library), null, Modifier.size(52.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("让阅读从这里开始", style = MaterialTheme.typography.titleLarge)
+                            Text("导入本地 TXT，将喜欢的书放进书架。", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Button(onClick = onImport, enabled = !state.busy && state.pendingReady && state.pendingImports.isEmpty(),
+                                modifier = Modifier.testTag("reader_empty_import")) {
+                                Text("导入本地书")
+                            }
                         }
                     }
                 }
+                else -> LazyColumn(Modifier.widthIn(max = 760.dp).fillMaxSize().testTag("reader_bookshelf"),
+                    contentPadding = PaddingValues(horizontal = 19.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item { Text("我的书架 · ${state.books.size}", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    items(state.books, key = { it.id }) { book -> BookRow(book, state.busy, model) }
+                }
             }
-            else -> LazyColumn(Modifier.widthIn(max = 760.dp).fillMaxSize().testTag("reader_bookshelf"),
-                contentPadding = PaddingValues(horizontal = 19.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { Text("我的书架 · ${state.books.size}", style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                items(state.books, key = { it.id }) { book -> BookRow(book, state.busy, model) }
+        }
+    }
+}
+
+@Composable
+private fun ShelfSearchAndOrder(state: ReaderUiState, model: ReaderViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    val labels = listOf(LibrarySort.LAST_READ to "最近阅读", LibrarySort.ADDED to "加入时间",
+        LibrarySort.TITLE to "书名", LibrarySort.AUTHOR to "作者", LibrarySort.MANUAL to "手动顺序")
+    Row(Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(value = state.shelfQuery, onValueChange = model::setShelfQuery,
+            label = { Text("搜索书名或作者") }, singleLine = true, enabled = !state.busy,
+            modifier = Modifier.weight(1f).testTag("reader_shelf_query"))
+        Box {
+            TextButton(onClick = { expanded = true }, enabled = !state.busy,
+                modifier = Modifier.testTag("reader_shelf_sort")) {
+                Text(labels.first { it.first == state.shelfSort }.second)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                labels.forEach { (sort, label) ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = {
+                        expanded = false; model.setShelfOrder(sort)
+                    }, modifier = Modifier.testTag("reader_shelf_sort_${sort.name}"))
+                }
+                DropdownMenuItem(text = { Text(if (state.shelfDirection == LibrarySortDirection.ASCENDING) "改为降序" else "改为升序") },
+                    onClick = {
+                        expanded = false
+                        model.setShelfOrder(state.shelfSort, if (state.shelfDirection == LibrarySortDirection.ASCENDING)
+                            LibrarySortDirection.DESCENDING else LibrarySortDirection.ASCENDING)
+                    }, modifier = Modifier.testTag("reader_shelf_sort_direction"))
             }
         }
     }

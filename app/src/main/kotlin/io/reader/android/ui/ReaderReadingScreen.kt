@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -38,6 +40,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -82,7 +85,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             readerChapterIndex = reading.chapter.index
         }) {
         key(reading.identity) {
-            ReaderChapterBody(reading, state.fontSize, state.paper,
+            ReaderChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
                 onVisibleAnchor = { model.visibleAnchor(reading.identity, it) },
                 onTap = model::toggleControls,
                 modifier = Modifier.align(Alignment.Center).widthIn(max = 760.dp).fillMaxSize())
@@ -109,37 +112,52 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                 ReaderRecoveryNotice("原进度保存尚未确认，已暂停后续保存。当前正文仍可阅读。", state.busy,
                     { model.reconcilePendingPosition(pending) }, "核对原保存", "reader_reconcile_position")
             }
+            state.pendingBookmarks.firstOrNull { it.bookId == reading.book.id }?.let { pending ->
+                ReaderRecoveryNotice("原书签操作尚未确认，请先核对原操作。", state.busy,
+                    { model.reconcileBookmark(pending) }, "核对原书签操作", "reader_reconcile_bookmark")
+            }
+            if (state.pendingSearchClose != null) ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。",
+                state.searchBusy, model::reconcileSearchClose, "核对原搜索", "reader_reconcile_search")
             if (state.busy) LoadingLine()
         }
         if (state.controlsVisible) {
             Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp,
                 modifier = Modifier.align(Alignment.BottomCenter).widthIn(max = 760.dp).fillMaxWidth().testTag("reader_controls")) {
-                Column(Modifier.padding(horizontal = 19.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { model.changeChapter(-1) }, enabled = !state.busy && state.pendingPosition == null && reading.chapter.index > 0,
-                            modifier = Modifier.testTag("reader_previous_chapter")) { Text("上一章") }
-                        Text("${reading.chapter.index + 1} / ${reading.book.chapterCount}", modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        TextButton(onClick = { model.changeChapter(1) },
-                            enabled = !state.busy && state.pendingPosition == null && reading.chapter.index + 1 < reading.book.chapterCount,
-                            modifier = Modifier.testTag("reader_next_chapter")) { Text("下一章") }
-                    }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("字号", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { model.setFontSize(state.fontSize - 1) }, enabled = state.fontSize > 14,
-                            modifier = Modifier.testTag("reader_font_smaller")) { Text("A−") }
-                        Text(state.fontSize.toString(), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { model.setFontSize(state.fontSize + 1) }, enabled = state.fontSize < 32,
-                            modifier = Modifier.testTag("reader_font_larger")) { Text("A+") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(ReaderPaper.Paper to "素纸", ReaderPaper.Warm to "暖纸", ReaderPaper.Night to "夜读").forEach { (paper, text) ->
-                            FilterChip(selected = state.paper == paper, onClick = { model.setPaper(paper) }, label = { Text(text) },
-                                modifier = Modifier.testTag("reader_paper_${paper.name}"))
+                if (state.readerPanel != null) ReaderToolsPanel(state, model)
+                else {
+                    Column(Modifier.padding(horizontal = 19.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TextButton(onClick = model::showBookmarks, enabled = !state.busy,
+                                modifier = Modifier.testTag("reader_open_bookmarks")) { Text("书签") }
+                            TextButton(onClick = model::showContentSearch, enabled = !state.busy,
+                                modifier = Modifier.testTag("reader_open_content_search")) { Text("正文搜索") }
                         }
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = model::toggleControls, modifier = Modifier.testTag("reader_close_controls")) { Text("收起") }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { model.changeChapter(-1) }, enabled = !state.busy && state.pendingPosition == null && reading.chapter.index > 0,
+                                modifier = Modifier.testTag("reader_previous_chapter")) { Text("上一章") }
+                            Text("${reading.chapter.index + 1} / ${reading.book.chapterCount}", modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            TextButton(onClick = { model.changeChapter(1) },
+                                enabled = !state.busy && state.pendingPosition == null && reading.chapter.index + 1 < reading.book.chapterCount,
+                                modifier = Modifier.testTag("reader_next_chapter")) { Text("下一章") }
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("字号", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = { model.setFontSize(state.fontSize - 1) }, enabled = state.fontSize > 14,
+                                modifier = Modifier.testTag("reader_font_smaller")) { Text("A−") }
+                            Text(state.fontSize.toString(), style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = { model.setFontSize(state.fontSize + 1) }, enabled = state.fontSize < 32,
+                                modifier = Modifier.testTag("reader_font_larger")) { Text("A+") }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(ReaderPaper.Paper to "素纸", ReaderPaper.Warm to "暖纸", ReaderPaper.Night to "夜读").forEach { (paper, text) ->
+                                FilterChip(selected = state.paper == paper, onClick = { model.setPaper(paper) }, label = { Text(text) },
+                                    modifier = Modifier.testTag("reader_paper_${paper.name}"))
+                            }
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = model::toggleControls, modifier = Modifier.testTag("reader_close_controls")) { Text("收起") }
+                        }
                     }
                 }
             }
@@ -148,6 +166,9 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 22.dp, vertical = 8.dp))
         }
+        ReaderNativeConfirmation(state.bookmarkDeletion?.let {
+            ReaderConfirmationPresentation(it.id, "删除书签", it.chapterTitle, "删除")
+        }, model::confirmBookmarkDeletion, model::dismissBookmarkDeletion)
     }
 }
 
@@ -173,6 +194,7 @@ private fun ReaderChapterBody(
     reading: ReadingSession,
     fontSize: Int,
     paper: ReaderPaper,
+    userScrollEnabled: Boolean,
     onVisibleAnchor: (Int) -> Unit,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -185,6 +207,7 @@ private fun ReaderChapterBody(
     var restoring by remember { mutableStateOf(true) }
     var restoreFailed by remember { mutableStateOf(false) }
     var restoreAttempt by remember { mutableIntStateOf(0) }
+    val currentAnchor by rememberUpdatedState(onVisibleAnchor)
     val horizontalPx = with(LocalDensity.current) { 22.dp.roundToPx() }
 
     // Restore the original scalar anchor to the actual native line. Reflow changes
@@ -219,7 +242,8 @@ private fun ReaderChapterBody(
                 val visible = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key is Int }
                 val block = (visible?.key as? Int)?.let(byStart::get)
                 val native = block?.let { layouts[it.startUtf16] }
-                if (visible == null || block == null || native == null || native.fontSize != fontSize) null
+                if (visible == null || block == null || native == null || native.fontSize != fontSize ||
+                    native.result.size.width != widthPx - horizontalPx * 2) null
                 else {
                     val y = (list.layoutInfo.viewportStartOffset - visible.offset).coerceAtLeast(0).toFloat()
                     val line = native.result.getLineForVerticalPosition(y)
@@ -233,38 +257,45 @@ private fun ReaderChapterBody(
                 userScrollObserved = false
             } else if (scrolling) {
                 userScrollObserved = true
-                if (scalar != null) onVisibleAnchor(scalar)
+                if (scalar != null) currentAnchor(scalar)
             } else if (userScrollObserved) {
                 // Native fling's final layout can arrive in the same snapshot
                 // that retires scrolling. Capture that last user-driven anchor.
                 userScrollObserved = false
-                if (scalar != null) onVisibleAnchor(scalar)
+                if (scalar != null) currentAnchor(scalar)
             }
         }
     }
 
     Box(modifier) {
-        LazyColumn(
-            state = list,
-            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 52.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize().onSizeChanged { widthPx = it.width }
-                .pointerInput(reading.identity) { detectTapGestures(onTap = { onTap() }) }
-                .testTag("reader_body"),
-        ) {
-            item(key = "chapter-title") {
-                Text(reading.chapter.title, fontFamily = ReaderFonts.Serif, fontSize = 23.sp,
-                    color = paper.ink(), modifier = Modifier.padding(top = 32.dp, bottom = 12.dp).testTag("reader_chapter_title"))
-            }
-            items(blocks, key = { it.startUtf16 }) { block ->
-                Text(block.text.ifEmpty { "\u200B" },
-                    style = TextStyle(fontFamily = ReaderFonts.Serif, fontSize = fontSize.sp, lineHeight = (fontSize * 1.8f).sp),
-                    color = paper.ink(), modifier = Modifier.fillMaxWidth(),
-                    onTextLayout = { result ->
-                        val previous = layouts[block.startUtf16]
-                        if (previous == null || previous.fontSize != fontSize || previous.result.size != result.size ||
-                            previous.result.lineCount != result.lineCount) layouts[block.startUtf16] = NativeParagraphLayout(fontSize, result)
-                    })
+        SelectionContainer {
+            LazyColumn(
+                state = list,
+                userScrollEnabled = userScrollEnabled,
+                contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 52.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize().onSizeChanged { widthPx = it.width }
+                    .pointerInput(reading.identity) { detectTapGestures(onTap = { onTap() }) }
+                    .testTag("reader_body"),
+            ) {
+                item(key = "chapter-title") {
+                    DisableSelection {
+                        Text(reading.chapter.title, fontFamily = ReaderFonts.Serif, fontSize = 23.sp,
+                            color = paper.ink(), modifier = Modifier.padding(top = 32.dp, bottom = 12.dp).testTag("reader_chapter_title"))
+                    }
+                }
+                items(blocks, key = { it.startUtf16 }) { block ->
+                    // Native selection copies the original paragraph, including empty
+                    // paragraphs. No display-only placeholder enters the clipboard.
+                    Text(block.text,
+                        style = TextStyle(fontFamily = ReaderFonts.Serif, fontSize = fontSize.sp, lineHeight = (fontSize * 1.8f).sp),
+                        color = paper.ink(), modifier = Modifier.fillMaxWidth().testTag("reader_paragraph_${block.startUtf16}"),
+                        onTextLayout = { result ->
+                            val previous = layouts[block.startUtf16]
+                            if (previous == null || previous.fontSize != fontSize || previous.result.size != result.size ||
+                                previous.result.lineCount != result.lineCount) layouts[block.startUtf16] = NativeParagraphLayout(fontSize, result)
+                        })
+                }
             }
         }
         if (restoring) {

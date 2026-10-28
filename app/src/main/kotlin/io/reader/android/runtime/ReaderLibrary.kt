@@ -56,19 +56,28 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val staging = File(root, "ImportStaging")
     private val journal by lazy { DurableJournal(File(root, "Operations")) }
     private val transport: CoreTransport = NativeCoreTransport(File(root, "Core"), File(application.cacheDir, "ReaderCore"))
+    private val bookmarkService by lazy { ReaderBookmarks(transport, journal) }
+    private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
+    private val searchService by searchServiceDelegate
     private val mutex = Mutex()
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<String, Session>()
 
-    suspend fun books(): List<LibraryBook> = onIO {
+    suspend fun books(
+        keyword: String? = null,
+        sort: LibrarySort = LibrarySort.LAST_READ,
+        direction: LibrarySortDirection = LibrarySortDirection.DESCENDING,
+    ): List<LibraryBook> = onIO {
         val result = mutableListOf<LibraryBook>()
         var offset = 0
         repeat(10_000) {
-            val page = transport.request("bookshelf.list", JSONObject()
+            val parameters = JSONObject()
                 .put("sourceId", "local").put("contentKind", "text")
-                .put("sortBy", "lastReadAt").put("sortDirection", "descending")
-                .put("offset", offset).put("limit", 128))
+                .put("sortBy", sort.wire).put("sortDirection", direction.wire)
+                .put("offset", offset).put("limit", 128)
+            keyword?.takeIf { it.isNotBlank() }?.let { parameters.put("keyword", it) }
+            val page = transport.request("bookshelf.list", parameters)
             val entries = page.getJSONArray("books")
             for (index in 0 until entries.length()) {
                 val entry = entries.getJSONObject(index)
@@ -99,7 +108,10 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }
     }
 
-    suspend fun chapter(bookId: String, index: Int): ReaderChapter = onIO {
+    suspend fun chapter(bookId: String, index: Int): ReaderChapter = onIO { readChapter(bookId, index) }
+
+    /** Validate a jump before publishing its new session; stale targets leave the old session usable. */
+    private fun readChapter(bookId: String, index: Int, validate: (ReaderChapter) -> Unit = {}): ReaderChapter {
         localIdentity(bookId)
         require(index >= 0)
         val data = transport.request("local_book.chapter.content", JSONObject()
@@ -109,10 +121,84 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         val content = ReaderChapter(bookId, index, data.getString("chapterTitle"), data.getString("content"),
             data.getString("bodyVersion"), data.getString("processingVersion"))
         check(content.bodyVersion.isNotEmpty() && content.processingVersion.isNotEmpty()) { "CONTENT_VERSION_MISSING" }
+        validate(content)
         val revision = readProgress(bookId).getString("progressRevision")
         check(revision.isNotEmpty()) { "PROGRESS_OBSERVATION_MISSING" }
         readingSessions[bookId] = Session(content, revision)
-        content
+        return content
+    }
+
+    suspend fun bookmarks(bookId: String, query: String? = null): List<ReaderBookmark> = onIO {
+        val book = readShelfEntry(bookId)
+        bookmarkService.list(bookId, book.getString("title"), book.getString("author"), query)
+    }
+
+    suspend fun createBookmark(
+        bookId: String,
+        index: Int,
+        scalarOffset: Int,
+        sessionToken: String,
+        excerpt: String = "",
+        note: String = "",
+    ): ReaderBookmark = onIO {
+        val chapter = activeChapter(bookId, sessionToken, index)
+        bookmarkService.requireWritable()
+        val book = readShelfEntry(bookId)
+        bookmarkService.create(chapter, book.getString("title"), book.getString("author"), scalarOffset, excerpt, note)
+    }
+
+    suspend fun deleteBookmark(bookId: String, time: Long, sessionToken: String): BookmarkDeleteResult = onIO {
+        val chapter = activeChapter(bookId, sessionToken)
+        bookmarkService.requireWritable()
+        val book = readShelfEntry(bookId)
+        val target = bookmarkService.list(bookId, book.getString("title"), book.getString("author"))
+            .firstOrNull { it.time == time } ?: error("BOOKMARK_TARGET_NOT_FOUND")
+        bookmarkService.delete(chapter, target)
+    }
+
+    suspend fun pendingBookmarks(): List<PendingBookmark> = onIO { bookmarkService.pending() }
+
+    suspend fun reconcilePendingBookmark(bookId: String, operationId: String): BookmarkOperationResult = onIO {
+        localIdentity(bookId)
+        bookmarkService.reconcile(bookId, operationId)
+    }
+
+    suspend fun openBookmark(bookmark: ReaderBookmark): ReaderChapter = onIO {
+        check(bookmark.sourceId == "local") { "LOCAL_BOOKMARK_REQUIRED" }
+        readChapter(bookmark.bookId, bookmark.chapterIndex) { chapter ->
+            if (chapter.bodyVersion != bookmark.bodyVersion || chapter.processingVersion != bookmark.processingVersion ||
+                bookmark.scalarOffset !in 0..chapter.scalarCount) throw BookmarkTargetStaleException(bookmark.bookId, bookmark.time)
+        }
+    }
+
+    suspend fun startContentSearch(bookId: String, keyword: String, limit: Int = 50): ReaderContentSearchPage = onIO {
+        localIdentity(bookId)
+        searchService.start(bookId, keyword, limit)
+    }
+
+    suspend fun nextContentSearch(session: ReaderContentSearchSession, cursor: String): ReaderContentSearchPage = onIO {
+        searchService.next(session, cursor)
+    }
+
+    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO { searchService.close(session) }
+
+    suspend fun openContentSearchHit(session: ReaderContentSearchSession, hit: ReaderContentSearchHit): ReaderChapter = onIO {
+        readChapter(hit.bookId, hit.chapterIndex) { chapter -> searchService.validateJump(session, hit, chapter) }
+    }
+
+    private fun activeChapter(bookId: String, sessionToken: String, index: Int? = null): ReaderChapter {
+        localIdentity(bookId)
+        val chapter = readingSessions[bookId]?.chapter ?: error("READING_SESSION_MISSING")
+        check(chapter.sessionToken == sessionToken && (index == null || chapter.index == index)) { "RETIRED_READING_SESSION_TOKEN" }
+        return chapter
+    }
+
+    private fun readShelfEntry(bookId: String): JSONObject {
+        localIdentity(bookId)
+        val entry = transport.request("bookshelf.get", JSONObject().put("sourceId", "local").put("bookId", bookId))
+            .getJSONObject("book")
+        check(entry.getString("sourceId") == "local" && entry.getString("bookId") == bookId) { "LOCAL_SHELF_IDENTITY_CHANGED" }
+        return entry
     }
 
     suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): Unit = onIO {
@@ -490,7 +576,14 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     private suspend fun <T> onIO(block: suspend () -> T): T = withContext(Dispatchers.IO) {
-        mutex.withLock { check(!closed.get()) { "LIBRARY_CLOSED" }; block() }
+        mutex.withLock {
+            check(!closed.get()) { "LIBRARY_CLOSED" }
+            try { block() } finally {
+                // Same owner turn only: late original search results can reveal a
+                // retired cursor. This cleanup adds no second poll/event owner.
+                if (searchServiceDelegate.isInitialized()) searchService.finishOwnerTurn()
+            }
+        }
     }
 
     override fun close() {
