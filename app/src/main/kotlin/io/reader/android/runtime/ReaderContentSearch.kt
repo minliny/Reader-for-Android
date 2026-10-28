@@ -268,7 +268,7 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
             // Core's initial search guard closes its slot on error, before publishing the terminal.
             search.snapshotClosed = true
         }
-        val data = NativeCoreTransport.result("search.content", event)
+        val data = CoreTerminal.result("search.content", event)
         if (call.closing) {
             check(data.getJSONArray("results").length() == 0 && ContentSearchReceiptPolicy.cursor(data) == null &&
                 (!data.has("hasMore") || data.get("hasMore") == false)) { "INVALID_CONTENT_SEARCH_CLOSE_RECEIPT" }

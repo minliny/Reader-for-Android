@@ -69,6 +69,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 @Composable
 fun ReaderApp(model: ReaderViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
+    val protocol by model.coreProtocolRecoveries.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current
     val view = LocalView.current
     DisposableEffect(lifecycle, model) {
@@ -84,7 +85,8 @@ fun ReaderApp(model: ReaderViewModel) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) model.importDocument(uri)
     }
-    val importAllowed = !state.busy && state.pendingReady && state.pendingImports.isEmpty()
+    val importAllowed = !state.busy && state.pendingReady && state.pendingImports.isEmpty() &&
+        (!protocol.initialized || protocol.admissionOpen)
     val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
@@ -140,6 +142,7 @@ fun ReaderApp(model: ReaderViewModel) {
                 },
             ) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding)) {
+                    ReaderProtocolRecoveryHost(model)
                     if (state.pendingImports.isNotEmpty() || (!state.pendingReady && state.ready)) {
                         ReaderRecoveryNotice("有一次导入尚未确认。核对原操作后再导入新的书籍。", state.busy,
                             model::reconcilePendingImports)

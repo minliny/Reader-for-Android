@@ -1,14 +1,12 @@
 package io.reader.android.runtime
 
 import android.content.Context
+import io.reader.android.ReaderApplication
+import kotlinx.coroutines.flow.StateFlow
 import android.net.Uri
 import android.provider.OpenableColumns
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -50,16 +48,18 @@ data class PendingPosition(val id: String, val bookId: String, val stage: String
  */
 class ReaderLibrary(context: Context) : AutoCloseable {
     private val application = context.applicationContext
-    private val root = File(application.filesDir, "Reader")
-    private val originals = File(root, "Originals")
+    private val client = (application as? ReaderApplication)?.coreOwner?.newClient()
+        ?: error("READER_APPLICATION_OWNER_REQUIRED")
+    private val root get() = client.root
+    private val originals get() = client.originals
     private val sourcePublisher = OriginalSourcePublisher(originals)
-    private val staging = File(root, "ImportStaging")
-    private val journal by lazy { DurableJournal(File(root, "Operations")) }
-    private val transport: CoreTransport = NativeCoreTransport(File(root, "Core"), File(application.cacheDir, "ReaderCore"))
+    private val staging get() = client.staging
+    private val journal get() = client.journal
+    private val transport: CoreTransport = client.transport
     private val bookmarkService by lazy { ReaderBookmarks(transport, journal) }
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
-    private val mutex = Mutex()
+    private val registeredSearchCleanups = mutableSetOf<String>()
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<String, Session>()
@@ -173,14 +173,31 @@ class ReaderLibrary(context: Context) : AutoCloseable {
 
     suspend fun startContentSearch(bookId: String, keyword: String, limit: Int = 50): ReaderContentSearchPage = onIO {
         localIdentity(bookId)
-        searchService.start(bookId, keyword, limit)
+        val originalService = searchService
+        try {
+            originalService.start(bookId, keyword, limit).also { registerSearchCleanup(it.session, originalService) }
+        } catch (pending: ContentSearchPendingException) {
+            registerSearchCleanup(pending.session, originalService)
+            throw pending
+        }
+    }
+
+    private fun registerSearchCleanup(session: ReaderContentSearchSession, originalService: ReaderContentSearch) {
+        if (!registeredSearchCleanups.add(session.id)) return
+        client.registerSearchCleanup(client.currentTurn(), session.id) {
+            originalService.close(session) // Exact old service + UUID; never close a mutable "current cursor".
+        }
     }
 
     suspend fun nextContentSearch(session: ReaderContentSearchSession, cursor: String): ReaderContentSearchPage = onIO {
         searchService.next(session, cursor)
     }
 
-    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO { searchService.close(session) }
+    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO {
+        searchService.close(session) // Returns only after the exact original cursor close is confirmed.
+        client.currentTurn().cleanupCompleted("search:${session.id}")
+        registeredSearchCleanups.remove(session.id)
+    }
 
     suspend fun openContentSearchHit(session: ReaderContentSearchSession, hit: ReaderContentSearchHit): ReaderChapter = onIO {
         readChapter(hit.bookId, hit.chapterIndex) { chapter -> searchService.validateJump(session, hit, chapter) }
@@ -251,7 +268,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             }
             record.put("completed", true)
             journal.write(record)
-            NativeCoreTransport.result("reading.progress.update", event)
+            CoreTerminal.result("reading.progress.update", event)
         }
         val parameters = record.getJSONObject("parameters")
         val revision = ProgressReceiptPolicy.revision(record, event)
@@ -287,7 +304,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         // Archived originals can be read again by their exact owner, but their
         // ACK must still validate; absence is never converted into success.
         if (record.optBoolean("completed")) {
-            if (terminal.getString("type") == "error") NativeCoreTransport.result("reading.progress.update", terminal)
+            if (terminal.getString("type") == "error") CoreTerminal.result("reading.progress.update", terminal)
             ProgressReceiptPolicy.revision(record, terminal)
         } else consumeProgressTerminal(record, terminal)
         Unit
@@ -386,7 +403,6 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         var record = original
         val dispatched = mutableSetOf<String>()
         repeat(8) {
-            check(!closed.get()) { "LIBRARY_CLOSED" }
             val pendingStage = record.optString("inFlightStage")
             if (pendingStage.isNotEmpty()) {
                 val terminal = record.optJSONObject("wireTerminal")
@@ -496,7 +512,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             }
             throw PendingOperationException(record.getString("id"), stage)
         }
-        return NativeCoreTransport.result("import.local.$stage.v2", event)
+        return CoreTerminal.result("import.local.$stage.v2", event)
     }
 
     private fun completeSettlement(record: JSONObject, response: JSONObject) {
@@ -575,27 +591,29 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         require(bookId.matches(Regex("local:[a-f0-9]{64}"))) { "LOCAL_BOOK_ID_REQUIRED" }
     }
 
-    private suspend fun <T> onIO(block: suspend () -> T): T = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            check(!closed.get()) { "LIBRARY_CLOSED" }
+    private suspend fun <T> onIO(block: suspend () -> T): T {
+        check(!closed.get()) { "LIBRARY_CLIENT_RETIRED" }
+        return client.wholeTurn {
+            // This App-scope block and finally are not children of the VM caller.
+            // Retirement closes NEW admission, never interrupts accepted stages.
             try { block() } finally {
-                // Same owner turn only: late original search results can reveal a
-                // retired cursor. This cleanup adds no second poll/event owner.
                 if (searchServiceDelegate.isInitialized()) searchService.finishOwnerTurn()
             }
         }
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) {
-            // Lifecycle callbacks run on Android's main thread. Admission closes
-            // immediately; destruction waits off-thread for the bounded original
-            // request and its durable terminal callback, never underneath it.
-            Thread({ transport.close() }, "reader-core-close").apply { isDaemon = true; start() }
-        }
+        if (closed.compareAndSet(false, true)) client.retire()
+        // Existing ViewModel.onCleared() still calls this, but no native destroy,
+        // detached close thread, current-cursor close, or old-session map clearing.
     }
 
     companion object {
+        /** These read the cheap Application feed and never instantiate Library/AppCoreOwner/Native. */
+        internal fun observeCoreProtocol(context: Context): StateFlow<CoreProtocolRecoveryView> =
+            (context.applicationContext as ReaderApplication).coreProtocolRecovery.view
+        internal fun requestCoreProtocolRecovery(context: Context, presentationId: String): Boolean =
+            (context.applicationContext as ReaderApplication).coreProtocolRecovery.requestAction(presentationId)
         private const val MAX_SOURCE_BYTES = 64L * 1024 * 1024
         private val DEFINITE_REJECTIONS = setOf("INVALID_PARAMS", "INVALID_MESSAGE", "UNKNOWN_METHOD",
             "INVALID_PROTOCOL_VERSION", "BUSY", "RESOURCE_EXHAUSTED", "BOOK_ALREADY_ON_SHELF")

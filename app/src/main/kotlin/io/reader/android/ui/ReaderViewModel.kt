@@ -12,6 +12,9 @@ import io.reader.android.runtime.ReaderLibrary
 import io.reader.android.runtime.PendingImport
 import io.reader.android.runtime.PendingPosition
 import io.reader.android.runtime.PendingOperationException
+import io.reader.android.runtime.coreProtocolPending
+import io.reader.android.runtime.CoreProtocolReference
+import io.reader.android.ReaderApplication
 import io.reader.android.runtime.CoreCommandException
 import io.reader.android.runtime.CoreReadTimeoutException
 import io.reader.android.runtime.LibrarySort
@@ -29,6 +32,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -87,12 +91,17 @@ data class ReaderUiState(
     val searchReady: Boolean = false,
     val searchError: String? = null,
     val pendingSearchClose: ReaderContentSearchSession? = null,
+    val protocolRecoveryReference: CoreProtocolReference? = null,
 ) {
     val pendingPosition: PendingPosition? get() = pendingPositions.firstOrNull { it.bookId == reading?.book?.id }
 }
 
 /** Platform display preferences only. Books, chapters and positions belong to Core. */
 class ReaderViewModel(application: Application) : AndroidViewModel(application) {
+    // Does not access lazy Library/AppCoreOwner or send a Core request.
+    private val protocolVmId = java.util.UUID.randomUUID().toString()
+    private val protocolFeed = (application as ReaderApplication).coreProtocolRecovery
+    internal val coreProtocolRecoveries = protocolFeed.view
     private val libraryDelegate = lazy { ReaderLibrary(application) }
     private val library by libraryDelegate
     private val preferences = application.getSharedPreferences("reader.display", 0)
@@ -115,7 +124,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     )
     val state = mutableState.asStateFlow()
 
-    init { refreshBooks() }
+    init {
+        viewModelScope.launch {
+            coreProtocolRecoveries.collect { view ->
+                if (view.initialized && view.admissionOpen) mutableState.update { current ->
+                    val original = current.protocolRecoveryReference
+                    if (original != null && view.items.none { it.original == original })
+                        current.copy(protocolRecoveryReference = null) else current
+                }
+            }
+        }
+        refreshBooks() // Existing startup action, not a status-query side effect.
+    }
 
     private inline fun <reified T : Enum<T>> enumValue(value: String?, fallback: T): T =
         enumValues<T>().firstOrNull { it.name == value } ?: fallback
@@ -152,6 +172,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                     throw cancelled
                 } catch (error: Exception) {
                     if (request == generation) {
+                        val protocolPending = error.coreProtocolPending()
+                        if (protocolPending != null) {
+                            // Protocol facts never enter the import/bookmark business pending classifier.
+                            mutableState.update { it.copy(protocolRecoveryReference = protocolPending.original, error = null) }
+                            return@withLock // finally still retires this invocation's busy state.
+                        }
                         if (error is PendingOperationException && error.stage == "reading.progress.update") {
                             retainPositionPending(error)
                         } else if (error is PendingOperationException && bookmarkOwner) {
@@ -184,6 +210,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+    }
+
+    private fun retainProtocolPending(error: Throwable): Boolean {
+        val pending = error.coreProtocolPending() ?: return false
+        mutableState.update { it.copy(protocolRecoveryReference = pending.original, error = null) }
+        return true
     }
 
     private fun retainPositionPending(error: PendingOperationException) {
@@ -420,9 +452,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                     searchCursor = page.nextCursor, searchHasMore = page.hasMore, searchReady = true) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (pending: ContentSearchPendingException) {
+                retainProtocolPending(pending)
                 mutableState.update { it.copy(pendingSearchClose = pending.session) }
             }
-            catch (error: Exception) { if (request == searchGeneration) mutableState.update {
+            catch (error: Exception) { if (request == searchGeneration && !retainProtocolPending(error)) mutableState.update {
                 it.copy(searchError = error.userMessage(), searchHasMore = false, searchCursor = null, searchSession = null)
             } }
             finally { if (request == searchGeneration) mutableState.update { it.copy(searchBusy = false) } }
@@ -446,12 +479,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (pending: ContentSearchPendingException) {
+                retainProtocolPending(pending)
                 mutableState.update { it.copy(pendingSearchClose = pending.session) }
                 if (request == searchGeneration) mutableState.update {
                     it.copy(searchSession = null, searchCursor = null, searchHasMore = false)
                 }
             }
-            catch (error: Exception) { if (request == searchGeneration) mutableState.update {
+            catch (error: Exception) { if (request == searchGeneration && !retainProtocolPending(error)) mutableState.update {
                 it.copy(searchError = error.userMessage(), searchHasMore = false, searchCursor = null, searchSession = null)
             } }
             finally { if (request == searchGeneration) mutableState.update { it.copy(searchBusy = false) } }
@@ -486,8 +520,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 mutableState.update { if (it.pendingSearchClose?.id == session.id) it.copy(pendingSearchClose = null) else it }
             }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (pending: ContentSearchPendingException) { mutableState.update { it.copy(pendingSearchClose = pending.session) } }
+            catch (pending: ContentSearchPendingException) {
+                retainProtocolPending(pending)
+                mutableState.update { it.copy(pendingSearchClose = pending.session) }
+            }
             catch (error: Exception) {
+                retainProtocolPending(error)
                 Log.w("ReaderUI", "Original search cursor close failed", error)
                 mutableState.update { it.copy(pendingSearchClose = session) }
             }
@@ -503,8 +541,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 library.closeContentSearch(session)
                 mutableState.update { if (it.pendingSearchClose?.id == session.id) it.copy(pendingSearchClose = null) else it }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (pending: ContentSearchPendingException) { mutableState.update { it.copy(pendingSearchClose = pending.session) } }
-            catch (error: Exception) { Log.w("ReaderUI", "Original search close remains unconfirmed", error) }
+            catch (pending: ContentSearchPendingException) {
+                retainProtocolPending(pending)
+                mutableState.update { it.copy(pendingSearchClose = pending.session) }
+            }
+            catch (error: Exception) {
+                retainProtocolPending(error)
+                Log.w("ReaderUI", "Original search close remains unconfirmed", error)
+            }
             finally { mutableState.update { it.copy(searchBusy = false) } }
         }
     }
@@ -582,7 +626,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
                     if (state.value.reading?.identity == session) {
-                        if (error is PendingOperationException) retainPositionPending(error)
+                        if (retainProtocolPending(error)) Unit
+                        else if (error is PendingOperationException) retainPositionPending(error)
                         else mutableState.update { it.copy(error = "阅读位置尚未保存：${error.userMessage()}") }
                     }
                 }
@@ -632,7 +677,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 try { persist(reading) }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
-                    if (error is PendingOperationException) retainPositionPending(error)
+                    if (retainProtocolPending(error)) Unit
+                    else if (error is PendingOperationException) retainPositionPending(error)
                     else mutableState.update { it.copy(error = "阅读位置尚未保存：${error.userMessage()}") }
                 }
             }
@@ -643,6 +689,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         if (state.value.readerPanel != null) closeReaderPanel()
         else mutableState.update { it.copy(controlsVisible = !it.controlsVisible) }
     }
+    fun recoverCoreProtocol(presentationId: String, expectedHost: String) {
+        if (expectedHost != protocolHostIdentity()) return
+        if (coreProtocolRecoveries.value.items.none { it.presentationId == presentationId }) return
+        protocolFeed.requestAction(presentationId) // App-scope owner; no VM business/Core request.
+    }
+    private fun protocolHostIdentity(): String = "$protocolVmId:$generation:${state.value.route}"
+    fun protocolRecoveryHost(): String = protocolHostIdentity()
+
     fun clearError() = mutableState.update { it.copy(error = null) }
     fun setFontSize(size: Int) {
         val value = size.coerceIn(14, 32)

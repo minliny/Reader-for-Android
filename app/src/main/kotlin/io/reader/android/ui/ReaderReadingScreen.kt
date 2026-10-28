@@ -74,6 +74,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                     }
                 }
             }
+            ReaderProtocolRecoveryHost(model)
             if (state.error != null) ReaderTransientFeedback(state.error, model::clearError)
             state.pendingPosition?.let { pending ->
                 ReaderRecoveryNotice("原进度保存尚未确认，已暂停后续保存。当前正文仍可阅读。", state.busy,
