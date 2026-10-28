@@ -2,12 +2,16 @@ package io.reader.android.ui
 
 import android.content.Context
 import android.graphics.Paint
+import android.graphics.Rect
+import android.os.Parcelable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.LineHeightSpan
 import android.util.TypedValue
+import android.util.SparseArray
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -113,9 +117,16 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
     private var anchor: (Int) -> Unit = {}
     private var tap: () -> Unit = {}
     private var phase: (NativeLayoutPhase) -> Unit = {}
-    private val timeout = Runnable { if (!released && restoring) phase(NativeLayoutPhase.Failed) }
+    private val timeout = Runnable {
+        if (!released && restoring) {
+            pendingPlacement = false
+            removeCallbacks(finish)
+            phase(NativeLayoutPhase.Failed)
+        }
+    }
     private val finish = Runnable {
-        if (!released && finishEpoch == epoch && rawVerifiedEpoch == epoch && isAttachedToWindow && !bodyView.isLayoutRequested) {
+        if (!released && finishEpoch == epoch && rawVerifiedEpoch == epoch && isAttachedToWindow &&
+            !bodyView.isLayoutRequested && logicalLineIntersectsViewport()) {
             restoring = false
             userGestureObserved = false
             userMoved = false
@@ -174,6 +185,30 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
             addView(bodyView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         viewTreeObserver.addOnGlobalLayoutListener(layoutObserver)
+    }
+
+    // Core/ReadingSession owns the logical position. AndroidView otherwise
+    // restores ScrollView pixels and TextView selection from a second hierarchy
+    // state, which can override the current scalar during Activity recreation.
+    override fun dispatchSaveInstanceState(container: SparseArray<Parcelable>) = Unit
+    override fun dispatchRestoreInstanceState(container: SparseArray<Parcelable>) = Unit
+
+    override fun requestChildRectangleOnScreen(child: View, rectangle: Rect, immediate: Boolean): Boolean {
+        // Selectable TextView's pre-draw can bring its initial/restored caret
+        // into view after our global-layout placement. During that one restore,
+        // the logical anchor has priority. Normal selection keeps native scroll.
+        if (restoring) return false
+        return super.requestChildRectangleOnScreen(child, rectangle, immediate)
+    }
+
+    private fun logicalLineIntersectsViewport(): Boolean {
+        val layout = bodyView.layout ?: return false
+        if (height <= paddingTop + paddingBottom) return false
+        val utf16 = ReaderTextCoordinates.utf16Offset(rawText, logicalScalar)
+        val line = layout.getLineForOffset(utf16)
+        val top = bodyView.top + bodyView.totalPaddingTop - bodyView.scrollY + layout.getLineTop(line)
+        val bottom = bodyView.top + bodyView.totalPaddingTop - bodyView.scrollY + layout.getLineBottom(line)
+        return top < scrollY + height - paddingBottom && bottom > scrollY + paddingTop
     }
 
     fun bind(reading: ReadingSession, fontSize: Int, paper: ReaderPaper, scrollEnabled: Boolean,

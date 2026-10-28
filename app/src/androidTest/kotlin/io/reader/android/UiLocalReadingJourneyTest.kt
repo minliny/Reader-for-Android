@@ -387,9 +387,12 @@ class UiLocalReadingJourneyTest {
                 scrollLocation[0] + scroll.width - scroll.paddingRight, scrollLocation[1] + scroll.height - scroll.paddingBottom))
             val location = IntArray(2)
             body.getLocationOnScreen(location)
-            val top = location[1] + body.totalPaddingTop + layout.getLineTop(line)
-            val bottom = location[1] + body.totalPaddingTop + layout.getLineBottom(line)
-            assertTrue("Original scalar's actual native line must intersect the viewport", top < viewport.bottom && bottom > viewport.top)
+            val top = location[1] + body.totalPaddingTop - body.scrollY + layout.getLineTop(line)
+            val bottom = location[1] + body.totalPaddingTop - body.scrollY + layout.getLineBottom(line)
+            assertTrue("Original scalar's actual native line must intersect the viewport: scalar=$scalar utf16=$utf16 " +
+                "line=$line top=$top bottom=$bottom viewport=$viewport scrollY=${scroll.scrollY} " +
+                "bodyScrollY=${body.scrollY} selection=${body.selectionStart}/${body.selectionEnd}",
+                top < viewport.bottom && bottom > viewport.top)
         }
     }
 
