@@ -110,6 +110,18 @@ def main():
         tool_versions = {name: subprocess.check_output([deps["tools"][name], "--version"], cwd=source, text=True, stderr=subprocess.STDOUT).strip()
                          for name in ("cargo", "rustup", "javac", "node")}
         wrapper = cmake_wrapper(deps["cmake"])
+        # CMake records its absolute source directory. Each immutable Core
+        # snapshot needs its own JNI cache; Cargo keeps the same explicit cache.
+        jni_root = ROOT / ".build/core-target/android-jni" / config()["commit"]
+        expected_cmake_source = str(source / "bindings/android/jni")
+        for abi in config()["abis"]:
+            cmake_cache = jni_root / "cmake" / abi / "CMakeCache.txt"
+            if cmake_cache.is_file():
+                homes = [line.removeprefix("CMAKE_HOME_DIRECTORY:INTERNAL=")
+                         for line in cmake_cache.read_text().splitlines()
+                         if line.startswith("CMAKE_HOME_DIRECTORY:INTERNAL=")]
+                if homes != [expected_cmake_source]:
+                    raise RuntimeError("Pinned JNI cache belongs to another source; preserve it and diagnose: " + str(cmake_cache))
         inputs = {"coreCommit": config()["commit"], "coreTree": git(source, "rev-parse", "HEAD^{tree}").decode().strip(),
                   "coreArchive": json.loads(source.with_suffix(".archive.json").read_text()),
                   "dependencySha256": file_sha(CONFIG_PATH), "builderSha256": file_sha(Path(__file__)),
@@ -118,6 +130,7 @@ def main():
                   "leaseOrchestratorSha256": file_sha(ROOT / "scripts/build-lease.mjs"),
                   "androidApi": config()["minimumAndroidApi"], "abis": config()["abis"],
                   "sourcePath": str(source), "cargoTargetDirectory": str(ROOT / ".build/core-target"),
+                  "androidJniBuildDirectory": str(jni_root),
                   "dependencies": deps, "toolVersions": tool_versions,
                   "javaWrapper": {item["destination"]: item["sha256"] for item in config()["files"]},
                   "nestedCompilations": config()["nestedCompilations"], "businessTests": "NOT_RUN"}
@@ -137,7 +150,7 @@ def main():
                    # default whitespace parser preserves those quote bytes;
                    # use its supported shell parser rather than altering Core.
                    "CC_SHELL_ESCAPED_FLAGS": "1",
-                   "ANDROID_JNI_BUILD_ROOT": str(ROOT / ".build/core-target/android-jni"),
+                   "ANDROID_JNI_BUILD_ROOT": str(jni_root),
                    "READER_CORE_BUILD_IDENTITY_OUTPUT": str(run / "native-identity.json"),
                    "READER_CORE_BUILD_INPUT_SNAPSHOT": str(run / "inputs.json")}
             command = [deps["tools"]["nice"], "-n", "15", deps["tools"]["node"],
@@ -154,7 +167,7 @@ def main():
             native_identity = json.loads((run / "native-identity.json").read_text())
             if native_identity.get("gitCommit") != config()["commit"] or native_identity.get("gitDirty") is not False:
                 raise RuntimeError("Embedded Core identity is not the exact clean pinned source")
-            library = ROOT / ".build/core-target/android-jni/libs/arm64-v8a/libreader_core_jni.so"
+            library = jni_root / "libs/arm64-v8a/libreader_core_jni.so"
             elf = inspect_elf(library, Path(deps["ndkHost"]) / "bin/llvm-readelf")
             immutable = run / "lib/arm64-v8a/libreader_core_jni.so"
             immutable.parent.mkdir(parents=True)
