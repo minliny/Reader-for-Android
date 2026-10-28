@@ -5,18 +5,17 @@ import android.content.ClipData
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Point
 import android.graphics.Rect
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -29,6 +28,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiSelector
 import io.reader.android.runtime.ReaderTextCoordinates
 import io.reader.android.runtime.ReaderBookmark
@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Exact existing-book A2 selectors. No import, fixtures, data reset or business retries. */
 @RunWith(AndroidJUnit4::class)
@@ -277,6 +278,7 @@ class UiDailyReadingTest {
         var ownedText: String? = null
         var ownedTimestamp: Long? = null
         var primaryFailure: Throwable? = null
+        var selectionDevice: UiDevice? = null
         compose.runOnUiThread {
             clipboard = compose.activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             originalClip = clipboard.primaryClip // Memory only; never log or persist clipboard content.
@@ -293,12 +295,41 @@ class UiDailyReadingTest {
                 putBoolean("hasLineBreak", text.contains('\n'))
                 putBoolean("hasBlankLine", text.contains("\n\n") || text.contains("\r\n\r\n"))
             })
-            val point = visibleNativeCharacter()
-            compose.onNodeWithTag("reader_body").performTouchInput { longClick(point) }
+            val (selectionView, point) = visibleNativeCharacter()
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            selectionDevice = device
+            // UiAutomator 2.3's drag holds DOWN for the platform long-press
+            // duration in real time. Compose's event clock cannot drive the
+            // native TextView Handler's delayed long-press callback.
+            marker("native-long-press-request")
+            assertTrue("Native long press was not dispatched", device.drag(point.x, point.y, point.x, point.y, 1))
+            fun ownsSelection(): Boolean = compose.runOnUiThread {
+                model.state.value.reading?.identity == reading.identity && selectionView.isAttachedToWindow &&
+                    compose.activity.findViewById<TextView>(R.id.reader_native_text) === selectionView &&
+                    selectionView.hasSelection() && text.contentEquals(selectionView.text)
+            }
+            compose.waitUntil(5_000) { ownsSelection() }
+            marker("native-selection-owner-ready")
             val selectAll = device.findObject(UiSelector().textMatches("全选|Select all|SELECT ALL").enabled(true))
+            if (!selectAll.waitForExists(5_000)) {
+                val overflowId = "android:id/floating_toolbar_overflow_button"
+                assertTrue("Native Select all is absent and no unique observed toolbar overflow is available",
+                    device.findObjects(By.res(overflowId).enabled(true)).size == 1)
+                assertTrue("The observed overflow must belong to the original native selection", ownsSelection())
+                marker("native-selection-overflow-observed")
+                assertTrue("Observed native toolbar overflow click failed",
+                    device.findObject(UiSelector().resourceId(overflowId).enabled(true)).click())
+                assertTrue("Opening overflow must retain the original native selection", ownsSelection())
+            }
             assertTrue("Native Select all action did not appear", selectAll.waitForExists(5_000))
             assertTrue("Native Select all action failed", selectAll.click())
+            compose.waitUntil(5_000) {
+                ownsSelection() && compose.runOnUiThread {
+                    minOf(selectionView.selectionStart, selectionView.selectionEnd) == 0 &&
+                        maxOf(selectionView.selectionStart, selectionView.selectionEnd) == text.length
+                }
+            }
+            marker("native-selection-whole-chapter-ready")
             val copy = device.findObject(
                 UiSelector().textMatches("复制|Copy|COPY").enabled(true))
             assertTrue("Native selection Copy action did not appear", copy.waitForExists(5_000))
@@ -328,6 +359,8 @@ class UiDailyReadingTest {
             marker("method-exit")
         } catch (failure: Throwable) {
             primaryFailure = failure
+            try { selectionDevice?.let(::captureSelectionFailure) }
+            catch (evidenceFailure: Throwable) { failure.addSuppressed(evidenceFailure) }
             throw failure
         } finally {
             try {
@@ -370,7 +403,7 @@ class UiDailyReadingTest {
     }
 
     /** Coordinates come from the attached platform Layout and its real clipped viewport. */
-    private fun visibleNativeCharacter(): Offset = compose.runOnUiThread {
+    private fun visibleNativeCharacter(): Pair<TextView, Point> = compose.runOnUiThread {
         val body = compose.activity.findViewById<TextView>(R.id.reader_native_text)
         val scroll = compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
         val layout = body.layout ?: throw AssertionError("Native Layout is absent")
@@ -393,7 +426,23 @@ class UiDailyReadingTest {
         val next = offset + Character.charCount(raw.codePointAt(offset))
         val x = bodyLocation[0] + body.totalPaddingLeft + (layout.getPrimaryHorizontal(offset) + layout.getPrimaryHorizontal(next)) / 2f
         val y = origin + (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
-        Offset(x - scrollLocation[0], y - scrollLocation[1])
+        val screenPoint = Point(x.roundToInt(), y.roundToInt())
+        assertTrue("The actual glyph point must remain inside the native content clip", viewport.contains(screenPoint.x, screenPoint.y))
+        body to screenPoint
+    }
+
+    /** Same UiDevice/UiAutomation, once on failure; diagnostics never replace the primary result. */
+    private fun captureSelectionFailure(device: UiDevice) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val base = "reader-evidence-$method-selection-failure"
+        val details = Bundle().apply { putString("fileBase", base) }
+        try {
+            device.dumpWindowHierarchy(File(context.cacheDir, "$base.xml"))
+            details.putBoolean("hierarchySaved", true)
+        } catch (failure: Exception) { details.putString("hierarchyFailureClass", failure.javaClass.name) }
+        try { details.putBoolean("screenshotSaved", device.takeScreenshot(File(context.cacheDir, "$base.png"))) }
+        catch (failure: Exception) { details.putString("screenshotFailureClass", failure.javaClass.name) }
+        marker("native-selection-failure-evidence", details)
     }
 
     private fun captureNativeEvidence(phase: String) {
