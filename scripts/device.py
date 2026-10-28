@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Explicit-target debug APK overwrite install with one short physical-device lease."""
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import argparse
 import hashlib
 import json
@@ -23,6 +23,14 @@ PACKAGE = "io.reader.minliny"
 EXCLUDED_REBUILDABLE = {"cache", "code_cache", "lib"}
 
 
+class DeviceCallError(RuntimeError):
+    """Preserve the owned client outcome and partial captured bytes."""
+
+    def __init__(self, message, command_record, stdout=b"", stderr=b""):
+        super().__init__(message)
+        self.command_record, self.stdout, self.stderr = command_record, stdout, stderr
+
+
 class Device:
     def __init__(self, serial):
         self.serial = serial
@@ -32,41 +40,102 @@ class Device:
         self.deadline = time.monotonic() + 600
         self.target_ref = None
         self.commands = []
+        self.lease_owner = None
+        self.active_clients = set()
 
-    def call(self, *args, timeout=30, allow_error=False, output_path=None):
+    def call(self, *args, timeout=30, allow_error=False, output_path=None, stderr_path=None,
+             on_tick=None):
+        """on_tick() runs only while this exact client is active; it never retries it."""
+        if not args or timeout <= 0:
+            raise ValueError("An adb command and a positive timeout are required")
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
             raise RuntimeError("Device session reached its ten-minute bound")
         command = [str(self.adb), "-s", self.serial, *map(str, args)]
         started = time.monotonic()
-        output_stream = Path(output_path).open("wb") if output_path is not None else subprocess.PIPE
-        child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=output_stream,
-                                 stderr=subprocess.PIPE, start_new_session=True)
-        try:
-            output, error = child.communicate(timeout=min(timeout, remaining))
-        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+        deadline = started + min(timeout, remaining)
+        record = {"operation": str(args[0]), "arguments": list(map(str, args)), "startedAt": utc_now(),
+                  "timeoutSeconds": round(min(timeout, remaining), 3), "dispatched": False,
+                  "timedOut": False, "interrupted": False, "signalsSent": []}
+        child, failure = None, None
+        output, error = b"", b""
+        with ExitStack() as streams:
+            # File-backed streams cannot lose TimeoutExpired's partial output or
+            # fill a PIPE while the parent handles an exact consent callback.
+            stdout = streams.enter_context(Path(output_path).open("xb") if output_path is not None else tempfile.TemporaryFile())
+            stderr = streams.enter_context(Path(stderr_path).open("xb") if stderr_path is not None else tempfile.TemporaryFile())
             try:
-                os.killpg(child.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                child.communicate(timeout=3)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                child.communicate(timeout=3)
-            raise RuntimeError("Owned adb client stopped on timeout or interruption; shared server and target were not reset")
-        finally:
-            if output_path is not None:
-                output_stream.close()
-        self.commands.append({"operation": str(args[0]), "exitCode": child.returncode,
-                              "durationSeconds": round(time.monotonic() - started, 3)})
+                child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=stdout,
+                                         stderr=stderr, start_new_session=True)
+                self.active_clients.add(child.pid)
+                record.update({"dispatched": True, "clientPid": child.pid})
+                while True:
+                    budget = deadline - time.monotonic()
+                    if budget <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout)
+                    try:
+                        child.wait(timeout=min(budget, 0.5) if on_tick else budget)
+                        break
+                    except subprocess.TimeoutExpired:
+                        if time.monotonic() >= deadline:
+                            raise
+                        if on_tick is not None:
+                            on_tick()
+            except BaseException as caught:
+                failure = caught
+                record.update({"timedOut": isinstance(caught, subprocess.TimeoutExpired),
+                               "interrupted": isinstance(caught, KeyboardInterrupt), "failureType": type(caught).__name__})
+                if child is not None:
+                    for signum in (signal.SIGTERM, signal.SIGKILL):
+                        if child.poll() is not None:
+                            break
+                        try:
+                            os.killpg(child.pid, signum)
+                            record["signalsSent"].append(signal.Signals(signum).name)
+                        except ProcessLookupError:
+                            pass
+                        try:
+                            child.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            continue
+            finally:
+                record.update({"exitCode": child.poll() if child is not None else None,
+                               "childExited": child.poll() is not None if child is not None else None,
+                               "durationSeconds": round(time.monotonic() - started, 3), "finishedAt": utc_now()})
+                if child is not None and record["childExited"]:
+                    self.active_clients.discard(child.pid)
+                for field, path, stream in (("stdout", output_path, stdout), ("stderr", stderr_path, stderr)):
+                    stream.flush()
+                    record[field + "Bytes"] = os.fstat(stream.fileno()).st_size
+                    if path is not None:
+                        record[field + "Path"] = str(Path(path).resolve())
+                if output_path is None:
+                    stdout.seek(0)
+                    output = stdout.read()
+                if stderr_path is None:
+                    stderr.seek(0)
+                    error = stderr.read()
+                # Timeout, interruption and spawn errors are first-class command
+                # outcomes. They must be present before any exception is raised.
+                self.commands.append(record)
+        if failure is not None:
+            raise DeviceCallError("Owned adb client failed or stopped; partial output and its exact outcome were retained",
+                                  record, output, error) from failure
         if child.returncode and not allow_error:
-            # Do not leak raw physical identifiers or paths through errors.
-            raise RuntimeError("adb " + str(args[0]) + " failed with status " + str(child.returncode))
-        return child.returncode, output or b"", error
+            raise DeviceCallError("adb " + str(args[0]) + " failed with status " + str(child.returncode), record, output, error)
+        return child.returncode, output, error
+
+    def require_lease(self):
+        owner = self.lease_owner
+        if owner is None or owner.get("pid") != os.getpid() or owner.get("targetRef") != self.target_ref:
+            raise RuntimeError("An existing physical Android lease is required")
+        path = Path.home() / ".codex/locks/reader-android-devices" / (self.target_ref + ".lock/owner.json")
+        current = json.loads(path.read_text())
+        if current.get("pid") != os.getpid() or current.get("token") != owner.get("token"):
+            raise RuntimeError("Physical Android lease identity changed")
+        if time.monotonic() >= self.deadline:
+            raise RuntimeError("Physical Android lease reached its ten-minute bound")
+        return owner
 
     def identify(self):
         _, state, _ = self.call("get-state")
@@ -102,13 +171,17 @@ def device_lease(device):
         raise RuntimeError("Physical Android target is occupied or has an unreconciled lease; no service recovery is attempted")
     try:
         write_json(directory / "owner.json", owner)
+        device.lease_owner = owner
         yield owner
     finally:
+        if device.active_clients:
+            raise RuntimeError("An owned adb client remains active; physical lease retained for diagnosis")
         current = json.loads((directory / "owner.json").read_text())
         if current.get("token") != owner["token"] or current.get("pid") != os.getpid():
             raise RuntimeError("Android target owner changed; refusing lease release")
         (directory / "owner.json").unlink()
         directory.rmdir()
+        device.lease_owner = None
 
 
 def installed_apk(device, run, label):
