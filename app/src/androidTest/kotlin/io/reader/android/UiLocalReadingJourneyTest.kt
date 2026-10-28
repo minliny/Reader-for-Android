@@ -19,6 +19,9 @@ import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.UiWatcher
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import io.reader.android.runtime.ReaderTextCoordinates
 import io.reader.android.ui.ReaderViewModel
 import io.reader.android.ui.ReaderRoute
@@ -33,6 +36,7 @@ import org.junit.rules.Timeout
 import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CountDownLatch
 
 /**
  * Selector: io.reader.android.UiLocalReadingJourneyTest#realTxtPickerReadReturnAndRecreateRetainsPosition
@@ -61,7 +65,7 @@ class UiLocalReadingJourneyTest {
     ).around(phaseMarker).around(compose)
 
     @Test
-    fun realTxtPickerReadReturnAndRecreateRetainsPosition() {
+    fun realTxtPickerReadReturnAndRecreateRetainsPosition() = withMethodCleanup {
         marker("method-enter") // Before the first potentially blocking compose.activity lookup.
         val args = InstrumentationRegistry.getArguments()
         val inputName = args.getString("readerInputName")
@@ -149,7 +153,7 @@ class UiLocalReadingJourneyTest {
 
     /** Controller force-stops and proves no old PID before launching this separate method. */
     @Test
-    fun coldLaunchExistingRealTxtRetainsPosition() {
+    fun coldLaunchExistingRealTxtRetainsPosition() = withMethodCleanup {
         marker("method-enter") // The first method marker precedes compose.activity.
         val args = InstrumentationRegistry.getArguments()
         val hash = args.getString("expectedSHA")
@@ -187,6 +191,78 @@ class UiLocalReadingJourneyTest {
         marker("cold-native-restored")
         exitToBookshelfAndAwaitSave(model, book.id, chapter, scalar)
         marker("method-exit")
+    }
+
+    /** Runs inside the method, before Compose's ActivityScenarioRule.close(). */
+    private fun withMethodCleanup(body: () -> Unit) {
+        var primaryFailure: Throwable? = null
+        try {
+            body()
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            try {
+                marker("method-failure", Bundle().apply {
+                    putString("failureClass", failure.javaClass.name)
+                    putString("failureMessage", failure.message?.take(256))
+                })
+            } catch (markerFailure: Throwable) { failure.addSuppressed(markerFailure) }
+            throw failure
+        } finally {
+            var cleanupFailure: Throwable? = null
+            try {
+                marker("teardown-enter")
+                finishOwnedActivity()
+            } catch (failure: Throwable) { cleanupFailure = failure }
+            try {
+                marker("teardown-exit", Bundle().apply { putBoolean("destroyed", cleanupFailure == null) })
+            } catch (failure: Throwable) {
+                val earlierCleanupFailure = cleanupFailure
+                if (earlierCleanupFailure == null) cleanupFailure = failure else earlierCleanupFailure.addSuppressed(failure)
+            }
+            cleanupFailure?.let { failure ->
+                val originalFailure = primaryFailure
+                if (originalFailure != null) originalFailure.addSuppressed(failure)
+                else throw AssertionError("Business method completed but Activity teardown failed").apply { addSuppressed(failure) }
+            }
+        }
+    }
+
+    private fun finishOwnedActivity() {
+        val scenario = compose.activityRule.scenario
+        if (scenario.state == Lifecycle.State.DESTROYED) {
+            marker("activity-destroyed")
+            return
+        }
+        val destroyed = CountDownLatch(1)
+        var owner: MainActivity? = null
+        val observer = object : LifecycleEventObserver {
+            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                if (event == Lifecycle.Event.ON_DESTROY) {
+                    source.lifecycle.removeObserver(this)
+                    destroyed.countDown()
+                }
+            }
+        }
+        try {
+            // The scenario supplies its actual current instance, including after
+            // recreate. Standard finish avoids launching a test-APK bootstrap.
+            scenario.onActivity { activity ->
+                owner = activity
+                activity.lifecycle.addObserver(observer)
+                activity.finish()
+            }
+            assertTrue("Owned MainActivity did not reach ON_DESTROY within 10 seconds",
+                destroyed.await(10, TimeUnit.SECONDS))
+            // Drain the completed destruction callback before inspecting the
+            // scenario's steady state; no Compose idle or second UI owner.
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                assertTrue("The exact finished MainActivity is not destroyed", owner?.isDestroyed == true)
+            }
+            assertEquals(Lifecycle.State.DESTROYED, scenario.state)
+            marker("activity-destroyed")
+        } finally {
+            owner?.let { activity -> activity.runOnUiThread { activity.lifecycle.removeObserver(observer) } }
+        }
     }
 
     private fun marker(step: String, details: Bundle = Bundle()) {
