@@ -102,7 +102,7 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
     private var font = -1
     private var released = false
     private var scrollingAllowed = true
-    private var logicalScalar = owner.restoreScalarOffset
+    private var logicalScalar = owner.visibleScalarOffset
     private var restoring = true
     private var pendingPlacement = true
     private var epoch = 0L

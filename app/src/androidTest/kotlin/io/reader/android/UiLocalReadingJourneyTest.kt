@@ -2,17 +2,22 @@ package io.reader.android
 
 import android.os.Bundle
 import android.graphics.Rect
+import android.util.TypedValue
+import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.ScrollView
 import android.widget.TextView
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.click
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -26,6 +31,8 @@ import io.reader.android.runtime.ReaderTextCoordinates
 import io.reader.android.runtime.LibraryBook
 import io.reader.android.ui.ReaderViewModel
 import io.reader.android.ui.ReaderRoute
+import io.reader.android.ui.ReaderChapterIndexKey
+import io.reader.android.ui.ReaderScalarOffsetKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -38,6 +45,8 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 
 /**
  * Selector: io.reader.android.UiLocalReadingJourneyTest#realTxtPickerReadReturnAndRecreateRetainsPosition
@@ -49,6 +58,8 @@ import java.util.concurrent.CountDownLatch
 class UiLocalReadingJourneyTest {
     private val compose = createAndroidComposeRule<MainActivity>()
     private var currentMethod = "unassigned"
+    private var observedNativeOwner: Long? = null
+    private var observedNativeScroll: ScrollView? = null
     private val phaseMarker = TestRule { base, description ->
         object : Statement() {
             override fun evaluate() {
@@ -130,15 +141,14 @@ class UiLocalReadingJourneyTest {
         marker("method-exit")
     }
 
-    /** Shared unchanged reading suffix; import and existing-book admission stay separate. */
+    /** Shared reading suffix; import and existing-book admission stay separate. */
     private fun readReturnAndRecreateExisting(book: LibraryBook, model: ReaderViewModel) {
         marker("reader-open-request")
         compose.onNodeWithTag("reader_book_${book.id}").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
         waitForNativeRestore()
         marker("reader-native-restored")
-        compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
-        compose.waitUntil(5_000) { model.state.value.controlsVisible }
+        showControlsAndAwaitDraw(model, "reader_open_directory")
         marker("directory-open-request")
         compose.onNodeWithTag("reader_open_directory").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Directory && !model.state.value.busy }
@@ -154,13 +164,34 @@ class UiLocalReadingJourneyTest {
         compose.onNodeWithTag("reader_body").performTouchInput { swipeUp(durationMillis = 550) }
         compose.waitForIdle() // Native control entry below stops the platform fling and captures its actual final line.
         compose.waitUntil(10_000) { (model.state.value.reading?.visibleScalarOffset ?: 0) > 0 }
-        compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
-        compose.waitUntil(5_000) { model.state.value.controlsVisible }
+        showControlsAndAwaitDraw(model, "reader_font_larger")
         val beforeExit = model.state.value.reading ?: throw AssertionError("Missing actual reading session")
         marker("visible-anchor-recorded", Bundle().apply { putInt("scalarOffset", beforeExit.visibleScalarOffset) })
+        assertNotEquals("This actual pan must exercise a position newer than the initial restore", beforeExit.restoreScalarOffset,
+            beforeExit.visibleScalarOffset)
+        val beforeReadingRecreate = compose.runOnUiThread {
+            compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+                ?: throw AssertionError("The original native viewport is absent before recreation")
+        }
+        marker("reading-activity-recreate-request")
+        compose.activityRule.scenario.recreate()
+        compose.waitUntil(20_000) {
+            val state = compose.activity.readerViewModel.state.value
+            state.ready && !state.busy && state.route == ReaderRoute.Reading
+        }
+        assertTrue("Activity recreation must retain this ViewModel", compose.activity.readerViewModel === model)
+        waitForNativeRestore(replacedView = beforeReadingRecreate)
+        val recreated = model.state.value.reading ?: throw AssertionError("The retained reader is absent after recreation")
+        assertEquals("Recreation retains the current reader owner", beforeExit.identity, recreated.identity)
+        assertEquals("Recreation must retain the newer logical anchor", beforeExit.visibleScalarOffset, recreated.visibleScalarOffset)
+        assertNativeAnchorVisible(beforeExit.visibleScalarOffset)
+        marker("reading-activity-new-native-view-ACK", Bundle().apply { putInt("scalarOffset", recreated.visibleScalarOffset) })
         compose.onNodeWithTag("reader_controls").assertIsDisplayed()
         compose.onNodeWithTag("reader_font_larger").performClick()
         waitForNativeRestore()
+        assertEquals("Font reflow alone must preserve the logical anchor", beforeExit.visibleScalarOffset,
+            model.state.value.reading!!.visibleScalarOffset)
+        assertNativeAnchorVisible(beforeExit.visibleScalarOffset)
         marker("font-reflow-complete")
         marker("exit-request")
         compose.onNodeWithTag("reader_exit").performClick()
@@ -232,6 +263,7 @@ class UiLocalReadingJourneyTest {
         val reading = model.state.value.reading ?: throw AssertionError("Cold reader is absent")
         assertEquals(chapter, reading.chapter.index)
         assertEquals(scalar, reading.restoreScalarOffset)
+        assertEquals(scalar, reading.visibleScalarOffset)
         assertNativeAnchorVisible(scalar)
         marker("cold-native-restored")
         exitToBookshelfAndAwaitSave(model, book.id, chapter, scalar)
@@ -320,10 +352,7 @@ class UiLocalReadingJourneyTest {
     }
 
     private fun exitToBookshelfAndAwaitSave(model: ReaderViewModel, bookId: String, chapter: Int, scalar: Int) {
-        if (!model.state.value.controlsVisible) {
-            compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
-        }
-        compose.waitUntil(5_000) { model.state.value.controlsVisible }
+        showControlsAndAwaitDraw(model, "reader_exit")
         marker("final-exit-request")
         compose.onNodeWithTag("reader_exit").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
@@ -364,10 +393,84 @@ class UiLocalReadingJourneyTest {
         }
     }
 
-    private fun waitForNativeRestore() {
-        compose.waitUntil(8_000) {
-            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("reader_restore_loading"))
-                .fetchSemanticsNodes().isEmpty()
+    private fun waitForNativeRestore(replacedView: ScrollView? = null) {
+        val model = compose.activity.readerViewModel
+        val expected = model.state.value
+        val reading = expected.reading ?: throw AssertionError("No current reading session to restore")
+        val previousView = replacedView ?: observedNativeScroll
+        val mustReplace = replacedView != null || (observedNativeOwner != null && observedNativeOwner != reading.identity)
+        var actualView: ScrollView? = null
+        compose.waitUntil(10_000) {
+            val roots = compose.onAllNodes(hasTestTag("reader_reading")).fetchSemanticsNodes()
+            val semanticsMatch = roots.size == 1 && ReaderChapterIndexKey in roots.single().config &&
+                ReaderScalarOffsetKey in roots.single().config &&
+                roots.single().config[ReaderChapterIndexKey] == reading.chapter.index &&
+                roots.single().config[ReaderScalarOffsetKey] == reading.visibleScalarOffset
+            val controlsMatch = compose.onAllNodes(hasTestTag("reader_controls")).fetchSemanticsNodes().isNotEmpty() == expected.controlsVisible
+            val loadingGone = compose.onAllNodes(hasTestTag("reader_restore_loading")).fetchSemanticsNodes().isEmpty()
+            val nativeMatch = compose.runOnUiThread {
+                val scroll = compose.activity.findViewById<ScrollView>(R.id.reader_native_scroll)
+                val body = compose.activity.findViewById<TextView>(R.id.reader_native_text)
+                val layout = body?.layout
+                val replaced = !mustReplace || (scroll !== previousView && previousView?.isAttachedToWindow != true)
+                val ready = scroll != null && body != null && scroll.isAttachedToWindow && body.isAttachedToWindow &&
+                    scroll.isShown && body.isShown && scroll.isLaidOut && body.isLaidOut &&
+                    !scroll.isLayoutRequested && !body.isLayoutRequested && layout != null &&
+                    layout.width == body.width - body.totalPaddingLeft - body.totalPaddingRight &&
+                    reading.chapter.text.contentEquals(body.text) && abs(body.textSize - TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_SP, expected.fontSize.toFloat(), body.resources.displayMetrics)) < .5f && replaced
+                if (ready) actualView = scroll
+                ready
+            }
+            model.state.value.reading?.identity == reading.identity && semanticsMatch && controlsMatch && loadingGone && nativeMatch
+        }
+        val native = actualView ?: throw AssertionError("Current native viewport did not become ready")
+        awaitAttachedDraw(native)
+        assertEquals("The drawn native view must retain the admitted reader", reading.identity, model.state.value.reading!!.identity)
+        observedNativeOwner = reading.identity
+        observedNativeScroll = native
+        marker("native-session-draw-ACK", Bundle().apply {
+            putLong("readingOwner", reading.identity); putInt("chapter", reading.chapter.index)
+            putInt("scalarOffset", reading.visibleScalarOffset); putBoolean("replacedView", mustReplace)
+        })
+    }
+
+    private fun showControlsAndAwaitDraw(model: ReaderViewModel, actionTag: String) {
+        val owner = model.state.value.reading!!.identity
+        if (!model.state.value.controlsVisible) compose.onNodeWithTag("reader_body").performTouchInput { click(center) }
+        compose.waitUntil(5_000) {
+            model.state.value.reading?.identity == owner && model.state.value.controlsVisible && enabledControlPresent(actionTag)
+        }
+        awaitAttachedDraw(compose.activity.window.decorView)
+        assertEquals(owner, model.state.value.reading!!.identity)
+        assertTrue("The actual enabled control must survive the attached draw", enabledControlPresent(actionTag))
+        marker("native-control-draw-ACK", Bundle().apply { putString("actionTag", actionTag) })
+    }
+
+    private fun enabledControlPresent(tag: String): Boolean {
+        val nodes = compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes()
+        return nodes.size == 1 && SemanticsProperties.Disabled !in nodes.single().config &&
+            nodes.single().boundsInRoot.width > 0f && nodes.single().boundsInRoot.height > 0f
+    }
+
+    /** Observe the real attached tree's next draw without sleeping or issuing business input. */
+    private fun awaitAttachedDraw(view: View) {
+        val drawn = AtomicBoolean(false)
+        lateinit var observer: ViewTreeObserver
+        val listener = ViewTreeObserver.OnDrawListener {
+            if (view.isAttachedToWindow && view.isShown && view.width > 0 && view.height > 0) drawn.set(true)
+        }
+        compose.runOnUiThread {
+            assertTrue("The draw target must be attached", view.isAttachedToWindow && view.isShown)
+            observer = view.viewTreeObserver
+            observer.addOnDrawListener(listener)
+            view.invalidate()
+        }
+        try {
+            compose.waitUntil(5_000) { drawn.get() }
+            compose.runOnUiThread { assertTrue("The acknowledged view must remain attached", view.isAttachedToWindow && view.isShown) }
+        } finally {
+            compose.runOnUiThread { if (observer.isAlive) observer.removeOnDrawListener(listener) }
         }
     }
 
