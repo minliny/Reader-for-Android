@@ -7,6 +7,17 @@ if (!uuid.test(session) || location.origin !== 'https://reader-ebook.invalid' ||
 let retired = false, serial = 0, sequence = 0, active = null, publication = null, confirmed = false, interacted = false, pending = 0, scrollEnabled = false;
 const integer = value => { if (!Number.isSafeInteger(value) || value < 0) throw Error('EXACT_INTEGER_REQUIRED'); return value; };
 const current = captured => !retired && active === captured;
+// Observer-only: captured identity is never replaced with a newer active layout after an await.
+const diagnosticClock = () => { try { const v=performance.now(); return Number.isFinite(v)&&v>=0?v:0; } catch { return 0; } };
+const diagnosticPhase = (captured, phase) => {
+  try {
+    if (!captured || !current(captured) || !Number.isSafeInteger(sequence + 1)) return;
+    const elapsed = diagnosticClock() - captured.observerStartedMs;
+    if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed > 86400000) return;
+    ReaderEbookHost.postMessage(JSON.stringify({protocolVersion:1,session,sequence:++sequence,kind:'phase',
+      value:{phase,sinceLayoutStartMs:elapsed,layoutToken:captured.token,layoutEpoch:captured.epoch}}));
+  } catch {} // Observation cannot throw into DOM, layout or business failure handling.
+};
 const send = (kind, value) => {
   if (retired || !active) return;
   if (!Number.isSafeInteger(++sequence)) throw Error('MESSAGE_SEQUENCE_EXHAUSTED');
@@ -33,12 +44,15 @@ const applyScrollPolicy = () => {
 const reportSelection = () => { if (confirmed && !retired) send('selection', {active: selectionActive()}); };
 const nextPaint = win => new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
 let documentPromise;
-const loadDocument = () => documentPromise ||= (async () => {
+const loadDocument = captured => documentPromise ||= (async () => {
+  diagnosticPhase(captured, 'CONFIG_FETCH_BEGIN');
   const data = await json(`/__reader/config/${session}.json`);
+  diagnosticPhase(captured, 'CONFIG_FETCH_COMPLETE');
   if (retired || data.protocolVersion !== 1 || data.session !== session) throw Error('FOREIGN_BOOTSTRAP');
   const expected = new URL(data.entryUrl);
   if (expected.origin !== location.origin || !expected.pathname.startsWith(`/publication/${session}/`) || expected.search || expected.hash)
     throw Error('FOREIGN_PUBLICATION_URL');
+  diagnosticPhase(captured, 'FRAME_LOAD_BEGIN');
   await new Promise((resolve, reject) => {
     const loaded = () => {
       try {
@@ -49,6 +63,7 @@ const loadDocument = () => documentPromise ||= (async () => {
     frame.addEventListener('load', loaded); frame.addEventListener('error', () => reject(Error('PUBLICATION_LOAD_FAILED')), {once: true});
     frame.src = expected.href;
   });
+  diagnosticPhase(captured, 'FRAME_LOAD_COMPLETE');
   const win = frame.contentWindow, doc = frame.contentDocument;
   if (retired || !doc || !doc.head || win.location.href !== expected.href) throw Error('FOREIGN_CHILD_DOCUMENT');
   const metadata = data.dom;
@@ -65,8 +80,11 @@ const loadDocument = () => documentPromise ||= (async () => {
     input = metadata; // Preserve the exact supplied original/content/edits; never overwrite confirmed edits.
   }
   const dom = createReaderEbookDom({document: doc, window: win, Node: win.Node, NodeFilter: win.NodeFilter, Range: win.Range,
-    isCurrent: () => !retired && frame.contentDocument === doc && win.document === doc}, input);
+    isCurrent: () => !retired && frame.contentDocument === doc && win.document === doc,
+    phase: code => diagnosticPhase(captured, code)}, input);
+  diagnosticPhase(captured, 'DOM_ADMIT_BEGIN');
   dom.admit(); // Full canonical entry authenticates before the existing Range chapter crop.
+  diagnosticPhase(captured, 'DOM_ADMIT_COMPLETE');
   publication = {win, doc, dom};
   const gesture = event => { if (event.isTrusted && confirmed) interacted = true; };
   for (const name of ['pointerdown', 'touchstart', 'wheel', 'keydown']) doc.addEventListener(name, gesture, {passive: true, capture: true});
@@ -126,24 +144,34 @@ const measurement = captured => {
 async function configure(epoch, token) {
   if (retired || !uuid.test(token)) return;
   integer(epoch); if (active && epoch <= active.epoch) return;
-  const captured = {epoch, token, serial: ++serial, layout: null}; active = captured;
+  const captured = {epoch, token, serial: ++serial, layout: null, observerStartedMs: diagnosticClock()}; active = captured;
+  diagnosticPhase(captured, 'CONFIGURE_ENTER');
   confirmed = false; interacted = false; frame.style.pointerEvents = 'none'; applyScrollPolicy();
   try {
     // Only native-owned immutable metadata is read. A newer native viewport may
     // precede module startup; adopt that advertised epoch rather than retrying a stale URI.
+    diagnosticPhase(captured, 'LAYOUT_FETCH_BEGIN');
     const layout = await json(`/__reader/layout-current/${session}.json`);
     if (!current(captured)) return;
     integer(layout.layoutEpoch);
     if (layout.session !== session || !uuid.test(layout.layoutToken) || layout.layoutEpoch < epoch ||
         (layout.layoutEpoch === epoch && layout.layoutToken !== token)) throw Error('FOREIGN_LAYOUT_CONFIG');
     captured.epoch = layout.layoutEpoch; captured.token = layout.layoutToken;
+    diagnosticPhase(captured, 'LAYOUT_FETCH_COMPLETE');
     integer(layout.anchor); if (typeof layout.userScrollEnabled !== 'boolean') throw Error('SCROLL_POLICY_REQUIRED');
     scrollEnabled = layout.userScrollEnabled; captured.layout = layout;
-    const book = await loadDocument(); if (!current(captured)) return;
+    diagnosticPhase(captured, 'DOCUMENT_WAIT_BEGIN');
+    const book = await loadDocument(captured); if (!current(captured)) return;
+    diagnosticPhase(captured, 'DOCUMENT_WAIT_COMPLETE');
     book.dom.applyLayout(layout.options);
+    diagnosticPhase(captured, 'ASSET_WAIT_BEGIN');
     await waitAssets(book); if (!current(captured)) return;
-    book.dom.restorePosition(layout.anchor); await nextPaint(book.win);
-    if (current(captured)) send('ready', {phase: 'dom', ...measurement(captured)});
+    diagnosticPhase(captured, 'ASSET_WAIT_COMPLETE');
+    diagnosticPhase(captured, 'RESTORE_BEGIN');
+    book.dom.restorePosition(layout.anchor);
+    diagnosticPhase(captured, 'RESTORE_COMPLETE');
+    await nextPaint(book.win);
+    if (current(captured)) { diagnosticPhase(captured, 'READY_DOM_SEND'); send('ready', {phase: 'dom', ...measurement(captured)}); }
   } catch (error) { if (current(captured)) fail(error); }
 }
 Object.defineProperty(window, 'ReaderEbookRuntime', {value: Object.freeze({
@@ -151,11 +179,13 @@ Object.defineProperty(window, 'ReaderEbookRuntime', {value: Object.freeze({
   probe(epoch, token) {
     const captured = active;
     if (!captured || captured.epoch !== epoch || captured.token !== token || !captured.layout) return;
-    try { send('ready', {phase: 'paint', ...measurement(captured)}); } catch (error) { fail(error); }
+    try { diagnosticPhase(captured, 'READY_PAINT_SEND'); send('ready', {phase: 'paint', ...measurement(captured)}); } catch (error) { fail(error); }
   },
   confirm(epoch, token, enabled) {
-    if (!active || active.epoch !== epoch || active.token !== token || retired) return;
+    const captured = active;
+    if (!captured || captured.epoch !== epoch || captured.token !== token || retired) return;
     if (typeof enabled !== 'boolean') return;
+    diagnosticPhase(captured, 'READY_CONFIRM');
     confirmed = true; scrollEnabled = enabled; interacted = false; frame.style.pointerEvents = 'auto';
     applyScrollPolicy(); reportSelection();
   },

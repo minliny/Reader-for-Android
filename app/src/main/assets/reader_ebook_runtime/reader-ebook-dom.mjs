@@ -9,6 +9,7 @@ export function createReaderEbookDom(context, input) {
   if (window.document !== document || window.Node !== Node || window.NodeFilter !== NodeFilter || window.Range !== Range)
     throw Error('FOREIGN_DOM_REALM');
   let state = 'CREATED';
+  const observePhase = code => { try { if (state !== 'RETIRED' && state !== 'FAILED' && isCurrent() === true && typeof context.phase === 'function') context.phase(code); } catch {} };
   const current = () => {
     let admitted = false;
     try { admitted = state !== 'RETIRED' && state !== 'FAILED' && window.document === document && isCurrent() === true; } catch {}
@@ -54,7 +55,7 @@ export function createReaderEbookDom(context, input) {
     start, end, scalarCount, offset: integer(input.offset, scalarCount),
     topInset: integer(input.topInset, 100000), edits: Object.freeze(edits)};
   current();
-// BEGIN SAME-BYTE iOS ReaderEbookScript.swift:105-233
+// BEGIN iOS ReaderEbookScript.swift:105-233 WITH OBSERVER-ONLY DIAGNOSTIC HOOKS
 const whitespace=c=>/^\p{White_Space}$/u.test(c);
 const significant=text=>{const values=[];let scalar=0;for(const c of text){if(!whitespace(c))values.push({c,scalar});scalar++;}return values;};
 let points=[],expected=[],ready=false,lastAnchor=config.offset,userMoving=false,scrollTimer=0,pendingFrame=0,selectionActive=false,pageTurning=false,pageEpoch=0,layoutGeneration=0;
@@ -99,6 +100,7 @@ const boundary=(array,reference,scalar)=>{
 };
 const setRange=(range,method,point)=>range[method](point.node,point.offset);
 const documentWindow=()=>{
+  observePhase('DOCUMENT_WINDOW_BEGIN');
   // Authenticate the entire original entry, including text outside this chapter.
   // Only the two requested DOM/UTF-16 endpoints survive the streaming comparison;
   // full-flow character objects and node-reference arrays are never constructed.
@@ -133,13 +135,16 @@ const documentWindow=()=>{
   if(referenceCount!==actualCount)throw Error(`canonical-length:document:expected=${referenceCount}:actual=${actualCount}`);
   if(mismatch)throw Error(mismatch);
   const pastLast=()=>lastNode?endpoint({node:lastNode,start:lastEnd,end:lastEnd,image:lastImage},true):{node:body,offset:0};
+  observePhase('DOCUMENT_WINDOW_COMPLETE');
   return {start:start||pastLast(),end:end||pastLast()};
 };
 const restrictChapter=()=>{
   // Keep original semantic ancestors, document styles, tables, lists and links.
   // Range is the browser's native DOM operation, not a second HTML parser.
   document.querySelectorAll('body style,body link[rel~="stylesheet"]').forEach(node=>document.head.appendChild(node.cloneNode(true)));
-  const chapter=documentWindow(),range=document.createRange();
+  const chapter=documentWindow();
+  observePhase('DOM_CROP_BEGIN');
+  const range=document.createRange();
   setRange(range,'setStart',chapter.start);
   setRange(range,'setEnd',chapter.end);
   // Range clones partially selected descendants, but deliberately omits its
@@ -151,9 +156,12 @@ const restrictChapter=()=>{
   let fragment=range.extractContents();
   for(const original of ancestors){const shell=original.cloneNode(false);shell.appendChild(fragment);fragment=shell;}
   body.replaceChildren(fragment);
+  observePhase('DOM_CROP_COMPLETE');
   const originalMap=match(config.original,'chapter-original');
+  observePhase('ORIGINAL_MATCH_COMPLETE');
   // Apply Core's confirmed rule output. The standard Swift diff is supplied
   // as data; no JavaScript regex/replacement engine re-runs business rules.
+  observePhase('EDIT_APPLY_BEGIN');
   for(const edit of config.edits.slice().reverse()){
     const patch=document.createRange();
     setRange(patch,'setStart',boundary(originalMap.actual,originalMap.reference,edit.startScalar));
@@ -167,8 +175,10 @@ const restrictChapter=()=>{
       patch.startContainer.replaceData(patch.startOffset,patch.endOffset-patch.startOffset,edit.text);
     }else{patch.deleteContents();if(edit.text)patch.insertNode(document.createTextNode(edit.text));}
   }
+  observePhase('EDIT_APPLY_COMPLETE');
   body.normalize();
   const visible=match(config.content,'chapter-processed');points=visible.actual;expected=visible.reference;
+  observePhase('PROCESSED_MATCH_COMPLETE');
 };
 const rangeAt=point=>{const range=document.createRange(),start=endpoint(point);range.setStart(start.node,start.offset);range.collapse(true);return range;};
 const scalarAt=(node,offset)=>{
@@ -184,7 +194,7 @@ const restore=scalar=>{
   let rect;if(point.image)rect=point.node.getBoundingClientRect();else{const range=rangeAt(point);range.setEnd(point.node,point.end);rect=range.getBoundingClientRect();}
   window.scrollTo(0,Math.max(0,window.scrollY+rect.top-config.topInset));
 };
-// END SAME-BYTE iOS ReaderEbookScript.swift:105-233
+// END iOS ReaderEbookScript.swift:105-233 WITH OBSERVER-ONLY DIAGNOSTIC HOOKS
 // BEGIN SAME-BYTE iOS ReaderEbookScript.swift:254-257
 const canonicalRange=(start,end)=>{
   if(start>=end)return null;const range=document.createRange();

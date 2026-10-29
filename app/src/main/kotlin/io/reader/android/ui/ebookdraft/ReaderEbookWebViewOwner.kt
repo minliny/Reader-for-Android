@@ -5,6 +5,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -31,6 +32,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     private val onSelectionChanged: (ReaderEbookSelectionState) -> Unit) {
     val view = WebView(context)
     private val lease = original.prepared.lease
+    private val diagnostics = ReaderEbookLayoutDiagnostics(lease.renderId.toString()) { SystemClock.elapsedRealtime() }
     private val main = Handler(Looper.getMainLooper())
     private val closed = AtomicBoolean(false)
     private val resourceFailure = AtomicReference<Exception?>()
@@ -53,9 +55,11 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     private val draw = ViewTreeObserver.OnDrawListener {
         val captured = awaitingDraw
         if (captured != null && layout === captured && phase == ReaderEbookPhase.Restoring) {
+            diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.NATIVE_DRAW_OBSERVED)
             awaitingDraw = null
             view.post {
                 if (live() && !forceLayout && layout === captured && nativeViewport(captured)) {
+                    diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.NATIVE_DRAW_POSTED)
                     drawnEpoch = captured.epoch
                     script("probe", captured)
                 }
@@ -73,10 +77,11 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
 
     fun start() {
         checkMain(); guard.requireCurrent(lease)
+        diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.OWNER_START)
         ReaderEbookWebViewBoundary.hardenTrustedShell(view)
         view.settings.apply { textZoom = 100; setSupportZoom(false); builtInZoomControls = false; displayZoomControls = false
             useWideViewPort = true; loadWithOverviewMode = false }
-        resources = ReaderEbookLocalResources(view.context, original, { layout }, { requireLive() }) { error ->
+        resources = ReaderEbookLocalResources(view.context, original, { layout }, { requireLive() }, diagnostics) { error ->
             resourceFailure.compareAndSet(null, error)
             main.post { fail("publication-resource", resourceFailure.get() ?: error) } // No UI/gate wait on IO.
         }
@@ -125,8 +130,11 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
             check(epoch < 9_007_199_254_740_991L) { "LAYOUT_EPOCH_EXHAUSTED" }
             val captured = ReaderEbookLocalResources.snapshot(input, ++epoch, UUID.randomUUID().toString(), anchors.desiredAnchor, view.width, view.height)
             layout = captured; forceLayout = false; awaitingDraw = null; drawnEpoch = -1
+            diagnostics.beginLayout(captured.epoch, captured.token)
             setPhase(ReaderEbookPhase.Restoring); main.removeCallbacks(deadline); main.postDelayed(deadline, 20_000)
-            if (!shellLoaded) { shellLoaded = true; view.loadUrl(ReaderEbookLocalResources.SHELL_URL) }
+            if (!shellLoaded) { shellLoaded = true
+                diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.SHELL_LOAD_REQUEST)
+                view.loadUrl(ReaderEbookLocalResources.SHELL_URL) }
             else script("configure", captured)
         } catch (error: Exception) { fail("layout", error) }
     }
@@ -135,6 +143,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
         checkMain(); if (!live() || message.lease != lease) return
         if (forceLayout) return
         val captured = layout ?: return
+        if (diagnostics.consume(message.kind, message.valueJson, captured.epoch, captured.token)) return
         val value = JSONObject(message.valueJson)
         if (message.layoutToken != captured.token || exact(value, "layoutEpoch") != captured.epoch) return
         when (message.kind) {
@@ -143,9 +152,12 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
                 "invalidated" -> if (phase == ReaderEbookPhase.Ready) { anchors.restore(input.currentAnchor); requestLayout(true) }
                 "dom" -> {
                     checkMeasurement(value, captured, captured.anchor)
+                    diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.READY_DOM_RECEIVED)
+                    diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.VISUAL_REQUEST)
                     view.postVisualStateCallback(captured.epoch, object : WebView.VisualStateCallback() {
                         override fun onComplete(requestId: Long) {
                             if (live() && !forceLayout && requestId == captured.epoch && layout === captured && nativeViewport(captured)) {
+                                diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.VISUAL_COMPLETED)
                                 awaitingDraw = captured; view.invalidate()
                             }
                         }
@@ -154,9 +166,14 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
                 "paint" -> {
                     check(phase == ReaderEbookPhase.Restoring && drawnEpoch == captured.epoch && nativeViewport(captured))
                     checkMeasurement(value, captured, captured.anchor)
+                    diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.READY_PAINT_RECEIVED)
                     main.removeCallbacks(deadline); setPhase(ReaderEbookPhase.Ready)
                     onReady(ReaderEbookReady(lease, captured.epoch, captured.token, captured.anchor, captured.widthPx, captured.heightPx))
-                    if (live() && layout === captured) script("confirm", captured)
+                    if (live() && layout === captured) {
+                        diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.NATIVE_READY)
+                        diagnostics.terminal(ReaderEbookLayoutDiagnostics.Outcome.NATIVE_READY)
+                        script("confirm", captured)
+                    }
                 }
                 else -> error("UNKNOWN_READY_PHASE")
             }
@@ -208,6 +225,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     }
     private fun script(method: String, captured: ReaderEbookLayoutSnapshot) {
         if (!live() || layout !== captured || view.url != ReaderEbookLocalResources.SHELL_URL) return
+        if (method == "probe") diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.PROBE_REQUEST)
         val policy = if (method == "confirm") ",${input.userScrollEnabled}" else ""
         view.evaluateJavascript("window.ReaderEbookRuntime?.$method(${captured.epoch},${JSONObject.quote(captured.token)}$policy)", null)
     }
@@ -223,6 +241,15 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
             request.isForMainFrame || request.url.toString() != resources.entryUrl
         override fun onPageStarted(view: WebView, url: String, icon: android.graphics.Bitmap?) {
             if (url != ReaderEbookLocalResources.SHELL_URL || ++shellStarts != 1) fail("navigation", IllegalStateException("MAIN_NAVIGATION_DENIED"))
+            else diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.SHELL_PAGE_STARTED)
+        }
+        override fun onPageCommitVisible(view: WebView, url: String) {
+            if (live() && view === this@ReaderEbookWebViewOwner.view && url == ReaderEbookLocalResources.SHELL_URL)
+                diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.SHELL_COMMIT_VISIBLE)
+        }
+        override fun onPageFinished(view: WebView, url: String) {
+            if (live() && view === this@ReaderEbookWebViewOwner.view && url == ReaderEbookLocalResources.SHELL_URL)
+                diagnostics.native(ReaderEbookLayoutDiagnostics.NativePhase.SHELL_PAGE_FINISHED)
         }
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (resources.activeResource(request.url)) fail("web-resource", resourceFailure.get() ?: IllegalStateException("${error.errorCode}:${error.description}"))
@@ -246,7 +273,11 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     private fun requireLive() { check(live()) { "RETIRED_WEBVIEW_OWNER" } }
     private fun fail(stage: String, error: Exception) {
         checkMain(); if (!live()) return
-        android.util.Log.w("ReaderEbook", "stage=$stage renderId=${lease.renderId} epoch=${layout?.epoch ?: 0}", error)
+        diagnostics.terminal(if (stage == "layout-deadline") ReaderEbookLayoutDiagnostics.Outcome.LAYOUT_DEADLINE else ReaderEbookLayoutDiagnostics.Outcome.EARLIER_FAILURE)
+        val detail = if (stage == "layout-deadline") try {
+            " diagnostic=" + diagnostics.snapshot().put("resourceFailurePresent", resourceFailure.get() != null).toString()
+        } catch (_: Exception) { " diagnostic=UNAVAILABLE" } else ""
+        android.util.Log.w("ReaderEbook", "stage=$stage renderId=${lease.renderId} epoch=${layout?.epoch ?: 0}$detail", error)
         terminal = true; main.removeCallbacks(deadline); awaitingDraw = null; original.prepared.retire()
         if (view.url == ReaderEbookLocalResources.SHELL_URL) view.evaluateJavascript("window.ReaderEbookRuntime?.retire()", null)
         view.stopLoading()
@@ -258,6 +289,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     private fun removeDraw() { drawObserver?.let { if (it.isAlive) it.removeOnDrawListener(draw) }; drawObserver = null }
     fun close() {
         checkMain(); if (!closed.compareAndSet(false, true)) return
+        diagnostics.close()
         original.prepared.retire(); main.removeCallbacks(deadline); awaitingDraw = null; removeDraw()
         view.removeOnAttachStateChangeListener(attach); view.removeOnLayoutChangeListener(resized)
         ReaderEbookWebViewBoundary.removeMessages(view); view.stopLoading()

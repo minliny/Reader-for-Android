@@ -27,6 +27,7 @@ internal data class ReaderEbookLayoutSnapshot(val epoch: Long, val token: String
 /** Exact private capability only. Must use the provider-owner patch; this file has no Native bridge. */
 internal class ReaderEbookLocalResources(context: Context, private val original: ReaderEbookRenderInput,
     private val current: () -> ReaderEbookLayoutSnapshot?, private val requireCurrent: () -> Unit,
+    private val diagnostics: ReaderEbookLayoutDiagnostics,
     private val failed: (Exception) -> Unit) {
     private val assets = context.assets
     private val session = original.prepared.lease.renderId.toString()
@@ -38,6 +39,26 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
         .addPathHandler("/__reader/", WebViewAssetLoader.PathHandler { suffix -> trusted(suffix) }).build()
 
     fun intercept(request: WebResourceRequest): WebResourceResponse {
+        val ticket = try { diagnostics.resourceStarted(category(request)) } catch (_: Exception) { null }
+        var failedResponse = true
+        return try {
+            interceptCurrent(request).also { failedResponse = it.statusCode >= 400 }
+        } finally { diagnostics.resourceReturned(ticket, failedResponse) }
+    }
+    private fun category(request: WebResourceRequest): ReaderEbookLayoutDiagnostics.Resource {
+        val path = request.url.encodedPath.orEmpty()
+        return when {
+            path == "/__reader/shell.html" -> ReaderEbookLayoutDiagnostics.Resource.SHELL
+            path == "/__reader/runtime.mjs" -> ReaderEbookLayoutDiagnostics.Resource.RUNTIME_MODULE
+            path == "/__reader/reader-ebook-dom.mjs" -> ReaderEbookLayoutDiagnostics.Resource.DOM_MODULE
+            path == "/__reader/config/$session.json" -> ReaderEbookLayoutDiagnostics.Resource.CONFIG
+            path.startsWith("/__reader/layout") -> ReaderEbookLayoutDiagnostics.Resource.LAYOUT
+            path == Uri.parse(entryUrl).encodedPath -> ReaderEbookLayoutDiagnostics.Resource.ENTRY
+            path.startsWith("/publication/$session/") -> ReaderEbookLayoutDiagnostics.Resource.RELATED_PUBLICATION_RESOURCE
+            else -> ReaderEbookLayoutDiagnostics.Resource.DENIED_OR_OTHER
+        }
+    }
+    private fun interceptCurrent(request: WebResourceRequest): WebResourceResponse {
         var canonicalEntry: String? = null
         return try {
             requireCurrent()

@@ -63,6 +63,9 @@ data class ReadingSession(
     val restoreScalarOffset: Int,
     val format: ReaderLocalBookFormat,
     val visibleScalarOffset: Int = restoreScalarOffset,
+    // This reading owner/chapter has actually passed the existing ebook Ready admission.
+    // It survives reflow/view failure, and is never an original Core save receipt.
+    val ebookPresented: Boolean = false,
 )
 
 data class ReaderUiState(
@@ -752,6 +755,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         if (prior != null && (event.layoutEpoch < prior.layoutEpoch ||
             (event.layoutEpoch == prior.layoutEpoch && event.layoutToken != prior.layoutToken))) return
         mount.ready = event // Admission only; a restore/reflow never becomes a new business reading position.
+        mutableState.update { current ->
+            val reading = current.reading
+            if (current.route != ReaderRoute.Reading || reading == null ||
+                reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
+                reading.book.id != event.lease.bookId || reading.chapter.bookId != event.lease.bookId ||
+                reading.chapter.index != event.lease.chapterIndex || reading.chapter.bodyVersion != event.lease.bodyVersion ||
+                reading.chapter.processingVersion != event.lease.processingVersion || reading.visibleScalarOffset != event.scalar) current
+            else current.copy(reading = reading.copy(ebookPresented = true))
+        }
     }
 
     /** True means this exact visible observation was admitted, never that Core saved it. */
@@ -822,7 +834,17 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun persist(reading: ReadingSession?) {
-        if (reading != null) library.savePosition(reading.book.id, reading.chapter.index,
+        if (reading == null) return
+        if (reading.format != ReaderLocalBookFormat.TXT) {
+            // Read the current same-session fact: a caller may have captured the session before Ready.
+            // A transient mount.ready=null must not erase a previously admitted visible position.
+            val current = state.value.reading ?: return
+            if (!current.ebookPresented || current.identity != reading.identity || current.format != reading.format ||
+                current.book.id != reading.book.id || current.chapter.bookId != reading.chapter.bookId ||
+                current.chapter.index != reading.chapter.index || current.chapter.sessionToken != reading.chapter.sessionToken ||
+                current.chapter.bodyVersion != reading.chapter.bodyVersion || current.chapter.processingVersion != reading.chapter.processingVersion) return
+        }
+        library.savePosition(reading.book.id, reading.chapter.index,
             reading.visibleScalarOffset, reading.chapter.sessionToken)
     }
 

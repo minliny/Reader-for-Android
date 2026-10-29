@@ -69,7 +69,7 @@ internal object ReaderEbookWebViewBoundary {
                 val kind = event.opt("kind") as? String ?: return@WebMessageListener
                 val value = event.opt("value") as? JSONObject ?: return@WebMessageListener
                 val token = value.opt("layoutToken") as? String ?: return@WebMessageListener
-                if (sequence <= lastSequence || kind !in setOf("ready", "position", "selection", "tap", "failure") || token != expectedLayoutToken()) return@WebMessageListener
+                if (sequence <= lastSequence || kind !in setOf("ready", "position", "selection", "tap", "failure", "phase") || token != expectedLayoutToken()) return@WebMessageListener
                 lastSequence = sequence
                 // The trusted wrapper supplies no file/book/path authority. Native lease supplies scope.
                 consume(Message(lease, sequence, kind, token, value.toString()))
