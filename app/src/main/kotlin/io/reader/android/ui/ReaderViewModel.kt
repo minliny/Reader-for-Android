@@ -9,6 +9,9 @@ import io.reader.android.runtime.ChapterItem
 import io.reader.android.runtime.LibraryBook
 import io.reader.android.runtime.ReaderRemoteShelfBook
 import io.reader.android.runtime.ReaderOnlineChapter
+import io.reader.android.runtime.ReaderOnlineNeighbor
+import io.reader.android.runtime.ReaderOnlineReadingWindowSnapshot
+import io.reader.android.runtime.ReaderOnlineWindowSchedule
 import io.reader.android.runtime.ReaderOnlineOriginalObservation
 import io.reader.android.runtime.ReaderOnlineOriginalPending
 import io.reader.android.runtime.ReaderOnlineDirectoryNode
@@ -56,6 +59,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -168,6 +172,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     private val gate = Mutex()
     private var generation = 0L
     private var delayedSave: Job? = null
+    private var onlineWindowJob: Job? = null
+    private var onlineWindowSchedule: ReaderOnlineWindowSchedule? = null
+    private var onlineWindowScheduleReadingIdentity: String? = null
     private var ebookMount: ReaderEbookUiMount? = null
     private var shelfRead: Job? = null
     private var searchGeneration = 0L
@@ -1123,18 +1130,119 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
     fun continueOnlineReading(identity: String) {
-        val directory = state.value.onlineDirectory ?: return
-        if (state.value.busy || state.value.route != ReaderRoute.OnlineDirectory || directory.identity != identity || onlineBlocked(directory.book.key)) return
+        val directory = state.value.onlineDirectory
+        val book = directory?.book ?: state.value.onlineSelectedBook ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.OnlineDirectory || state.value.onlineDirectoryIdentity != identity ||
+            (directory != null && directory.identity != identity) || onlineBlocked(book.key)) return
         onlineAction { request ->
-            if (state.value.onlineDirectory?.identity != identity || state.value.route != ReaderRoute.OnlineDirectory || onlineBlocked(directory.book.key)) return@onlineAction
-            val opened = library.openOnlineChapter(directory.book.key) // Core chooses its actual current/prepared entry; no Host index guessing.
-            if (request == generation) publishOnlineReading(directory.book, opened, request)
+            if (state.value.onlineDirectoryIdentity != identity || state.value.route != ReaderRoute.OnlineDirectory ||
+                state.value.onlineSelectedBook !== book || onlineBlocked(book.key)) return@onlineAction
+            val opened = library.openOnlineChapter(book.key) // Core cached entry only; missing never refetches or upgrades.
+            if (request == generation) publishOnlineReading(book, opened, request)
         }
     }
     private fun publishOnlineReading(book: ReaderRemoteShelfBook, opened: ReaderOnlineChapter, nativeOwner: Long) {
+        stopOnlineWindow(retire = true)
         check(opened.chapter.key == book.key && opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT)
         mutableState.update { it.copy(route = ReaderRoute.OnlineReading, onlineReading = ReaderOnlineReadingUi(
             java.util.UUID.randomUUID().toString(), nativeOwner, book, opened), onlineOriginal = null, error = null) }
+    }
+    /** Only the existing Native body can report this after raw/visible-line/OnDraw admission. */
+    fun onlineNativeReady(identity: String, opened: ReaderOnlineChapter) {
+        val reading = state.value.onlineReading ?: return
+        if (state.value.route != ReaderRoute.OnlineReading || reading.identity != identity || reading.opened !== opened || reading.nativePresented) return
+        mutableState.update { it.copy(onlineReading = reading.copy(nativePresented = true)) }
+    }
+    private fun onlineWindowBlocked(reading: ReaderOnlineReadingUi) = onlineBlocked(reading.book.key) ||
+        coreProtocolRecoveries.value.items.isNotEmpty()
+    private fun stopOnlineWindow(retire: Boolean) {
+        if (retire) { onlineWindowSchedule?.stop(); state.value.onlineReading?.window?.window?.retire() }
+        onlineWindowJob?.cancel(); onlineWindowJob = null
+        // No Core cancel/pause, no join claim, and no clearing of an original/unknown.
+    }
+    fun prepareOnlineReadingWindow(identity: String) {
+        val reading = state.value.onlineReading ?: return
+        if (state.value.route != ReaderRoute.OnlineReading || state.value.busy || reading.identity != identity ||
+            !reading.nativePresented || reading.windowRequested || reading.opened.resumeOnly || onlineWindowBlocked(reading)) return
+        mutableState.update { it.copy(onlineReading = reading.copy(windowRequested = true, windowLoading = true, windowError = null)) }
+        val schedule = ReaderOnlineWindowSchedule(); onlineWindowSchedule = schedule
+        onlineWindowScheduleReadingIdentity = reading.identity
+        onlineWindowJob = viewModelScope.launch {
+            try {
+                val snapshot = gate.withLock {
+                    val actual = state.value.onlineReading
+                    if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading || onlineWindowBlocked(reading)) return@withLock null
+                    if (state.value.busy) {
+                        mutableState.update { it.copy(onlineReading = actual?.copy(windowRequested = false, windowLoading = false)) }
+                        return@withLock null // No window request was dispatched; the same Ready host can schedule later.
+                    }
+                    library.onlineReadingWindow(reading.opened, schedule)
+                } ?: return@launch
+                if (onlineWindowSchedule !== schedule || !sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading) { snapshot.window.retire(); return@launch }
+                mutableState.update { it.copy(onlineReading = it.onlineReading?.copy(window = snapshot)) }
+                // An App/VM turn per chapter leaves saves/user actions eligible between targets. All
+                // read bodies and network work remain in the original App owner; cancellation stops only future slots.
+                for (offset in listOf(1, 2, -1, -2)) {
+                    val neighbor = snapshot.window.neighbors.singleOrNull { it.offset == offset } ?: continue
+                    val keepGoing = gate.withLock {
+                        val actual = state.value.onlineReading
+                        if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading || state.value.busy ||
+                            onlineWindowBlocked(reading) || actual?.window?.window !== snapshot.window || snapshot.window.isRetired) return@withLock false
+                        val prepared = library.prepareOnlineNeighbor(snapshot.window, neighbor)
+                        if (sameOnline(reading) && state.value.route == ReaderRoute.OnlineReading && !snapshot.window.isRetired) mutableState.update { current ->
+                            val currentReading = current.onlineReading ?: return@update current
+                            val currentWindow = currentReading.window ?: return@update current
+                            if (currentWindow.window !== snapshot.window) current else current.copy(onlineReading = currentReading.copy(
+                                window = ReaderOnlineReadingWindowSnapshot(snapshot.window, currentWindow.states.map {
+                                    if (it.neighbor === neighbor) prepared else it
+                                })))
+                        }
+                        true
+                    }
+                    if (!keepGoing) break
+                    yield()
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { if (onlineWindowSchedule === schedule) retainOnlineWindowFailure(reading, error) }
+            finally {
+                if (onlineWindowSchedule === schedule && sameOnline(reading)) mutableState.update { it.copy(onlineReading = it.onlineReading?.copy(windowLoading = false)) }
+            }
+        }
+    }
+    private fun retainOnlineWindowFailure(reading: ReaderOnlineReadingUi, error: Exception) {
+        if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading || retainProtocolPending(error)) return
+        if (error is ReaderOnlineOriginalPending) mutableState.update { it.copy(onlineOriginal = error.original, error = null) }
+        else mutableState.update { it.copy(onlineReading = it.onlineReading?.copy(
+            windowError = "本章仍可阅读；邻章准备未完成，请稍后明确重试。")) }
+    }
+    fun retryOnlineReadingWindow(identity: String) {
+        val reading = state.value.onlineReading ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.OnlineReading || reading.identity != identity || onlineWindowBlocked(reading)) return
+        stopOnlineWindow(retire = true)
+        mutableState.update { it.copy(onlineReading = reading.copy(window = null, windowRequested = false, windowLoading = false, windowError = null)) }
+        prepareOnlineReadingWindow(identity)
+    }
+    fun resumeOnlineWindow(identity: String) {
+        val reading = state.value.onlineReading ?: return
+        val ownedRetiredSchedule = onlineWindowScheduleReadingIdentity == reading.identity && onlineWindowSchedule?.isOpen == false
+        val retired = ownedRetiredSchedule && (reading.window?.window?.isRetired == true || (reading.window == null && reading.windowRequested))
+        if (state.value.route != ReaderRoute.OnlineReading || reading.identity != identity || !retired ||
+            reading.windowError != null || onlineWindowBlocked(reading)) return
+        // Foreground restores scheduling eligibility only. No original is cleared or retried here.
+        mutableState.update { it.copy(onlineReading = reading.copy(window = null, windowRequested = false, windowLoading = false)) }
+    }
+    fun moveOnlineNeighbor(identity: String, neighbor: ReaderOnlineNeighbor) {
+        val reading = state.value.onlineReading ?: return
+        val window = reading.window?.window ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.OnlineReading || reading.identity != identity ||
+            onlineWindowBlocked(reading) || window.isRetired || window.neighbors.none { it === neighbor }) return
+        stopOnlineWindow(retire = false) // Keep this issued ticket valid for the explicit move, not for more background dispatch.
+        onlineAction(reading) { request ->
+            if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading || onlineWindowBlocked(reading) || window.isRetired) return@onlineAction
+            val confirmed = persistOnline(reading) // Exact original ACK before any neighbor becomes current.
+            val opened = library.openOnlineNeighbor(window, neighbor, confirmed)
+            if (request == generation) publishOnlineReading(reading.book, opened, request)
+        }
     }
     fun visibleOnlineAnchor(identity: String, opened: ReaderOnlineChapter, scalar: Int): Boolean {
         val reading = state.value.onlineReading ?: return false
@@ -1158,6 +1266,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
     private fun retainOnlineSaveFailure(reading: ReaderOnlineReadingUi, error: Exception) {
         if (retainProtocolPending(error) || !sameOnline(reading)) return
+        if (error is ReaderOnlineOriginalPending) {
+            mutableState.update { it.copy(onlineOriginal = error.original, error = null) }; return
+        }
         if (error is PendingOperationException) {
             val pending = PendingPosition(error.operationId, reading.book.key.bookId, error.stage, reading.book.key.sourceId)
             mutableState.update { it.copy(pendingPositions = it.pendingPositions.filterNot { old -> old.id == pending.id } + pending) }
@@ -1181,6 +1292,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun showOnlineDirectory() {
         val reading = state.value.onlineReading ?: return
         if (state.value.busy || state.value.route != ReaderRoute.OnlineReading || onlineBlocked(reading.book.key)) return
+        stopOnlineWindow(retire = true)
         onlineAction(reading) { request ->
             if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading) return@onlineAction
             persistOnline(reading)
@@ -1194,6 +1306,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun exitOnlineReading() {
         val reading = state.value.onlineReading ?: return
         if (state.value.busy || state.value.route !in setOf(ReaderRoute.OnlineReading, ReaderRoute.OnlineDirectory) || onlineBlocked(reading.book.key)) return
+        stopOnlineWindow(retire = true)
         onlineAction(reading) { request ->
             if (!sameOnline(reading)) return@onlineAction
             persistOnline(reading) // Unknown/failure leaves the actual reading and original pending on this host.
@@ -1201,6 +1314,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             val directory = state.value.onlineDirectory
             // The original save is confirmed before navigation; projection failure cannot repeat that save.
             mutableState.update { it.copy(route = ReaderRoute.Bookshelf, onlineReading = null, onlineDirectory = null, onlineSelectedBook = null, onlineDirectoryIdentity = null, onlineError = null) }
+            library.closeOnlineChapter(reading.opened)
             directory?.let { library.closeOnlineDirectory(it.page.directory) }
             val books = readShelf(); val captured = state.value
             val remote = library.remoteShelfMetadata(captured.shelfQuery.ifBlank { null }, captured.shelfSort, captured.shelfDirection)
@@ -1209,8 +1323,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
     private fun backOnlineDirectory() {
         if (state.value.busy) return
-        if (state.value.onlineReading != null) mutableState.update { it.copy(route = ReaderRoute.OnlineReading) }
-        else {
+        val reading = state.value.onlineReading
+        if (reading != null) {
+            val retired = onlineWindowScheduleReadingIdentity == reading.identity && onlineWindowSchedule?.isOpen == false
+            mutableState.update { current -> current.copy(route = ReaderRoute.OnlineReading,
+                onlineReading = if (retired || reading.window?.window?.isRetired == true)
+                    reading.copy(window = null, windowRequested = false, windowLoading = false, windowError = null)
+                else reading) }
+            if (retired || reading.window?.window?.isRetired == true) prepareOnlineReadingWindow(reading.identity)
+        } else {
             val directory = state.value.onlineDirectory
             if (directory == null) { mutableState.update { it.copy(route = ReaderRoute.Bookshelf, onlineSelectedBook = null, onlineDirectoryIdentity = null, onlineError = null) }; return }
             onlineAction(null) { request ->
@@ -1269,6 +1390,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun retireOnlineFeedback(id: String) { mutableState.update { if (it.onlineFeedbackId == id) it.copy(onlineFeedback = null) else it } }
     private fun backgroundOnline() {
         val reading = state.value.onlineReading ?: return
+        stopOnlineWindow(retire = true)
         delayedSave?.cancel()
         viewModelScope.launch { gate.withLock {
             if (state.value.route != ReaderRoute.OnlineReading || !sameOnline(reading) || onlineBlocked(reading.book.key)) return@withLock
@@ -1297,6 +1419,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        stopOnlineWindow(retire = true)
         ebookMount?.view?.close(); ebookMount = null
         delayedSave?.cancel()
         shelfRead?.cancel()

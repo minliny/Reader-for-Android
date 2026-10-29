@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,12 +58,12 @@ internal fun ReaderNativeChapterBody(reading: ReadingSession, fontSize: Int, pap
 @Composable
 internal fun ReaderOnlineNativeChapterBody(readingOwner: Long, opened: ReaderOnlineChapter, visibleScalarOffset: Int,
     fontSize: Int, paper: ReaderPaper, userScrollEnabled: Boolean, onVisibleAnchor: (Int) -> Boolean,
-    onTap: () -> Unit, modifier: Modifier = Modifier) {
+    onTap: () -> Unit, modifier: Modifier = Modifier, onReady: () -> Unit = {}) {
     val chapter = opened.chapter
     check(chapter.sourceId != "local" && chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT && visibleScalarOffset in 0..chapter.scalarCount)
     key(readingOwner, chapter.sourceId, chapter.bookId, chapter.sessionToken) {
         ReaderNativeTextPresentationBody(ReaderNativeTextOwner(readingOwner, chapter, visibleScalarOffset, requiresVisibleAdmission = true),
-            fontSize, paper, userScrollEnabled, onVisibleAnchor, onTap, modifier)
+            fontSize, paper, userScrollEnabled, onVisibleAnchor, onTap, modifier, onReady)
     }
 }
 
@@ -75,8 +77,14 @@ private fun ReaderNativeTextPresentationBody(
     onVisibleAnchor: (Int) -> Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
+    onReady: (() -> Unit)? = null,
 ) {
     var phase by remember { mutableStateOf(NativeLayoutPhase.Restoring) }
+    val readyCallback by rememberUpdatedState(onReady)
+    LaunchedEffect(phase, reading.identity, reading.chapter.sessionToken) {
+        // This phase is emitted only after the existing native UTF-16/visible-line/OnDraw gate.
+        if (phase == NativeLayoutPhase.Ready) readyCallback?.invoke()
+    }
     val native = remember { arrayOfNulls<ReaderNativeScrollView>(1) }
     Box(modifier.testTag("reader_body")) {
         AndroidView(

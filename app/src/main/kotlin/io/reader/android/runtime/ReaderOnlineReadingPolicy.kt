@@ -5,16 +5,22 @@ import org.json.JSONObject
 /** Core DTO/scalar admission only; no HTML, directory, rule or canonical-text parser. */
 internal object ReaderOnlineReadingPolicy {
     val METHODS = setOf("bookshelf.get", "cache.book.status", "reading.directory.view.open.v2", "reading.directory.view.page.v2",
-        "reading.directory.target.resolve.v2", "reading.entry.snapshot", "reading.entry.prepare", "chapter.content", "reading.progress.get")
+        "reading.directory.target.resolve.v2", "reading.entry.snapshot", "reading.entry.prepare", "chapter.content", "reading.progress.get",
+        "reading.preparation")
     fun remote(key: ShelfBookKey) { require(key.sourceId.isNotBlank() && key.sourceId != "local" && key.bookId.isNotBlank()) }
     fun scope(value: JSONObject, key: ShelfBookKey) {
         check(value.getString("sourceId") == key.sourceId && value.getString("bookId") == key.bookId) { "ONLINE_READING_SCOPE" }
     }
-    fun chapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject, target: ReaderOnlineDirectoryTarget?): ReaderOnlineChapter {
+    fun chapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject, target: ReaderOnlineDirectoryTarget?): ReaderOnlineChapter =
+        selectedChapter(key, version, entry, progress, target?.chapterIndex, target?.scalarOffset, target?.positionScopeJson)
+    internal fun neighborChapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject, index: Int): ReaderOnlineChapter =
+        selectedChapter(key, version, entry, progress, index, 0, null)
+    private fun selectedChapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject,
+        selectedIndex: Int?, selectedOffset: Int?, selectedScope: String?): ReaderOnlineChapter {
         remote(key); scope(entry, key)
         check(entry.getString("kind") == "ready" && !entry.optBoolean("contentRefreshRequired") && !entry.optBoolean("sourceCorrectionRequired") &&
             (!entry.has("documentWindow") || entry.isNull("documentWindow"))) { "ONLINE_ENTRY_NOT_COMPLETE_READY" }
-        val index = entry.getInt("chapterIndex"); check(index >= 0 && (target == null || index == target.chapterIndex))
+        val index = entry.getInt("chapterIndex"); check(index >= 0 && (selectedIndex == null || index == selectedIndex))
         val position = entry.getJSONObject("positionScope"); scope(position, key)
         check(position.getInt("chapterIndex") == index && position.getString("bodyVersion").isNotBlank() &&
             position.getString("processingVersion").isNotBlank()) { "ONLINE_ENTRY_POSITION_SCOPE" }
@@ -33,10 +39,10 @@ internal object ReaderOnlineReadingPolicy {
             for (field in listOf("chapterIndex", "chapterOffset", "updatedAt")) check(stored.get(field) == inEntry.get(field)) { "ONLINE_ENTRY_PROGRESS_CHANGED" }
         }
         val count = text.codePointCount(0, text.length)
-        val offset = if (target != null) {
+        val offset = if (selectedOffset != null) {
             check(!entry.optBoolean("resumeOnly")) { "ONLINE_EXPLICIT_TARGET_NOT_READABLE" }
-            target.positionScopeJson?.let { check(ProgressJournalCandidatePolicy.sameObject(position, JSONObject(it))) { "ONLINE_TARGET_SCOPE_CHANGED" } }
-            target.scalarOffset
+            selectedScope?.let { check(ProgressJournalCandidatePolicy.sameObject(position, JSONObject(it))) { "ONLINE_TARGET_SCOPE_CHANGED" } }
+            selectedOffset
         } else if (stored != null) {
             check(stored.getInt("chapterIndex") == index && stored.getString("bodyVersion") == position.getString("bodyVersion") &&
                 stored.getString("processingVersion") == position.getString("processingVersion")) { "ONLINE_RESTORE_SCOPE_CHANGED" }

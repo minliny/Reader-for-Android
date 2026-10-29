@@ -79,6 +79,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<ShelfBookKey, Session>()
+    private var openedOnlineChapter: ReaderOnlineChapter? = null
     private val progressDispatchSessions = mutableMapOf<String, Session>()
     private val positionIntent = AtomicReference<ReaderPositionIntentState?>()
     private val originalAuthorities = ReaderLocalOriginalAuthorityReader(File(root, "Operations/Completed"))
@@ -346,11 +347,54 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
     suspend fun openOnlineChapter(key: ShelfBookKey, target: ReaderOnlineDirectoryTarget? = null): ReaderOnlineChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         val opened = onlineReading.open(client.lease, key, target)
-        check(opened.chapter.key == key && opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT)
-        // Publish only after complete Core entry + current CAS observation and scalar admission.
+        check(opened.chapter.key == key)
+        publishOnlineChapter(opened)
+    }
+    private fun publishOnlineChapter(opened: ReaderOnlineChapter): ReaderOnlineChapter {
+        check(opened.chapter.sourceId != "local" && opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT)
+        openedOnlineChapter?.let { old ->
+            onlineReading.retire(client.lease, old)
+            client.currentTurn().cleanupCompleted("search:online-entry:" + old.chapter.sessionToken)
+            if (readingSessions[old.chapter.key]?.chapter === old.chapter) readingSessions.remove(old.chapter.key)
+        }
+        // New chapter/session never inherits a local Original or a different position capability.
         retirePreparedEbook(); positionIntent.set(null)
-        readingSessions[key] = Session(opened.chapter, opened.progressRevision)
-        opened
+        readingSessions[opened.chapter.key] = Session(opened.chapter, opened.progressRevision)
+        openedOnlineChapter = opened
+        val exactLease = client.lease
+        client.registerSearchCleanup(client.currentTurn(), "online-entry:" + opened.chapter.sessionToken) { onlineReading.retire(exactLease, opened) }
+        return opened
+    }
+    private fun requireOnlineChapter(opened: ReaderOnlineChapter) {
+        check(openedOnlineChapter === opened && readingSessions[opened.chapter.key]?.chapter === opened.chapter &&
+            opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT) { "ONLINE_CHAPTER_SESSION_RETIRED" }
+    }
+    /** UI Ready is a display fact; all actual window authority remains inside the same held App turn. */
+    suspend fun onlineReadingWindow(opened: ReaderOnlineChapter, schedule: ReaderOnlineWindowSchedule): ReaderOnlineReadingWindowSnapshot = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        requireOnlineChapter(opened); onlineReading.window(client.lease, opened, schedule)
+    }
+    suspend fun prepareOnlineNeighbor(window: ReaderOnlineReadingWindow, neighbor: ReaderOnlineNeighbor): ReaderOnlineNeighborState =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { requireOnlineChapter(window.opened); onlineReading.warm(client.lease, window, neighbor) }
+    /** Only the exact newly archived current-runtime ACK can authorize leaving this chapter. */
+    suspend fun openOnlineNeighbor(window: ReaderOnlineReadingWindow, neighbor: ReaderOnlineNeighbor,
+        confirmed: ReaderPositionSaveResult.ConfirmedNewOriginal): ReaderOnlineChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        requireOnlineChapter(window.opened)
+        val record = checkNotNull(journal.exact(confirmed.originalId, includeCompleted = true)) { "ONLINE_MOVE_ORIGINAL_MISSING" }
+        check(record.getBoolean("completed")) { "ONLINE_MOVE_ORIGINAL_NOT_COMPLETED" }
+        val actual = ReaderProgressNewIntentPolicy.confirmed(record)
+        check(actual.sourceId == window.key.sourceId && actual.bookId == window.key.bookId && actual.chapterIndex == window.chapterIndex &&
+            actual.runtimeSession == transport.session && actual.bodyVersion == window.bodyVersion && actual.processingVersion == window.processingVersion &&
+            actual.progressRevision == readingSessions[window.key]?.revision && actual.originalId == confirmed.originalId && actual.requestId == confirmed.requestId &&
+            actual.scalarOffset == confirmed.scalarOffset && actual.progressRevision == confirmed.progressRevision &&
+            ProgressJournalCandidatePolicy.sameObject(JSONObject(actual.originalParametersJson), JSONObject(confirmed.originalParametersJson)) &&
+            ProgressJournalCandidatePolicy.sameObject(JSONObject(actual.parsedTerminalJson), JSONObject(confirmed.parsedTerminalJson))) { "ONLINE_MOVE_ORIGINAL_SCOPE" }
+        publishOnlineChapter(onlineReading.move(client.lease, window, neighbor))
+    }
+    suspend fun closeOnlineChapter(opened: ReaderOnlineChapter): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        onlineReading.retire(client.lease, opened)
+        client.currentTurn().cleanupCompleted("search:online-entry:" + opened.chapter.sessionToken)
+        if (readingSessions[opened.chapter.key]?.chapter === opened.chapter) readingSessions.remove(opened.chapter.key)
+        if (openedOnlineChapter === opened) openedOnlineChapter = null
     }
 
     suspend fun bookmarks(bookId: String, query: String? = null): List<ReaderBookmark> = onIO(WholeTurnMode.OBSERVER_READ) {
@@ -528,7 +572,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     suspend fun savePosition(key: ShelfBookKey, index: Int, scalarOffset: Int, sessionToken: String): ReaderPositionSaveResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
-        if (key.sourceId == "local") localIdentity(key.bookId) else ReaderOnlineReadingPolicy.remote(key)
+        if (key.sourceId == "local") localIdentity(key.bookId) else onlineReading.requireNoUnknown(key)
         val bookId = key.bookId
         val session = readingSessions[key] ?: error("READING_SESSION_MISSING")
         check((key.sourceId == "local" || session.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT) &&

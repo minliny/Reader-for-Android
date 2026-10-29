@@ -6,6 +6,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -16,6 +21,9 @@ import io.reader.android.runtime.*
 data class ReaderOnlineReadingUi(
     val identity: String, val nativeOwner: Long, val book: ReaderRemoteShelfBook, val opened: ReaderOnlineChapter,
     val visibleScalar: Int = opened.restoreScalarOffset, val controls: Boolean = false,
+    val nativePresented: Boolean = false, val windowRequested: Boolean = false,
+    val windowLoading: Boolean = false, val windowError: String? = null,
+    val window: ReaderOnlineReadingWindowSnapshot? = null,
 )
 data class ReaderOnlineDirectoryUi(val identity: String, val book: ReaderRemoteShelfBook,
     val page: ReaderOnlineDirectoryPage, val nodes: List<ReaderOnlineDirectoryNode> = page.nodes)
@@ -31,7 +39,14 @@ internal fun ReaderOnlineDirectoryScreen(state: ReaderUiState, model: ReaderView
             Text(state.onlineSelectedBook?.title.orEmpty(), modifier = Modifier.padding(19.dp))
             ReaderOnlineOriginalNotice(state, model)
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            else ReaderPageState("目录暂时不可用", state.onlineError.orEmpty())
+            else {
+                ReaderPageState("目录暂时不可用", state.onlineError.orEmpty())
+                val selected = state.onlineSelectedBook
+                val identity = state.onlineDirectoryIdentity
+                if (selected != null && identity != null) TextButton({ model.continueOnlineReading(identity) },
+                    enabled = state.onlineOriginal == null && state.pendingPositions.none { it.key == selected.key },
+                    modifier = Modifier.testTag("reader_online_resume")) { Text("继续阅读（缓存）") }
+            }
         }
         return
     }
@@ -78,6 +93,15 @@ internal fun ReaderOnlineOriginalNotice(state: ReaderUiState, model: ReaderViewM
 internal fun ReaderOnlineReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
     val reading = state.onlineReading ?: return
     val blocked = state.busy || state.onlineOriginal != null || state.pendingPositions.any { it.key == reading.book.key }
+    val lifecycle = LocalLifecycleOwner.current
+    DisposableEffect(lifecycle, model, reading.identity) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_START) model.resumeOnlineWindow(reading.identity) }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(reading.identity, reading.nativePresented, reading.windowRequested, blocked) {
+        if (reading.nativePresented && !reading.windowRequested && !blocked && !reading.opened.resumeOnly) model.prepareOnlineReadingWindow(reading.identity)
+    }
     Column(Modifier.fillMaxSize().background(state.paper.background()).windowInsetsPadding(WindowInsets.safeDrawing)
         .testTag("reader_online_reading")) {
         ReaderProtocolRecoveryHost(model)
@@ -96,6 +120,19 @@ internal fun ReaderOnlineReadingScreen(state: ReaderUiState, model: ReaderViewMo
                     TextButton({ model.toggleOnlineControls(reading.identity) }, enabled = !state.busy) { Text("收起") }
                 }
                 Row {
+                    for ((offset, label) in listOf(-1 to "上一章", 1 to "下一章")) {
+                        val neighbor = reading.window?.window?.neighbors?.singleOrNull { it.offset == offset }
+                        TextButton({ if (neighbor != null) model.moveOnlineNeighbor(reading.identity, neighbor) },
+                            enabled = !blocked && neighbor != null && reading.window?.window?.isRetired == false,
+                            modifier = Modifier.testTag(if (offset < 0) "reader_online_previous" else "reader_online_next")) { Text(label) }
+                    }
+                }
+                if (reading.windowLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("reader_online_window_loading"))
+                reading.windowError?.let { message -> ReaderPageState("邻章暂时不可用", message, "重新准备邻章",
+                    if (!blocked) ({ model.retryOnlineReadingWindow(reading.identity) }) else null) }
+                if (reading.window?.window?.isRetired == true && reading.windowError == null) TextButton(
+                    { model.retryOnlineReadingWindow(reading.identity) }, enabled = !blocked) { Text("重新准备邻章") }
+                Row {
                     TextButton({ model.setFontSize(state.fontSize - 1) }, enabled = !state.busy && state.fontSize > 14) { Text("字号－") }
                     TextButton({ model.setFontSize(state.fontSize + 1) }, enabled = !state.busy && state.fontSize < 32) { Text("字号＋") }
                 }
@@ -108,6 +145,7 @@ internal fun ReaderOnlineReadingScreen(state: ReaderUiState, model: ReaderViewMo
         }
         ReaderOnlineNativeChapterBody(reading.nativeOwner, reading.opened, reading.visibleScalar, state.fontSize, state.paper,
             !reading.controls && !blocked, { model.visibleOnlineAnchor(reading.identity, reading.opened, it) },
-            { model.toggleOnlineControls(reading.identity) }, Modifier.weight(1f).fillMaxWidth())
+            { model.toggleOnlineControls(reading.identity) }, Modifier.weight(1f).fillMaxWidth(),
+            onReady = { model.onlineNativeReady(reading.identity, reading.opened) })
     }
 }

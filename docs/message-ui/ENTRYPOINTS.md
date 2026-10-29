@@ -94,3 +94,14 @@ Online 离页只关闭准确原 Host 搜索 session（Core 没有 online search 
 | 协议未决 | 既有 ReaderProtocolRecoveryHost，reading 与非 reading 互斥宿主 | 原 protocol reference/presentation；仍先于业务错误分类。页面不冒认 ACK、不释放新外来 fault |
 
 Native anchor 的 Boolean 仅为当前完整 reading/token/key 范围内的显示接纳；busy/同 key 未决/旧 opened 对象被拒，不推进 reflow 基准、不生成保存。现有450ms调度与正常退出均走同原 progress journal/ACK；离页、VM取消及隐藏消息不取消已准入 App turn。远程书签/正文搜索/TTS/格式/原件工具未接入，入口保持缺席。local 进度提示及旧新意图列表明确 sourceId=local，不能借相同 bookId 认领在线原件。
+
+
+### A4 已展示正文的邻章窗口（源码候选）
+
+| 事实 | 公共宿主 | 资格与退休 |
+| --- | --- | --- |
+| 正在准备前后各两章缓存 | 既有 LinearProgressIndicator，OnlineReading controls 内局部区域 | 实际 Native Ready 后，同 reading UUID/opened/session/full source-book-body-processing、App client lease、Core catalog revision 的一个窗口；默认自动调度，每章独立 App turn，控件仅反映本窗口 |
+| 已知邻章准备失败 | ReaderPageState，OnlineReading controls；明确“重新准备邻章”动作 | 同 reading/window owner；失败不退出正文、不清原操作，不自动重试；动作入口与 gate 后再核原 reading/unknown/barrier |
+| 窗口 acquisition/protocol 未决 | 本节既有 ReaderRecoveryNotice / ReaderProtocolRecoveryHost | 保实际原 request/runtime/params/terminal；晚结果仍归 App 原 owner。退休只停止后续调度，不能称 Native.cancel、join 或原 ACK |
+
+“继续阅读（缓存）”只请求 Core 现存 entry，缺正文不隐式联网/升级。源已停用、删除或版本不同不抹除缓存正文与原位置；Core ready/fullscope 仍是正文准入，新 begin/read 与缺章网络获取另要求当前启用且同 sourceVersion。±1/±2 只来自 Core indexed navigation，显式切邻章须先同当前章实际新 Completed 原 ACK；窗口、缓存存在、当前位置查询都不是保存 ACK。本候选不开放近末尾目录刷新、整书下载、换源或后台退休 client 的新写入。
