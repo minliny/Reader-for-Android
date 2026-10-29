@@ -18,6 +18,9 @@ internal class ReaderOnlineCatalogOriginals(private val transport: CoreTransport
             })
     }
     private val calls = linkedMapOf<String, Call>()
+    /** Bounded acknowledged observations remain inspectable after the one-slot
+     * current-call route advances to the next online-window request. */
+    private val recent = linkedMapOf<String, ReaderOnlineOriginalObservation>()
     fun pending(): List<ReaderOnlineOriginalObservation> {
         assertHeld()
         return calls.values.filter { !it.transportAcknowledged }.map { it.observation() }
@@ -58,6 +61,7 @@ internal class ReaderOnlineCatalogOriginals(private val transport: CoreTransport
             throw ReaderOnlineOriginalPending(call.observation(), error)
         }
         check(call.runtime == transport.session && call.requestId != null && call.terminal != null) { "ONLINE_ORIGINAL_UNCONFIRMED" }
+        recent[method] = call.observation()
         return CoreTerminal.result(method, JSONObject(checkNotNull(call.terminal)))
     }
 }

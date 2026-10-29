@@ -145,6 +145,27 @@ class UiRealOnlineReadingJourneyTest {
                 putString("freshObservedProgressRevision", opened.opened.progressRevision); putBoolean("localReadingSessionAbsent", model.state.value.reading == null)
                 putString("nativeClaim", "FULL_CORE_ENTRY_UTF16_AND_ACTUAL_SCALAR_LINE_DRAW_NOT_RAW_HTTP_OR_LOCAL_ORIGINAL")
             })
+            phase = "real-online-window-neighbors-ready"
+            compose.waitUntil(20_000) {
+                failed(model) || model.state.value.onlineReading?.window?.states?.isNotEmpty() == true &&
+                    model.state.value.onlineReading?.window?.states?.all { it.ready } == true
+            }
+            healthy(model)
+            val window = checkNotNull(model.state.value.onlineReading?.window)
+            assertEquals(opened.identity, model.state.value.onlineReading?.identity)
+            assertEquals(opened.opened.chapter.sessionToken, window.window.sessionToken)
+            assertEquals(opened.opened.sourceVersion, window.window.sourceVersion)
+            assertTrue(window.window.id.isNotBlank()); assertTrue(window.window.catalogRevision.isNotBlank())
+            assertTrue(window.window.preparationRevision == null || window.window.preparationRevision > 0)
+            assertTrue(window.window.neighbors.isNotEmpty())
+            assertTrue(window.states.all { it.ready && it.bodyVersion!!.isNotBlank() && it.processingVersion!!.isNotBlank() })
+            marker("online-window-ready-neighbors", readingBundle(opened).apply {
+                putString("windowId", window.window.id); putString("windowCatalogRevision", window.window.catalogRevision)
+                putString("preparationRevision", window.window.preparationRevision?.toString() ?: "null")
+                putInt("neighborCount", window.window.neighbors.size); putInt("readyNeighborCount", window.states.count { it.ready })
+                putString("neighborOffsets", window.window.neighbors.map { it.offset }.sorted().joinToString(","))
+                putString("readyOffsets", window.states.filter { it.ready }.map { it.neighbor.offset }.sorted().joinToString(","))
+            })
 
             phase = "one-real-native-pan"
             val viewport = viewport(); assertTrue("Actual chapter must have forward native scroll extent", compose.runOnUiThread { checkNotNull(nativeScroll).canScrollVertically(1) })
@@ -335,7 +356,23 @@ class UiRealOnlineReadingJourneyTest {
     private fun catalogOriginal(method: String): JSONObject = compose.runOnUiThread {
         val delegate = field(appOwner, "onlineCatalogService\$delegate") as Lazy<*>
         assertTrue(delegate.isInitialized()); val originals = field(checkNotNull(delegate.value), "originals")!!
-        val calls = field(originals, "calls") as Map<*, *>; assertEquals(1, calls.size); val call = calls.values.single()!!
+        val calls = field(originals, "calls") as Map<*, *>
+        val current = calls.values.singleOrNull()
+        if (current == null || field(current, "method") != method) {
+            val recent = field(originals, "recent") as Map<*, *>
+            val observation = recent[method] as? ReaderOnlineOriginalObservation
+            assertNotNull("No acknowledged recent original for $method", observation)
+            val observed = checkNotNull(observation)
+            assertEquals(method, observed.method); assertEquals(runtime, observed.runtimeSession)
+            assertEquals(key.sourceId, observed.sourceId); assertTrue(observed.requestId != null)
+            val wire = JSONObject(checkNotNull(observed.parsedTerminalJson)); val p = JSONObject(observed.originalParametersJson)
+            assertEquals(key.sourceId, p.getString("sourceId")); assertEquals(key.bookId, p.getString("bookId"))
+            assertEquals(1, wire.getInt("protocolVersion")); assertEquals(observed.requestId, wire.getLong("requestId")); assertEquals("result", wire.getString("type")); assertTrue(wire.getLong("deliveryId") > 0)
+            CoreTerminal.result(method, wire)
+            return@runOnUiThread JSONObject().put("method", method).put("runtimeSession", observed.runtimeSession).put("requestId", observed.requestId)
+                .put("originalParametersJson", observed.originalParametersJson).put("parsedTerminalJson", observed.parsedTerminalJson).put("transportAcknowledged", true)
+        }
+        assertEquals(1, calls.size); val call = checkNotNull(current)
         assertEquals(method, field(call, "method")); assertEquals(runtime, field(call, "runtime")); assertEquals(true, field(call, "transportAcknowledged"))
         val parameters = field(call, "params") as String; val terminal = field(call, "terminal") as String
         val request = field(call, "requestId") as Long; val wire = JSONObject(terminal); val p = JSONObject(parameters)

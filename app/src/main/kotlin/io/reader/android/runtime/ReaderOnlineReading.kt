@@ -149,8 +149,11 @@ internal class ReaderOnlineReading(
         if (entry.optString("kind") != "ready") throw ReaderOnlineEntryUnavailable(key, entry.optString("kind"), entry.optString("reason"))
         if (entry.optBoolean("contentRefreshRequired") || entry.optBoolean("sourceCorrectionRequired"))
             throw ReaderOnlineEntryUnavailable(key, "ready", "explicitContentUpgradeRequired")
-        val progress = request("reading.progress.get", key)
+        // Keep the progress read as the final entry observation. The cache-version
+        // guard still runs in the same acquisition turn, before progress is
+        // admitted, so existing reading receipts retain their stable boundary.
         check(cachedVersion(key, requireCatalog = target != null) == version) { "ONLINE_READING_CACHED_CATALOG_CHANGED" }
+        val progress = request("reading.progress.get", key)
         return retainEntry(lease, ReaderOnlineReadingPolicy.chapter(key, version, entry, progress, target))
     }
     private fun retainEntry(lease: ReaderOperationOwner.ClientLease, opened: ReaderOnlineChapter): ReaderOnlineChapter {
