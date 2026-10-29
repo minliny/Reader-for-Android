@@ -1,9 +1,8 @@
 package io.reader.android
 
-import android.content.Context
 import android.util.Log
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import io.reader.android.runtime.AndroidTextToSpeechEngine
 import io.reader.android.runtime.ReaderTtsPlaybackEngine
 import org.junit.Assert.assertTrue
@@ -23,7 +22,7 @@ class TtsEngineProbeTest {
     fun systemTtsDeliversInitializationCallback() {
         val ready = CountDownLatch(1)
         val success = AtomicBoolean(false)
-        val engine = AndroidTextToSpeechEngine(ApplicationProvider.getApplicationContext<Context>())
+        val engine = AndroidTextToSpeechEngine(InstrumentationRegistry.getInstrumentation().targetContext)
         engine.setListener(object : ReaderTtsPlaybackEngine.Listener {
             override fun onReady(value: Boolean) {
                 success.set(value)
