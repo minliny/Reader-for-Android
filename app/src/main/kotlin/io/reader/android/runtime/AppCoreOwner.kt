@@ -96,6 +96,13 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
     private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal) }
+    private val onlineAddService by lazy {
+        requireHeldLane()
+        ReaderOnlineAdd(serviceTransport, journal, ::requireHeldLane,
+            { lease, preview -> onlineCatalogService.authorizeAdd(lease, preview) },
+            { sourceId -> sourceRulesService.list(sourceId, true) },
+            { check(sourceRulesService.pending().isEmpty() && managementService.pending().isEmpty()) { "SHARED_WRITER_ORIGINAL_PENDING" } })
+    }
     private val onlineCatalogService by lazy {
         requireHeldLane()
         ReaderOnlineCatalog(serviceTransport, { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane)
@@ -111,6 +118,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val management: ReaderBookshelfManagement get() { owner.requireLane(lease); return owner.managementService }
         val sourceRules: ReaderSourceRules get() { owner.requireLane(lease); return owner.sourceRulesService }
         val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
+        val onlineAdds: ReaderOnlineAdd get() { owner.requireLane(lease); return owner.onlineAddService }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {

@@ -23,6 +23,7 @@ internal class ReaderOnlineCatalog(
     private val originals = ReaderOnlineCatalogOriginals(transport, assertHeld)
     private val selections = Collections.newSetFromMap(IdentityHashMap<ReaderOnlineSourceSelection, Boolean>())
     private val searches = linkedMapOf<String, Search>()
+    private var addPreview: Pair<ReaderOnlineDetailPreview, ReaderOnlineSearchSession>? = null
     private var generation = 0L
     private var runtime: String? = null
     private var capabilitiesConfigured = false
@@ -34,6 +35,7 @@ internal class ReaderOnlineCatalog(
         val source = sources(sourceId).single { it.sourceId == sourceId && it.enabled }
         check(source.sourceVersion.isNotBlank()) { "ONLINE_SOURCE_VERSION_REQUIRED" }
         // Selections have no Native resources. Retiring them never mutates an original call or allocates a Native resource.
+        addPreview = null
         selections.clear()
         searches.values.forEach { retire(it) }; searches.clear()
         val selected = ReaderOnlineSourceSelection(source.sourceId, source.sourceVersion, source.name, lease, transport.session)
@@ -45,6 +47,7 @@ internal class ReaderOnlineCatalog(
         selection(lease, source)
         require(keyword.isNotBlank() && keyword.toByteArray(Charsets.UTF_8).size <= 4_096) { "ONLINE_KEYWORD_BUDGET" }
         originals.pending().firstOrNull()?.let { throw ReaderOnlineOriginalPending(it) }
+        addPreview = null
         configureCapabilities()
         searches.values.filter { it.session.source.lease == lease }.forEach { retire(it) }
         searches.entries.removeAll { it.value.closed }
@@ -64,16 +67,23 @@ internal class ReaderOnlineCatalog(
         try {
             val value = originals.request("book.detail", selected.key.sourceId, JSONObject().put("sourceId", selected.key.sourceId)
                 .put("book", JSONObject(selected.originalCoreBookJson)).put("bookUrl", selected.key.bookId))
-            return ReaderOnlineCatalogPolicy.detail(session.source, selected, value)
+            return ReaderOnlineCatalogPolicy.detail(session.source, selected, value).also { addPreview = it to session }
         } catch (error: Exception) { search.failed = true; throw error }
     }
     fun close(session: ReaderOnlineSearchSession) {
         checkLane()
         val search = searches[session.id] ?: return
         check(search.session === session) { "FOREIGN_ONLINE_SEARCH_SESSION" }
+        if (addPreview?.second === session) addPreview = null
         retire(search)
         searches.remove(session.id)
         // There is no Core search cursor/close RPC. Pending original routes/facts are untouched.
+    }
+    fun authorizeAdd(lease: ReaderOperationOwner.ClientLease, preview: ReaderOnlineDetailPreview): ReaderOnlineAddAuthority {
+        val issued = checkNotNull(addPreview) { "ONLINE_ADD_PREVIEW_NOT_ISSUED" }
+        active(lease, issued.second)
+        check(issued.first === preview && preview.contentKind == ReaderOnlineContentKind.TEXT && originals.pending().isEmpty()) { "ONLINE_ADD_PREVIEW_RETIRED" }
+        return ReaderOnlineAddAuthority(preview, lease, transport.session)
     }
     fun pending(): List<ReaderOnlineOriginalObservation> { assertHeld(); return originals.pending() }
     fun observeOriginal(id: String): ReaderOnlineOriginalObservation { assertHeld(); return originals.observe(id) }

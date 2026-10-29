@@ -64,6 +64,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val managementService get() = client.management
     private val sourceRulesService get() = client.sourceRules
     private val onlineCatalog get() = client.onlineCatalog
+    private val onlineAdds get() = client.onlineAdds
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -185,6 +186,15 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.pending() }
     suspend fun observeOnlineOriginal(id: String): ReaderOnlineOriginalObservation =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.observeOriginal(id) }
+
+    suspend fun addOnlinePreview(preview: ReaderOnlineDetailPreview): ReaderOnlineAddResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.begin(client.lease, preview) }
+    suspend fun reconcileOnlineAdd(id: String): ReaderOnlineAddResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.reconcile(id) }
+    suspend fun pendingOnlineAdds(): List<ReaderOnlineAddPending> =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.pending() }
+    suspend fun observeOnlineAddState(id: String): ReaderOnlineAddObservation =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.observe(id) }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }

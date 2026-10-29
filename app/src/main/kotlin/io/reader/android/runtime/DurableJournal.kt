@@ -86,6 +86,32 @@ internal class DurableJournal(private val directory: File) {
         .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
         .distinct().sorted().map { sourceRulesOriginalForQuery(it) ?: error("SOURCE_JOURNAL_MISSING") }
 
+    /** Online-add base query only. A retained .new is flagged, never read/promoted/deleted. */
+    @Synchronized
+    fun onlineAddOriginalForQuery(id: String): ReaderOnlineAddJournalSnapshot? {
+        require(ReaderOnlineAddPolicy.id.matches(id)) { "ONLINE_ADD_JOURNAL_ID" }
+        val active = File(directory, "$id.json")
+        val base = if (active.exists() || File(active.path + ".bak").exists() || File(active.path + ".new").exists()) active
+            else File(File(directory, "Completed"), "$id.json")
+        val retained = File(base.path + ".new").exists()
+        val record = if (retained) {
+            check(base.isFile && !File(base.path + ".bak").exists()) { "ONLINE_ADD_CANDIDATE_BASE_OR_BACKUP_CONFLICT" }
+            ReaderOnlineAddPolicy.parse(readBounded(base, ReaderOnlineAddPolicy.MAX_BYTES))
+        } else {
+            if (!base.exists() && !File(base.path + ".bak").exists()) return null
+            readRecord(base)
+        }
+        ReaderOnlineAddPolicy.record(record)
+        check(record.getString("id") == id) { "ONLINE_ADD_JOURNAL_IDENTITY" }
+        return ReaderOnlineAddJournalSnapshot(record.toString(), retained)
+    }
+    @Synchronized
+    fun onlineAddActiveForQuery(): List<ReaderOnlineAddJournalSnapshot> = directory.listFiles().orEmpty()
+        .filter { it.name.startsWith("android-onlineadd-") &&
+            (it.name.endsWith(".json") || it.name.endsWith(".json.bak") || it.name.endsWith(".json.new")) }
+        .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
+        .distinct().sorted().map { onlineAddOriginalForQuery(it) ?: error("ONLINE_ADD_JOURNAL_MISSING") }
+
     /** Exact read-only source of supported originals; never AtomicFile.openRead or candidate recovery. */
     @Synchronized
     internal fun progressOriginalsForContinuation(root: File, bookId: String): List<ReaderProgressOriginalSnapshot> {
