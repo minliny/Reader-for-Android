@@ -228,7 +228,7 @@ private fun TabAction(label: String, icon: Int, selected: Boolean, enabled: Bool
     val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.widthIn(min = 104.dp).clickable(enabled = enabled, role = Role.Tab, onClick = onClick)
         .padding(horizontal = 16.dp, vertical = 6.dp).testTag(tag), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(painterResource(icon), null, tint = color, modifier = Modifier.size(23.dp))
+        Icon(painterResource(icon), label, tint = color, modifier = Modifier.size(23.dp))
         Text(label, color = color, style = MaterialTheme.typography.labelMedium)
     }
 }

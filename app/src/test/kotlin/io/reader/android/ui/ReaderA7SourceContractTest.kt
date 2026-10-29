@@ -21,6 +21,7 @@ class ReaderA7SourceContractTest {
         assertTrue("enableEdgeToEdge()" in activity)
         assertTrue("Icon(painterResource(R.drawable.reader_back), \"返回\")" in app)
         assertTrue("Icon(painterResource(R.drawable.reader_import), \"导入本地书\")" in app)
+        assertTrue("Icon(painterResource(icon), label," in app)
     }
 
     @Test
