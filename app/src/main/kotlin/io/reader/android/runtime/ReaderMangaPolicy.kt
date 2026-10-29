@@ -14,17 +14,22 @@ internal object ReaderMangaPolicy {
             val url = row.getString("url").also { check(it.isNotBlank()) { "MANGA_PAGE_URL:$index" } }
             val requestRule = row.optionalString("requestRule", "MANGA_REQUEST_RULE:$index")
             val referrer = row.optionalString("referrer", "MANGA_REFERRER:$index")
-            val headers = row.optJSONObject("headers")?.let { headerObject ->
-                val parsed = linkedMapOf<String, String>()
-                val keys = headerObject.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next().also { check(it.isNotBlank()) { "MANGA_HEADER_NAME:$index" } }
-                    val header = headerObject.get(key)
-                    check(header is String && header.isNotBlank()) { "MANGA_HEADER_VALUE:$index" }
-                    parsed[key] = header
+            val headers = when {
+                !row.has("headers") || row.isNull("headers") -> emptyMap()
+                else -> {
+                    val headerObject = row.get("headers") as? JSONObject
+                        ?: error("MANGA_HEADERS_TYPE:$index")
+                    val parsed = linkedMapOf<String, String>()
+                    val keys = headerObject.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next().also { check(it.isNotBlank()) { "MANGA_HEADER_NAME:$index" } }
+                        val header = headerObject.get(key)
+                        check(header is String && header.isNotBlank()) { "MANGA_HEADER_VALUE:$index" }
+                        parsed[key] = header
+                    }
+                    parsed.toMap()
                 }
-                parsed.toMap()
-            } ?: emptyMap()
+            }
             pages += ReaderMangaPage(url, requestRule, referrer, headers)
         }
         return ReaderMangaPagesExtract(

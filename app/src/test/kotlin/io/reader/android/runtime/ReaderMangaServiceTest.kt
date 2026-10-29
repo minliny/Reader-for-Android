@@ -57,6 +57,10 @@ class ReaderMangaServiceTest {
             .put("pages", JSONArray().put(JSONObject().put("url", "https://img.test/1.jpg")
                 .put("headers", JSONObject().put("X-Count", 1))))
         assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(nonStringHeader, chapter) }
+
+        val nonObjectHeaders = JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+            .put("pages", JSONArray().put(JSONObject().put("url", "https://img.test/1.jpg").put("headers", 1)))
+        assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(nonObjectHeaders, chapter) }
     }
 
     @Test
