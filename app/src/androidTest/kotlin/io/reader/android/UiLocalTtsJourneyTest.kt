@@ -33,6 +33,7 @@ class UiLocalTtsJourneyTest {
         scenario = ActivityScenario.launch(MainActivity::class.java)
         val model = activity().readerViewModel
         compose.waitUntil(15_000) { model.state.value.ready && !model.state.value.busy && model.state.value.error == null }
+        Log.i("ReaderTtsProbe", "books=${model.state.value.books.joinToString { it.id }} pending=${model.state.value.pendingPositions.joinToString { it.bookId }}")
         val book = model.state.value.books.single { it.id == bookId }
         assertTrue(book.progressChapter >= 0 && book.progressOffset >= 0)
         scenario!!.onActivity { it.readerViewModel.openBook(book) }
