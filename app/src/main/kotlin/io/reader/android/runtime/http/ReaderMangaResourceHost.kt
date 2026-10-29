@@ -36,6 +36,9 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
             is ReaderCoreEventActor.HostReply.AssetTransfer -> ReaderCoreEventActor.HostReply.Error(
                 "INTERNAL", "MANGA_HTTP_NESTED_ASSET_UNEXPECTED", false,
             )
+            is ReaderCoreEventActor.HostReply.AssetConsume -> ReaderCoreEventActor.HostReply.Error(
+                "INTERNAL", "MANGA_HTTP_NESTED_ASSET_UNEXPECTED", false,
+            )
             is ReaderCoreEventActor.HostReply.Complete -> parseHttpResult(httpReply.resultJson, input.maxBytes)
         }
     }

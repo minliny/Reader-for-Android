@@ -129,6 +129,13 @@ internal class ReaderCoreEventActor(
             val width: Int? = null,
             val height: Int? = null,
         ) : HostReply
+        /** Core-owned asset bytes are read/released by the actor before Host consumption. */
+        data class AssetConsume(
+            val assetId: Long,
+            val operationId: Long,
+            val bytes: Long,
+            val consumer: suspend (ByteArray) -> HostReply,
+        ) : HostReply
     }
     fun interface HostHandler { suspend fun execute(original: HostEnvelope): HostReply }
     data class RequestSummary(val request: PreparedRequest, val phase: Phase, val readRetired: Boolean)
@@ -165,7 +172,8 @@ internal class ReaderCoreEventActor(
         val lateHostDisposition: LateHostDisposition? = null)
     private data class HostKey(val requestId: Long, val operationId: Long)
     private data class HostWork(val envelope: HostEnvelope, val deliveries: MutableList<Long>,
-        var phase: String = "RUNNING", var job: Job? = null, var response: HostReply? = null, var controlId: Long? = null)
+        var phase: String = "RUNNING", var job: Job? = null, var response: HostReply? = null, var controlId: Long? = null,
+        var assetReleasePending: Boolean = false, var assetReleased: Boolean = false)
     // Successful control calls have NO success event. Keep only identity tombstones
     // to route possible late control errors; never expose them as waiting for success.
     private data class Control(val id: Long, val primary: Route, val key: HostKey)
@@ -393,8 +401,7 @@ internal class ReaderCoreEventActor(
     suspend fun supplyOriginalHostResponse(envelope: HostEnvelope, response: HostReply) = call {
         val work = hosts[HostKey(envelope.requestId, envelope.operationId)] ?: error("ORIGINAL_HOST_MISSING")
         check(work.envelope == envelope && work.phase == "AWAITING_OWNER" && work.response == null)
-        work.response = freezeReply(response)
-        sendHostResponse(work)
+        acceptHostResponse(work, freezeReply(response))
     }
 
     /**
@@ -645,11 +652,109 @@ internal class ReaderCoreEventActor(
             work.phase = "AWAITING_OWNER"
             fail("HOST_OUTCOME_UNKNOWN", envelope.requestId, root = error, operationId = envelope.operationId)
         } else {
+            acceptHostResponse(work, response)
+        }
+        notifyChanged()
+    }
+
+    /** Admit a fixed Host reply; AssetConsume first performs its Core-owned read. */
+    private fun acceptHostResponse(work: HostWork, response: HostReply) {
+        if (response !is HostReply.AssetConsume) {
             work.response = response
+            sendHostResponse(work)
+            return
+        }
+        work.response = response
+        val envelope = work.envelope
+        val identityValid = response.operationId == envelope.operationId && response.assetId > 0 &&
+            response.bytes in 1..MAX_ASSET_CONSUME_BYTES
+        if (!identityValid) {
+            work.response = HostReply.Error("INVALID_PARAMS", "MANGA_ASSET_CONSUME_IDENTITY", false)
+            sendHostResponse(work)
+            return
+        }
+        work.assetReleasePending = true
+        try {
+            val encoded = readAsset(envelope, response)
+            startAssetConsumer(work, response, encoded)
+        } catch (_: Throwable) {
+            val releaseError = releaseAsset(work)
+            work.response = if (releaseError != null) {
+                HostReply.Error("INTERNAL", "MANGA_ASSET_RELEASE_FAILED", false)
+            } else {
+                HostReply.Error("INTERNAL", "MANGA_ASSET_CONSUME_FAILED", false)
+            }
+            sendHostResponse(work)
+        }
+    }
+
+    /** Read exactly the declared Core asset and prove EOF before Host work. */
+    private fun readAsset(envelope: HostEnvelope, reply: HostReply.AssetConsume): ByteArray {
+        val output = ByteArray(reply.bytes.toInt())
+        var offset = 0L
+        while (offset < reply.bytes) {
+            val limit = minOf(ASSET_CHUNK_BYTES, (reply.bytes - offset).toInt())
+            val chunk = port.assetReadChunk(envelope.requestId, reply.operationId, reply.assetId, offset, limit)
+            check(chunk.isNotEmpty() && chunk.size <= limit) { "MANGA_ASSET_READ_LENGTH" }
+            chunk.copyInto(output, destinationOffset = offset.toInt())
+            offset += chunk.size
+        }
+        val extra = port.assetReadChunk(envelope.requestId, reply.operationId, reply.assetId, offset, 1)
+        check(extra.isEmpty()) { "MANGA_ASSET_READ_EOF" }
+        return output
+    }
+
+    private fun startAssetConsumer(work: HostWork, reply: HostReply.AssetConsume, encoded: ByteArray) {
+        work.phase = "ASSET_CONSUMING"
+        var response: HostReply? = null
+        var failure: Throwable? = null
+        val job = scope.launch(hostDispatcher, start = CoroutineStart.LAZY) {
+            try { response = reply.consumer(encoded) }
+            catch (error: Throwable) { failure = error }
+        }
+        work.job = job
+        job.invokeOnCompletion { stopped ->
+            scope.launch(hostDispatcher + NonCancellable) {
+                try {
+                    mailbox.send { finishAssetConsumer(work.envelope, response, failure ?: stopped) }
+                } catch (_: Exception) { /* close retains unresolved Host identity */ }
+            }
+        }
+        job.start()
+    }
+
+    /** Return to the actor, release exactly once, then admit complete/error. */
+    private fun finishAssetConsumer(envelope: HostEnvelope, response: HostReply?, error: Throwable?) {
+        val work = hosts[HostKey(envelope.requestId, envelope.operationId)] ?: return
+        check(work.envelope == envelope && work.phase == "ASSET_CONSUMING")
+        work.job = null
+        val releaseError = releaseAsset(work)
+        if (requests[envelope.requestId]?.readRetired == true) {
+            work.phase = "READ_RETIRED"
+            work.deliveries.toList().forEach { frames[it]?.let(::acknowledgeConsumed) }
+        } else {
+            work.phase = "RUNNING"
+            work.response = when {
+                releaseError != null -> HostReply.Error("INTERNAL", "MANGA_ASSET_RELEASE_FAILED", false)
+                error != null || response == null -> HostReply.Error("INTERNAL", "MANGA_ASSET_CONSUME_FAILED", false)
+                else -> runCatching { freezeReply(response) }.getOrElse {
+                    HostReply.Error("INTERNAL", "MANGA_ASSET_CONSUME_FAILED", false)
+                }
+            }
             sendHostResponse(work)
         }
         notifyChanged()
     }
+
+    private fun releaseAsset(work: HostWork): Throwable? {
+        if (!work.assetReleasePending || work.assetReleased) return null
+        work.assetReleased = true
+        val reply = work.response as? HostReply.AssetConsume ?: return null
+        return runCatching {
+            port.assetRelease(work.envelope.requestId, reply.operationId, reply.assetId)
+        }.exceptionOrNull()
+    }
+
     private fun sendHostResponse(work: HostWork) {
         check(work.controlId == null) { "HOST_RESPONSE_ALREADY_DISPATCHED" }
         val original = requests[work.envelope.requestId]?.plan ?: error("ORIGINAL_HOST_REQUEST_OWNER_MISSING")
@@ -672,6 +777,12 @@ internal class ReaderCoreEventActor(
                         .put("retryable", false))
                     "host.error"
                 }
+            }
+            is HostReply.AssetConsume -> {
+                params.put("error", JSONObject().put("code", "INTERNAL")
+                    .put("message", "MANGA_ASSET_CONSUME_NOT_READY")
+                    .put("retryable", false))
+                "host.error"
             }
         }
         try {
@@ -794,9 +905,14 @@ internal class ReaderCoreEventActor(
     private fun finishClose() {
         if (nativeClosed) return
         closing = true
-        val drained = hosts.values.none { it.phase == "RUNNING" }
+        val drained = hosts.values.none { it.phase in setOf("RUNNING", "ASSET_CONSUMING") }
         val retained = snapshotOnActor()
-        hosts.values.forEach { it.job?.cancel() }
+        hosts.values.forEach {
+            it.job?.cancel()
+            // The encoded bytes are already actor-owned; release before native
+            // close so cancellation cannot strand a Core asset.
+            releaseAsset(it)
+        }
         var failure: String? = null
         try { port.close() } catch (error: Throwable) { failure = error.javaClass.simpleName }
         nativeClosed = true
@@ -848,6 +964,15 @@ internal class ReaderCoreEventActor(
                 require(reply.height == null || reply.height > 0) { "MANGA_ASSET_HEIGHT" }
                 reply.copy(chunks = chunks)
             }
+            is HostReply.AssetConsume -> {
+                require(reply.assetId > 0 && reply.operationId > 0 && reply.bytes in 1..MAX_ASSET_CONSUME_BYTES) {
+                    "MANGA_ASSET_CONSUME_IDENTITY"
+                }
+                reply.copy()
+            }
         }
+
+        private const val ASSET_CHUNK_BYTES = 1024 * 1024
+        private const val MAX_ASSET_CONSUME_BYTES = 128L * 1024 * 1024
     }
 }

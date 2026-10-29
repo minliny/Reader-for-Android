@@ -1,6 +1,7 @@
 package io.reader.android.runtime
 
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -10,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
+import java.util.concurrent.CancellationException
 
 class ReaderCoreEventActorAssetTransferTest {
     private class Port : ReaderCoreEventActor.RuntimePort {
@@ -17,6 +19,8 @@ class ReaderCoreEventActorAssetTransferTest {
         val events = ConcurrentLinkedQueue<String>()
         val begins = ConcurrentLinkedQueue<Triple<Long, Long, Long>>()
         val writes = ConcurrentLinkedQueue<ByteArray>()
+        val reads = ConcurrentLinkedQueue<Triple<Long, Int, Long>>()
+        val readReplies = ConcurrentLinkedQueue<ByteArray>()
         val releases = ConcurrentLinkedQueue<Long>()
         var failCommit = false
         override fun deliveryCapabilities() = 1
@@ -37,15 +41,18 @@ class ReaderCoreEventActorAssetTransferTest {
             if (failCommit) error("COMMIT_FAILED")
             return writes.sumOf { it.size }.toLong()
         }
-        override fun assetReadChunk(requestId: Long, operationId: Long, assetId: Long, offset: Long, limit: Int) = byteArrayOf()
+        override fun assetReadChunk(requestId: Long, operationId: Long, assetId: Long, offset: Long, limit: Int): ByteArray {
+            reads.add(Triple(offset, limit, assetId))
+            return readReplies.poll()?.copyOf() ?: byteArrayOf()
+        }
         override fun assetRelease(requestId: Long, operationId: Long, assetId: Long) { releases.add(assetId) }
         override fun close() = Unit
     }
 
-    private fun hostRequest(requestId: Long, deliveryId: Long, operationId: Long) = JSONObject()
+    private fun hostRequest(requestId: Long, deliveryId: Long, operationId: Long, stage: String = "input") = JSONObject()
         .put("protocolVersion", 1).put("requestId", requestId).put("deliveryId", deliveryId)
         .put("type", "host.request").put("operationId", operationId)
-        .put("capability", "manga.resource.transfer").put("params", JSONObject().put("stage", "input"))
+        .put("capability", "manga.resource.transfer").put("params", JSONObject().put("stage", stage))
         .toString()
 
     @Test fun actorTransfersAssetOnOwnerThreadAndCompletesWithOpaqueReceipt() = runBlocking {
@@ -105,6 +112,114 @@ class ReaderCoreEventActorAssetTransferTest {
             assertEquals("MANGA_ASSET_TRANSFER_FAILED", command.getJSONObject("params")
                 .getJSONObject("error").getString("message"))
             assertEquals(listOf(99L), port.releases.toList())
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
+            dispatcher.close(); executor.shutdownNow()
+        }
+    }
+
+    @Test fun actorReadsExactAssetOnOwnerThenConsumesAndReleasesOnce() = runBlocking {
+        val port = Port().also {
+            it.readReplies.add(byteArrayOf(1, 2)); it.readReplies.add(byteArrayOf(3, 4));
+            it.readReplies.add(byteArrayOf(5)); it.readReplies.add(byteArrayOf())
+        }
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "asset-owner") }
+        val dispatcher = executor.asCoroutineDispatcher()
+        val consumed = CompletableDeferred<List<Byte>>()
+        val actor = ReaderCoreEventActor(port, dispatcher,
+            hostHandler = ReaderCoreEventActor.HostHandler {
+                ReaderCoreEventActor.HostReply.AssetConsume(99L, 77L, 5L) { bytes ->
+                    consumed.complete(bytes.toList())
+                    ReaderCoreEventActor.HostReply.Complete("{}")
+                }
+            }, pollIntervalMs = 1)
+        try {
+            actor.awaitReady()
+            val plan = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.DURABLE_WRITE)
+            actor.dispatch(plan) {}
+            port.events.add(hostRequest(plan.requestId, 41, 77, stage = "output"))
+            withTimeout(3_000) {
+                while (actor.snapshot().hostOperations.firstOrNull { it.envelope.operationId == 77L }?.phase != "RESPONSE_ACCEPTED_NO_SUCCESS_EVENT") {
+                    actor.changes.receive()
+                }
+            }
+            assertEquals(listOf<Byte>(1, 2, 3, 4, 5), consumed.await())
+            assertEquals(listOf(Triple(0L, 5, 99L), Triple(2L, 3, 99L),
+                Triple(4L, 1, 99L), Triple(5L, 1, 99L)), port.reads.toList())
+            assertEquals(listOf(99L), port.releases.toList())
+            assertEquals("host.complete", port.commands.first { it.optString("method") == "host.complete" }.getString("method"))
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
+            dispatcher.close(); executor.shutdownNow()
+        }
+    }
+
+    @Test fun actorRejectsNonEofAssetAndReleasesExactlyOnce() = runBlocking {
+        val port = Port().also { it.readReplies.add(byteArrayOf(1, 2, 3)); it.readReplies.add(byteArrayOf(4)) }
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "asset-owner") }
+        val dispatcher = executor.asCoroutineDispatcher()
+        var consumerCalled = false
+        val actor = ReaderCoreEventActor(port, dispatcher,
+            hostHandler = ReaderCoreEventActor.HostHandler {
+                ReaderCoreEventActor.HostReply.AssetConsume(99L, 77L, 3L) {
+                    consumerCalled = true
+                    ReaderCoreEventActor.HostReply.Complete("{}")
+                }
+            }, pollIntervalMs = 1)
+        try {
+            actor.awaitReady()
+            val plan = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.DURABLE_WRITE)
+            actor.dispatch(plan) {}
+            port.events.add(hostRequest(plan.requestId, 42, 77, stage = "output"))
+            withTimeout(3_000) {
+                while (port.commands.none { it.optString("method") == "host.error" }) actor.changes.receive()
+            }
+            val command = port.commands.first { it.optString("method") == "host.error" }
+            assertEquals("MANGA_ASSET_CONSUME_FAILED", command.getJSONObject("params").getJSONObject("error").getString("message"))
+            assertEquals(false, consumerCalled)
+            assertEquals(listOf(99L), port.releases.toList())
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
+            dispatcher.close(); executor.shutdownNow()
+        }
+    }
+
+    @Test fun actorReleasesAfterConsumerFailureAndCancellation() = runBlocking {
+        val port = Port().also {
+            it.readReplies.add(byteArrayOf(1, 2)); it.readReplies.add(byteArrayOf());
+            it.readReplies.add(byteArrayOf(3, 4)); it.readReplies.add(byteArrayOf())
+        }
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "asset-owner") }
+        val dispatcher = executor.asCoroutineDispatcher()
+        val outcomes = ConcurrentLinkedQueue<String>()
+        val actor = ReaderCoreEventActor(port, dispatcher,
+            hostHandler = ReaderCoreEventActor.HostHandler {
+                val operation = it.operationId
+                ReaderCoreEventActor.HostReply.AssetConsume(99L, operation, 2L) {
+                    if (operation == 77L) throw IllegalStateException("decode failed")
+                    throw CancellationException("decode cancelled")
+                }
+            }, pollIntervalMs = 1)
+        try {
+            actor.awaitReady()
+            val first = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.DURABLE_WRITE)
+            actor.dispatch(first) {}
+            port.events.add(hostRequest(first.requestId, 43, 77, stage = "output"))
+            withTimeout(3_000) {
+                while (port.commands.count { it.optString("method") == "host.error" } < 1) actor.changes.receive()
+            }
+            outcomes.add(port.commands.first { it.optString("method") == "host.error" }
+                .getJSONObject("params").getJSONObject("error").getString("message"))
+            val second = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.DURABLE_WRITE)
+            actor.dispatch(second) {}
+            port.events.add(hostRequest(second.requestId, 44, 78, stage = "output"))
+            withTimeout(3_000) {
+                while (port.commands.count { it.optString("method") == "host.error" } < 2) actor.changes.receive()
+            }
+            outcomes.add(port.commands.last { it.optString("method") == "host.error" }
+                .getJSONObject("params").getJSONObject("error").getString("message"))
+            assertEquals(listOf("MANGA_ASSET_CONSUME_FAILED", "MANGA_ASSET_CONSUME_FAILED"), outcomes.toList())
+            assertEquals(listOf(99L, 99L), port.releases.toList())
         } finally {
             withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
             dispatcher.close(); executor.shutdownNow()
