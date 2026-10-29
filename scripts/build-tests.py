@@ -27,6 +27,8 @@ def main():
     parser.add_argument("--host-manifest", required=True)
     parser.add_argument("--rationale", required=True)
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--allow-dependency-download", action="store_true",
+                        help="Allow required Runner dependency resolution; offline remains the default")
     args = parser.parse_args()
     if not args.rationale.strip() or not 1 <= args.timeout <= 900:
         parser.error("A concrete rationale and a 1..900 second deadline are required")
@@ -35,6 +37,7 @@ def main():
     result = {"schemaVersion": 1, "startedAt": utc_now(), "result": "FAIL",
               "rationale": args.rationale, "sourceIdentity": git_identity(),
               "execution": "NOT_RUN", "deviceActions": 0, "automaticRetries": 0,
+              "dependencyResolution": "online" if args.allow_dependency_download else "offline",
               "coreRebuilds": 0, "gradleCache": str(Path(os.environ.get("GRADLE_USER_HOME", "~/.gradle")).expanduser())}
     try:
         host_path = Path(args.host_manifest).resolve()
@@ -61,7 +64,8 @@ def main():
             raise RuntimeError("node and nice are required for the shared build lease")
         command = [nice, "-n", "15", node, str(ROOT / "scripts/build-lease.mjs"),
                    "--module", str(source / "scripts/lib/build-resource-lock.mjs"), "--",
-                   str(ROOT / "gradlew"), "--no-daemon", "--offline", "--max-workers=1",
+                   str(ROOT / "gradlew"), "--no-daemon",
+                   *([] if args.allow_dependency_download else ["--offline"]), "--max-workers=1",
                    "--console=plain", ":app:assembleDebugAndroidTest"]
         result["command"] = command
         write_json(run / "plan.json", result)
