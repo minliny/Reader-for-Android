@@ -62,6 +62,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val transport: CoreTransport = client.transport
     private val bookmarkService get() = client.bookmarks
     private val managementService get() = client.management
+    private val sourceRulesService get() = client.sourceRules
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -157,6 +158,15 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     private fun retirePreparedEbook() { ebookRender.getAndSet(null)?.publication?.retire() }
+
+    suspend fun sources(sourceId: String? = null, enabledOnly: Boolean? = null): List<ReaderSourceEntry> =
+        onIO(WholeTurnMode.OBSERVER_READ) { sourceRulesService.list(sourceId, enabledOnly) }
+    suspend fun pendingSourceImports(): List<PendingSourceImport> =
+        onIO(WholeTurnMode.OBSERVER_READ) { sourceRulesService.pending() }
+    suspend fun importSourceJson(sourceId: String, originalBookSourceJson: String): SourceImportResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.importJson(sourceId, originalBookSourceJson) }
+    suspend fun reconcileSourceImport(operationId: String): SourceImportResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.reconcile(operationId) }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }

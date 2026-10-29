@@ -96,7 +96,7 @@ internal fun <T> blockingObserverRequest(observer: ReaderReadObservers.ReadObser
 internal fun actorKindForObserver(observer: ReaderReadObservers.ReadObserver?, method: String, hasOriginalSink: Boolean): ReaderCoreEventActor.Kind {
     if (observer == null) return ReaderCoreEventActor.Kind.DURABLE_WRITE // Entire retained business turn, including read prelude.
     observer.ensureActive()
-    check(!hasOriginalSink && method in setOf("bookshelf.list", "bookshelf.get", "reading.progress.get", "local_book.toc", "bookmark.list", "book-group.list")) {
+    check(!hasOriginalSink && method in setOf("bookshelf.list", "bookshelf.get", "reading.progress.get", "local_book.toc", "bookmark.list", "book-group.list", "source.list")) {
         "NON_PURE_REQUEST_IN_OBSERVER_READ_TURN"
     }
     return ReaderCoreEventActor.Kind.READ_ONLY

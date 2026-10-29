@@ -57,6 +57,35 @@ internal class DurableJournal(private val directory: File) {
             .also { check(it.getInt("journalSchema") == 1 && it.getString("id") == id) { "ORIGINAL_JOURNAL_IDENTITY" } }
     }
 
+    /** Query-only A4 source intent access. A retained .new is never opened by AtomicFile or promoted.
+     * Unlike progressCandidateForReconcile this returns NO candidate terminal or completion authority. */
+    @Synchronized
+    fun sourceRulesOriginalForQuery(id: String): SourceRulesJournalOriginal? {
+        require(id.matches(Regex("android-source-[a-fA-F0-9-]{36}"))) { "SOURCE_JOURNAL_ID" }
+        val active = File(directory, "$id.json")
+        val base = if (active.exists() || File(active.path + ".bak").exists() || File(active.path + ".new").exists()) active
+            else File(File(directory, "Completed"), "$id.json")
+        val retained = File(base.path + ".new").exists()
+        val record = if (retained) {
+            check(base.isFile && !File(base.path + ".bak").exists()) { "SOURCE_CANDIDATE_BASE_OR_BACKUP_CONFLICT_RETAINED" }
+            // Only the committed base is decoded. All candidate bytes remain untouched and untrusted.
+            SourceRulesReceiptPolicy.decodeRecord(readBounded(base, SourceRulesReceiptPolicy.MAX_RECORD_BYTES))
+        } else {
+            if (!base.exists() && !File(base.path + ".bak").exists()) return null
+            readRecord(base)
+        }
+        SourceRulesReceiptPolicy.parameters(record)
+        check(record.getString("id") == id) { "SOURCE_JOURNAL_IDENTITY" }
+        return SourceRulesJournalOriginal(record.toString(), retained)
+    }
+
+    @Synchronized
+    fun sourceRulesActiveForQuery(): List<SourceRulesJournalOriginal> = directory.listFiles().orEmpty()
+        .filter { it.name.startsWith("android-source-") &&
+            (it.name.endsWith(".json") || it.name.endsWith(".json.bak") || it.name.endsWith(".json.new")) }
+        .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
+        .distinct().sorted().map { sourceRulesOriginalForQuery(it) ?: error("SOURCE_JOURNAL_MISSING") }
+
     /** Only explicit original-progress reconcile uses this. Ordinary reads still return base pending. */
     @Synchronized
     fun progressCandidateForReconcile(id: String, bookId: String): JSONObject? {
