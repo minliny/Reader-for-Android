@@ -118,7 +118,16 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     }
     private val onlineCatalogService by lazy {
         requireHeldLane()
-        ReaderOnlineCatalog(serviceTransport, { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane)
+        ReaderOnlineCatalog(serviceTransport, { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane, ::beforeOnlineCatalogStage)
+    }
+
+    /** Catalog reads share the writer-original barrier with add/reading lanes. A stale
+     * source list or remote search must never bypass an unresolved mutation elsewhere. */
+    private fun beforeOnlineCatalogStage() {
+        requireHeldLane()
+        check(sourceRulesService.pending().isEmpty() && onlineAddService.pending().isEmpty() && managementService.pending().isEmpty()) {
+            "SHARED_WRITER_ORIGINAL_PENDING"
+        }
     }
 
     private val onlineReadingService by lazy {

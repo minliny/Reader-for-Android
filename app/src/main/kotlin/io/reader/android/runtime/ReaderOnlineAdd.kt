@@ -23,8 +23,12 @@ internal class ReaderOnlineAdd(
         check(preview.key.sourceId != "local" && preview.title.isNotBlank()) { "ONLINE_TEXT_PREVIEW_REQUIRED" }
         val raw = JSONObject(preview.originalResultJson)
         check(raw.getString("sourceId") == preview.key.sourceId && raw.getJSONObject("book").getString("bookId") == preview.key.bookId) { "ONLINE_ADD_PREVIEW_SCOPE" }
-        check(ReaderOnlineAddPolicy.sourceVersion(raw, preview.sourceVersion) == preview.sourceVersion &&
-            (ReaderOnlineCatalogPolicy.optional(raw, "contentKind") ?: "text") == "text")
+        val rawKind = when {
+            !raw.has("contentKind") -> "text"
+            raw.isNull("contentKind") -> null
+            else -> raw.getString("contentKind")
+        }
+        check(ReaderOnlineAddPolicy.sourceVersion(raw, preview.sourceVersion) == preview.sourceVersion && rawKind == "text")
         val add = JSONObject().put("sourceId", preview.key.sourceId).put("bookId", preview.key.bookId)
             .put("title", preview.title).put("author", preview.author).put("requireReadable", true).put("sortIndex", 0)
         listOf("coverUrl" to preview.coverUrl, "intro" to preview.intro, "kind" to preview.kind, "lastChapter" to preview.lastChapter)

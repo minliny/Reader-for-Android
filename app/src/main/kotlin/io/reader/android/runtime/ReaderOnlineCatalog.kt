@@ -11,6 +11,7 @@ internal class ReaderOnlineCatalog(
     private val transport: CoreTransport,
     private val sources: (String) -> List<ReaderSourceEntry>,
     private val assertHeld: () -> Unit,
+    private val beforeNewStage: () -> Unit = {},
 ) {
     private class Search(val session: ReaderOnlineSearchSession) {
         var closed = false
@@ -20,7 +21,7 @@ internal class ReaderOnlineCatalog(
         var retainedCandidateBytes = 0L
         val issued = Collections.newSetFromMap(IdentityHashMap<ReaderOnlineBook, Boolean>())
     }
-    private val originals = ReaderOnlineCatalogOriginals(transport, assertHeld)
+    private val originals = ReaderOnlineCatalogOriginals(transport, assertHeld, beforeNewStage)
     private val selections = Collections.newSetFromMap(IdentityHashMap<ReaderOnlineSourceSelection, Boolean>())
     private val searches = linkedMapOf<String, Search>()
     private var addPreview: Pair<ReaderOnlineDetailPreview, ReaderOnlineSearchSession>? = null
@@ -30,6 +31,7 @@ internal class ReaderOnlineCatalog(
 
     fun select(lease: ReaderOperationOwner.ClientLease, sourceId: String): ReaderOnlineSourceSelection {
         checkLane()
+        beforeNewStage()
         require(sourceId.isNotBlank() && sourceId != "local") { "ONLINE_STORED_SOURCE_REQUIRED" }
         originals.pending().firstOrNull()?.let { throw ReaderOnlineOriginalPending(it) }
         val source = sources(sourceId).single { it.sourceId == sourceId && it.enabled }

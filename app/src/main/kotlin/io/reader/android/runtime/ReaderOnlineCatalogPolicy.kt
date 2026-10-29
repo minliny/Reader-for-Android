@@ -10,20 +10,25 @@ internal object ReaderOnlineCatalogPolicy {
     fun string(value: JSONObject, name: String): String = value.get(name) as? String ?: error("ONLINE_STRING:$name")
     fun optional(value: JSONObject, name: String): String? =
         if (!value.has(name) || value.isNull(name)) null else string(value, name)
-    fun kind(value: JSONObject): ReaderOnlineContentKind = when (optional(value, "contentKind")) {
-        "text" -> ReaderOnlineContentKind.TEXT
-        "manga" -> ReaderOnlineContentKind.MANGA
-        "audio" -> ReaderOnlineContentKind.AUDIO
-        // Core's text DTO keeps contentKind optional for legacy/text sources. Harmony
-        // admits an absent/null kind as text while still rejecting explicit non-text kinds.
-        null -> ReaderOnlineContentKind.TEXT
-        else -> error("ONLINE_CONTENT_KIND")
+    fun kind(value: JSONObject): ReaderOnlineContentKind {
+        if (!value.has("contentKind")) return ReaderOnlineContentKind.TEXT
+        if (value.isNull("contentKind")) return ReaderOnlineContentKind.UNKNOWN
+        return when (string(value, "contentKind")) {
+            "text" -> ReaderOnlineContentKind.TEXT
+            "manga" -> ReaderOnlineContentKind.MANGA
+            "audio" -> ReaderOnlineContentKind.AUDIO
+            else -> error("ONLINE_CONTENT_KIND")
+        }
     }
     fun json(value: JSONObject): String = value.toString().also {
         check(it.toByteArray(Charsets.UTF_8).size <= MAX_JSON_BYTES) { "ONLINE_RESULT_BYTE_BUDGET" }
     }
     fun scope(value: JSONObject, source: ReaderOnlineSourceSelection) {
-        val returnedVersion = optional(value, "sourceVersion")
+        val returnedVersion = when {
+            !value.has("sourceVersion") -> null
+            value.isNull("sourceVersion") -> error("ONLINE_SOURCE_VERSION_CHANGED")
+            else -> string(value, "sourceVersion")
+        }
         check(string(value, "sourceId") == source.sourceId && (returnedVersion == null || returnedVersion == source.sourceVersion)) {
             "ONLINE_SOURCE_VERSION_CHANGED"
         }
@@ -41,7 +46,9 @@ internal object ReaderOnlineCatalogPolicy {
                 optional(row, "coverUrl"), optional(row, "intro"), json(row))
         }
         // Preserve Core order, duplicates and all extra candidate fields. No Host deduplication/sort.
-        return ReaderOnlineSearchPage(session, page, Collections.unmodifiableList(result), kind(value),
+        val contentKind = kind(value)
+        check(contentKind != ReaderOnlineContentKind.UNKNOWN) { "ONLINE_CONTENT_KIND" }
+        return ReaderOnlineSearchPage(session, page, Collections.unmodifiableList(result), contentKind,
             if (result.isEmpty()) false else null, json(value))
     }
     fun detail(source: ReaderOnlineSourceSelection, selected: ReaderOnlineBook, value: JSONObject): ReaderOnlineDetailPreview {

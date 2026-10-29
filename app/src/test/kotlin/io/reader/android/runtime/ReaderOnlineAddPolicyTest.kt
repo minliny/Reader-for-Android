@@ -52,6 +52,14 @@ class ReaderOnlineAddPolicyTest {
         assertThrows(IllegalStateException::class.java) {
             ReaderOnlineAddPolicy.record(JSONObject(parent.toString()).put("previewJson", foreign.toString()))
         }
+        val nullVersion = JSONObject(preview.toString()).put("sourceVersion", JSONObject.NULL)
+        assertThrows(IllegalStateException::class.java) {
+            ReaderOnlineAddPolicy.record(JSONObject(parent.toString()).put("previewJson", nullVersion.toString()))
+        }
+        val nullKind = JSONObject(preview.toString()).put("contentKind", JSONObject.NULL)
+        assertThrows(IllegalStateException::class.java) {
+            ReaderOnlineAddPolicy.record(JSONObject(parent.toString()).put("previewJson", nullKind.toString()))
+        }
     }
 
     @Test fun omittedReadableIndexesAdmitAllTocEntriesAndForeignExplicitIndexesFail() {

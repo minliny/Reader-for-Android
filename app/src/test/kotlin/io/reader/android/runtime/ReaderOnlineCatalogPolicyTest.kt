@@ -26,12 +26,18 @@ class ReaderOnlineCatalogPolicyTest {
             .put("contentKind", JSONObject.NULL).put("book", JSONObject().put("bookId", raw.getString("bookId"))
                 .put("title", "detail").put("author", "author")).put("variables", JSONObject().put("token", "original"))
         val preview = ReaderOnlineCatalogPolicy.detail(selected, result.books.single(), detail)
-        assertEquals(ReaderOnlineContentKind.TEXT, preview.contentKind)
+        assertEquals(ReaderOnlineContentKind.UNKNOWN, preview.contentKind)
         val legacyPage = JSONObject(page(selected, JSONArray().put(raw)).toString()).also { it.remove("sourceVersion") }
         assertEquals(ReaderOnlineContentKind.TEXT, ReaderOnlineCatalogPolicy.page(session, 1, legacyPage).contentKind)
-        val legacyDetail = JSONObject(detail.toString()).also { it.remove("sourceVersion") }
-        assertEquals(selected.sourceVersion, ReaderOnlineCatalogPolicy.detail(selected, result.books.single(), legacyDetail).sourceVersion)
+        val legacyDetail = JSONObject(detail.toString()).also { it.remove("sourceVersion"); it.remove("contentKind") }
+        assertEquals(ReaderOnlineContentKind.TEXT, ReaderOnlineCatalogPolicy.detail(selected, result.books.single(), legacyDetail).contentKind)
         assertEquals(mapOf("token" to "original"), preview.variables)
+        assertThrows(IllegalStateException::class.java) {
+            ReaderOnlineCatalogPolicy.page(session, 1, JSONObject(page(selected, JSONArray()).toString()).put("contentKind", JSONObject.NULL))
+        }
+        assertThrows(IllegalStateException::class.java) {
+            ReaderOnlineCatalogPolicy.page(session, 1, JSONObject(page(selected, JSONArray()).toString()).put("sourceVersion", JSONObject.NULL))
+        }
         assertThrows(IllegalStateException::class.java) {
             ReaderOnlineCatalogPolicy.page(session, 1, page(selected, JSONArray()).put("sourceVersion", "changed"))
         }
@@ -74,5 +80,32 @@ class ReaderOnlineCatalogPolicyTest {
         assertEquals(pending, service.observeOriginal(pending.id))
         assertThrows(ReaderOnlineOriginalPending::class.java) { service.start(lease, selection, "third") }
         assertEquals(sent, methods) // No Core close, retry, query-with-new-ID, shelf write or progress command.
+    }
+
+    @Test fun sharedWriterPendingBlocksCatalogBeforeAnyNewCoreDispatch() {
+        val methods = mutableListOf<String>()
+        var sharedWriterPending = false
+        val port = object : CoreTransport {
+            override val session = "runtime-a"
+            override fun request(method: String, parameters: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
+                terminal: ((JSONObject) -> Unit)?): JSONObject {
+                methods += method
+                val id = methods.size.toLong(); beforeSend(id)
+                val data = if (method == "runtime.setHostCapabilities") JSONObject().put("applied", true).put("capabilities", 1).put("lanes", 0)
+                    else page(source(), JSONArray())
+                terminal?.invoke(JSONObject().put("protocolVersion", 1).put("requestId", id).put("type", "result").put("data", data))
+                return data
+            }
+            override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = error("NO_NEW_DRAIN")
+            override fun close() = error("NO_NATIVE_CLOSE")
+        }
+        val service = ReaderOnlineCatalog(port,
+            { id -> listOf(ReaderSourceEntry(id, "source", "", true, false, "version-a", null)) },
+            {}, { check(!sharedWriterPending) { "SHARED_WRITER_ORIGINAL_PENDING" } })
+        val selection = service.select(lease, source().sourceId)
+        val before = methods.toList()
+        sharedWriterPending = true
+        assertThrows(IllegalStateException::class.java) { service.start(lease, selection, "blocked") }
+        assertEquals(before, methods)
     }
 }

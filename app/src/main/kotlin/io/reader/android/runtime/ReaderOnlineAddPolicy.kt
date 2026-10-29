@@ -30,8 +30,16 @@ internal object ReaderOnlineAddPolicy {
         } else {
             check(Regex(PARENT).matches(value.getString("id")))
             val preview = JSONObject(value.getString("previewJson")); val add = JSONObject(value.getString("pendingAddJson"))
-            val previewVersion = ReaderOnlineCatalogPolicy.optional(preview, "sourceVersion") ?: value.getString("sourceVersion")
-            val previewKind = ReaderOnlineCatalogPolicy.optional(preview, "contentKind") ?: "text"
+            val previewVersion = when {
+                !preview.has("sourceVersion") -> value.getString("sourceVersion")
+                preview.isNull("sourceVersion") -> null
+                else -> preview.getString("sourceVersion")
+            }
+            val previewKind = when {
+                !preview.has("contentKind") -> "text"
+                preview.isNull("contentKind") -> null
+                else -> preview.getString("contentKind")
+            }
             check(preview.getString("sourceId") == value.getString("sourceId") && previewVersion == value.getString("sourceVersion") &&
                 previewKind == "text" && key(add) == key(value) && add.get("requireReadable") == true &&
                 preview.getJSONObject("book").getString("bookId") == value.getString("bookId") &&
@@ -42,7 +50,11 @@ internal object ReaderOnlineAddPolicy {
     fun key(row: JSONObject) = ShelfBookKey(row.getString("sourceId"), row.getString("bookId"))
     fun scope(row: JSONObject, key: ShelfBookKey) { check(this.key(row) == key) { "ONLINE_ADD_SCOPE" } }
     fun sourceVersion(value: JSONObject, expected: String): String {
-        val returned = ReaderOnlineCatalogPolicy.optional(value, "sourceVersion")
+        val returned = when {
+            !value.has("sourceVersion") -> null
+            value.isNull("sourceVersion") -> error("ONLINE_SOURCE_VERSION_CHANGED")
+            else -> ReaderOnlineCatalogPolicy.string(value, "sourceVersion")
+        }
         check(returned == null || returned == expected) { "ONLINE_SOURCE_VERSION_CHANGED" }
         return returned ?: expected
     }

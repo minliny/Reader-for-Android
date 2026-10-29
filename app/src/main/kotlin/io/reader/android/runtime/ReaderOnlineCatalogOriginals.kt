@@ -4,7 +4,11 @@ import org.json.JSONObject
 import java.util.UUID
 
 /** App gate-confined warm facts. Does not own Native, poll, ACK, journal or replay. */
-internal class ReaderOnlineCatalogOriginals(private val transport: CoreTransport, private val assertHeld: () -> Unit) {
+internal class ReaderOnlineCatalogOriginals(
+    private val transport: CoreTransport,
+    private val assertHeld: () -> Unit,
+    private val beforeNewStage: () -> Unit = {},
+) {
     private class Call(val id: String, val method: String, val sourceId: String, val runtime: String, val params: String) {
         var requestId: Long? = null
         var terminal: String? = null
@@ -33,6 +37,7 @@ internal class ReaderOnlineCatalogOriginals(private val transport: CoreTransport
         assertHeld()
         check(method in setOf("runtime.setHostCapabilities", "book.search", "book.detail") || method in ReaderOnlineReadingPolicy.METHODS) { "ONLINE_METHOD_NOT_ADMITTED" }
         pending().firstOrNull()?.let { throw ReaderOnlineOriginalPending(it) }
+        beforeNewStage()
         // Retain all unresolved records; discard only acknowledged observational history before admitting more.
         while (calls.isNotEmpty()) {
             val key = calls.entries.firstOrNull { it.value.transportAcknowledged }?.key ?: error("ONLINE_ORIGINAL_CAPACITY")
