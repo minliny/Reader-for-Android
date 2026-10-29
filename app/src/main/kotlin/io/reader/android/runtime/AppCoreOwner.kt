@@ -97,6 +97,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
     private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal, ::clearSourceHostSession) }
+    private val ttsService by lazy { requireHeldLane(); ReaderTtsService(serviceTransport) }
     /** No Core RPC. No old Native worker join claim. Old late Host frames remain actor-owned/quarantined. */
     private fun clearSourceHostSession(sourceId: String): SourceHostCleanupFact {
         requireHeldLane()
@@ -150,6 +151,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val onlineReading: ReaderOnlineReading get() { owner.requireLane(lease); return owner.onlineReadingService }
         val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
         val onlineAdds: ReaderOnlineAdd get() { owner.requireLane(lease); return owner.onlineAddService }
+        val tts: ReaderTtsService get() { owner.requireLane(lease); return owner.ttsService }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {

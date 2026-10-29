@@ -73,6 +73,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val onlineCatalog get() = client.onlineCatalog
     private val onlineAdds get() = client.onlineAdds
     private val onlineReading get() = client.onlineReading
+    private val tts get() = client.tts
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -247,6 +248,18 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.pending() }
     suspend fun observeOnlineAddState(id: String): ReaderOnlineAddObservation =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineAdds.observe(id) }
+
+    /** Core TTS plan only; Android speech output is intentionally host-owned and not started here. */
+    suspend fun ttsSlice(chapter: ReaderTtsChapterRef, content: String,
+        strategy: ReaderTtsSlicingStrategy = ReaderTtsSlicingStrategy.PARAGRAPH): ReaderTtsSlicePlan =
+        onIO(WholeTurnMode.OBSERVER_READ) { tts.slice(chapter, content, strategy) }
+
+    suspend fun ttsQueueStatus(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
+        onIO(WholeTurnMode.OBSERVER_READ) { tts.queueStatus(chapter) }
+
+    suspend fun ttsChapterPlan(chapter: ReaderTtsChapterRef, next: ReaderTtsChapterRef? = null,
+        drainBehavior: ReaderTtsDrainBehavior = ReaderTtsDrainBehavior.STOP_ON_BOUNDARY): ReaderTtsChapterTransition =
+        onIO(WholeTurnMode.OBSERVER_READ) { tts.chapterPlan(chapter, next, drainBehavior) }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }

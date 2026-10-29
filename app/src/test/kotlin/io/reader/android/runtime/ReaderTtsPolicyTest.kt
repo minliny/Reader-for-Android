@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import org.json.JSONException
 
 /** Protocol-only TTS DTO admission. No Android speech engine, Core or device is used. */
 class ReaderTtsPolicyTest {
@@ -89,5 +90,39 @@ class ReaderTtsPolicyTest {
         val bad = JSONObject().put("transition", JSONObject().put("current", chapterJson())
             .put("next", chapterJson(backward)))
         assertThrows(IllegalStateException::class.java) { ReaderTtsPolicy.transition(bad, chapter) }
+    }
+
+    @Test
+    fun serviceBindsCoreMethodsToExactChapterAndDoesNotCreateSpeechSideEffects() {
+        val methods = mutableListOf<String>()
+        val port = object : CoreTransport {
+            override val session = "tts-runtime"
+            override fun request(method: String, parameters: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
+                terminal: ((JSONObject) -> Unit)?): JSONObject {
+                methods += method
+                when (method) {
+                    "tts.slice" -> {
+                        assertEquals("local", parameters.getJSONObject("chapter").getString("sourceId"))
+                        assertEquals(3, parameters.getJSONObject("chapter").getInt("chapterIndex"))
+                        return JSONObject().put("plan", JSONObject().put("chapter", chapterJson(ReaderTtsChapterRef("local", "book-a", 3)))
+                            .put("sourceCharCount", 2).put("slices", JSONArray().put(JSONObject()
+                                .put("index", 0).put("text", "正文").put("charStart", 0).put("charEnd", 2).put("paragraphIndex", 0))))
+                    }
+                    "tts.queue.status" -> return JSONObject().put("snapshot", JSONObject().put("chapter", chapterJson())
+                        .put("state", "idle").put("totalSlices", 0).put("completedSlices", 0))
+                    "tts.chapter.plan" -> return JSONObject().put("transition", JSONObject().put("current", chapterJson())
+                        .put("next", JSONObject.NULL).put("drainBehavior", "stop-on-boundary"))
+                    else -> throw JSONException("unexpected method")
+                }
+            }
+            override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = error("NO_DRAIN")
+            override fun close() = Unit
+        }
+        val service = ReaderTtsService(port)
+        val local = ReaderChapter("book-a", 3, "第四章", "正文", "body", "processing")
+        assertEquals(1, service.slice(local).slices.size)
+        assertEquals(ReaderTtsQueueState.IDLE, service.queueStatus(chapter).state)
+        assertNull(service.chapterPlan(chapter).next)
+        assertEquals(listOf("tts.slice", "tts.queue.status", "tts.chapter.plan"), methods)
     }
 }
