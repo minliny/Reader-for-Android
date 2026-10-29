@@ -28,7 +28,15 @@ internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: Rea
         if (state.unconfirmedId != null && state.pendingSources.isEmpty() && state.pendingAdds.isEmpty() && state.pendingReads.isEmpty())
             ReaderRecoveryNotice("原操作尚未确认，原意图会继续保留。", state.busy, null)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("reader_online_loading"))
-        state.error?.let { ReaderPageState("本次操作未完成", it, "读取状态", { owner.refresh(revision) }) }
+        val retrySearch = state.sessionFailed && !state.pending && state.selection != null && state.query.isNotBlank()
+        if (state.error != null || retrySearch) {
+            ReaderPageState(
+                if (retrySearch) "搜索未完成" else "本次操作未完成",
+                state.error ?: "原操作已核对，可以重新执行相同查询。",
+                if (retrySearch) "重试搜索" else "读取状态",
+                if (retrySearch) ({ owner.retrySearch(revision) }) else ({ owner.refresh(revision) }),
+            )
+        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(19.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (state.page) {
                 OnlineWorkspacePage.SOURCES -> {

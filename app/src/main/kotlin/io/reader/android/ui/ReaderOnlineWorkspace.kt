@@ -154,13 +154,24 @@ internal class ReaderOnlineWorkspace(
         if (!offered(revision) || state.value.pending || state.value.query.isBlank()) return
         val selected = state.value.selection ?: return; val query = state.value.query
         clearDocument(); retireSession(); queryGeneration++; replace(state.value.copy(session = null, books = emptyList(), detail = null, ended = false, nextPage = 1, loadedPage = false, sessionFailed = false))
-        run(ticket()) { t ->
-            val session = library().beginOnlineSearch(selected, query)
-            if (!qualifies(t)) { library().closeOnlineSearch(session); return@run }
-            mutable.update { it.copy(session = session) } // Exact close identity exists before the first page.
-            val page = library().onlineSearchPage(session, 1)
-            if (qualifies(t) && state.value.session === session) replace(state.value.copy(books = page.books, nextPage = 2, ended = page.hasMore == false, loadedPage = true))
-        }
+        run(ticket()) { t -> performSearch(t, selected, query) }
+    }
+
+    /** Explicit retry only after the caller has resolved every earlier original. */
+    fun retrySearch(revision: String) {
+        if (!offered(revision) || state.value.pending || !state.value.sessionFailed || state.value.query.isBlank()) return
+        val selected = state.value.selection ?: return; val query = state.value.query
+        clearDocument(); retireSession(); queryGeneration++
+        replace(state.value.copy(session = null, books = emptyList(), detail = null, ended = false, nextPage = 1, loadedPage = false, sessionFailed = false))
+        run(ticket()) { t -> performSearch(t, selected, query) }
+    }
+
+    private suspend fun performSearch(t: OnlineUiTicket, selected: ReaderOnlineSourceSelection, query: String) {
+        val session = library().beginOnlineSearch(selected, query)
+        if (!qualifies(t)) { library().closeOnlineSearch(session); return }
+        mutable.update { it.copy(session = session) } // Exact close identity exists before the first page.
+        val page = library().onlineSearchPage(session, 1)
+        if (qualifies(t) && state.value.session === session) replace(state.value.copy(books = page.books, nextPage = 2, ended = page.hasMore == false, loadedPage = true))
     }
     fun next(revision: String) {
         if (!offered(revision) || state.value.pending || state.value.sessionFailed || !state.value.loadedPage || state.value.ended || state.value.nextPage > 20) return
