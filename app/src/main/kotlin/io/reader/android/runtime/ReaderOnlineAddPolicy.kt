@@ -30,8 +30,10 @@ internal object ReaderOnlineAddPolicy {
         } else {
             check(Regex(PARENT).matches(value.getString("id")))
             val preview = JSONObject(value.getString("previewJson")); val add = JSONObject(value.getString("pendingAddJson"))
-            check(preview.getString("sourceId") == value.getString("sourceId") && preview.getString("sourceVersion") == value.getString("sourceVersion") &&
-                preview.getString("contentKind") == "text" && key(add) == key(value) && add.get("requireReadable") == true &&
+            val previewVersion = ReaderOnlineCatalogPolicy.optional(preview, "sourceVersion") ?: value.getString("sourceVersion")
+            val previewKind = ReaderOnlineCatalogPolicy.optional(preview, "contentKind") ?: "text"
+            check(preview.getString("sourceId") == value.getString("sourceId") && previewVersion == value.getString("sourceVersion") &&
+                previewKind == "text" && key(add) == key(value) && add.get("requireReadable") == true &&
                 preview.getJSONObject("book").getString("bookId") == value.getString("bookId") &&
                 preview.getJSONObject("book").getString("title") == add.getString("title") &&
                 preview.getJSONObject("book").getString("author") == add.getString("author")) { "ONLINE_ADD_PARENT_SNAPSHOT" }
@@ -39,6 +41,26 @@ internal object ReaderOnlineAddPolicy {
     }
     fun key(row: JSONObject) = ShelfBookKey(row.getString("sourceId"), row.getString("bookId"))
     fun scope(row: JSONObject, key: ShelfBookKey) { check(this.key(row) == key) { "ONLINE_ADD_SCOPE" } }
+    fun sourceVersion(value: JSONObject, expected: String): String {
+        val returned = ReaderOnlineCatalogPolicy.optional(value, "sourceVersion")
+        check(returned == null || returned == expected) { "ONLINE_SOURCE_VERSION_CHANGED" }
+        return returned ?: expected
+    }
+    fun readableChapterIndexes(toc: JSONObject): List<Int> {
+        val chapters = toc.getJSONArray("toc")
+        val known = (0 until chapters.length()).map { chapters.getJSONObject(it).getInt("index") }.toSet()
+        val indexes = if (!toc.has("readableChapterIndexes") || toc.isNull("readableChapterIndexes")) {
+            // Core/Harmony omit this optional field for a fully readable text TOC.
+            known.toList()
+        } else {
+            val values = toc.getJSONArray("readableChapterIndexes")
+            (0 until values.length()).map { values.getInt(it) }
+        }
+        check(indexes.isNotEmpty() && indexes.distinct().size == indexes.size && indexes.all { it >= 0 && it in known }) {
+            "ONLINE_ADD_NO_READABLE_CHAPTER"
+        }
+        return indexes
+    }
     fun original(record: JSONObject): JSONObject {
         this.record(record)
         val event = JSONObject(record.getString("originalTerminalJson"))

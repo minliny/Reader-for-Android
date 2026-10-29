@@ -26,7 +26,11 @@ class ReaderOnlineCatalogPolicyTest {
             .put("contentKind", JSONObject.NULL).put("book", JSONObject().put("bookId", raw.getString("bookId"))
                 .put("title", "detail").put("author", "author")).put("variables", JSONObject().put("token", "original"))
         val preview = ReaderOnlineCatalogPolicy.detail(selected, result.books.single(), detail)
-        assertEquals(ReaderOnlineContentKind.UNKNOWN, preview.contentKind)
+        assertEquals(ReaderOnlineContentKind.TEXT, preview.contentKind)
+        val legacyPage = JSONObject(page(selected, JSONArray().put(raw)).toString()).also { it.remove("sourceVersion") }
+        assertEquals(ReaderOnlineContentKind.TEXT, ReaderOnlineCatalogPolicy.page(session, 1, legacyPage).contentKind)
+        val legacyDetail = JSONObject(detail.toString()).also { it.remove("sourceVersion") }
+        assertEquals(selected.sourceVersion, ReaderOnlineCatalogPolicy.detail(selected, result.books.single(), legacyDetail).sourceVersion)
         assertEquals(mapOf("token" to "original"), preview.variables)
         assertThrows(IllegalStateException::class.java) {
             ReaderOnlineCatalogPolicy.page(session, 1, page(selected, JSONArray()).put("sourceVersion", "changed"))

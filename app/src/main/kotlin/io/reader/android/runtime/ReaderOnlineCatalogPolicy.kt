@@ -14,14 +14,17 @@ internal object ReaderOnlineCatalogPolicy {
         "text" -> ReaderOnlineContentKind.TEXT
         "manga" -> ReaderOnlineContentKind.MANGA
         "audio" -> ReaderOnlineContentKind.AUDIO
-        null -> ReaderOnlineContentKind.UNKNOWN
+        // Core's text DTO keeps contentKind optional for legacy/text sources. Harmony
+        // admits an absent/null kind as text while still rejecting explicit non-text kinds.
+        null -> ReaderOnlineContentKind.TEXT
         else -> error("ONLINE_CONTENT_KIND")
     }
     fun json(value: JSONObject): String = value.toString().also {
         check(it.toByteArray(Charsets.UTF_8).size <= MAX_JSON_BYTES) { "ONLINE_RESULT_BYTE_BUDGET" }
     }
     fun scope(value: JSONObject, source: ReaderOnlineSourceSelection) {
-        check(string(value, "sourceId") == source.sourceId && string(value, "sourceVersion") == source.sourceVersion) {
+        val returnedVersion = optional(value, "sourceVersion")
+        check(string(value, "sourceId") == source.sourceId && (returnedVersion == null || returnedVersion == source.sourceVersion)) {
             "ONLINE_SOURCE_VERSION_CHANGED"
         }
     }

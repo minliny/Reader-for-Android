@@ -37,4 +37,30 @@ class ReaderOnlineAddPolicyTest {
         val unknown = JSONObject(stage.toString()).also { it.remove("originalTerminalJson") }
         assertThrows(org.json.JSONException::class.java) { ReaderOnlineAddPolicy.original(unknown) }
     }
+
+    @Test fun legacyTextPreviewMayOmitOptionalVersionAndKindButForeignVersionStillFails() {
+        val id = "android-onlineadd-00000000-0000-4000-8000-000000000003"
+        val preview = JSONObject().put("sourceId", "protocol-source")
+            .put("book", JSONObject().put("bookId", "protocol-book").put("title", "protocol-title").put("author", ""))
+        val add = JSONObject().put("sourceId", "protocol-source").put("bookId", "protocol-book")
+            .put("title", "protocol-title").put("author", "").put("requireReadable", true).put("sortIndex", 0)
+        val parent = JSONObject().put("journalSchema", 1).put("kind", "onlineAdd").put("id", id)
+            .put("sourceId", "protocol-source").put("bookId", "protocol-book").put("sourceVersion", "source-version")
+            .put("previewJson", preview.toString()).put("pendingAddJson", add.toString()).put("completed", false)
+        ReaderOnlineAddPolicy.record(parent)
+        val foreign = JSONObject(preview.toString()).put("sourceVersion", "foreign")
+        assertThrows(IllegalStateException::class.java) {
+            ReaderOnlineAddPolicy.record(JSONObject(parent.toString()).put("previewJson", foreign.toString()))
+        }
+    }
+
+    @Test fun omittedReadableIndexesAdmitAllTocEntriesAndForeignExplicitIndexesFail() {
+        val toc = JSONObject().put("toc", org.json.JSONArray()
+            .put(JSONObject().put("index", 3)).put(JSONObject().put("index", 7)))
+        assertEquals(listOf(3, 7), ReaderOnlineAddPolicy.readableChapterIndexes(toc))
+        val explicit = JSONObject(toc.toString()).put("readableChapterIndexes", org.json.JSONArray().put(7))
+        assertEquals(listOf(7), ReaderOnlineAddPolicy.readableChapterIndexes(explicit))
+        val foreign = JSONObject(toc.toString()).put("readableChapterIndexes", org.json.JSONArray().put(99))
+        assertThrows(IllegalStateException::class.java) { ReaderOnlineAddPolicy.readableChapterIndexes(foreign) }
+    }
 }

@@ -23,7 +23,8 @@ internal class ReaderOnlineAdd(
         check(preview.key.sourceId != "local" && preview.title.isNotBlank()) { "ONLINE_TEXT_PREVIEW_REQUIRED" }
         val raw = JSONObject(preview.originalResultJson)
         check(raw.getString("sourceId") == preview.key.sourceId && raw.getJSONObject("book").getString("bookId") == preview.key.bookId) { "ONLINE_ADD_PREVIEW_SCOPE" }
-        check(raw.getString("sourceVersion") == preview.sourceVersion && raw.getString("contentKind") == "text")
+        check(ReaderOnlineAddPolicy.sourceVersion(raw, preview.sourceVersion) == preview.sourceVersion &&
+            (ReaderOnlineCatalogPolicy.optional(raw, "contentKind") ?: "text") == "text")
         val add = JSONObject().put("sourceId", preview.key.sourceId).put("bookId", preview.key.bookId)
             .put("title", preview.title).put("author", preview.author).put("requireReadable", true).put("sortIndex", 0)
         listOf("coverUrl" to preview.coverUrl, "intro" to preview.intro, "kind" to preview.kind, "lastChapter" to preview.lastChapter)
@@ -94,10 +95,11 @@ internal class ReaderOnlineAdd(
             if (preview.has("tocUrl") && !preview.isNull("tocUrl")) tocParams.put("tocUrl", preview.getString("tocUrl"))
             val toc = call("toc", "book.toc", tocParams).first
             ReaderOnlineAddPolicy.scope(toc, key)
-            check(toc.getString("sourceVersion") == source.sourceVersion && toc.optString("catalogDeferredReason").isEmpty()) { "ONLINE_ADD_CATALOG_NOT_ADMITTED" }
-            val readable = toc.getJSONArray("readableChapterIndexes"); check(readable.length() > 0) { "ONLINE_ADD_NO_READABLE_CHAPTER" }
-            val firstIndex = readable.getInt(0); check(firstIndex >= 0)
             val chapters = toc.getJSONArray("toc")
+            val readable = ReaderOnlineAddPolicy.readableChapterIndexes(toc)
+            ReaderOnlineAddPolicy.sourceVersion(toc, source.sourceVersion)
+            check(toc.optString("catalogDeferredReason").isEmpty()) { "ONLINE_ADD_CATALOG_NOT_ADMITTED" }
+            val firstIndex = readable.first()
             val chapter = (0 until chapters.length()).map { chapters.getJSONObject(it) }.single { it.getInt("index") == firstIndex }
             if (parent.optString("viewRuntimeSession") != transport.session) {
                 originals.requireNoUnknown(id) // Never bypass an old unknown add/content/preparation by refreshing a derived view.
