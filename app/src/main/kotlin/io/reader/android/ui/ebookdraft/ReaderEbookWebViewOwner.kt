@@ -165,9 +165,10 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
                 val valueScalar = exact(value, "scalar")
                 require(valueScalar <= original.chapter.scalarCount.toLong())
                 val scalar = valueScalar.toInt()
-                checkMeasurement(value, captured, scalar)
-                anchors.observe(scalar) {
-                    onVisible(ReaderEbookVisibleAnchor(lease, captured.epoch, captured.token, scalar))
+                ReaderEbookMeasurementAdmission.observePosition(measurement(value, captured, scalar)) {
+                    anchors.observe(scalar) {
+                        onVisible(ReaderEbookVisibleAnchor(lease, captured.epoch, captured.token, scalar))
+                    }
                 }
             }
             "selection" -> {
@@ -184,14 +185,19 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     }
 
     private fun checkMeasurement(value: JSONObject, captured: ReaderEbookLayoutSnapshot, expectedScalar: Int) {
+        ReaderEbookMeasurementAdmission.requireReady(measurement(value, captured, expectedScalar))
+    }
+    private fun measurement(value: JSONObject, captured: ReaderEbookLayoutSnapshot, expectedScalar: Int): ReaderEbookMeasurement {
         check(exact(value, "scalar") == expectedScalar.toLong())
         val rect = value.getJSONObject("rect")
-        fun number(key: String): Double = (rect.get(key) as? Number ?: error("RECT_NUMBER_REQUIRED")).toDouble().also { check(it.isFinite()) }
-        val left = number("left"); val right = number("right"); val top = number("top"); val bottom = number("bottom")
-        val width = number("viewportWidth"); val height = number("viewportHeight"); val g = captured.input.geometry
-        check(right > left && bottom > top && number("width") > 0 && number("height") > 0)
-        check(abs(width - captured.widthPx / g.density.toDouble()) <= 1.1 && abs(height - captured.heightPx / g.density.toDouble()) <= 1.1)
-        check(bottom > g.topPx / g.density && top < height - g.bottomPx / g.density && right > 0 && left < width) { "ANCHOR_NOT_IN_REAL_VIEWPORT" }
+        fun number(key: String): Double = (rect.get(key) as? Number ?: error("RECT_NUMBER_REQUIRED")).toDouble()
+        val g = captured.input.geometry
+        return ReaderEbookMeasurement(
+            left = number("left"), right = number("right"), top = number("top"), bottom = number("bottom"),
+            width = number("width"), height = number("height"),
+            viewportWidth = number("viewportWidth"), viewportHeight = number("viewportHeight"),
+            expectedWidth = captured.widthPx / g.density.toDouble(), expectedHeight = captured.heightPx / g.density.toDouble(),
+            topInset = (g.topPx / g.density).toDouble(), bottomInset = (g.bottomPx / g.density).toDouble())
     }
     private fun nativeViewport(captured: ReaderEbookLayoutSnapshot): Boolean {
         val visible = Rect()

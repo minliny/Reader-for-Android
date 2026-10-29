@@ -175,7 +175,7 @@ const canonicalRange=(start,end)=>{
   let innerWidth = window.innerWidth, observedPosition = null;
   const getSelection = () => window.getSelection();
   const send = (kind, value) => { if (kind === 'position') observedPosition = value; };
-// BEGIN SAME-BYTE iOS 71773 ReaderEbookScript.swift:234-253
+// BEGIN iOS 71773 ReaderEbookScript.swift:234-253 WITH ANDROID VISIBLE-CANDIDATE ADMISSION
 const colorAndMetrics=options=>{
   const font=options.fontURL?`@font-face{font-family:ReaderSelectedFace;src:url(${JSON.stringify(options.fontURL)});font-display:block}`:'';
   const selectable=options.longPressSelectText!==false?'text':'none';
@@ -188,15 +188,15 @@ const colorAndMetrics=options=>{
   if(config.longPressSelectText===false){getSelection()?.removeAllRanges();selectionActive=false;}
   return changed;
 };
-const visiblePosition=(report=true)=>{
+const visiblePosition=(report=true,accept=()=>true)=>{
   if(!ready||!userMoving||selectionActive)return;
   for(const y of [config.topInset+4,config.topInset+20,config.topInset+48])for(const x of [0.1,0.5,0.9]){
     const range=document.caretRangeFromPoint(Math.max(config.horizontalInset+2,innerWidth*x),y);
     if(!range||!body.contains(range.startContainer))continue;
-    const scalar=scalarAt(range.startContainer,range.startOffset);if(scalar!==null){lastAnchor=scalar;if(report)send('position',scalar);return;}
+    const scalar=scalarAt(range.startContainer,range.startOffset);if(scalar!==null&&accept(scalar)){lastAnchor=scalar;if(report)send('position',scalar);return;}
   }
 };
-// END SAME-BYTE iOS 71773 ReaderEbookScript.swift:234-253
+// END iOS 71773 ReaderEbookScript.swift:234-253 WITH ANDROID VISIBLE-CANDIDATE ADMISSION
   const admitted = () => { current(); if (state !== 'ADMITTED') throw Error('DOM_NOT_ADMITTED'); };
   const guarded = operation => {
     current();
@@ -213,6 +213,12 @@ const visiblePosition=(report=true)=>{
     return {top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right,
       width: rect.width, height: rect.height, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight};
   };
+  const usableVisibleRectangle = rect => rect !== null &&
+    ['top','bottom','left','right','width','height','viewportWidth','viewportHeight'].every(key => Number.isFinite(rect[key])) &&
+    rect.right > rect.left && rect.bottom > rect.top && rect.width > 0 && rect.height > 0 &&
+    rect.viewportWidth > 0 && rect.viewportHeight > 0 &&
+    rect.bottom > config.topInset && rect.top < rect.viewportHeight - config.bottomInset &&
+    rect.right > 0 && rect.left < rect.viewportWidth;
   return Object.freeze({
     admit() {
       return guarded(() => {
@@ -237,9 +243,16 @@ const visiblePosition=(report=true)=>{
       admitted();
       if (window.getSelection()?.isCollapsed === false) return null;
       innerWidth = window.innerWidth; observedPosition = null; userMoving = true;
-      try { visiblePosition(true); }
-      finally { userMoving = false; }
-      return observedPosition === null ? null : {scalar: observedPosition, rect: rectangleAt(observedPosition)};
+      let acceptedRectangle = null;
+      try {
+        visiblePosition(true, scalar => {
+          const rect = rectangleAt(scalar);
+          if (!usableVisibleRectangle(rect)) return false; // Try the next caret; do not commit an invisible projection.
+          acceptedRectangle = rect;
+          return true;
+        });
+      } finally { userMoving = false; }
+      return observedPosition === null ? null : {scalar: observedPosition, rect: acceptedRectangle};
     },
     scalarForBoundary(node, offset) {
       admitted();
