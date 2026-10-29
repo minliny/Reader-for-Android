@@ -60,6 +60,17 @@ internal class ReaderCoreEventActor(
         fun poll(): String?
         fun cancel(requestId: Long): NativeStatus
         fun acknowledge(deliveryId: Long): NativeStatus
+        /** Core-owned response assets; the default fails closed for old bindings. */
+        fun assetBegin(requestId: Long, operationId: Long, declaredBytes: Long): Long =
+            error("CORE_ASSET_BRIDGE_UNAVAILABLE")
+        fun assetWrite(requestId: Long, operationId: Long, assetId: Long, bytes: ByteArray): Long =
+            error("CORE_ASSET_BRIDGE_UNAVAILABLE")
+        fun assetCommit(requestId: Long, operationId: Long, assetId: Long): Long =
+            error("CORE_ASSET_BRIDGE_UNAVAILABLE")
+        fun assetReadChunk(requestId: Long, operationId: Long, assetId: Long,
+            offset: Long, limit: Int): ByteArray = error("CORE_ASSET_BRIDGE_UNAVAILABLE")
+        fun assetRelease(requestId: Long, operationId: Long, assetId: Long): Unit =
+            error("CORE_ASSET_BRIDGE_UNAVAILABLE")
         fun close()
     }
 
@@ -111,6 +122,13 @@ internal class ReaderCoreEventActor(
     sealed interface HostReply {
         data class Complete(val resultJson: String) : HostReply
         data class Error(val code: String, val message: String, val retryable: Boolean) : HostReply
+        /** Immutable bytes captured by a Host; the actor owns Core asset transfer. */
+        data class AssetTransfer(
+            val chunks: List<ByteArray>,
+            val contentType: String? = null,
+            val width: Int? = null,
+            val height: Int? = null,
+        ) : HostReply
     }
     fun interface HostHandler { suspend fun execute(original: HostEnvelope): HostReply }
     data class RequestSummary(val request: PreparedRequest, val phase: Phase, val readRetired: Boolean)
@@ -644,6 +662,17 @@ internal class ReaderCoreEventActor(
             is HostReply.Complete -> { params.put("result", JSONObject(reply.resultJson)); "host.complete" }
             is HostReply.Error -> { params.put("error", JSONObject().put("code", reply.code).put("message", reply.message)
                 .put("retryable", reply.retryable)); "host.error" }
+            is HostReply.AssetTransfer -> {
+                try {
+                    params.put("result", transferAsset(work.envelope, reply))
+                    "host.complete"
+                } catch (error: Throwable) {
+                    params.put("error", JSONObject().put("code", "INTERNAL")
+                        .put("message", "MANGA_ASSET_TRANSFER_FAILED")
+                        .put("retryable", false))
+                    "host.error"
+                }
+            }
         }
         try {
             val status = port.send(command(method, id, params.toString()))
@@ -662,6 +691,41 @@ internal class ReaderCoreEventActor(
             fail(work.phase, id, root = error)
         }
         notifyChanged()
+    }
+
+    /** Runs only on the poll actor thread; Host handlers never receive RuntimePort. */
+    private fun transferAsset(envelope: HostEnvelope, reply: HostReply.AssetTransfer): JSONObject {
+        val chunks = reply.chunks
+        check(chunks.isNotEmpty()) { "MANGA_ASSET_EMPTY" }
+        val total = chunks.sumOf { it.size.toLong() }
+        check(total in 1..(128L * 1024 * 1024)) { "MANGA_ASSET_TOTAL_BUDGET" }
+        val assetId = port.assetBegin(envelope.requestId, envelope.operationId, total)
+        check(assetId > 0) { "MANGA_ASSET_BEGIN_ID" }
+        var committed = false
+        try {
+            var written = 0L
+            chunks.forEach { chunk ->
+                check(chunk.size <= 1024 * 1024) { "MANGA_ASSET_CHUNK_BUDGET" }
+                val next = port.assetWrite(envelope.requestId, envelope.operationId, assetId, chunk)
+                written += chunk.size
+                check(next == written) { "MANGA_ASSET_WRITE_RECEIPT" }
+            }
+            check(port.assetCommit(envelope.requestId, envelope.operationId, assetId) == total) {
+                "MANGA_ASSET_COMMIT_RECEIPT"
+            }
+            committed = true
+            return JSONObject().put("assetId", assetId)
+                .put("operationId", envelope.operationId).put("bytes", total)
+                .apply {
+                    reply.contentType?.let { put("contentType", it) }
+                    reply.width?.let { put("width", it) }
+                    reply.height?.let { put("height", it) }
+                }
+        } finally {
+            if (!committed) runCatching {
+                port.assetRelease(envelope.requestId, envelope.operationId, assetId)
+            }
+        }
     }
 
     private fun acknowledgeConsumed(frame: Frame): Acknowledgement {
@@ -770,6 +834,19 @@ internal class ReaderCoreEventActor(
                 require(reply.code in setOf("UNKNOWN_METHOD", "INVALID_PARAMS", "INVALID_PROTOCOL_VERSION", "CANCELLED", "TIMEOUT",
                     "INVALID_MESSAGE", "INTERNAL", "TRANSACTION_PENDING", "BUSY", "RESOURCE_EXHAUSTED", "BOOK_ALREADY_ON_SHELF"))
                 reply.copy()
+            }
+            is HostReply.AssetTransfer -> {
+                val chunks = reply.chunks.map { chunk ->
+                    require(chunk.size <= 1024 * 1024) { "MANGA_ASSET_CHUNK_BUDGET" }
+                    chunk.copyOf()
+                }
+                require(chunks.isNotEmpty()) { "MANGA_ASSET_EMPTY" }
+                require(chunks.sumOf { it.size.toLong() } <= 128L * 1024 * 1024) {
+                    "MANGA_ASSET_TOTAL_BUDGET"
+                }
+                require(reply.width == null || reply.width > 0) { "MANGA_ASSET_WIDTH" }
+                require(reply.height == null || reply.height > 0) { "MANGA_ASSET_HEIGHT" }
+                reply.copy(chunks = chunks)
             }
         }
     }

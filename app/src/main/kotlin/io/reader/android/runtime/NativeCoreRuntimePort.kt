@@ -41,6 +41,22 @@ internal class NativeCoreRuntimePort(
 
     override fun acknowledge(deliveryId: Long) = status("rc_runtime_ack_event") { runtime().ackEvent(deliveryId) }
 
+    override fun assetBegin(requestId: Long, operationId: Long, declaredBytes: Long): Long =
+        runtime().assetBegin(requestId, operationId, declaredBytes)
+
+    override fun assetWrite(requestId: Long, operationId: Long, assetId: Long, bytes: ByteArray): Long =
+        runtime().assetWrite(requestId, operationId, assetId, bytes)
+
+    override fun assetCommit(requestId: Long, operationId: Long, assetId: Long): Long =
+        runtime().assetCommit(requestId, operationId, assetId)
+
+    override fun assetReadChunk(requestId: Long, operationId: Long, assetId: Long,
+        offset: Long, limit: Int): ByteArray =
+        runtime().assetReadChunk(requestId, operationId, assetId, offset, limit)
+
+    override fun assetRelease(requestId: Long, operationId: Long, assetId: Long) =
+        runtime().assetRelease(requestId, operationId, assetId)
+
     private inline fun status(operation: String, call: () -> Unit): ReaderCoreEventActor.NativeStatus {
         return try {
             call()

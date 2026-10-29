@@ -4,6 +4,7 @@ import android.app.Application
 import io.reader.android.ReaderApplication
 import android.os.Looper
 import io.reader.android.runtime.http.ReaderHttpHost
+import io.reader.android.runtime.http.ReaderMangaResourceHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -38,10 +39,17 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
             this, root, operations.dataDirectory)
     }
     private val httpHost = ReaderHttpHost()
+    private val mangaResourceHost = ReaderMangaResourceHost(httpHost)
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
             NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),
-            hostHandler = ReaderCoreEventActor.HostHandler { original -> httpHost.execute(original) },
+            hostHandler = ReaderCoreEventActor.HostHandler { original ->
+                if (original.capability == ReaderMangaResourceHost.CAPABILITY) {
+                    mangaResourceHost.execute(original)
+                } else {
+                    httpHost.execute(original)
+                }
+            },
         )
     }
     private val actor by actorDelegate
