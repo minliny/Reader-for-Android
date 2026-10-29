@@ -48,7 +48,7 @@ internal object ReaderTtsPolicy {
         return ReaderTtsSlicePlan(actualChapter, strategy, Collections.unmodifiableList(slices), sourceCount)
     }
 
-    fun queueState(value: JSONObject, expected: ReaderTtsChapterRef): ReaderTtsQueueSnapshot {
+    fun queueState(value: JSONObject, expected: ReaderTtsChapterRef, expectedTotal: Int? = null): ReaderTtsQueueSnapshot {
         val snapshot = value.getJSONObject("snapshot")
         val chapter = chapter(snapshot.getJSONObject("chapter"))
         check(chapter.sourceId == expected.sourceId && chapter.bookId == expected.bookId &&
@@ -62,6 +62,7 @@ internal object ReaderTtsPolicy {
             else -> error("TTS_QUEUE_STATE")
         }
         val total = snapshot.getInt("totalSlices").also { check(it >= 0) { "TTS_QUEUE_TOTAL" } }
+        expectedTotal?.let { check(total == it) { "TTS_QUEUE_PLAN_BINDING" } }
         val completed = snapshot.getInt("completedSlices").also { check(it in 0..total) { "TTS_QUEUE_COMPLETED" } }
         val current = if (!snapshot.has("currentSliceIndex") || snapshot.isNull("currentSliceIndex")) null
             else snapshot.getInt("currentSliceIndex").also { check(it in 0 until total) { "TTS_QUEUE_CURSOR" } }
@@ -97,6 +98,22 @@ internal object ReaderTtsPolicy {
         }
         return ReaderTtsQueueSnapshot(chapter, state, current, total, completed, Collections.unmodifiableList(statuses),
             failurePolicy, consecutiveFailures, failureLimit, drainBehavior, restartPolicy)
+    }
+
+    fun callback(value: JSONObject, expected: ReaderTtsChapterRef, expectedTotal: Int? = null): ReaderTtsQueueCallbackResult {
+        val snapshot = queueState(value, expected, expectedTotal)
+        val disposition = when (value.getString("callbackDisposition")) {
+            "applied" -> ReaderTtsCallbackDisposition.APPLIED
+            "duplicate" -> ReaderTtsCallbackDisposition.DUPLICATE
+            "stale" -> ReaderTtsCallbackDisposition.STALE
+            else -> error("TTS_CALLBACK_DISPOSITION")
+        }
+        val action = if (!value.has("failureAction") || value.isNull("failureAction")) null else when (value.getString("failureAction")) {
+            "skip" -> ReaderTtsFailureAction.SKIP
+            "stop" -> ReaderTtsFailureAction.STOP
+            else -> error("TTS_FAILURE_ACTION")
+        }
+        return ReaderTtsQueueCallbackResult(snapshot, disposition, action)
     }
 
     fun transition(value: JSONObject, expected: ReaderTtsChapterRef): ReaderTtsChapterTransition {

@@ -33,6 +33,8 @@ data class ReaderTtsSlicePlan(
 
 enum class ReaderTtsQueueState { IDLE, PLAYING, PAUSED, COMPLETED, STOPPED }
 enum class ReaderTtsSliceStatus { PENDING, SPEAKING, DONE, SKIPPED, FAILED }
+enum class ReaderTtsCallbackDisposition { APPLIED, DUPLICATE, STALE }
+enum class ReaderTtsFailureAction { SKIP, STOP }
 enum class ReaderTtsFailurePolicy(val wire: String) { SKIP("skip"), STOP("stop") }
 enum class ReaderTtsQueueRestartPolicy(val wire: String) { RESET_ON_CORE_RESTART("reset-on-core-restart") }
 
@@ -54,6 +56,13 @@ data class ReaderTtsChapterTransition(
     val current: ReaderTtsChapterRef,
     val next: ReaderTtsChapterRef?,
     val drainBehavior: ReaderTtsDrainBehavior,
+)
+
+data class ReaderTtsQueueSetRateResult(val snapshot: ReaderTtsQueueSnapshot, val rate: Int)
+data class ReaderTtsQueueCallbackResult(
+    val snapshot: ReaderTtsQueueSnapshot,
+    val callbackDisposition: ReaderTtsCallbackDisposition,
+    val failureAction: ReaderTtsFailureAction?,
 )
 
 enum class ReaderTtsDrainBehavior(val wire: String) {
