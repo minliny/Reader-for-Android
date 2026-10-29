@@ -6,7 +6,7 @@ import org.json.JSONObject
  * Source-only Core TTS adapter. It owns no Android speech engine and no
  * playback lifecycle; those remain platform-host responsibilities.
  */
-internal class ReaderTtsService(private val transport: CoreTransport) {
+internal class ReaderTtsService(private val transport: CoreTransport) : ReaderTtsPlaybackCommands {
     fun slice(chapter: ReaderTtsChapterRef, content: String,
         strategy: ReaderTtsSlicingStrategy = ReaderTtsSlicingStrategy.PARAGRAPH): ReaderTtsSlicePlan {
         val data = transport.request("tts.slice", JSONObject()
@@ -25,7 +25,7 @@ internal class ReaderTtsService(private val transport: CoreTransport) {
         return ReaderTtsPolicy.queueState(data, chapter)
     }
 
-    fun queuePlay(plan: ReaderTtsSlicePlan, startSliceIndex: Int = 0): ReaderTtsQueueSnapshot {
+    override fun queuePlay(plan: ReaderTtsSlicePlan, startSliceIndex: Int): ReaderTtsQueueSnapshot {
         check(plan.slices.isNotEmpty()) { "TTS_QUEUE_PLAN_EMPTY" }
         check(startSliceIndex in plan.slices.indices) { "TTS_QUEUE_START_INDEX" }
         val data = transport.request("tts.queue.play", JSONObject()
@@ -33,13 +33,13 @@ internal class ReaderTtsService(private val transport: CoreTransport) {
         return ReaderTtsPolicy.queueState(data, plan.chapter, plan.slices.size)
     }
 
-    fun queuePause(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
+    override fun queuePause(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         queueControl("tts.queue.pause", chapter)
 
-    fun queueResume(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
+    override fun queueResume(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         queueControl("tts.queue.resume", chapter)
 
-    fun queueStop(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
+    override fun queueStop(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         queueControl("tts.queue.stop", chapter)
 
     fun queueNext(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
@@ -57,7 +57,7 @@ internal class ReaderTtsService(private val transport: CoreTransport) {
     fun queueSkip(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         queueControl("tts.queue.skip", chapter)
 
-    fun queueSetRate(chapter: ReaderTtsChapterRef, rate: Int): ReaderTtsQueueSetRateResult {
+    override fun queueSetRate(chapter: ReaderTtsChapterRef, rate: Int): ReaderTtsQueueSetRateResult {
         check(rate in 1..10) { "TTS_QUEUE_RATE" }
         val data = transport.request("tts.queue.set-rate", chapterParams(chapter).put("rate", rate))
         val snapshot = ReaderTtsPolicy.queueState(data, chapter)
@@ -76,10 +76,10 @@ internal class ReaderTtsService(private val transport: CoreTransport) {
         return ReaderTtsPolicy.queueState(data, chapter).also { requireSlice(it, sliceIndex) }
     }
 
-    fun queueReportCallback(chapter: ReaderTtsChapterRef, sliceIndex: Int,
+    override fun queueReportCallback(chapter: ReaderTtsChapterRef, sliceIndex: Int,
         status: ReaderTtsSliceStatus, callbackId: String,
-        failurePolicy: ReaderTtsFailurePolicy = ReaderTtsFailurePolicy.STOP,
-        failureLimit: Int = 3): ReaderTtsQueueCallbackResult {
+        failurePolicy: ReaderTtsFailurePolicy,
+        failureLimit: Int): ReaderTtsQueueCallbackResult {
         check(sliceIndex >= 0) { "TTS_QUEUE_SLICE_INDEX" }
         check(status in setOf(ReaderTtsSliceStatus.SPEAKING, ReaderTtsSliceStatus.DONE, ReaderTtsSliceStatus.FAILED)) {
             "TTS_QUEUE_REPORT_CALLBACK"
