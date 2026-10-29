@@ -8,6 +8,7 @@ import android.webkit.WebResourceResponse
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.webkit.WebViewAssetLoader
+import io.reader.android.runtime.ReaderEbookFontFallback
 import io.reader.android.runtime.ebookdraft.ReaderEbookAssetProvider
 import io.reader.android.runtime.ebookdraft.ReaderEbookWebViewBoundary
 import io.reader.android.ui.background
@@ -29,6 +30,7 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
     private val failed: (Exception) -> Unit) {
     private val assets = context.assets
     private val session = original.prepared.lease.renderId.toString()
+    private val missingFonts = ReaderEbookFontFallback()
     val entryUrl: String = Uri.parse(ReaderEbookAssetProvider.ORIGIN).buildUpon().appendPath("publication").appendPath(session)
         .apply { original.prepared.presentation.entryPath.split('/').forEach { appendPath(it) } }.build().toString()
     private val bootstrap by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { bootstrap() } // Encoded only on interception IO, not UI.
@@ -36,6 +38,7 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
         .addPathHandler("/__reader/", WebViewAssetLoader.PathHandler { suffix -> trusted(suffix) }).build()
 
     fun intercept(request: WebResourceRequest): WebResourceResponse {
+        var canonicalEntry: String? = null
         return try {
             requireCurrent()
             val uri = request.url
@@ -50,15 +53,33 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
                 }
                 path.startsWith("/publication/$session/") && !request.isForMainFrame -> {
                     val provider = original.prepared.provider
-                    val resource = provider.readCanonicalEntry(provider.canonicalEntry(uri, request.method))
+                    val entry = provider.canonicalEntry(uri, request.method)
+                    canonicalEntry = entry
+                    val resource = provider.readCanonicalEntry(entry)
                     requireCurrent()
                     // Archive bytes retain their original encoding. Chromium handles BOM/XML/charset detection.
                     response(resource.mime, null, resource.bytes, ReaderEbookWebViewBoundary.PUBLICATION_CSP)
                 }
                 else -> ReaderEbookWebViewBoundary.denied()
             }
-        } catch (error: Exception) { failed(error); ReaderEbookWebViewBoundary.denied(404) }
+        } catch (error: Exception) {
+            val entry = canonicalEntry
+            if (entry != null) {
+                try {
+                    requireCurrent()
+                    if (missingFonts.recordMissingFont(request.url.toString(), entry, error))
+                        return ReaderEbookWebViewBoundary.denied(404)
+                } catch (retired: Exception) {
+                    failed(retired)
+                    return ReaderEbookWebViewBoundary.denied(404)
+                }
+            }
+            failed(error)
+            ReaderEbookWebViewBoundary.denied(404)
+        }
     }
+
+    fun missingEmbeddedFontResponse(uri: Uri, status: Int): Boolean = missingFonts.acceptsHttpFailure(uri.toString(), status)
 
     fun activeResource(uri: Uri): Boolean {
         if (uri.scheme != "https" || uri.encodedAuthority != ReaderEbookAssetProvider.ORIGIN_HOST) return false

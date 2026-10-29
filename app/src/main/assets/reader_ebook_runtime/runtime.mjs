@@ -103,7 +103,8 @@ const waitAssets = async ({doc}) => {
   })));
   for (const image of doc.images) if (!image.complete || image.naturalWidth <= 0) throw Error('PUBLICATION_IMAGE_UNAVAILABLE');
   await doc.fonts.ready;
-  for (const face of doc.fonts) if (face.status === 'error') throw Error('PUBLICATION_FONT_UNAVAILABLE');
+  // Chromium resolves missing embedded faces through its normal font fallback.
+  // Layout and canonical-position admission still use the actually rendered DOM.
   for (const sheet of doc.querySelectorAll('link[rel~="stylesheet"]')) if (!sheet.disabled && !sheet.sheet) throw Error('PUBLICATION_STYLESHEET_UNAVAILABLE');
 };
 const measurement = captured => {

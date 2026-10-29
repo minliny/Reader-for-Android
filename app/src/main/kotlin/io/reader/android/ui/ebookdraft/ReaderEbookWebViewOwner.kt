@@ -222,7 +222,8 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
             if (resources.activeResource(request.url)) fail("web-resource", resourceFailure.get() ?: IllegalStateException("${error.errorCode}:${error.description}"))
         }
         override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
-            if (resources.activeResource(request.url)) fail("web-http", resourceFailure.get() ?: IllegalStateException("RESOURCE_HTTP_${response.statusCode}"))
+            if (resources.activeResource(request.url) && !resources.missingEmbeddedFontResponse(request.url, response.statusCode))
+                fail("web-http", resourceFailure.get() ?: IllegalStateException("RESOURCE_HTTP_${response.statusCode}"))
         }
     }
     @android.annotation.TargetApi(26)
