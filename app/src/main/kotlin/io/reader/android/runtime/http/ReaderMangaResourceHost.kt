@@ -14,16 +14,19 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
         if (envelope.capability != CAPABILITY) return ReaderCoreEventActor.HostReply.Error(
             "UNKNOWN_METHOD", "Android manga resource transfer is not available for this capability", false,
         )
+        val raw = try { JSONObject(envelope.parametersJson) } catch (_: org.json.JSONException) {
+            return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_RESOURCE_INPUT_INVALID", false)
+        }
+        if (raw.optString("stage", "") != STAGE_INPUT) return ReaderCoreEventActor.HostReply.Error(
+            "UNKNOWN_METHOD", "manga resource output/decode is not implemented in this slice", false,
+        )
         val input = try {
-            parseInput(envelope.parametersJson)
+            parseInput(raw)
         } catch (error: IllegalArgumentException) {
             return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", error.message ?: "MANGA_RESOURCE_INPUT_INVALID", false)
         } catch (error: org.json.JSONException) {
             return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_RESOURCE_INPUT_INVALID", false)
         }
-        if (input.stage != STAGE_INPUT) return ReaderCoreEventActor.HostReply.Error(
-            "UNKNOWN_METHOD", "manga resource output/decode is not implemented in this slice", false,
-        )
         val httpReply = httpHost.execute(envelope.copy(
             capability = "http.execute",
             parametersJson = input.request.toString(),
@@ -40,7 +43,10 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
     internal data class ParsedHttpResult(val status: Int, val contentType: String, val bytes: ByteArray)
 
     internal fun parseInput(raw: String): ParsedInput {
-        val value = JSONObject(raw)
+        return parseInput(JSONObject(raw))
+    }
+
+    private fun parseInput(value: JSONObject): ParsedInput {
         exactKeys(value, setOf("stage", "transferId", "resourceRef", "request", "maxBytes", "inspectGraphics"))
         val stage = value.getString("stage")
         val transferId = nonBlank(value.getString("transferId"), "transferId", 128)

@@ -1,6 +1,7 @@
 package io.reader.android.runtime.http
 
 import io.reader.android.runtime.ReaderCoreEventActor
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,6 +67,16 @@ class ReaderMangaResourceHostTest {
             .put("headers", JSONObject().put("Content-Type", "image/png"))
             .put("bodyBase64", body)
         assertError(host.parseHttpResult(tooLarge.toString(), 2), "MANGA_IMAGE_MAX_BYTES")
+    }
+
+    @Test fun outputStageIsExplicitlyClosedWithoutDecodeOrCache() = runBlocking {
+        val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
+            runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
+            capability = ReaderMangaResourceHost.CAPABILITY,
+            parametersJson = JSONObject().put("stage", "output").put("assetId", 1).toString(),
+        ))
+        assertError(reply, "manga resource output/decode is not implemented in this slice")
+        assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
     }
 
     private fun assertError(reply: ReaderCoreEventActor.HostReply, message: String) {
