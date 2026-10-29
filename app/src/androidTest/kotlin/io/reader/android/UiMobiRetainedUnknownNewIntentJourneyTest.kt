@@ -617,7 +617,7 @@ class UiMobiRetainedUnknownNewIntentJourneyTest {
     companion object {
         private const val METHOD = "existingMobiUnknownRetainedNewVisiblePositionSavesAndExitsWithNewReceipts"
         private const val IMPORT_ID = "android-import-edfcd87b-f962-4830-ba12-7b0bb60f7f55"
-        private const val BASELINE_PROOF_SHA = "b24c9f4c062d44063b5465b344dc2877fdb975d2ad4541210e36a12b77d4187b"
+        private const val BASELINE_PROOF_SHA = "ac0302db9c2adca8def37e6685891b48cadc64d691693c3aaa3a00c4ae725235"
         private const val UNKNOWN_ID = "android-progress-34f21d9a-6dc6-478e-a551-f85219609563"
         private const val UNKNOWN_SHA = "c4a496c111870155bd93435b76aae2dd70402fbd65e834bf4ebb91297df1ec82"
         private const val UNKNOWN_RUNTIME = "aa519b17-bc13-4f47-841b-a31f9de9a1cc"

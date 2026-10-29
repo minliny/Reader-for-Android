@@ -38,8 +38,12 @@ const selectionActive = () => publication?.win.getSelection()?.isCollapsed === f
 const applyScrollPolicy = () => {
   if (!publication) return;
   const value = confirmed && scrollEnabled ? 'auto' : 'hidden';
+  // Reader owns the viewport scroll box. Making body auto/hidden as well creates
+  // an independent body scroller in quirks-mode publications.
+  publication.doc.body.style.setProperty('overflow-x', 'visible', 'important');
+  publication.doc.body.style.setProperty('overflow-y', 'visible', 'important');
+  publication.doc.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
   publication.doc.documentElement.style.setProperty('overflow-y', value, 'important');
-  publication.doc.body.style.setProperty('overflow-y', value, 'important');
 };
 const reportSelection = () => { if (confirmed && !retired) send('selection', {active: selectionActive()}); };
 const nextPaint = win => new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
@@ -90,6 +94,7 @@ const loadDocument = captured => documentPromise ||= (async () => {
   dom.admit(); // Full canonical entry authenticates before the existing Range chapter crop.
   diagnosticPhase(captured, 'DOM_ADMIT_COMPLETE');
   publication = {win, doc, dom};
+  applyScrollPolicy(); // Also override author body overflow before the first restore/Ready.
   const gesture = event => { if (event.isTrusted && confirmed) interacted = true; };
   for (const name of ['pointerdown', 'touchstart', 'wheel', 'keydown']) doc.addEventListener(name, gesture, {passive: true, capture: true});
   win.addEventListener('scroll', () => {
