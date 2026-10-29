@@ -208,6 +208,10 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.OBSERVER_READ) { sourceRulesService.pending() }
     suspend fun importSourceJson(sourceId: String, originalBookSourceJson: String): SourceImportResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.importJson(sourceId, originalBookSourceJson) }
+    suspend fun setSourceEnabled(sourceId: String, observedSourceVersion: String, enabled: Boolean): SourceImportResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.setEnabled(sourceId, observedSourceVersion, enabled) }
+    suspend fun deleteSource(sourceId: String, observedSourceVersion: String): SourceImportResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.deleteSource(sourceId, observedSourceVersion) }
     suspend fun reconcileSourceImport(operationId: String): SourceImportResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.reconcile(operationId) }
 

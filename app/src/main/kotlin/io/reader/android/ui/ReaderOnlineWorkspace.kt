@@ -26,6 +26,7 @@ internal data class OnlineWorkspaceState(
     val pendingReads: List<ReaderOnlineOriginalObservation> = emptyList(), val unconfirmedId: String? = null,
     val sourceDocument: ReaderSourceDocumentPreview? = null, val sourceDocumentEpoch: Long = 0,
     val sourceDocumentSelection: ReaderSourceJsonInput? = null,
+    val sourceDeletion: ReaderConfirmationPresentation? = null,
     val error: String? = null, val feedback: String? = null, val feedbackId: String = UUID.randomUUID().toString(),
 ) { val pending get() = pendingSources.isNotEmpty() || pendingAdds.isNotEmpty() || pendingReads.isNotEmpty() || unconfirmedId != null }
 
@@ -38,15 +39,17 @@ internal class ReaderOnlineWorkspace(
     private val reloadShelf: suspend () -> Unit,
 ) {
     private val owner = UUID.randomUUID().toString(); private var host = 0L; private var queryGeneration = 0L
+    private data class SourceDeletion(val id: String, val source: ReaderSourceEntry, val ticket: OnlineUiTicket)
+    private var sourceDeletion: SourceDeletion? = null
     private var active = true; private var picker: Pair<String, OnlineUiTicket>? = null
     private data class DocumentStage(val document: ReaderSourceDocumentPreview, val epoch: Long, val ticket: OnlineUiTicket)
     private var documentEpoch = 0L; private var documentStage: DocumentStage? = null
     private val mutable = MutableStateFlow(OnlineWorkspaceState()); val state = mutable.asStateFlow()
     private fun ticket() = OnlineUiTicket(owner, host, queryGeneration, state.value.revision)
     private fun qualifies(t: OnlineUiTicket) = active && visible() && OnlineWorkspaceUiPolicy.current(t, owner, host, queryGeneration, state.value.revision)
-    private fun offered(revision: String) = active && visible() && !state.value.busy && revision == state.value.revision
+    private fun offered(revision: String) = active && visible() && !state.value.busy && state.value.sourceDeletion == null && revision == state.value.revision
     private fun replace(next: OnlineWorkspaceState) { mutable.value = next.copy(revision = UUID.randomUUID().toString()) }
-    fun open() { if (!active || !visible() || state.value.busy) return; host++; clearDocument(); replace(OnlineWorkspaceState()); refresh(state.value.revision) }
+    fun open() { if (!active || !visible() || state.value.busy) return; host++; sourceDeletion = null; clearDocument(); replace(OnlineWorkspaceState()); refresh(state.value.revision) }
     fun refresh(revision: String) { if (offered(revision)) { clearDocument(); run(ticket()) { t ->
         loadPending(t)
         val rows = library().sources()
@@ -95,6 +98,43 @@ internal class ReaderOnlineWorkspace(
     private fun clearDocument() {
         documentStage = null
         mutable.update { it.copy(sourceDocument = null, sourceDocumentEpoch = 0, sourceDocumentSelection = null) }
+    }
+    fun setSourceEnabled(source: ReaderSourceEntry, enabled: Boolean, revision: String) {
+        if (!offered(revision) || state.value.pending || state.value.page != OnlineWorkspacePage.SOURCES ||
+            state.value.sources.none { it === source } || source.enabled == enabled) return
+        run(ticket()) { t ->
+            val result = library().setSourceEnabled(source.sourceId, source.sourceVersion, enabled)
+            finishSourceManagement(t, result, if (enabled) "启用" else "停用")
+        }
+    }
+    fun requestSourceDeletion(source: ReaderSourceEntry, revision: String) {
+        if (!offered(revision) || state.value.pending || state.value.page != OnlineWorkspacePage.SOURCES || state.value.sources.none { it === source }) return
+        val id = UUID.randomUUID().toString(); sourceDeletion = SourceDeletion(id, source, ticket())
+        mutable.update { it.copy(sourceDeletion = ReaderConfirmationPresentation(id, "删除书源“${source.name}”？",
+            "将删除该书源定义及其在线搜索元数据，并清理该书源的 HTTP 会话。已有书架条目、阅读位置和本地原件保留。", "删除书源")) }
+    }
+    fun dismissSourceDeletion(id: String) {
+        if (sourceDeletion?.id != id) return
+        sourceDeletion = null; mutable.update { if (it.sourceDeletion?.identity == id) it.copy(sourceDeletion = null) else it }
+    }
+    fun confirmSourceDeletion(id: String) {
+        val original = sourceDeletion?.takeIf { it.id == id } ?: return
+        if (!qualifies(original.ticket) || state.value.busy || state.value.pending || state.value.sources.none { it === original.source }) return
+        dismissSourceDeletion(id) // Retire this exact presentation before queueing its one original mutation.
+        run(original.ticket) { t ->
+            if (state.value.sources.none { it === original.source }) return@run
+            val result = library().deleteSource(original.source.sourceId, original.source.sourceVersion)
+            finishSourceManagement(t, result, "删除")
+        }
+    }
+    private suspend fun finishSourceManagement(t: OnlineUiTicket, result: SourceImportResult, action: String) {
+        if (qualifies(t)) {
+            if (!result.durable || result.confirmation == SourceImportConfirmation.UNKNOWN) mutable.update { it.copy(unconfirmedId = result.operationId) }
+            else if (result.confirmation == SourceImportConfirmation.APPLIED) feedback("原${action}已确认。")
+            else feedback("原${action}已确认未应用。")
+        }
+        loadPending(t)
+        val actual = library().sources(); if (qualifies(t)) replace(state.value.copy(sources = actual, loaded = true))
     }
     fun select(source: ReaderSourceEntry, revision: String) {
         if (!offered(revision) || state.value.pending || source !in state.value.sources || !source.enabled) return
@@ -213,12 +253,13 @@ internal class ReaderOnlineWorkspace(
     }
     fun back(): Boolean {
         if (!active || state.value.busy) return true
+        state.value.sourceDeletion?.let { dismissSourceDeletion(it.identity); return true }
         return when (state.value.page) {
             OnlineWorkspacePage.DETAIL -> { replace(state.value.copy(detail = null, page = OnlineWorkspacePage.RESULTS)); true }
             OnlineWorkspacePage.RESULTS -> { retireSession(); queryGeneration++; replace(state.value.copy(session = null, books = emptyList(), detail = null, page = OnlineWorkspacePage.SOURCES)); true }
             OnlineWorkspacePage.SOURCES -> false
         }
     }
-    fun leave() { host++; picker = null; clearDocument(); retireSession(); replace(state.value.copy(session = null, detail = null, books = emptyList())) }
-    fun close() { active = false; picker = null; host++; clearDocument() } // Library retires its real client; no detached new UI task/runtime.
+    fun leave() { sourceDeletion = null; mutable.update { it.copy(sourceDeletion = null) }; host++; picker = null; clearDocument(); retireSession(); replace(state.value.copy(session = null, detail = null, books = emptyList())) }
+    fun close() { sourceDeletion = null; mutable.update { it.copy(sourceDeletion = null) }; active = false; picker = null; host++; clearDocument() } // Library retires its real client; no detached new UI task/runtime.
 }

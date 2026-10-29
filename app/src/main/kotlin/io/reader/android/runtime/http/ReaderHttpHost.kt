@@ -122,6 +122,22 @@ internal class ReaderHttpHost(
         return snapshot()
     }
 
+    /** Called only after App actor + HTTP quiescence is certified under its whole-turn lane.
+     * Core source-fetch session.id is exactly sourceId. Never clear another session or global manager. */
+    fun clearSourceCookieSession(runtime: String, sourceId: String): Boolean {
+        require(sourceId.isNotBlank())
+        val key = CookieKey(runtime, sourceId)
+        val original = synchronized(state) {
+            if (closed || admitted.isNotEmpty() || executing.isNotEmpty()) return false
+            cookies[key]
+        }
+        original?.clear() // Platform CookieStore; no collector/Host state lock during store calls.
+        return synchronized(state) {
+            if (closed || admitted.isNotEmpty() || executing.isNotEmpty() || cookies[key] !== original) return false
+            cookies.remove(key)
+            true
+        }
+    }
     fun snapshot(): CloseSnapshot = synchronized(state) { CloseSnapshot(closed, admitted.toSet(), executing.keys.toSet(), cookies.size) }
 
     companion object {
@@ -146,6 +162,7 @@ internal suspend fun <T> awaitOwnedHttpExecution(cancel: () -> Unit, execute: ()
 
 internal class ReaderHttpCookieSession(limits: ReaderHttpLimits) {
     private val manager = CookieManager(ReaderHttpCookieAdmissionStore(CookieManager().cookieStore, limits), CookiePolicy.ACCEPT_ORIGINAL_SERVER)
+    @Synchronized fun clear() { manager.cookieStore.removeAll(); check(manager.cookieStore.cookies.isEmpty()) { "SOURCE_COOKIE_STORE_NOT_EMPTY" } }
     @Synchronized fun requestHeaders(url: java.net.URI, headers: Map<String, List<String>>): Map<String, List<String>> =
         manager.get(url, headers)
     @Synchronized fun responseHeaders(url: java.net.URI, headers: Map<String, List<String>>) { manager.put(url, headers) }

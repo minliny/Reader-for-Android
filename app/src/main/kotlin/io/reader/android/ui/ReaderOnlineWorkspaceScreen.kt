@@ -14,11 +14,13 @@ import io.reader.android.runtime.ReaderOnlineContentKind
 /** Existing public message adapters; no raw JSON, rule parameters or pretend reading action. */
 @Composable
 internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: ReaderOnlineWorkspace, requestFile: () -> Unit) {
-    val revision = state.revision; val enabled = !state.busy && !state.pending
+    val revision = state.revision; val enabled = !state.busy && !state.pending && state.sourceDeletion == null
     Column(Modifier.fillMaxSize().testTag("reader_online_workspace")) {
         state.feedback?.let { message -> key(state.feedbackId) { ReaderTransientFeedback(message) { owner.clearFeedback(state.feedbackId) } } }
-        state.pendingSources.forEach { original -> ReaderRecoveryNotice("原书源导入尚未确认，原记录会继续保留。", state.busy,
-            { owner.reconcileSource(original.id, revision) }, "核对原导入", "reader_source_reconcile") }
+        state.pendingSources.forEach { original -> ReaderRecoveryNotice(
+            if (original.hostCleanupPending && original.confirmation == io.reader.android.runtime.SourceImportConfirmation.APPLIED)
+                "原书源操作已确认，会话清理仍未完成。" else "原书源操作尚未确认，原记录会继续保留。", state.busy,
+            { owner.reconcileSource(original.id, revision) }, if (original.hostCleanupPending) "继续清理原会话" else "核对原操作", "reader_source_reconcile") }
         state.pendingAdds.forEach { original -> ReaderRecoveryNotice("原入架尚未确认，请核对原操作。", state.busy,
             { owner.reconcileAdd(original.operationId, revision) }, "核对原入架", "reader_online_add_reconcile") }
         state.pendingReads.forEach { original -> ReaderRecoveryNotice("原搜索或详情尚未确认，暂不能开始新的请求。", state.busy,
@@ -57,6 +59,10 @@ internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: Rea
                             Column(Modifier.weight(1f)) { Text(source.name); if (!source.enabled) Text("已停用", style = MaterialTheme.typography.bodySmall) }
                             TextButton({ owner.select(source, revision) }, enabled = enabled && source.enabled,
                                 modifier = Modifier.testTag("reader_source_select_$index")) { Text("选择") }
+                            TextButton({ owner.setSourceEnabled(source, !source.enabled, revision) }, enabled = enabled,
+                                modifier = Modifier.testTag("reader_source_toggle_$index")) { Text(if (source.enabled) "停用" else "启用") }
+                            TextButton({ owner.requestSourceDeletion(source, revision) }, enabled = enabled,
+                                modifier = Modifier.testTag("reader_source_delete_$index")) { Text("删除") }
                         } }
                     }
                 }
@@ -93,4 +99,5 @@ internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: Rea
             }
         }
     }
+    ReaderNativeConfirmation(state.sourceDeletion, owner::confirmSourceDeletion, owner::dismissSourceDeletion)
 }

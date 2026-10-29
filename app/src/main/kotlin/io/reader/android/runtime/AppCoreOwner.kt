@@ -10,6 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asContextElement
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -95,7 +96,19 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     }
     private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
-    private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal) }
+    private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal, ::clearSourceHostSession) }
+    /** No Core RPC. No old Native worker join claim. Old late Host frames remain actor-owned/quarantined. */
+    private fun clearSourceHostSession(sourceId: String): SourceHostCleanupFact {
+        requireHeldLane()
+        val current = actor // Real previously initialized singleton used by the original/query.
+        val protocol = runBlocking { current.snapshot() }
+        if (!protocol.admissionOpen || protocol.requests.isNotEmpty() || protocol.deliveries.isNotEmpty() ||
+            protocol.faults.isNotEmpty() || protocol.unparsedOriginals.isNotEmpty() ||
+            protocol.hostOperations.any { it.phase !in setOf("RESPONSE_ACCEPTED_NO_SUCCESS_EVENT", "READ_RETIRED") })
+            return SourceHostCleanupFact(sourceId, current.runtimeSession, SourceHostCleanupReason.ACTOR_NOT_QUIESCENT)
+        return SourceHostCleanupFact(sourceId, current.runtimeSession, if (httpHost.clearSourceCookieSession(current.runtimeSession, sourceId))
+            SourceHostCleanupReason.CONFIRMED else SourceHostCleanupReason.HTTP_NOT_QUIESCENT)
+    }
     private val onlineAddService by lazy {
         requireHeldLane()
         ReaderOnlineAdd(serviceTransport, journal, ::requireHeldLane,

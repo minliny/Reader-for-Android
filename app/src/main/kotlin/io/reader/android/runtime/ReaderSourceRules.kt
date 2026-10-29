@@ -12,11 +12,18 @@ data class ReaderSourceEntry(val sourceId: String, val name: String, val baseUrl
     val enabled: Boolean, val enabledExplore: Boolean, val sourceVersion: String, val bookSourceJson: String?)
 enum class SourceImportConfirmation { UNKNOWN, APPLIED, REJECTED }
 data class PendingSourceImport(val id: String, val sourceId: String, val confirmation: SourceImportConfirmation,
-    val candidateRetained: Boolean)
+    val candidateRetained: Boolean, val method: String = "source.import", val hostCleanupPending: Boolean = false)
 /** Confirmation is Core evidence; durable=false never admits a following rules mutation. */
 data class SourceImportResult(val operationId: String, val sourceId: String, val confirmation: SourceImportConfirmation,
     val durable: Boolean, val candidateRetained: Boolean = false, val coreOperationId: String,
-    val sequence: Long, val receiptJson: String? = null, val headJson: String? = null)
+    val sequence: Long, val receiptJson: String? = null, val headJson: String? = null,
+    val method: String = "source.import", val hostCleanupRequired: Boolean = false, val hostCleanupConfirmed: Boolean = false)
+internal enum class SourceHostCleanupReason { ACTOR_NOT_QUIESCENT, HTTP_NOT_QUIESCENT, CONFIRMED }
+internal data class SourceHostCleanupFact(val sourceId: String, val runtimeSession: String, val reason: SourceHostCleanupReason) {
+    val confirmed get() = reason == SourceHostCleanupReason.CONFIRMED
+    fun json(): JSONObject = JSONObject().put("sourceId", sourceId).put("runtimeSession", runtimeSession)
+        .put("reason", reason.name).put("confirmed", confirmed)
+}
 class SourceRulesPendingException(val operationId: String, val stage: String, cause: Throwable? = null) :
     Exception("SOURCE_RULES_PENDING:$operationId/$stage", cause)
 
@@ -49,18 +56,51 @@ internal object SourceRulesReceiptPolicy {
     }
     fun parameters(record: JSONObject): JSONObject {
         check(record.getInt("journalSchema") == 1 && record.getString("kind") == KIND &&
-            record.getString("method") == "source.import") { "SOURCE_ORIGINAL_KIND" }
+            record.getString("method") in setOf("source.import", "source.update", "source.delete")) { "SOURCE_ORIGINAL_KIND" }
         val params = JSONObject(record.getString("parametersJson"))
         val seq = integer(params, "sequence"); val id = string(params, "operationId")
         check(seq in 1..MAX_SEQUENCE && operation.matches(id) && id.substringAfterLast('/') == seq.toString()) { "SOURCE_ORIGINAL_BINDING" }
         val mutation = params.getJSONObject("mutation")
-        check(string(mutation, "method") == "source.import") { "SOURCE_METHOD_REQUIRES_ITS_OWN_OWNER" }
-        val business = mutation.getJSONObject("params")
-        check(business.keys().asSequence().toSet() == setOf("sourceId", "bookSource") &&
-            string(business, "sourceId") == string(record, "sourceId") && string(record, "sourceId").isNotBlank()) { "SOURCE_ORIGINAL_IDENTITY" }
-        // Compare the same mature org.json wire view as parametersJson, preserving the original raw string.
-        val originalWireView = JSONObject(sourceObject(record.getString("originalBookSourceJson")).toString())
-        check(same(business.getJSONObject("bookSource"), originalWireView)) { "SOURCE_ORIGINAL_JSON_CHANGED" }
+        check(string(mutation, "method") == string(record, "method")) { "SOURCE_ORIGINAL_METHOD_CHANGED" }
+        val business = mutation.getJSONObject("params"); val source = string(record, "sourceId")
+        check(source.isNotBlank()) { "SOURCE_ORIGINAL_IDENTITY" }
+        when (string(record, "method")) {
+            "source.import" -> {
+                check(business.keys().asSequence().toSet() == setOf("sourceId", "bookSource") &&
+                    string(business, "sourceId") == source) { "SOURCE_ORIGINAL_IDENTITY" }
+                // Preserve existing import bytes and its complete-original-object interpretation.
+                val originalWireView = JSONObject(sourceObject(record.getString("originalBookSourceJson")).toString())
+                check(same(business.getJSONObject("bookSource"), originalWireView)) { "SOURCE_ORIGINAL_JSON_CHANGED" }
+            }
+            "source.update" -> {
+                check(business.keys().asSequence().toSet() == setOf("sourceId", "enabled") &&
+                    string(business, "sourceId") == source && business.get("enabled") is Boolean) { "SOURCE_UPDATE_NARROW_DTO" }
+                check(fingerprint.matches(string(record, "observedSourceVersion")) && !record.has("originalBookSourceJson") &&
+                    record.get("hostCleanupRequired") == !business.getBoolean("enabled")) { "SOURCE_UPDATE_ORIGINAL_SCOPE" }
+            }
+            "source.delete" -> {
+                val ids = business.getJSONArray("sourceIds")
+                check(business.keys().asSequence().toSet() == setOf("sourceIds") && ids.length() == 1 && ids.get(0) == source &&
+                    fingerprint.matches(string(record, "observedSourceVersion")) && !record.has("originalBookSourceJson") &&
+                    record.get("hostCleanupRequired") == true) { "SOURCE_DELETE_SINGLE_ORIGINAL_SCOPE" }
+            }
+        }
+        if (record.getString("method") != "source.import") {
+            check(record.get("hostCleanupConfirmed") is Boolean && (!record.has("queryQualified") || record.get("queryQualified") is Boolean)) { "SOURCE_HOST_CLEANUP_FACT_TYPE" }
+            if (record.getBoolean("hostCleanupConfirmed")) check(record.getBoolean("hostCleanupRequired") &&
+                record.opt("queryQualified") == true && record.optString("receiptJson").isNotEmpty() &&
+                record.getString("hostCleanupRuntimeSession").matches(Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"))) { "SOURCE_HOST_CLEANUP_SCOPE" }
+            if (record.has("lastHostCleanupObservationJson")) {
+                val observed = JSONObject(record.getString("lastHostCleanupObservationJson"))
+                check(observed.keys().asSequence().toSet() == setOf("sourceId", "runtimeSession", "reason", "confirmed") &&
+                    string(observed, "sourceId") == source && observed.get("confirmed") is Boolean &&
+                    string(observed, "runtimeSession").matches(Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")) &&
+                    string(observed, "reason") in SourceHostCleanupReason.values().map { it.name } &&
+                    observed.getBoolean("confirmed") == (observed.getString("reason") == "CONFIRMED")) { "SOURCE_HOST_CLEANUP_OBSERVATION" }
+                if (record.getBoolean("hostCleanupConfirmed")) check(observed.getBoolean("confirmed") &&
+                    observed.getString("runtimeSession") == record.getString("hostCleanupRuntimeSession")) { "SOURCE_HOST_CLEANUP_OBSERVATION_SCOPE" }
+            } else check(!record.getBoolean("hostCleanupConfirmed")) { "SOURCE_HOST_CLEANUP_OBSERVATION_REQUIRED" }
+        }
         check(record.getString("id") == "android-source-" + id.substringBeforeLast('/') &&
             record.get("completed") is Boolean) { "SOURCE_JOURNAL_IDENTITY" }
         return params
@@ -74,12 +114,21 @@ internal object SourceRulesReceiptPolicy {
     fun receipt(record: JSONObject, value: JSONObject): SourceImportConfirmation {
         val params = parameters(record); val b = value.getJSONObject("binding"); binding(b)
         check(string(b, "operationId") == string(params, "operationId") && integer(b, "sequence") == integer(params, "sequence") &&
-            string(value, "method") == "source.import" && fingerprint.matches(string(value, "ackFingerprint"))) { "SOURCE_ORIGINAL_RECEIPT_MISMATCH" }
+            string(value, "method") == string(record, "method") && fingerprint.matches(string(value, "ackFingerprint"))) { "SOURCE_ORIGINAL_RECEIPT_MISMATCH" }
         val data = value.getJSONObject("data")
         val confirmation = when (string(value, "outcome")) {
             "applied" -> {
-                check(data.get("imported") == true && string(data, "sourceId") == string(record, "sourceId") &&
-                    string(data, "name").isNotBlank()) { "SOURCE_IMPORT_ACK_MISMATCH" }
+                when (string(record, "method")) {
+                    "source.import" -> check(data.get("imported") == true && string(data, "sourceId") == string(record, "sourceId") &&
+                        string(data, "name").isNotBlank()) { "SOURCE_IMPORT_ACK_MISMATCH" }
+                    "source.update" -> {
+                        val updated = data.getJSONObject("source"); val business = params.getJSONObject("mutation").getJSONObject("params")
+                        check(data.keys().asSequence().toSet() == setOf("source") && string(updated, "sourceId") == string(record, "sourceId") &&
+                            updated.get("enabled") == business.get("enabled") && fingerprint.matches(string(updated, "sourceVersion")) &&
+                            updated.getJSONObject("bookSource").get("enabled") == business.get("enabled")) { "SOURCE_UPDATE_ORIGINAL_ACK" }
+                    }
+                    "source.delete" -> check(data.keys().asSequence().toSet() == setOf("deleted") && integer(data, "deleted") in 0L..1L) { "SOURCE_DELETE_ORIGINAL_ACK" }
+                }
                 SourceImportConfirmation.APPLIED
             }
             "rejected" -> {
@@ -113,12 +162,18 @@ internal object SourceRulesReceiptPolicy {
         if (disk == null) return warm
         if (warm == null) return disk.also { parameters(it) }
         parameters(disk); parameters(warm)
-        for (key in listOf("id", "kind", "sourceId", "method", "parametersJson", "originalBookSourceJson"))
+        val fields = listOf("id", "kind", "sourceId", "method", "parametersJson") +
+            (if (disk.getString("method") == "source.import") listOf("originalBookSourceJson") else listOf("observedSourceVersion", "hostCleanupRequired"))
+        for (key in fields)
             check(disk.get(key) == warm.get(key)) { "SOURCE_DURABLE_INTENT_CHANGED:$key" }
         disk.optString("receiptJson").takeIf { it.isNotEmpty() }?.let { raw ->
             receipt(warm, JSONObject(raw))
             if (warm.optString("receiptJson").isEmpty()) warm.put("receiptJson", raw)
             if (disk.optBoolean("queryQualified")) warm.put("queryQualified", true)
+        }
+        if (disk.getString("method") != "source.import" && disk.optBoolean("hostCleanupConfirmed") && !warm.optBoolean("hostCleanupConfirmed")) {
+            warm.put("hostCleanupConfirmed", true).put("hostCleanupRuntimeSession", disk.getString("hostCleanupRuntimeSession"))
+                .put("lastHostCleanupObservationJson", disk.getString("lastHostCleanupObservationJson"))
         }
         if (disk.optLong("requestId", -1) == warm.optLong("requestId", -2) &&
             disk.optString("runtimeSession") == warm.optString("runtimeSession")) disk.optJSONObject("wireTerminal")?.let { event ->
@@ -150,7 +205,8 @@ internal object SourceRulesReceiptPolicy {
 }
 
 /** One instance on the App owner; all calls require its actual held lane. No new poller/runtime/database. */
-internal class ReaderSourceRules(private val transport: CoreTransport, private val journal: DurableJournal) {
+internal class ReaderSourceRules(private val transport: CoreTransport, private val journal: DurableJournal,
+    private val cleanupSource: (String) -> SourceHostCleanupFact? = { null }) {
     private val runtime = transport.session
     private var checkedCapabilities = false
     private var warm: JSONObject? = null
@@ -188,7 +244,9 @@ internal class ReaderSourceRules(private val transport: CoreTransport, private v
         return originals.values.map { snapshot ->
             val record = JSONObject(snapshot.recordJson); SourceRulesReceiptPolicy.parameters(record)
             PendingSourceImport(record.getString("id"), record.getString("sourceId"),
-                SourceRulesReceiptPolicy.confirmation(record), snapshot.candidateRetained)
+                SourceRulesReceiptPolicy.confirmation(record), snapshot.candidateRetained, record.getString("method"),
+                record.optBoolean("hostCleanupRequired") && SourceRulesReceiptPolicy.confirmation(record) == SourceImportConfirmation.APPLIED &&
+                    !record.optBoolean("hostCleanupConfirmed"))
         }
     }
     fun importJson(sourceId: String, originalBookSourceJson: String): SourceImportResult {
@@ -227,6 +285,40 @@ internal class ReaderSourceRules(private val transport: CoreTransport, private v
         consumeWire(record)
         return qualify(record, candidateRetained = false)
     }
+    fun setEnabled(sourceId: String, observedSourceVersion: String, enabled: Boolean): SourceImportResult =
+        manage(sourceId, observedSourceVersion, "source.update", JSONObject().put("sourceId", sourceId).put("enabled", enabled), !enabled)
+    fun deleteSource(sourceId: String, observedSourceVersion: String): SourceImportResult =
+        manage(sourceId, observedSourceVersion, "source.delete", JSONObject().put("sourceIds", JSONArray().put(sourceId)), true)
+    private fun manage(sourceId: String, observedVersion: String, method: String, business: JSONObject, cleanupRequired: Boolean): SourceImportResult {
+        checkOwner(); require(sourceId.isNotBlank()); journal.readAll()
+        pending().firstOrNull()?.let { throw SourceRulesPendingException(it.id, "rules.mutation.apply") }
+        capabilities()
+        check(list(sourceId).singleOrNull()?.sourceVersion == observedVersion) { "SOURCE_MANAGEMENT_PRESENTATION_STALE" }
+        val sequence = SourceRulesReceiptPolicy.nextSequence(transport.request("rules.mutation.query"))
+        val uuid = UUID.randomUUID().toString()
+        val parameters = JSONObject().put("operationId", "$uuid/$sequence").put("sequence", sequence)
+            .put("mutation", JSONObject().put("method", method).put("params", business))
+        val record = JSONObject().put("journalSchema", 1).put("kind", SourceRulesReceiptPolicy.KIND)
+            .put("id", "android-source-$uuid").put("sourceId", sourceId).put("method", method)
+            .put("parametersJson", parameters.toString()).put("observedSourceVersion", observedVersion)
+            .put("hostCleanupRequired", cleanupRequired).put("hostCleanupConfirmed", false).put("completed", false)
+        SourceRulesReceiptPolicy.parameters(record); warm = record; persist(record)
+        val originalRuntime = transport.session
+        try {
+            transport.request("rules.mutation.apply", parameters, beforeSend = { requestId ->
+                record.put("requestId", requestId).put("runtimeSession", originalRuntime); persist(record)
+            }, terminal = { event ->
+                check(transport.session == originalRuntime && event.getLong("requestId") == record.getLong("requestId")) { "SOURCE_ORIGINAL_ROUTE_CHANGED" }
+                if (!record.optBoolean("completed")) record.put("wireTerminal", event)
+                journal.terminal(record.getString("id"), event.getLong("requestId"), originalRuntime, event)
+            })
+        } catch (error: Exception) {
+            if (error.coreProtocolPending() != null) throw error
+            throw SourceRulesPendingException(record.getString("id"), "rules.mutation.apply", error)
+        }
+        consumeWire(record)
+        return qualify(record, false)
+    }
     /** Query-only recovery. There is intentionally no replay or fresh-list-as-ACK path. */
     fun reconcile(operationId: String): SourceImportResult {
         checkOwner()
@@ -240,8 +332,7 @@ internal class ReaderSourceRules(private val transport: CoreTransport, private v
         warm = record
         if (snapshot?.candidateRetained != true && record.optBoolean("queryQualified") && record.optString("receiptJson").isNotEmpty()) {
             // A successful prior archive may still have failed directory fsync. Re-establish durability once.
-            record.put("completed", true); persist(record); warm = null
-            return result(record, true, false, null)
+            return finishQualified(record, null) // A cleanup retry cannot dispatch/query the Core mutation again.
         }
         return qualify(record, snapshot?.candidateRetained == true)
     }
@@ -257,13 +348,32 @@ internal class ReaderSourceRules(private val transport: CoreTransport, private v
         if (receipt != null) {
             record.put("receiptJson", receipt.toString()).put("queryQualified", true)
             if (!candidateRetained) {
-                record.put("completed", true); persist(record); warm = null
-                return result(record, true, false, query)
+                return finishQualified(record, query)
             }
         }
         // Existing .new is retained, never trusted/promoted/deleted. Original query facts may be shown,
         // but no durable completion or following mutation is authorized by this finite slice.
         return result(record, false, candidateRetained, query)
+    }
+    /** Core receipt and Host cleanup are separate facts. Caller is the actual App-owned retained turn. */
+    private fun finishQualified(record: JSONObject, query: JSONObject?): SourceImportResult {
+        if (record.optBoolean("hostCleanupRequired") && SourceRulesReceiptPolicy.confirmation(record) == SourceImportConfirmation.APPLIED &&
+            !record.optBoolean("hostCleanupConfirmed")) {
+            persist(record) // Durable original Core receipt before any independent Host action.
+            val cleanup = try { cleanupSource(record.getString("sourceId")) }
+            catch (error: Exception) {
+                record.put("hostCleanupFailureClass", error.javaClass.name); persist(record)
+                throw SourceRulesPendingException(record.getString("id"), "source.host.cleanup", error)
+            }
+            if (cleanup == null) return result(record, false, false, query)
+            check(cleanup.sourceId == record.getString("sourceId") && cleanup.runtimeSession == transport.session) { "SOURCE_HOST_CLEANUP_OWNER_CHANGED" }
+            record.put("lastHostCleanupObservationJson", cleanup.json().toString())
+            if (!cleanup.confirmed) { persist(record); return result(record, false, false, query) }
+            record.put("hostCleanupConfirmed", true).put("hostCleanupRuntimeSession", cleanup.runtimeSession)
+            record.remove("hostCleanupFailureClass"); persist(record)
+        }
+        record.put("completed", true); persist(record); warm = null
+        return result(record, true, false, query)
     }
     private fun consumeWire(record: JSONObject) {
         val wire = record.optJSONObject("wireTerminal") ?: return
@@ -277,7 +387,8 @@ internal class ReaderSourceRules(private val transport: CoreTransport, private v
             SourceRulesReceiptPolicy.confirmation(record), durable, candidateRetained,
             parameters.getString("operationId"), parameters.getLong("sequence"),
             record.optString("receiptJson").takeIf { it.isNotEmpty() },
-            query?.takeUnless { it.isNull("head") }?.getJSONObject("head")?.toString())
+            query?.takeUnless { it.isNull("head") }?.getJSONObject("head")?.toString(), record.getString("method"),
+            record.optBoolean("hostCleanupRequired"), record.optBoolean("hostCleanupConfirmed"))
     }
     private fun persist(record: JSONObject) {
         warm = record
