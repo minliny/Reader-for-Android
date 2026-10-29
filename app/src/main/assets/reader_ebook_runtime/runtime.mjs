@@ -55,8 +55,12 @@ const loadDocument = captured => documentPromise ||= (async () => {
   diagnosticPhase(captured, 'FRAME_LOAD_BEGIN');
   await new Promise((resolve, reject) => {
     const loaded = () => {
+      diagnosticPhase(captured, 'FRAME_LOAD_EVENT');
       try {
-        if (frame.contentWindow.location.href !== expected.href) return; // Initial about:blank is not the publication.
+        if (frame.contentWindow.location.href !== expected.href) {
+          diagnosticPhase(captured, 'FRAME_LOAD_IGNORED_HREF');
+          return; // Initial about:blank is not the publication; preserve the exact URL guard.
+        }
         frame.removeEventListener('load', loaded); resolve();
       } catch (error) { reject(error); }
     };
@@ -164,6 +168,9 @@ async function configure(epoch, token) {
     const book = await loadDocument(captured); if (!current(captured)) return;
     diagnosticPhase(captured, 'DOCUMENT_WAIT_COMPLETE');
     book.dom.applyLayout(layout.options);
+    // Initial full entry stays undisplayed through authentication, crop and confirmed edits.
+    // Already admitted reflow is not hidden; actual geometry/Ready work remains below.
+    if (frame.style.display !== 'block') frame.style.display = 'block';
     diagnosticPhase(captured, 'ASSET_WAIT_BEGIN');
     await waitAssets(book); if (!current(captured)) return;
     diagnosticPhase(captured, 'ASSET_WAIT_COMPLETE');

@@ -1,6 +1,8 @@
 package io.reader.android.ui.ebookdraft
 
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Finite observation of this one Owner; no URL/text, stream reads, Native calls or admission authority. */
@@ -10,7 +12,7 @@ internal class ReaderEbookLayoutDiagnostics(private val renderId: String, privat
         VISUAL_COMPLETED, NATIVE_DRAW_OBSERVED, NATIVE_DRAW_POSTED, PROBE_REQUEST,
         READY_PAINT_RECEIVED, NATIVE_READY }
     enum class JsPhase { CONFIGURE_ENTER, LAYOUT_FETCH_BEGIN, LAYOUT_FETCH_COMPLETE,
-        CONFIG_FETCH_BEGIN, CONFIG_FETCH_COMPLETE, FRAME_LOAD_BEGIN, FRAME_LOAD_COMPLETE,
+        CONFIG_FETCH_BEGIN, CONFIG_FETCH_COMPLETE, FRAME_LOAD_BEGIN, FRAME_LOAD_EVENT, FRAME_LOAD_IGNORED_HREF, FRAME_LOAD_COMPLETE,
         DOCUMENT_WAIT_BEGIN, DOCUMENT_WAIT_COMPLETE, DOM_ADMIT_BEGIN, DOCUMENT_WINDOW_BEGIN,
         DOCUMENT_WINDOW_COMPLETE, DOM_CROP_BEGIN, DOM_CROP_COMPLETE, ORIGINAL_MATCH_COMPLETE,
         EDIT_APPLY_BEGIN, EDIT_APPLY_COMPLETE, PROCESSED_MATCH_COMPLETE, DOM_ADMIT_COMPLETE,
@@ -34,6 +36,8 @@ internal class ReaderEbookLayoutDiagnostics(private val renderId: String, privat
     private val native = linkedMapOf<NativePhase, Long>()
     private val js = linkedMapOf<JsPhase, Pair<Long, Double>>()
     private val resources = Resource.values().associateWith { Response() }
+    private var entryStreams = 0L
+    private var entryStream: ReaderEbookEntryInputStream.Observation? = null
     private fun time(): Long? = try { clock().takeIf { it >= 0 } } catch (_: Exception) { null }
 
     fun beginLayout(value: Long, layoutToken: String) {
@@ -98,11 +102,23 @@ internal class ReaderEbookLayoutDiagnostics(private val renderId: String, privat
             if (row.pending == 0L) row.batchSince = 0
         }
     }
+    /** Exact entry only; failures to create observation return the same original memory stream. */
+    fun entryStream(stream: ByteArrayInputStream, declaredBytes: Int): InputStream {
+        return try {
+            val observed = ReaderEbookEntryInputStream(stream, declaredBytes.toLong(), clock)
+            synchronized(lock) {
+                if (closed) return stream
+                entryStreams++; entryStream = observed.observation
+            }
+            observed
+        } catch (_: Exception) { stream }
+    }
+
     /** Copy only finite primitive data under lock; JSON work happens after releasing it. */
     fun snapshot(): JSONObject {
         val copied = synchronized(lock) {
             Triple(listOf(epoch, token, outcome.name, closed, rejected), native.toMap(),
-                js.toMap() to resources.mapValues { it.value.copy() })
+                Triple(js.toMap(), resources.mapValues { it.value.copy() }, entryStreams to entryStream))
         }
         val scope = copied.first; val phases = JSONObject(); val jsPhases = JSONObject(); val counts = JSONObject()
         copied.second.forEach { (phase, at) -> phases.put(phase.name, at) }
@@ -113,9 +129,14 @@ internal class ReaderEbookLayoutDiagnostics(private val renderId: String, privat
                 .put("failedResponses", row.failed).put("pending", row.pending)
                 .put("activeBatchSinceElapsedMs", row.batchSince).put("lastCompletedElapsedMs", row.lastCompleted)
                 .put("lastDurationMs", row.lastDuration)) }
-        return JSONObject().put("schemaVersion", 1).put("renderId", renderId).put("layoutEpoch", scope[0])
+        val result = JSONObject().put("schemaVersion", 1).put("renderId", renderId).put("layoutEpoch", scope[0])
             .put("layoutToken", scope[1]).put("outcome", scope[2]).put("closed", scope[3])
             .put("rejectedDiagnosticEvents", scope[4]).put("nativePhases", phases).put("jsPhases", jsPhases)
             .put("resourcesScope", "OWNER_RENDER_LIFETIME_RESPONSE_RETURN_NOT_STREAM_OR_NATIVE_JOIN").put("resources", counts)
+            .put("entryStreamsObserved", copied.third.third.first)
+        // No stream/IO operation occurs under the collector lock. A memory-stream snapshot is bounded.
+        try { copied.third.third.second?.snapshot()?.let { result.put("entryStream", it) } }
+        catch (_: Exception) { result.put("entryStreamObservationUnavailable", true) }
+        return result
     }
 }

@@ -18,6 +18,7 @@ import java.io.BufferedWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
+import java.io.InputStream
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Locale
 import kotlin.math.ceil
@@ -80,7 +81,10 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
                     val resource = provider.readCanonicalEntry(entry)
                     requireCurrent()
                     // Archive bytes retain their original encoding. Chromium handles BOM/XML/charset detection.
-                    response(resource.mime, null, resource.bytes, ReaderEbookWebViewBoundary.PUBLICATION_CSP)
+                    val data = ByteArrayInputStream(resource.bytes)
+                    val observed = if (entry == original.prepared.presentation.entryPath)
+                        diagnostics.entryStream(data, resource.bytes.size) else data
+                    response(resource.mime, null, resource.bytes, ReaderEbookWebViewBoundary.PUBLICATION_CSP, observed)
                 }
                 else -> ReaderEbookWebViewBoundary.denied()
             }
@@ -175,9 +179,10 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
         private const val SHELL_CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
             "connect-src 'self'; frame-src 'self'; img-src 'none'; font-src 'none'; object-src 'none'; " +
             "base-uri 'none'; form-action 'none'; worker-src 'none'"
-        private fun response(mime: String, encoding: String?, bytes: ByteArray, csp: String) = WebResourceResponse(
+        private fun response(mime: String, encoding: String?, bytes: ByteArray, csp: String,
+            data: InputStream = ByteArrayInputStream(bytes)) = WebResourceResponse(
             mime, encoding, 200, "OK", mapOf("Content-Security-Policy" to csp, "Cache-Control" to "no-store",
-                "X-Content-Type-Options" to "nosniff", "Referrer-Policy" to "no-referrer"), ByteArrayInputStream(bytes))
+                "X-Content-Type-Options" to "nosniff", "Referrer-Policy" to "no-referrer"), data)
 
         fun snapshot(input: ReaderEbookRenderInput, epoch: Long, token: String, anchor: Int, width: Int, height: Int): ReaderEbookLayoutSnapshot {
             val g = input.geometry
