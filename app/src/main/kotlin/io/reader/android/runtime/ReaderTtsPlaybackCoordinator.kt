@@ -90,7 +90,7 @@ internal class ReaderTtsPlaybackCoordinator(
         check(snapshot.currentSliceIndex == startSliceIndex) { "TTS_QUEUE_START_BINDING" }
         plan = nextPlan; currentIndex = startSliceIndex
         publish(ReaderTtsPlaybackStatus.PREPARING, currentIndex, null)
-        Log.i("ReaderTts", "Coordinator start chapter=${nextPlan.chapter.bookId}/${nextPlan.chapter.index} slices=${nextPlan.slices.size} engineReady=${engine.ready}")
+        Log.i("ReaderTts", "Coordinator start chapter=${nextPlan.chapter.bookId}/${nextPlan.chapter.chapterIndex} slices=${nextPlan.slices.size} engineReady=${engine.ready}")
         if (engine.ready) speakCurrent() else engine.initialize()
     }
 
