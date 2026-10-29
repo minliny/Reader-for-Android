@@ -169,8 +169,10 @@ fun ReaderApp(model: ReaderViewModel) {
                 Column(Modifier.fillMaxSize().padding(padding)) {
                     ReaderProtocolRecoveryHost(model)
                     if (state.route == ReaderRoute.Bookshelf) {
-                        state.onlineFeedback?.let { message -> androidx.compose.runtime.key(state.onlineFeedbackId) {
-                            ReaderTransientFeedback(message) { model.retireOnlineFeedback(state.onlineFeedbackId) }
+                        state.onlineFeedback?.let { message ->
+                            val feedbackId = state.onlineFeedbackId
+                            androidx.compose.runtime.key(feedbackId) {
+                            ReaderTransientFeedback(message) { model.retireOnlineFeedback(feedbackId) }
                         } }
                         state.pendingPositions.filter { it.sourceId != "local" }.forEach { original ->
                             val host = model.protocolRecoveryHost()
