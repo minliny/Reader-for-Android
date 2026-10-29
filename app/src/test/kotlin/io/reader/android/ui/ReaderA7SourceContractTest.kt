@@ -14,9 +14,11 @@ class ReaderA7SourceContractTest {
     @Test
     fun appHostOwnsBackAndSafeDrawingBoundary() {
         val app = source("io/reader/android/ui/ReaderApp.kt")
+        val activity = source("io/reader/android/MainActivity.kt")
         assertTrue("BackHandler(enabled = state.route != ReaderRoute.Bookshelf)" in app)
         assertTrue("WindowInsets.safeDrawing" in app)
         assertTrue("testTagsAsResourceId = true" in app)
+        assertTrue("enableEdgeToEdge()" in activity)
         assertTrue("Icon(painterResource(R.drawable.reader_back), \"返回\")" in app)
         assertTrue("Icon(painterResource(R.drawable.reader_import), \"导入本地书\")" in app)
     }
