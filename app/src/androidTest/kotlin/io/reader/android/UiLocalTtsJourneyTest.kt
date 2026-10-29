@@ -38,6 +38,10 @@ class UiLocalTtsJourneyTest {
         compose.waitUntil(20_000) {
             model.state.value.route == ReaderRoute.Reading && model.state.value.reading != null && !model.state.value.busy
         }
+        assertTrue(
+            "Local TTS journey requires no unresolved progress operation for the selected book",
+            model.state.value.pendingPosition == null,
+        )
         compose.onNodeWithTag("reader_body").performTouchInput { click() }
         compose.waitUntil(5_000) { model.state.value.controlsVisible }
         compose.onNodeWithTag("reader_tts_toggle").performClick()
