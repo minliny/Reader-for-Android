@@ -35,6 +35,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.reader.android.R
+import io.reader.android.runtime.ReaderLocalBookFormat
 
 val ReaderScalarOffsetKey = SemanticsPropertyKey<Int>("ReaderScalarOffset")
 var SemanticsPropertyReceiver.readerScalarOffset by ReaderScalarOffsetKey
@@ -52,13 +53,15 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             readerChapterIndex = reading.chapter.index
         }) {
         key(reading.identity) {
-            ReaderNativeChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
-                onVisibleAnchor = { model.visibleAnchor(reading.identity, it) },
-                onTap = model::toggleControls,
-                modifier = Modifier.align(Alignment.Center).widthIn(max = 760.dp).fillMaxSize())
+            val bodyModifier = Modifier.align(Alignment.Center).widthIn(max = 760.dp).fillMaxSize()
+            when (reading.format) {
+                ReaderLocalBookFormat.TXT -> ReaderNativeChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
+                    onVisibleAnchor = { model.visibleAnchor(reading.identity, it) }, onTap = model::toggleControls, modifier = bodyModifier)
+                ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI -> ReaderEbookReadingBody(state, model, bodyModifier)
+            }
         }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-            if (state.controlsVisible || state.error != null || state.busy || state.pendingPosition != null) {
+            if (state.controlsVisible || state.error != null || state.busy || state.pendingPosition != null || state.ebookFailureOwner == reading.identity) {
                 Surface(color = state.paper.background()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = model::exitReading, enabled = !state.busy,

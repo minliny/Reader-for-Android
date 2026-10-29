@@ -34,3 +34,17 @@ Every visible callback captures the current VM UUID + generation + route and pre
 | 原搜索 cursor 关闭尚未确认 | Recovery / 既有 ReaderRecoveryNotice；当前 ReaderApp 非阅读消息列或 ReaderReadingScreen 阅读消息列互斥宿主 | 回调捕获完整原 session、展示 route 和 reading identity；VM 在入口核仍为同一宿主与 pending 原 session，Library 的 App owner gate 只观察或消费同一原关闭请求 | 换页面/reading/session 后旧回调失效；关闭面板和 pending=null 均不表示 ACK；ACK 失败或 Core 错误保原 Call，不能自动重派；成功确认仅同 readingOwner/VM 代次/完整 session/inflight 可投影，原业务清理由 service 持有 |
 
 searchCloseInFlight 与 lastSearchCloseConfirmation 是原操作事实的内存投影，不新增用户消息或样式出口。后者只包含原 parsed terminal 的重序列 JSON，不声明传输字节相同。协议未决优先由上面的 App owner protocol recovery 入口处理；展示隐藏不完成、取消或重试原请求。
+
+
+## A3 retained-original format and physical WebView host
+
+| Business fact / entry | Public category / physical host | Exact identity and validity | Cleanup / action boundary |
+| --- | --- | --- | --- |
+| Original book format/authority read fails before chapter publication | Transient / existing ReaderTransientFeedback in the original ReaderApp or reading message column | Original VM request generation and selected book; only the active perform owner may publish | A new request retires the old feedback. Missing authority does not become TXT fallback, new import or automatic re-import |
+| Physical ebook preparation, resource, canonical restore or draw fails | PageState / existing ReaderPageState under ReaderEbookReadingBody or ReaderEbookBody | Captured readingOwner + full chapter/session/body/processing + single-use physical view/render UUID; ready/failure also retain original layout epoch/token | Dispose/route/session replacement closes only the exact view. No generic retry, refresh or hidden business cancellation; hiding the error does not confirm an operation |
+| Same original renderer operation has a typed protocol pending cause | Recovery / existing ReaderProtocolRecoveryHost, mutually exclusive reading or non-reading message column | Existing CoreProtocolReference and presentationId remain App-owned; UI forwards only a cause from its still-current view/reading scope | Existing original protocol action eligibility applies. No import-pending alias, new Core request, replay or alternate ACK inferred from renderer/PageState/Ready |
+
+Native Ready/selection/tap/visible-anchor callbacks are scoped renderer facts,
+not user message components. Selection observation owns no bookmark/highlight
+write or clipboard receipt. Blocked external/cross-chapter link navigation is
+unadmitted, not a success message or a new generic Alert/Toast flow.

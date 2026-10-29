@@ -18,6 +18,11 @@
 - 本地导入持久保存原书和原操作 journal；超时保留未决，显式恢复核对原绑定。
   普通进度未知写入不重派。可见位置按原生行坐标转换到 Core scalar，绑定正文、
   处理版本、CAS revision 和阅读 session。
+- EPUB/MOBI 原文由受限 WebView 渲染，沿用 Core canonical 坐标与既有 iOS DOM
+  适配；资源通过同一 App/actor 读取私有原件，不另开 Core runtime。平台适配固定
+  `androidx.webkit:webkit:1.18.0`（Apache-2.0），来源为
+  [AndroidX WebKit](https://developer.android.com/jetpack/androidx/releases/webkit)。
+  每个实际 WebView 使用独立能力与布局身份；格式和真机验收仍在唯一待办分别记录。
 
 ## 构建与准确验证入口
 

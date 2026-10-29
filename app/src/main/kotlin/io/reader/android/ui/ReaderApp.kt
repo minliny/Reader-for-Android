@@ -88,7 +88,7 @@ fun ReaderApp(model: ReaderViewModel) {
     }
     val importAllowed = !state.busy && state.pendingReady && state.pendingImports.isEmpty() &&
         (!protocol.initialized || protocol.admissionOpen)
-    val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) }
+    val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/epub+zip", "application/x-mobipocket-ebook", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
         val readingVisible = state.route == ReaderRoute.Reading && state.reading != null
@@ -219,7 +219,7 @@ private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImpo
                             verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Icon(painterResource(R.drawable.reader_library), null, Modifier.size(52.dp), tint = MaterialTheme.colorScheme.primary)
                             Text("让阅读从这里开始", style = MaterialTheme.typography.titleLarge)
-                            Text("导入本地 TXT，将喜欢的书放进书架。", style = MaterialTheme.typography.bodyMedium,
+                            Text("导入本地 TXT、EPUB 或 MOBI，将喜欢的书放进书架。", style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Button(onClick = onImport, enabled = !state.busy && state.pendingReady && state.pendingImports.isEmpty(),
                                 modifier = Modifier.testTag("reader_empty_import")) {

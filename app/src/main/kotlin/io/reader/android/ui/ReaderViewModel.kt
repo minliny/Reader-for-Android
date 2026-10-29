@@ -9,6 +9,14 @@ import io.reader.android.runtime.ChapterItem
 import io.reader.android.runtime.LibraryBook
 import io.reader.android.runtime.ReaderChapter
 import io.reader.android.runtime.ReaderLibrary
+import io.reader.android.runtime.ReaderLocalBookFormat
+import io.reader.android.runtime.ReaderEbookViewLease
+import io.reader.android.runtime.ReaderEbookViewPreparation
+import io.reader.android.ui.ebookdraft.ReaderEbookReady
+import io.reader.android.ui.ebookdraft.ReaderEbookVisibleAnchor
+import io.reader.android.ui.ebookdraft.ReaderEbookRenderFailure
+import io.reader.android.ui.ebookdraft.ReaderEbookBodyTap
+import io.reader.android.ui.ebookdraft.ReaderEbookSelectionState
 import io.reader.android.runtime.PendingImport
 import io.reader.android.runtime.PendingPosition
 import io.reader.android.runtime.PendingOperationException
@@ -53,6 +61,7 @@ data class ReadingSession(
     val book: LibraryBook,
     val chapter: ReaderChapter,
     val restoreScalarOffset: Int,
+    val format: ReaderLocalBookFormat,
     val visibleScalarOffset: Int = restoreScalarOffset,
 )
 
@@ -66,6 +75,7 @@ data class ReaderUiState(
     val chapters: List<ChapterItem> = emptyList(),
     val reading: ReadingSession? = null,
     val controlsVisible: Boolean = false,
+    val ebookFailureOwner: Long? = null,
     val fontSize: Int = 20,
     val theme: ReaderAppTheme = ReaderAppTheme.System,
     val paper: ReaderPaper = ReaderPaper.Paper,
@@ -114,6 +124,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     private val gate = Mutex()
     private var generation = 0L
     private var delayedSave: Job? = null
+    private var ebookMount: ReaderEbookUiMount? = null
     private var shelfRead: Job? = null
     private var searchGeneration = 0L
     private var lastRetiredSearchScope: ReaderSearchCloseScope? = null
@@ -459,7 +470,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             persist(reading)
             val chapter = library.openBookmark(bookmark)
             if (request == generation && state.value.reading?.identity == reading.identity) mutableState.update {
-                it.copy(reading = ReadingSession(request, reading.book, chapter, bookmark.scalarOffset),
+                it.copy(reading = ReadingSession(request, reading.book, chapter, bookmark.scalarOffset, reading.format),
                     readerPanel = null, controlsVisible = false, bookmarkError = null)
             }
         }
@@ -546,7 +557,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             val chapter = library.openContentSearchHit(session, hit)
             if (request == generation && state.value.searchSession?.id == session.id) {
                 retireSearch()
-                mutableState.update { it.copy(reading = ReadingSession(request, reading.book, chapter, hit.chapterOffset),
+                mutableState.update { it.copy(reading = ReadingSession(request, reading.book, chapter, hit.chapterOffset, reading.format),
                     readerPanel = null, controlsVisible = false) }
             }
         }
@@ -639,6 +650,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val previous = state.value.reading
         perform { request ->
             persist(previous)
+            val format = library.localBookFormat(book.id) // Retained settled Core format; no extension/text fallback.
             val chapter = library.chapter(book.id, index.coerceIn(0, (book.chapterCount - 1).coerceAtLeast(0)))
             retireSearch()
             if (request == generation) mutableState.update {
@@ -646,7 +658,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                     route = ReaderRoute.Reading,
                     selectedBook = book,
                     reading = ReadingSession(request, book, chapter,
-                        scalarOffset.coerceIn(0, chapter.text.codePointCount(0, chapter.text.length))),
+                        scalarOffset.coerceIn(0, chapter.text.codePointCount(0, chapter.text.length)), format),
                     controlsVisible = false,
                     readerPanel = null, bookmarks = emptyList(), bookmarksReady = false, bookmarkError = null,
                     bookmarkDeletion = null,
@@ -680,6 +692,101 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val reading = state.value.reading ?: return
         val target = reading.chapter.index + delta
         if (target in 0 until reading.book.chapterCount) openChapter(reading.book, target, 0)
+    }
+
+    private fun ebookReading(owner: Long, chapterToken: String): ReadingSession? = state.value.reading?.takeIf {
+        state.value.route == ReaderRoute.Reading && it.identity == owner && it.chapter.sessionToken == chapterToken &&
+            it.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI)
+    }
+
+    private fun currentEbookMount(view: ReaderEbookViewLease): ReaderEbookUiMount? {
+        val mount = ebookMount?.takeIf { it.view === view } ?: return null
+        val reading = ebookReading(mount.readingOwner, mount.chapter.sessionToken) ?: return null
+        return mount.takeIf { reading.chapter.bookId == it.chapter.bookId && reading.chapter.index == it.chapter.index &&
+            reading.chapter.bodyVersion == it.chapter.bodyVersion && reading.chapter.processingVersion == it.chapter.processingVersion }
+    }
+
+    internal fun attachEbookView(owner: Long, chapterToken: String): ReaderEbookViewLease {
+        val reading = checkNotNull(ebookReading(owner, chapterToken)) { "RETIRED_EBOOK_READING_OWNER" }
+        ebookMount?.view?.close()
+        ebookMount = null
+        mutableState.update { if (it.ebookFailureOwner == owner) it.copy(ebookFailureOwner = null) else it }
+        return library.newEbookView().also { ebookMount = ReaderEbookUiMount(owner, reading.chapter, it) }
+    }
+
+    internal suspend fun prepareEbookView(owner: Long, chapterToken: String, view: ReaderEbookViewLease): ReaderEbookViewPreparation =
+        gate.withLock {
+            val mount = checkNotNull(currentEbookMount(view)) { "RETIRED_EBOOK_VIEW" }
+            check(mount.readingOwner == owner && mount.chapter.sessionToken == chapterToken)
+            val prepared = library.prepareEbookForView(view, mount.chapter.bookId, mount.chapter.index, chapterToken)
+            try {
+                prepared.requireCurrent()
+                check(currentEbookMount(view) === mount && prepared.view === view &&
+                    prepared.publication.lease.renderId == view.physicalViewId) { "RETIRED_EBOOK_PREPARATION" }
+                mount.preparation = prepared
+                prepared // Leave this gate before mounting, resource interception or any draw callback.
+            } catch (error: Throwable) { prepared.close(); throw error }
+        }
+
+    internal fun releaseEbookView(view: ReaderEbookViewLease) {
+        view.close()
+        if (ebookMount?.view === view) ebookMount = null
+    }
+
+    private fun readyEbookMount(view: ReaderEbookViewLease, lease: io.reader.android.runtime.ebookdraft.EbookRenderLease,
+        epoch: Long, token: String): ReaderEbookUiMount? {
+        val mount = currentEbookMount(view) ?: return null
+        val prepared = mount.preparation ?: return null
+        if (prepared.publication.lease != lease || lease.renderId != view.physicalViewId) return null
+        try { prepared.requireCurrent() } catch (_: IllegalStateException) { return null }
+        return mount.takeIf { it.ready?.let { ready -> ready.layoutEpoch == epoch && ready.layoutToken == token } == true }
+    }
+
+    internal fun ebookReady(view: ReaderEbookViewLease, event: ReaderEbookReady) {
+        val mount = currentEbookMount(view) ?: return
+        val prepared = mount.preparation ?: return
+        if (prepared.publication.lease != event.lease || event.lease.renderId != view.physicalViewId ||
+            event.layoutEpoch <= 0 || event.layoutToken.isEmpty() || event.scalar != state.value.reading?.visibleScalarOffset) return
+        try { prepared.requireCurrent() } catch (_: IllegalStateException) { return }
+        val prior = mount.ready
+        if (prior != null && (event.layoutEpoch < prior.layoutEpoch ||
+            (event.layoutEpoch == prior.layoutEpoch && event.layoutToken != prior.layoutToken))) return
+        mount.ready = event // Admission only; a restore/reflow never becomes a new business reading position.
+    }
+
+    internal fun ebookVisibleAnchor(view: ReaderEbookViewLease, event: ReaderEbookVisibleAnchor) {
+        val mount = readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return
+        if (event.scalar in 0..mount.chapter.scalarCount) visibleAnchor(mount.readingOwner, event.scalar)
+    }
+
+    internal fun ebookBodyTap(view: ReaderEbookViewLease, event: ReaderEbookBodyTap) {
+        readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return
+        if (!state.value.busy) toggleControls()
+    }
+
+    internal fun ebookSelectionChanged(view: ReaderEbookViewLease, event: ReaderEbookSelectionState) {
+        val mount = readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return
+        mount.selectionActive = event.active // Observation only; the trusted browser owner gates selection/tap/anchor.
+    }
+
+    internal fun ebookPreparationFailed(owner: Long, chapterToken: String, view: ReaderEbookViewLease?, error: Exception) {
+        if (ebookReading(owner, chapterToken) == null || (view != null && currentEbookMount(view) == null)) return
+        // The existing top exit remains available above the failed PageState; this is not a retry or navigation action.
+        mutableState.update { it.copy(ebookFailureOwner = owner) }
+        view?.close()
+        retainProtocolPending(error)
+    }
+
+    internal fun ebookRenderFailed(view: ReaderEbookViewLease, event: ReaderEbookRenderFailure) {
+        val mount = currentEbookMount(view) ?: return
+        if (mount.preparation?.publication?.lease != event.lease || event.lease.renderId != view.physicalViewId) return
+        val ready = mount.ready
+        if (ready != null && (event.layoutEpoch < ready.layoutEpoch ||
+            (event.layoutEpoch == ready.layoutEpoch && event.layoutToken != ready.layoutToken))) return
+        mount.ready = null
+        mutableState.update { it.copy(ebookFailureOwner = mount.readingOwner) }
+        view.close()
+        retainProtocolPending(event.cause) // Do not misclassify a resource/protocol failure as an import pending operation.
     }
 
     fun visibleAnchor(session: Long, scalarOffset: Int) {
@@ -790,6 +897,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        ebookMount?.view?.close(); ebookMount = null
         delayedSave?.cancel()
         shelfRead?.cancel()
         if (managementDelegate.isInitialized()) shelfManagement.close()
