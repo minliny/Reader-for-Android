@@ -1,0 +1,67 @@
+package io.reader.android.runtime
+
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Test
+
+/** Core manga descriptor boundary only; no image request, decode, cache or device path. */
+class ReaderMangaServiceTest {
+    private val chapter = ReaderMangaChapterRef("source-a", "book-a")
+
+    @Test
+    fun pagesExtractDispatchesExactCoreParamsAndPreservesPageRequestSemantics() {
+        val calls = mutableListOf<Pair<String, JSONObject>>()
+        val service = ReaderMangaService(fakeTransport { method, params ->
+            calls += method to params
+            JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+                .put("chapterTitle", "第一话").put("pages", JSONArray()
+                    .put(JSONObject().put("url", "https://img.test/1.jpg").put("referrer", "https://img.test/chapter")
+                        .put("headers", JSONObject().put("User-Agent", "Reader")))
+                    .put(JSONObject().put("url", "https://img.test/2.jpg").put("requestRule", "{\"method\":\"POST\"}"))
+                    .put(JSONObject().put("url", "https://img.test/2.jpg").put("requestRule", "{\"method\":\"POST\"}")))
+        })
+        val result = service.pagesExtract(ReaderMangaExtractRequest(
+            chapter = chapter,
+            chapterTitle = "第一话",
+            chapterResponse = "<html>images</html>",
+            chapterUrl = "https://img.test/chapter",
+            variables = mapOf("token" to "v1"),
+        ))
+        assertEquals("manga.pages.extract", calls.single().first)
+        val params = calls.single().second
+        assertEquals("<html>images</html>", params.getString("chapterResponse"))
+        assertEquals("https://img.test/chapter", params.getString("chapterUrl"))
+        assertEquals("v1", params.getJSONObject("variables").getString("token"))
+        assertEquals("第一话", result.chapterTitle)
+        assertEquals(3, result.pages.size)
+        assertEquals("{\"method\":\"POST\"}", result.pages[1].requestRule)
+        assertEquals(result.pages[1], result.pages[2])
+        assertEquals("Reader", result.pages[0].headers["User-Agent"])
+    }
+
+    @Test
+    fun pagesExtractRejectsForeignIdentityBlankUrlAndNonStringHeader() {
+        val foreign = JSONObject().put("sourceId", "other").put("bookId", chapter.bookId)
+            .put("pages", JSONArray())
+        assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(foreign, chapter) }
+
+        val blank = JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+            .put("pages", JSONArray().put(JSONObject().put("url", " ")))
+        assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(blank, chapter) }
+
+        val nonStringHeader = JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+            .put("pages", JSONArray().put(JSONObject().put("url", "https://img.test/1.jpg")
+                .put("headers", JSONObject().put("X-Count", 1))))
+        assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(nonStringHeader, chapter) }
+    }
+
+    private fun fakeTransport(response: (String, JSONObject) -> JSONObject) = object : CoreTransport {
+        override val session = "manga-test"
+        override fun request(method: String, params: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
+            terminal: ((JSONObject) -> Unit)?): JSONObject = response(method, params)
+        override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = error("NO_DRAIN")
+        override fun close() = error("NO_CLOSE")
+    }
+}

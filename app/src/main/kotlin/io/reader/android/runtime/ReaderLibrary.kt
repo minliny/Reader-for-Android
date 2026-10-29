@@ -74,6 +74,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val onlineAdds get() = client.onlineAdds
     private val onlineReading get() = client.onlineReading
     private val tts get() = client.tts
+    private val mangaService by lazy { ReaderMangaService(transport) }
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -290,6 +291,10 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) {
             tts.queueReportCallback(chapter, sliceIndex, status, callbackId, failurePolicy, failureLimit)
         }
+
+    /** Core extracts ordered image descriptors; Android does not download or decode them here. */
+    suspend fun mangaPagesExtract(request: ReaderMangaExtractRequest): ReaderMangaPagesExtract =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract(request) }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }
