@@ -23,7 +23,7 @@ import io.reader.android.ui.background
 /** New prepared capability for each physical WebView, including Activity recreation. No VM field is assumed. */
 @Composable
 internal fun ReaderEbookBody(input: ReaderEbookRenderInput, guard: EbookLeaseGuard,
-    onReady: (ReaderEbookReady) -> Unit, onVisibleAnchor: (ReaderEbookVisibleAnchor) -> Unit,
+    onReady: (ReaderEbookReady) -> Unit, onVisibleAnchor: (ReaderEbookVisibleAnchor) -> Boolean,
     onFailure: (ReaderEbookRenderFailure) -> Unit, onBodyTap: (ReaderEbookBodyTap) -> Unit,
     onSelectionChanged: (ReaderEbookSelectionState) -> Unit, modifier: Modifier = Modifier) {
     key(input.prepared.lease.renderId) {
@@ -41,7 +41,7 @@ internal fun ReaderEbookBody(input: ReaderEbookRenderInput, guard: EbookLeaseGua
 }
 
 private class ReaderEbookHostView(context: Context, initial: ReaderEbookRenderInput, guard: EbookLeaseGuard,
-    phase: (ReaderEbookPhase) -> Unit, ready: (ReaderEbookReady) -> Unit, visible: (ReaderEbookVisibleAnchor) -> Unit,
+    phase: (ReaderEbookPhase) -> Unit, ready: (ReaderEbookReady) -> Unit, visible: (ReaderEbookVisibleAnchor) -> Boolean,
     failure: (ReaderEbookRenderFailure) -> Unit, bodyTap: (ReaderEbookBodyTap) -> Unit,
     selectionChanged: (ReaderEbookSelectionState) -> Unit) : FrameLayout(context) {
     private var owner: ReaderEbookWebViewOwner? = null
@@ -50,6 +50,7 @@ private class ReaderEbookHostView(context: Context, initial: ReaderEbookRenderIn
             val created = ReaderEbookWebViewOwner(context, initial, guard, phase, ready, visible, failure, bodyTap, selectionChanged)
             owner = created; created.start(); addView(created.view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         } catch (error: Exception) {
+            android.util.Log.w("ReaderEbook", "stage=webview-start renderId=${initial.prepared.lease.renderId} epoch=0", error)
             owner?.close(); owner = null; initial.prepared.retire(); phase(ReaderEbookPhase.Failed)
             failure(ReaderEbookRenderFailure(initial.prepared.lease, 0, null, "webview-start", error))
         }

@@ -25,7 +25,7 @@ import kotlin.math.abs
 /** One physical WebView and one prepared render capability. All UI callbacks retain this exact lease. */
 internal class ReaderEbookWebViewOwner(context: Context, private val original: ReaderEbookRenderInput,
     private val guard: EbookLeaseGuard, private val phaseChanged: (ReaderEbookPhase) -> Unit,
-    private val onReady: (ReaderEbookReady) -> Unit, private val onVisible: (ReaderEbookVisibleAnchor) -> Unit,
+    private val onReady: (ReaderEbookReady) -> Unit, private val onVisible: (ReaderEbookVisibleAnchor) -> Boolean,
     private val onFailure: (ReaderEbookRenderFailure) -> Unit,
     private val onBodyTap: (ReaderEbookBodyTap) -> Unit,
     private val onSelectionChanged: (ReaderEbookSelectionState) -> Unit) {
@@ -38,8 +38,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     @Volatile private var layout: ReaderEbookLayoutSnapshot? = null
     private lateinit var resources: ReaderEbookLocalResources
     private var input = original
-    private var desiredAnchor = original.currentAnchor
-    private var lastVisible: Int? = null
+    private val anchors = ReaderEbookAnchorAdmission(original.currentAnchor)
     private var selectionActive = false
     private var epoch = 0L
     private var shellLoaded = false
@@ -96,10 +95,10 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
         checkMain(); if (!live()) return
         try {
             require(next.prepared === original.prepared && next.prepared.lease == lease && next.chapter.text == original.chapter.text) { "FOREIGN_RENDER_INPUT" }
-            val externalAnchor = next.currentAnchor != input.currentAnchor && next.currentAnchor != lastVisible
+            val externalAnchor = next.currentAnchor != input.currentAnchor && next.currentAnchor != anchors.lastVisible
             val changed = next.paper != input.paper || next.fontSizeSp != input.fontSizeSp || next.geometry != input.geometry || externalAnchor
-            if (externalAnchor) desiredAnchor = next.currentAnchor
-            else if (changed) desiredAnchor = lastVisible ?: next.currentAnchor
+            if (externalAnchor) anchors.restore(next.currentAnchor, external = true)
+            else if (changed) anchors.restore(next.currentAnchor)
             val policyChanged = next.userScrollEnabled != input.userScrollEnabled
             input = next
             if (changed) requestLayout(true)
@@ -124,7 +123,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
         if (!forceLayout && old != null && old.widthPx == view.width && old.heightPx == view.height) return
         try {
             check(epoch < 9_007_199_254_740_991L) { "LAYOUT_EPOCH_EXHAUSTED" }
-            val captured = ReaderEbookLocalResources.snapshot(input, ++epoch, UUID.randomUUID().toString(), desiredAnchor, view.width, view.height)
+            val captured = ReaderEbookLocalResources.snapshot(input, ++epoch, UUID.randomUUID().toString(), anchors.desiredAnchor, view.width, view.height)
             layout = captured; forceLayout = false; awaitingDraw = null; drawnEpoch = -1
             setPhase(ReaderEbookPhase.Restoring); main.removeCallbacks(deadline); main.postDelayed(deadline, 20_000)
             if (!shellLoaded) { shellLoaded = true; view.loadUrl(ReaderEbookLocalResources.SHELL_URL) }
@@ -141,7 +140,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
         when (message.kind) {
             "failure" -> fail("trusted-dom", IllegalStateException(value.getString("code")))
             "ready" -> when (value.getString("phase")) {
-                "invalidated" -> if (phase == ReaderEbookPhase.Ready) { desiredAnchor = lastVisible ?: input.currentAnchor; requestLayout(true) }
+                "invalidated" -> if (phase == ReaderEbookPhase.Ready) { anchors.restore(input.currentAnchor); requestLayout(true) }
                 "dom" -> {
                     checkMeasurement(value, captured, captured.anchor)
                     view.postVisualStateCallback(captured.epoch, object : WebView.VisualStateCallback() {
@@ -167,8 +166,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
                 require(valueScalar <= original.chapter.scalarCount.toLong())
                 val scalar = valueScalar.toInt()
                 checkMeasurement(value, captured, scalar)
-                if (lastVisible != scalar) {
-                    lastVisible = scalar; desiredAnchor = scalar
+                anchors.observe(scalar) {
                     onVisible(ReaderEbookVisibleAnchor(lease, captured.epoch, captured.token, scalar))
                 }
             }
@@ -241,6 +239,7 @@ internal class ReaderEbookWebViewOwner(context: Context, private val original: R
     private fun requireLive() { check(live()) { "RETIRED_WEBVIEW_OWNER" } }
     private fun fail(stage: String, error: Exception) {
         checkMain(); if (!live()) return
+        android.util.Log.w("ReaderEbook", "stage=$stage renderId=${lease.renderId} epoch=${layout?.epoch ?: 0}", error)
         terminal = true; main.removeCallbacks(deadline); awaitingDraw = null; original.prepared.retire()
         if (view.url == ReaderEbookLocalResources.SHELL_URL) view.evaluateJavascript("window.ReaderEbookRuntime?.retire()", null)
         view.stopLoading()

@@ -754,9 +754,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         mount.ready = event // Admission only; a restore/reflow never becomes a new business reading position.
     }
 
-    internal fun ebookVisibleAnchor(view: ReaderEbookViewLease, event: ReaderEbookVisibleAnchor) {
-        val mount = readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return
-        if (event.scalar in 0..mount.chapter.scalarCount) visibleAnchor(mount.readingOwner, event.scalar)
+    /** True means this exact visible observation was admitted, never that Core saved it. */
+    internal fun ebookVisibleAnchor(view: ReaderEbookViewLease, event: ReaderEbookVisibleAnchor): Boolean {
+        val mount = readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return false
+        if (event.scalar !in 0..mount.chapter.scalarCount) return false
+        return acceptVisibleAnchor(mount.readingOwner, event.scalar)
     }
 
     internal fun ebookBodyTap(view: ReaderEbookViewLease, event: ReaderEbookBodyTap) {
@@ -771,6 +773,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     internal fun ebookPreparationFailed(owner: Long, chapterToken: String, view: ReaderEbookViewLease?, error: Exception) {
         if (ebookReading(owner, chapterToken) == null || (view != null && currentEbookMount(view) == null)) return
+        Log.w("ReaderEbook", "stage=prepare renderId=${view?.physicalViewId} epoch=0", error)
         // The existing top exit remains available above the failed PageState; this is not a retry or navigation action.
         mutableState.update { it.copy(ebookFailureOwner = owner) }
         view?.close()
@@ -789,12 +792,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         retainProtocolPending(event.cause) // Do not misclassify a resource/protocol failure as an import pending operation.
     }
 
-    fun visibleAnchor(session: Long, scalarOffset: Int) {
-        val reading = state.value.reading ?: return
+    fun visibleAnchor(session: Long, scalarOffset: Int) { acceptVisibleAnchor(session, scalarOffset) }
+
+    private fun acceptVisibleAnchor(session: Long, scalarOffset: Int): Boolean {
+        val reading = state.value.reading ?: return false
         if (state.value.route != ReaderRoute.Reading || state.value.busy ||
-            state.value.pendingPosition != null || reading.identity != session) return
+            state.value.pendingPosition != null || reading.identity != session) return false
         val offset = scalarOffset.coerceIn(0, reading.chapter.text.codePointCount(0, reading.chapter.text.length))
-        if (reading.visibleScalarOffset == offset) return
+        if (reading.visibleScalarOffset == offset) return true
         mutableState.update { it.copy(reading = reading.copy(visibleScalarOffset = offset)) }
         delayedSave?.cancel()
         delayedSave = viewModelScope.launch {
@@ -813,6 +818,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+        return true
     }
 
     private suspend fun persist(reading: ReadingSession?) {

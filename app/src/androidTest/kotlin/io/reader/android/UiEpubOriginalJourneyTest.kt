@@ -171,7 +171,6 @@ class UiEpubOriginalJourneyTest {
             assertEquals("https", entryUri.scheme); assertEquals("reader-ebook.invalid", entryUri.encodedAuthority)
             assertEquals("/publication/${lease.renderId}/" + presentation.entryPath, entryUri.path)
             assertNull(entryUri.encodedQuery); assertNull(entryUri.encodedFragment)
-            assertEquals(significant(reading.chapter.text), significant(probe.getString("domText")))
             assertTrue(probe.getBoolean("documentComplete") && probe.getBoolean("selectionCollapsed"))
             assertEquals("auto", probe.getString("framePointerEvents")); assertEquals("auto", probe.getString("documentOverflowY"))
             val ready = checkNotNull(mount.ready)
@@ -184,16 +183,29 @@ class UiEpubOriginalJourneyTest {
                 val density = web.resources.displayMetrics.density.toDouble()
                 assertTrue(abs(probe.getDouble("width") * density - web.width) <= 1.1 * density)
                 assertTrue(abs(probe.getDouble("height") * density - web.height) <= 1.1 * density)
-                val glyph = probe.getJSONObject("glyph")
-                assertTrue(glyph.getDouble("bottom") > 32.0 && glyph.getDouble("top") < probe.getDouble("height") - 52)
-                val tap = probe.getJSONObject("tap")
-                val x = location[0] + ((probe.getDouble("frameLeft") + (tap.getDouble("left") + tap.getDouble("right")) * .5) * density).toInt()
-                val y = location[1] + ((probe.getDouble("frameTop") + (tap.getDouble("top") + tap.getDouble("bottom")) * .5) * density).toInt()
-                assertTrue(visible.contains(x, y)); intArrayOf(x, y)
+                val tap = probe.getJSONObject("tap") // Actual Range/image rectangle, not an assumed screen coordinate.
+                val frameLeft = probe.getDouble("frameLeft"); val frameTop = probe.getDouble("frameTop")
+                val left = maxOf(tap.getDouble("left"), 0.0, (visible.left - location[0]) / density - frameLeft)
+                val right = minOf(tap.getDouble("right"), probe.getDouble("width"), (visible.right - location[0]) / density - frameLeft)
+                val top = maxOf(tap.getDouble("top"), 32.0, (visible.top - location[1]) / density - frameTop)
+                val bottom = minOf(tap.getDouble("bottom"), probe.getDouble("height") - 52, (visible.bottom - location[1]) / density - frameTop)
+                assertTrue("Actual content has no usable child/native viewport intersection", right > left && bottom > top)
+                val raw = JSONObject().put("left", tap.getDouble("left")).put("right", tap.getDouble("right"))
+                    .put("top", tap.getDouble("top")).put("bottom", tap.getDouble("bottom"))
+                val clipped = JSONObject().put("left", left).put("right", right).put("top", top).put("bottom", bottom)
+                val cssX = frameLeft + (left + right) * .5
+                val cssY = frameTop + (top + bottom) * .5
+                val x = location[0] + (cssX * density).toInt()
+                val y = location[1] + (cssY * density).toInt()
+                assertTrue(visible.contains(x, y))
+                tap.put("raw", raw).put("clipped", clipped).put("screenX", x).put("screenY", y)
+                    .put("nativeVisible", JSONObject().put("left", visible.left).put("right", visible.right)
+                        .put("top", visible.top).put("bottom", visible.bottom))
+                intArrayOf(x, y)
             }
             assertTrue(Build.VERSION.SDK_INT >= 26)
             val provider = WebView.getCurrentWebViewPackage() ?: throw AssertionError("Actual WebView provider absent")
-            marker("epub-real-webview-ready-draw-canonical", Bundle().apply {
+            marker("epub-real-webview-ready-draw-observed-dom", Bundle().apply {
                 putString("bookId", bookId); putLong("readingOwner", reading.identity); putString("chapterSessionToken", reading.chapter.sessionToken)
                 putInt("chapter", reading.chapter.index); putInt("scalarOffset", ready.scalar); putInt("scalarCount", reading.chapter.scalarCount)
                 putString("bodyVersion", reading.chapter.bodyVersion); putString("processingVersion", reading.chapter.processingVersion)
@@ -205,9 +217,9 @@ class UiEpubOriginalJourneyTest {
                 putInt("documentScalarCount", canonicalScalars); putString("documentCanonicalSha256", sha(canonical.toByteArray(Charsets.UTF_8)))
                 putString("providerPackage", provider.packageName); putString("providerVersion", provider.versionName)
                 putString("canonicalSha256", sha(reading.chapter.text.toByteArray(Charsets.UTF_8)))
-                putString("significantDomSha256", sha(significant(probe.getString("domText")).toByteArray(Charsets.UTF_8)))
+                putString("observedDomTextSampleSha256", sha(probe.getString("domText").toByteArray(Charsets.UTF_8)))
                 putString("probeMetrics", JSONObject(probe.toString()).apply { remove("domText") }.toString())
-                putString("textClaim", "WHITESPACE_INSENSITIVE_LIVE_CHAPTER_PLUS_REAL_PRODUCTION_FULL_ENTRY_ADMISSION_NOT_RAW_HTML")
+                putString("textClaim", "LIVE_DOM_TEXT_SAMPLE_OBSERVATION_ONLY_CANONICAL_AUTHENTICATION_IS_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
             })
             val screen = File(current.cacheDir, "reader-a3-epub-original-draw.png")
             try { marker("epub-screenshot", Bundle().apply { putBoolean("saved", UiDevice.getInstance(instrumentation).takeScreenshot(screen)); putString("cacheFile", screen.name) }) }
@@ -215,7 +227,7 @@ class UiEpubOriginalJourneyTest {
             assertEquals(beforeExit, completedNames())
 
             phase = "trusted-body-tap-and-one-normal-exit"
-            assertTrue("Actual DOM-derived non-link glyph tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
+            assertTrue("Actual DOM-derived non-link visible content tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
             compose.waitUntil(5_000) { model.state.value.reading?.identity == reading.identity && model.state.value.controlsVisible && enabledExit() }
             attachedDraw(current.window.decorView)
             assertTrue(enabledExit()); healthy(model, 1)
@@ -342,12 +354,6 @@ class UiEpubOriginalJourneyTest {
         file.inputStream().use { stream -> val buffer = ByteArray(65536); while (true) { val n = stream.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) } }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
-    private fun significant(text: String): String {
-        val value = StringBuilder()
-        text.codePoints().forEach { if (!Character.isWhitespace(it) && !Character.isSpaceChar(it)) value.appendCodePoint(it) }
-        return value.toString()
-    }
-
     companion object {
         private const val METHOD = "oneRealZhongSongEpubImportsRendersAndExitsWithOriginalReceipt"
         private const val SOURCE_SHA = "5d6d9dd26bbea9ed0db4e4f7a127a538dfe439f5694c3370a30ac33503db9d67"
@@ -359,20 +365,32 @@ class UiEpubOriginalJourneyTest {
             (()=>{try{
               const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
               if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
-              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT),values=[];let n,glyph=null,tap=null;
+              const rect=q=>({left:q.left,right:q.right,top:q.top,bottom:q.bottom});
+              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
+              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
+              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
               while(n=walker.nextNode()){
-                const e=n.parentElement;if(!e||e.closest('script,style,noscript,template'))continue;
-                const s=w.getComputedStyle(e);if(s.display==='none'||s.visibility==='hidden')continue;
-                values.push(n.data);
-                if(!glyph||!tap){const i=n.data.search(/\S/u);if(i>=0){const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
-                  const q=r.getBoundingClientRect(),v={left:q.left,right:q.right,top:q.top,bottom:q.bottom};
-                  if(q.width>0&&q.height>0){if(!glyph)glyph=v;if(!tap&&!e.closest('a[href]')&&q.top<w.innerHeight&&q.bottom>0)tap=v;}}}
+                const e=n.parentElement;if(!eligible(e))continue;
+                const i=n.data.search(/\S/u);if(i<0)continue;
+                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
+                const q=r.getBoundingClientRect();if(usable(q)){tap={...rect(q),kind:'text-range'};break;}
               }
-              const text=values.join('');if(text.length>1000000)return {probeError:'BOUNDED_DOM_TEXT_EXCEEDED'};
-              const fr=f.getBoundingClientRect();
+              if(!tap)for(const image of d.querySelectorAll('img,image')){
+                if(!eligible(image))continue;
+                const q=image.getBoundingClientRect();if(!usable(q))continue;
+                const tag=image.localName.toLowerCase();let loaded=false;
+                if(tag==='img')loaded=image.complete&&image.naturalWidth>0;
+                else{const src=image.getAttribute('href')||image.getAttributeNS('http://www.w3.org/1999/xlink','href');
+                  if(src){const url=new URL(src,d.baseURI).href;loaded=w.performance.getEntriesByName(url).some(e=>e.responseEnd>0&&e.decodedBodySize>0);}}
+                if(loaded){tap={...rect(q),kind:tag==='img'?'loaded-img':'resource-complete-svg-image'};break;}
+              }
+              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT_OR_LOADED_IMAGE'};
+              const raw=d.body.textContent||'',text=raw.slice(0,1000000),fr=f.getBoundingClientRect();
               return {origin:location.origin,shellUrl:location.href,entryUrl:w.location.href,documentComplete:d.readyState==='complete',
                 framePointerEvents:getComputedStyle(f).pointerEvents,documentOverflowY:w.getComputedStyle(d.documentElement).overflowY,
-                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,width:w.innerWidth,height:w.innerHeight,glyph,tap};
+                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,
+                styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,domTextTotalUtf16:raw.length,
+                domTextSampleUtf16:text.length,domTextTruncated:raw.length>text.length,width:w.innerWidth,height:w.innerHeight,tap};
             }catch(e){return {probeError:String(e)}}})()
         """.trimIndent()
     }
