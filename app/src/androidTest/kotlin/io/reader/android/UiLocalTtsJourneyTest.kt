@@ -9,6 +9,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.util.Log
 import io.reader.android.runtime.ReaderTtsPlaybackStatus
 import io.reader.android.ui.ReaderRoute
 import org.junit.Assert.assertEquals
@@ -38,9 +39,11 @@ class UiLocalTtsJourneyTest {
         compose.waitUntil(20_000) {
             model.state.value.route == ReaderRoute.Reading && model.state.value.reading != null && !model.state.value.busy
         }
+        Log.i("ReaderTtsProbe", "before click pending=${model.state.value.pendingPosition} error=${model.state.value.error} controls=${model.state.value.controlsVisible}")
         compose.onNodeWithTag("reader_body").performTouchInput { click() }
         compose.waitUntil(5_000) { model.state.value.controlsVisible }
         compose.onNodeWithTag("reader_tts_toggle").performClick()
+        Log.i("ReaderTtsProbe", "after click pending=${model.state.value.pendingPosition} status=${model.state.value.ttsPlayback.status} error=${model.state.value.error}")
         compose.waitUntil(25_000) {
             model.state.value.ttsPlayback.status in setOf(ReaderTtsPlaybackStatus.PLAYING, ReaderTtsPlaybackStatus.FAILED)
         }
