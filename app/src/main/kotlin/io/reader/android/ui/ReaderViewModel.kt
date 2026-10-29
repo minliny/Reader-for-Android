@@ -696,7 +696,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun ebookReading(owner: Long, chapterToken: String): ReadingSession? = state.value.reading?.takeIf {
         state.value.route == ReaderRoute.Reading && it.identity == owner && it.chapter.sessionToken == chapterToken &&
-            it.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI)
+            it.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW)
     }
 
     private fun currentEbookMount(view: ReaderEbookViewLease): ReaderEbookUiMount? {

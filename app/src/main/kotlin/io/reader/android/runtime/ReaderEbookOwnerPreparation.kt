@@ -37,7 +37,7 @@ internal class ReaderEbookOwnerPreparation(
             chapter.bodyVersion == lease.bodyVersion && chapter.processingVersion == lease.processingVersion)
         val reader = ReaderEbookPresentationReader(ReaderEbookOwnerCommands(client.transport), guard)
         val kind = reader.kind(lease)
-        check(sourceFormat in setOf("epub", "mobi") && kind.format == sourceFormat && kind.kind == "ebook" && !kind.reimportRequired) { "EBOOK_ORIGINAL_REIMPORT_REQUIRED_OR_NOT_EBOOK" }
+        check(ReaderLocalBookFormat.fromCore(sourceFormat).acceptsEbookPresentation(kind.kind, kind.format, kind.reimportRequired)) { "EBOOK_ORIGINAL_REIMPORT_REQUIRED_OR_NOT_EBOOK" }
         val owned = client.authorizeEbookAssets(lease, sourceBytes, guard)
         try {
             val presentation = reader.read(lease, kind, chapter, owned.original)

@@ -57,7 +57,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             when (reading.format) {
                 ReaderLocalBookFormat.TXT -> ReaderNativeChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
                     onVisibleAnchor = { model.visibleAnchor(reading.identity, it) }, onTap = model::toggleControls, modifier = bodyModifier)
-                ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI -> ReaderEbookReadingBody(state, model, bodyModifier)
+                ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW -> ReaderEbookReadingBody(state, model, bodyModifier)
             }
         }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {

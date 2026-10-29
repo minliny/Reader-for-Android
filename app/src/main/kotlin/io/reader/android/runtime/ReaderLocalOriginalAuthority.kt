@@ -6,7 +6,17 @@ import java.io.File
 
 /** Product slice admission. Values are decoded from Core summary, never inferred from extension. */
 enum class ReaderLocalBookFormat(val wire: String) {
-    TXT("txt"), EPUB("epub"), MOBI("mobi");
+    TXT("txt"), EPUB("epub"), MOBI("mobi"), AZW("azw");
+
+    /** Original binding and renderer family are separate fixed-Core facts.
+     * libmobi-* presentation is "mobi" even when the original import is "azw". */
+    internal fun acceptsEbookPresentation(kind: String, format: String, reimportRequired: Boolean): Boolean =
+        !reimportRequired && kind == "ebook" && when (this) {
+            EPUB -> format == "epub"
+            MOBI, AZW -> format == "mobi"
+            TXT -> false
+        }
+
     companion object {
         internal fun fromCore(value: String): ReaderLocalBookFormat =
             entries.singleOrNull { it.wire == value } ?: error("LOCAL_FORMAT_NOT_ADMITTED")

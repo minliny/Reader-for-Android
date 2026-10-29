@@ -88,7 +88,7 @@ fun ReaderApp(model: ReaderViewModel) {
     }
     val importAllowed = !state.busy && state.pendingReady && state.pendingImports.isEmpty() &&
         (!protocol.initialized || protocol.admissionOpen)
-    val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/epub+zip", "application/x-mobipocket-ebook", "application/octet-stream")) }
+    val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/epub+zip", "application/x-mobipocket-ebook", "application/vnd.amazon.ebook", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
         val readingVisible = state.route == ReaderRoute.Reading && state.reading != null
@@ -286,7 +286,7 @@ private fun BookRow(book: LibraryBook, busy: Boolean, model: ReaderViewModel) {
                 Text(book.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (book.author.isNotBlank()) Text(book.author, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("本地 TXT · ${book.chapterCount} 章", style = MaterialTheme.typography.bodySmall,
+                Text("本地电子书 · ${book.chapterCount} 章", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("继续阅读 · 第 ${book.progressChapter + 1} 章", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary)

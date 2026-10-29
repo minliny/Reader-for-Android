@@ -46,7 +46,7 @@ data class PendingImport(val id: String, val fileName: String, val stage: String
 data class PendingPosition(val id: String, val bookId: String, val stage: String)
 
 /**
- * Local TXT/EPUB/MOBI product adapter draft. Fixed Core 1fe owns parsing, shelf, TOC,
+ * Local TXT/EPUB/MOBI/AZW product adapter draft. Fixed Core 1fe owns parsing, shelf, TOC,
  * documents, progress and transactions. Kotlin owns SAF, source bytes and the
  * original-operation journal, following the existing iOS local-import v2 lane.
  */
@@ -105,7 +105,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
                 val turn = client.currentTurn()
                 check(turn.lease == client.lease) { "FOREIGN_EBOOK_WHOLE_TURN" }
                 val original = originalAuthorities.forBook(bookId)
-                check(original.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI)) { "EBOOK_FORMAT_REQUIRED" }
+                check(original.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW)) { "EBOOK_FORMAT_REQUIRED" }
                 val lease = EbookRenderLease(client.lease.ownerId, client.lease.clientId, client.lease.ownerGeneration,
                     transport.session, view.physicalViewId, chapter.bookId, chapter.index, chapter.bodyVersion, chapter.processingVersion)
                 retirePreparedEbook()
@@ -438,7 +438,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         val pending = pendingImportRecords().firstOrNull()
         if (pending != null) throw PendingOperationException(pending.getString("id"), pending.getString("nextStage"))
         val filename = displayName(uri)
-        require(filename.substringAfterLast('.', "").lowercase() in setOf("txt", "epub", "mobi")) { "LOCAL_EXTENSION_NOT_ADMITTED" }
+        require(filename.substringAfterLast('.', "").lowercase() in setOf("txt", "epub", "mobi", "azw", "azw3", "kf8")) { "LOCAL_EXTENSION_NOT_ADMITTED" }
         check(staging.mkdirs() || staging.isDirectory)
         check(originals.mkdirs() || originals.isDirectory)
         val id = "android-import-${UUID.randomUUID()}"
