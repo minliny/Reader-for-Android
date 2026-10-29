@@ -13,7 +13,8 @@ internal object ReaderTtsPolicy {
         val bookId = value.getString("bookId").also { check(it.isNotBlank()) { "TTS_BOOK_ID" } }
         val index = value.getInt("chapterIndex").also { check(it >= 0) { "TTS_CHAPTER_INDEX" } }
         fun optional(name: String): String? = when {
-            !value.has(name) || value.isNull(name) -> null
+            !value.has(name) -> null
+            value.isNull(name) -> error("TTS_$name")
             else -> value.getString(name).also { check(it.isNotBlank()) { "TTS_$name" } }
         }
         return ReaderTtsChapterRef(sourceId, bookId, index, optional("chapterTitle"), optional("chapterUrl"))
@@ -77,7 +78,25 @@ internal object ReaderTtsPolicy {
                 }
             }
         } ?: emptyList()
-        return ReaderTtsQueueSnapshot(chapter, state, current, total, completed, Collections.unmodifiableList(statuses))
+        val failurePolicy = when (snapshot.optString("failurePolicy", ReaderTtsFailurePolicy.STOP.wire)) {
+            "skip" -> ReaderTtsFailurePolicy.SKIP
+            "stop" -> ReaderTtsFailurePolicy.STOP
+            else -> error("TTS_FAILURE_POLICY")
+        }
+        val consecutiveFailures = snapshot.optInt("consecutiveFailures", 0).also {
+            check(it >= 0) { "TTS_CONSECUTIVE_FAILURES" }
+        }
+        val failureLimit = snapshot.optInt("failureLimit", 3).also {
+            check(it > 0) { "TTS_FAILURE_LIMIT" }
+        }
+        val drainBehavior = drainBehaviors[snapshot.optString("drainBehavior", ReaderTtsDrainBehavior.STOP_ON_BOUNDARY.wire)]
+            ?: error("TTS_DRAIN_BEHAVIOR")
+        val restartPolicy = when (snapshot.optString("restartPolicy", ReaderTtsQueueRestartPolicy.RESET_ON_CORE_RESTART.wire)) {
+            "reset-on-core-restart" -> ReaderTtsQueueRestartPolicy.RESET_ON_CORE_RESTART
+            else -> error("TTS_RESTART_POLICY")
+        }
+        return ReaderTtsQueueSnapshot(chapter, state, current, total, completed, Collections.unmodifiableList(statuses),
+            failurePolicy, consecutiveFailures, failureLimit, drainBehavior, restartPolicy)
     }
 
     fun transition(value: JSONObject, expected: ReaderTtsChapterRef): ReaderTtsChapterTransition {

@@ -52,10 +52,14 @@ class ReaderTtsPolicyTest {
         val value = JSONObject().put("snapshot", JSONObject()
             .put("chapter", chapterJson()).put("state", "playing").put("currentSliceIndex", 1)
             .put("totalSlices", 3).put("completedSlices", 1)
+            .put("failurePolicy", "skip").put("consecutiveFailures", 1).put("failureLimit", 3)
+            .put("drainBehavior", "advance-to-next").put("restartPolicy", "reset-on-core-restart")
             .put("sliceStatuses", JSONArray().put("done").put("speaking").put("pending")))
         val snapshot = ReaderTtsPolicy.queueState(value, chapter)
         assertEquals(ReaderTtsQueueState.PLAYING, snapshot.state)
         assertEquals(1, snapshot.currentSliceIndex)
+        assertEquals(ReaderTtsFailurePolicy.SKIP, snapshot.failurePolicy)
+        assertEquals(ReaderTtsDrainBehavior.ADVANCE_TO_NEXT, snapshot.drainBehavior)
         assertEquals(listOf(ReaderTtsSliceStatus.DONE, ReaderTtsSliceStatus.SPEAKING, ReaderTtsSliceStatus.PENDING), snapshot.sliceStatuses)
 
         val idle = JSONObject().put("snapshot", JSONObject().put("chapter", chapterJson())
@@ -72,6 +76,16 @@ class ReaderTtsPolicyTest {
             .put("state", "playing").put("currentSliceIndex", 0).put("totalSlices", 3).put("completedSlices", 0)
             .put("sliceStatuses", JSONArray().put("speaking")))
         assertThrows(IllegalStateException::class.java) { ReaderTtsPolicy.queueState(badCount, chapter) }
+        val badFailurePolicy = JSONObject().put("snapshot", JSONObject().put("chapter", chapterJson())
+            .put("state", "idle").put("totalSlices", 0).put("completedSlices", 0).put("failurePolicy", "other"))
+        assertThrows(IllegalStateException::class.java) { ReaderTtsPolicy.queueState(badFailurePolicy, chapter) }
+    }
+
+    @Test
+    fun chapterRejectsExplicitNullOptionalIdentityFields() {
+        val malformed = JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+            .put("chapterIndex", chapter.chapterIndex).put("chapterTitle", JSONObject.NULL)
+        assertThrows(IllegalStateException::class.java) { ReaderTtsPolicy.chapter(malformed) }
     }
 
     @Test
