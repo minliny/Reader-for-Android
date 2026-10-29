@@ -33,7 +33,9 @@ fun ReaderTransientFeedback(message: String, onRetire: () -> Unit) {
 
 @Composable
 fun ReaderRecoveryNotice(message: String, busy: Boolean, onReconcile: (() -> Unit)?, actionLabel: String = "核对并继续",
-    actionTag: String = "reader_reconcile_import") {
+    actionTag: String = "reader_reconcile_import", secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null, secondaryActionTag: String = "reader_recovery_secondary",
+    secondaryActionEnabled: Boolean = true) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth().testTag("reader_recovery_notice")) {
         Column(Modifier.padding(horizontal = 19.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -42,6 +44,9 @@ fun ReaderRecoveryNotice(message: String, busy: Boolean, onReconcile: (() -> Uni
                 modifier = Modifier.testTag(actionTag)) {
                 Text(actionLabel)
             }
+            if (onSecondaryAction != null && secondaryActionLabel != null)
+                TextButton(onClick = onSecondaryAction, enabled = !busy && secondaryActionEnabled,
+                    modifier = Modifier.testTag(secondaryActionTag)) { Text(secondaryActionLabel) }
         }
     }
 }

@@ -69,6 +69,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<String, Session>()
+    private val positionIntent = AtomicReference<ReaderPositionIntentState?>()
     private val originalAuthorities = ReaderLocalOriginalAuthorityReader(File(root, "Operations/Completed"))
     private val ebookViewIdentity = Any()
     private data class EbookRenderState(val lease: EbookRenderLease, val chapterToken: String,
@@ -247,6 +248,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         val revision = readProgress(bookId).getString("progressRevision")
         check(revision.isNotEmpty()) { "PROGRESS_OBSERVATION_MISSING" }
         retirePreparedEbook() // Only after the new chapter/jump scope passed all validation.
+        positionIntent.set(null) // A fresh chapter/session never inherits another reading's new-intent capability.
         readingSessions[bookId] = Session(content, revision)
         return content
     }
@@ -342,19 +344,107 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         return entry
     }
 
-    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+    /** Explicit new user intent only. This observes current Core state; it never reconciles an old write. */
+    suspend fun beginNewPositionIntent(bookId: String, index: Int, sessionToken: String,
+        retainedUnknownIds: List<String>): ReaderNewPositionIntent {
+        val expectedIds = retainedUnknownIds.toList()
+        require(expectedIds.isNotEmpty() && expectedIds.toSet().size == expectedIds.size) { "NEW_POSITION_INTENT_EXPECTED_ORIGINALS" }
+        return onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            val chapter = activeChapter(bookId, sessionToken, index)
+            check(originalAuthorities.forBook(bookId).format != ReaderLocalBookFormat.TXT) { "NEW_POSITION_INTENT_EBOOK_REQUIRED" }
+            positionIntent.get()?.let { existing ->
+                check(existing.intent.bookId == bookId && existing.intent.sessionToken == sessionToken &&
+                    existing.intent.retainedUnknownIds.toSet() == expectedIds.toSet()) { "NEW_POSITION_INTENT_READING_CHANGED" }
+                client.requireNewPositionAuthority(existing.authority, chapter)
+                return@onIO existing.intent // No new baseline/permission from a duplicate button callback.
+            }
+            val authority = client.newPositionAuthority(chapter, expectedIds)
+            val observed = readProgress(bookId)
+            check(observed.get("found") == true) { "NEW_POSITION_INTENT_CURRENT_POSITION_MISSING" }
+            val progress = observed.getJSONObject("progress")
+            check(progress.getString("sourceId") == "local" && progress.getString("bookId") == bookId &&
+                progress.getInt("chapterIndex") == index && progress.getString("bodyVersion") == chapter.bodyVersion &&
+                progress.getString("processingVersion") == chapter.processingVersion) { "NEW_POSITION_INTENT_CURRENT_SCOPE_CHANGED" }
+            val offset = progress.getLong("chapterOffset")
+            check(offset in 0..chapter.scalarCount.toLong()) { "NEW_POSITION_INTENT_CURRENT_SCALAR" }
+            val revision = observed.getString("progressRevision")
+            check(revision.matches(Regex("reader-progress-v1:[a-f0-9]{64}"))) { "NEW_POSITION_INTENT_OBSERVATION_REQUIRED" }
+            check(revision == readingSessions.getValue(bookId).revision) { "NEW_POSITION_INTENT_REOPEN_CURRENT_POSITION" }
+            client.requireNewPositionAuthority(authority, chapter) // Revalidate after the read, still in the same whole turn.
+            val intent = ReaderNewPositionIntent(UUID.randomUUID().toString(), "local", bookId, index, sessionToken,
+                chapter.bodyVersion, chapter.processingVersion, authority.runtimeSession, offset.toInt(), revision,
+                authority.originals.map { it.identity() })
+            readingSessions.getValue(bookId).revision = revision // Baseline for a different future CAS; never an old ACK.
+            positionIntent.set(ReaderPositionIntentState(intent, authority, chapter.scalarCount, offset.toInt()))
+            intent
+        }
+    }
+
+    internal fun observeNewPositionReady(intent: ReaderNewPositionIntent, view: ReaderEbookViewLease,
+        lease: EbookRenderLease, layoutEpoch: Long, layoutToken: String, scalarOffset: Int): Boolean =
+        observeNewPosition(intent, view, lease, layoutEpoch, layoutToken, scalarOffset, anchor = false)
+
+    internal fun observeNewPositionAnchor(intent: ReaderNewPositionIntent, view: ReaderEbookViewLease,
+        lease: EbookRenderLease, layoutEpoch: Long, layoutToken: String, scalarOffset: Int): Boolean =
+        observeNewPosition(intent, view, lease, layoutEpoch, layoutToken, scalarOffset, anchor = true)
+
+    /** Called only after VM's existing real Ready/anchor gates; adds no Core/IO/business-lane wait. */
+    private fun observeNewPosition(intent: ReaderNewPositionIntent, view: ReaderEbookViewLease,
+        lease: EbookRenderLease, epoch: Long, token: String, scalar: Int, anchor: Boolean): Boolean {
+        return try {
+            val before = positionIntent.get() ?: return false
+            if (before.intent !== intent || epoch !in 1..9_007_199_254_740_991L || !ReaderProgressNewIntentPolicy.uuid(token) ||
+                scalar !in 0..before.scalarCount || lease.bookId != intent.bookId || lease.chapterIndex != intent.chapterIndex ||
+                lease.bodyVersion != intent.bodyVersion || lease.processingVersion != intent.processingVersion ||
+                lease.runtimeSession != intent.runtimeSession) return false
+            val render = ebookRender.get() ?: return false
+            if (render.view !== view || render.lease != lease || render.chapterToken != intent.sessionToken || render.publication == null) return false
+            ebookGuard.requireCurrent(lease)
+            val fact = ReaderPositionViewFact(lease, epoch, token)
+            val after = if (anchor) {
+                if (!before.everPresented || before.currentReady != fact) return false
+                before.copy(lastVisible = scalar)
+            } else {
+                if (scalar != before.lastVisible) return false // Restore/reflow is never a new business position.
+                val previous = before.currentReady
+                if (previous?.lease == lease && (epoch < previous.epoch || (epoch == previous.epoch && token != previous.token))) return false
+                before.copy(everPresented = true, currentReady = fact)
+            }
+            if (!positionIntent.compareAndSet(before, after)) return false
+            val published = try {
+                ebookGuard.requireCurrent(lease)
+                ebookRender.get() === render && !closed.get()
+            } catch (_: IllegalStateException) { false }
+            // A failed observation was never published to the VM. Roll back only our exact CAS;
+            // a later real observation or session retirement must never be overwritten.
+            if (!published) positionIntent.compareAndSet(after, before)
+            published
+        } catch (_: IllegalStateException) { false }
+    }
+
+    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): ReaderPositionSaveResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         localIdentity(bookId)
         val session = readingSessions[bookId] ?: error("READING_SESSION_MISSING")
         check(session.chapter.index == index) { "RETIRED_READING_SESSION" }
         check(sessionToken != null && sessionToken == session.chapter.sessionToken) { "RETIRED_READING_SESSION_TOKEN" }
         require(scalarOffset in 0..session.chapter.scalarCount)
-        val pending = journal.readAll().firstOrNull {
-            it.optString("kind") == "progress" && it.optString("bookId") == bookId && !it.optBoolean("completed")
-        }
-        if (pending != null) {
-            val terminal = pending.optJSONObject("wireTerminal")
-                ?: throw PendingOperationException(pending.getString("id"), "reading.progress.update")
-            consumeProgressTerminal(pending, terminal)
+        val continued = positionIntent.get()
+        if (continued != null) {
+            check(continued.intent.bookId == bookId && continued.intent.chapterIndex == index && continued.intent.sessionToken == sessionToken) { "NEW_POSITION_INTENT_READING_CHANGED" }
+            client.requireNewPositionAuthority(continued.authority, session.chapter)
+            check(continued.everPresented && scalarOffset == continued.lastVisible) { "NEW_POSITION_INTENT_VISIBLE_POSITION_REQUIRED" }
+            if (!continued.hasConfirmedNewOriginal && scalarOffset == continued.intent.baselineScalarOffset) {
+                return@onIO ReaderPositionSaveResult.SkippedUnchanged(continued.intent.retainedUnknownIds, bookId, index, scalarOffset)
+            }
+        } else {
+            val pending = journal.readAll().firstOrNull {
+                it.optString("kind") == "progress" && it.optString("bookId") == bookId && !it.optBoolean("completed")
+            }
+            if (pending != null) {
+                val terminal = pending.optJSONObject("wireTerminal")
+                    ?: throw PendingOperationException(pending.getString("id"), "reading.progress.update")
+                consumeProgressTerminal(pending, terminal)
+            }
         }
         val parameters = JSONObject().put("sourceId", "local").put("bookId", bookId)
             .put("chapterIndex", index).put("chapterOffset", scalarOffset)
@@ -377,7 +467,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         }, complete = {
             record.optJSONObject("wireTerminal")?.let { consumeProgressTerminal(record, it) }
         })
-        Unit
+        val confirmed = ReaderProgressNewIntentPolicy.confirmed(record)
+        if (continued != null) positionIntent.updateAndGet { current ->
+            if (current != null && current.intent === continued.intent) current.copy(hasConfirmedNewOriginal = true) else current
+        }
+        confirmed
     }
 
     private fun consumeProgressTerminal(record: JSONObject, event: JSONObject) {
@@ -731,7 +825,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) { retirePreparedEbook(); client.retire() }
+        if (closed.compareAndSet(false, true)) { positionIntent.set(null); retirePreparedEbook(); client.retire() }
         // Existing ViewModel.onCleared() still calls this, but no native destroy,
         // detached close thread, current-cursor close, or old-session map clearing.
     }

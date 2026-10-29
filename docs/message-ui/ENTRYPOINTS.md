@@ -48,3 +48,16 @@ Native Ready/selection/tap/visible-anchor callbacks are scoped renderer facts,
 not user message components. Selection observation owns no bookmark/highlight
 write or clipboard receipt. Blocked external/cross-chapter link navigation is
 unadmitted, not a success message or a new generic Alert/Toast flow.
+
+
+## 历史 UNKNOWN 与新的阅读位置意图
+
+分类仍为 Recovery，复用 ReaderRecoveryNotice。同一原 UNKNOWN 的事实、是否阻挡本次新 save、以及新操作是否获 ACK 是三个独立事实；UI 不铸造资格、原回执或完成状态。
+
+| 入口与事实 | 公共类别/宿主 | 精确身份与动作 | 失效、清理与消息边界 |
+| --- | --- | --- | --- |
+| 原进度保存仍未确认，当前保存 barrier 未解除 | Recovery / ReadingScreen 顶部现有消息列；书架、目录、设置等沿 ReaderApp 互斥消息列 | 原 PendingPosition id/book；原核对回调捕获 route + readingOwner，入口及 VM gate 后再核同宿主和原条目；原 reconcile 只处理准确原操作 | 不通过新 read、当前行或另一 ACK 结束原记录；退出宿主仅隐藏展示。旧回调不能操作新阅读/页面 |
+| 用户明确要求保留原记录并开始新的位置意图 | Recovery / 同一个 ReaderRecoveryNotice 的可选第二动作，不增 Alert/Toast/消息外框 | 捕获 readingOwner、chapter session token、完整 chapter body/processing、当前同书 pending ID 集；正文须有实际 matching Ready。VM gate 后再核同集合；Library/App owner 内部资格化，UI 不提供 runtime/bool 权限 | 新内存 intent 不是 progress originalId，不是 ACK。失败保留原 barrier；只有 backend 接受真实 Ready/visible-anchor 后，当前 reading 才区分 retained IDs 与保存 barrier。新 current-runtime UNKNOWN 仍阻挡 |
+| 旧 UNKNOWN 已获本 reading 的非 barrier 资格，但原结果仍未知 | Recovery / 阅读 controls 展开时沿原顶部消息列，书架仍沿原宿主显示 | 真实 Library-issued intent 对象 + readingOwner/session/fullscope；只使用现有“原记录会继续保留”文案，无原结果确认动作 | 合上 controls、退出或替换 reading 仅退休该显示/callback；pendingPositions 原列表不删、不写旧 Completed。当前章以外导航/书签/搜索 guard 不因该资格开放 |
+
+lastPositionSaveAttempt 是当前捕获 readingOwner/session/位置对 typed 保存结果的投影。SkippedUnchanged 只表示未派发，不更新 ACK、Saved 消息或原 pending；ConfirmedNewOriginal 必须来自其新 UUID/request/current runtime 的真实回执并匹配完整 scope。旧回调不能将其投影给新阅读。新 Ready/restore/reflow 本身不生成新的业务位置；新 visible anchor 必须先经原 Native 完整 gate 与 backend 原子观察资格。本文记录接入和生命周期合同；源码、准确测试、产物与设备证据分别记账。

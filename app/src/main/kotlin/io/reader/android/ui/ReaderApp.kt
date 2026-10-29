@@ -158,8 +158,11 @@ fun ReaderApp(model: ReaderViewModel) {
                             model::reconcilePendingImports)
                     } else state.error?.let { ReaderTransientFeedback(it, model::clearError) }
                     state.pendingPositions.firstOrNull()?.let { pending ->
+                        val positionHostRoute = state.route
+                        val positionHostReadingOwner = state.reading?.identity
                         ReaderRecoveryNotice("原进度保存尚未确认，原记录会继续保留。", state.busy,
-                            { model.reconcilePendingPosition(pending) }, "核对原保存", "reader_reconcile_position")
+                            { model.reconcilePendingPosition(pending, positionHostRoute, positionHostReadingOwner) },
+                            "核对原保存", "reader_reconcile_position")
                     }
                     state.pendingBookmarks.firstOrNull()?.let { pending ->
                         ReaderRecoveryNotice("原书签操作尚未确认，原记录会继续保留。", state.busy,

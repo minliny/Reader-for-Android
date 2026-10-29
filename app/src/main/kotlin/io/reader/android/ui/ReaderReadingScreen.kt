@@ -61,7 +61,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             }
         }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-            if (state.controlsVisible || state.error != null || state.busy || state.pendingPosition != null || state.ebookFailureOwner == reading.identity) {
+            if (state.controlsVisible || state.error != null || state.busy || state.positionSaveBarrier != null || state.ebookFailureOwner == reading.identity) {
                 Surface(color = state.paper.background()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = model::exitReading, enabled = !state.busy,
@@ -79,9 +79,20 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             }
             ReaderProtocolRecoveryHost(model)
             if (state.error != null) ReaderTransientFeedback(state.error, model::clearError)
-            state.pendingPosition?.let { pending ->
+            state.positionSaveBarrier?.let { pending ->
+                val retainedIds = state.pendingPositions.filter { it.bookId == reading.book.id }.map { it.id }
+                val canRequestNewIntent = reading.newPositionIntent == null && reading.format != ReaderLocalBookFormat.TXT
                 ReaderRecoveryNotice("原进度保存尚未确认，已暂停后续保存。当前正文仍可阅读。", state.busy,
-                    { model.reconcilePendingPosition(pending) }, "核对原保存", "reader_reconcile_position")
+                    { model.reconcilePendingPosition(pending, ReaderRoute.Reading, reading.identity) },
+                    "核对原保存", "reader_reconcile_position",
+                    secondaryActionLabel = if (canRequestNewIntent) "保留原记录，继续新阅读" else null,
+                    onSecondaryAction = if (canRequestNewIntent) ({ model.beginNewPositionIntent(
+                        reading.identity, reading.chapter.sessionToken, retainedIds) }) else null,
+                    secondaryActionTag = "reader_begin_new_position_intent", secondaryActionEnabled = reading.ebookPresented)
+            }
+            // Historical UNKNOWN stays in state and on the shelf; hiding this host never retires its record.
+            if (state.positionSaveBarrier == null && state.controlsVisible) state.historicalPosition?.let {
+                ReaderRecoveryNotice("原进度保存尚未确认，原记录会继续保留。", state.busy, null)
             }
             state.pendingBookmarks.firstOrNull { it.bookId == reading.book.id }?.let { pending ->
                 ReaderRecoveryNotice("原书签操作尚未确认，请先核对原操作。", state.busy,

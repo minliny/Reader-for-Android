@@ -19,6 +19,8 @@ import io.reader.android.ui.ebookdraft.ReaderEbookBodyTap
 import io.reader.android.ui.ebookdraft.ReaderEbookSelectionState
 import io.reader.android.runtime.PendingImport
 import io.reader.android.runtime.PendingPosition
+import io.reader.android.runtime.ReaderNewPositionIntent
+import io.reader.android.runtime.ReaderPositionSaveResult
 import io.reader.android.runtime.PendingOperationException
 import io.reader.android.runtime.coreProtocolPending
 import io.reader.android.runtime.CoreProtocolReference
@@ -66,7 +68,21 @@ data class ReadingSession(
     // This reading owner/chapter has actually passed the existing ebook Ready admission.
     // It survives reflow/view failure, and is never an original Core save receipt.
     val ebookPresented: Boolean = false,
-)
+    // Actual Library-issued object; UI cannot mint the backend capability.
+    val newPositionIntent: ReaderNewPositionIntent? = null,
+    // Mirror of a successful backend observation of this reading's actual Ready, not current layout readiness.
+    val newPositionIntentPresented: Boolean = false,
+) {
+    val retainedPositionIds: List<String> get() {
+        val intent = newPositionIntent ?: return emptyList()
+        return if (newPositionIntentPresented && intent.sourceId == "local" && intent.bookId == book.id &&
+            intent.chapterIndex == chapter.index && intent.sessionToken == chapter.sessionToken &&
+            intent.bodyVersion == chapter.bodyVersion && intent.processingVersion == chapter.processingVersion)
+            intent.retainedUnknownIds else emptyList()
+    }
+}
+
+data class ReaderPositionSaveProjection(val readingOwner: Long, val sessionToken: String, val result: ReaderPositionSaveResult)
 
 data class ReaderUiState(
     val route: ReaderRoute = ReaderRoute.Bookshelf,
@@ -88,6 +104,7 @@ data class ReaderUiState(
     val importRevision: Long = 0,
     val lastImportedBookId: String? = null,
     val pendingPositions: List<PendingPosition> = emptyList(),
+    val lastPositionSaveAttempt: ReaderPositionSaveProjection? = null,
     val shelfQuery: String = "",
     val shelfSort: LibrarySort = LibrarySort.LAST_READ,
     val shelfDirection: LibrarySortDirection = LibrarySortDirection.DESCENDING,
@@ -112,7 +129,14 @@ data class ReaderUiState(
     val lastSearchCloseConfirmation: ReaderSearchCloseConfirmation? = null,
     val protocolRecoveryReference: CoreProtocolReference? = null,
 ) {
+    // Original UNKNOWN facts stay visible/enumerable; this getter continues guarding unrelated navigation/tools.
     val pendingPosition: PendingPosition? get() = pendingPositions.firstOrNull { it.bookId == reading?.book?.id }
+    val positionSaveBarrier: PendingPosition? get() = pendingPositions.firstOrNull {
+        it.bookId == reading?.book?.id && it.id !in reading?.retainedPositionIds.orEmpty()
+    }
+    val historicalPosition: PendingPosition? get() = pendingPositions.firstOrNull {
+        it.bookId == reading?.book?.id && it.id in reading?.retainedPositionIds.orEmpty()
+    }
 }
 
 /** Platform display preferences only. Books, chapters and positions belong to Core. */
@@ -267,11 +291,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         return true
     }
 
-    private fun retainPositionPending(error: PendingOperationException) {
-        val reading = state.value.reading ?: return
+    private fun retainPositionPending(error: PendingOperationException, originalReading: ReadingSession? = state.value.reading) {
+        val reading = originalReading ?: return
         val pending = PendingPosition(error.operationId, reading.book.id, error.stage)
-        mutableState.update { it.copy(pendingPositions = it.pendingPositions.filterNot { old -> old.id == pending.id } + pending, error = null) }
-        delayedSave?.cancel()
+        mutableState.update { current -> current.copy(
+            pendingPositions = current.pendingPositions.filterNot { old -> old.id == pending.id } + pending,
+            error = if (current.reading?.identity == reading.identity) null else current.error) }
+        if (state.value.reading?.identity == reading.identity) delayedSave?.cancel()
     }
 
     fun refreshBooks() = perform { request ->
@@ -332,9 +358,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun reconcilePendingPosition(pending: PendingPosition) {
-        if (state.value.busy || state.value.pendingPositions.none { it.id == pending.id && it.bookId == pending.bookId }) return
+    fun reconcilePendingPosition(pending: PendingPosition, expectedRoute: ReaderRoute, expectedReadingOwner: Long?) {
+        if (state.value.busy || state.value.route != expectedRoute || state.value.reading?.identity != expectedReadingOwner ||
+            state.value.pendingPositions.none { it.id == pending.id && it.bookId == pending.bookId }) return
         perform { request ->
+            if (state.value.route != expectedRoute || state.value.reading?.identity != expectedReadingOwner ||
+                state.value.pendingPositions.none { it.id == pending.id && it.bookId == pending.bookId }) return@perform
             var originalRejection: CoreCommandException? = null
             try { library.reconcilePendingPosition(pending.bookId, pending.id) }
             catch (rejected: CoreCommandException) { originalRejection = rejected }
@@ -345,6 +374,42 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+
+    /** Explicit user intention; the owner, never this UI, qualifies the exact retained originals. */
+    fun beginNewPositionIntent(owner: Long, chapterToken: String, retainedIds: List<String>) {
+        val reading = state.value.reading ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.Reading || reading.identity != owner ||
+            reading.chapter.sessionToken != chapterToken || !reading.ebookPresented ||
+            reading.newPositionIntent != null || retainedIds.isEmpty() || retainedIds.distinct().size != retainedIds.size ||
+            state.value.pendingPositions.filter { it.bookId == reading.book.id }.map { it.id }.toSet() != retainedIds.toSet()) return
+        perform { request ->
+            val current = state.value.reading
+            if (current == null || !sameReadingScope(current, reading) || current.newPositionIntent != null ||
+                state.value.route != ReaderRoute.Reading ||
+                state.value.pendingPositions.filter { it.bookId == reading.book.id }.map { it.id }.toSet() != retainedIds.toSet()) return@perform
+            val intent = library.beginNewPositionIntent(reading.book.id, reading.chapter.index, chapterToken, retainedIds.toList())
+            check(intent.sourceId == "local" && intent.bookId == reading.book.id && intent.chapterIndex == reading.chapter.index &&
+                intent.sessionToken == chapterToken && intent.bodyVersion == reading.chapter.bodyVersion &&
+                intent.processingVersion == reading.chapter.processingVersion && intent.retainedUnknownIds.toSet() == retainedIds.toSet())
+            if (request != generation) return@perform
+            mutableState.update { state ->
+                val active = state.reading
+                if (active == null || state.route != ReaderRoute.Reading || !sameReadingScope(active, reading)) state
+                else state.copy(reading = active.copy(newPositionIntent = intent, newPositionIntentPresented = false), lastPositionSaveAttempt = null)
+            }
+            // Existing actual Ready may be submitted once; never manufacture a JS/Native probe.
+            val mount = ebookMount
+            val ready = mount?.ready
+            if (mount != null && ready != null && currentEbookMount(mount.view) === mount)
+                observeNewPositionReady(mount, ready)
+        }
+    }
+
+    private fun sameReadingScope(first: ReadingSession, second: ReadingSession): Boolean =
+        first.identity == second.identity && first.book.id == second.book.id && first.format == second.format &&
+            first.chapter.bookId == second.chapter.bookId && first.chapter.index == second.chapter.index &&
+            first.chapter.sessionToken == second.chapter.sessionToken && first.chapter.bodyVersion == second.chapter.bodyVersion &&
+            first.chapter.processingVersion == second.chapter.processingVersion
 
     fun showSettings() {
         if (!state.value.busy) {
@@ -474,7 +539,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             val chapter = library.openBookmark(bookmark)
             if (request == generation && state.value.reading?.identity == reading.identity) mutableState.update {
                 it.copy(reading = ReadingSession(request, reading.book, chapter, bookmark.scalarOffset, reading.format),
-                    readerPanel = null, controlsVisible = false, bookmarkError = null)
+                    readerPanel = null, controlsVisible = false, bookmarkError = null, lastPositionSaveAttempt = null)
             }
         }
     }
@@ -561,7 +626,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             if (request == generation && state.value.searchSession?.id == session.id) {
                 retireSearch()
                 mutableState.update { it.copy(reading = ReadingSession(request, reading.book, chapter, hit.chapterOffset, reading.format),
-                    readerPanel = null, controlsVisible = false) }
+                    readerPanel = null, controlsVisible = false, lastPositionSaveAttempt = null) }
             }
         }
     }
@@ -664,6 +729,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                         scalarOffset.coerceIn(0, chapter.text.codePointCount(0, chapter.text.length)), format),
                     controlsVisible = false,
                     readerPanel = null, bookmarks = emptyList(), bookmarksReady = false, bookmarkError = null,
+                    lastPositionSaveAttempt = null,
                     bookmarkDeletion = null,
                 )
             }
@@ -764,13 +830,30 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 reading.chapter.processingVersion != event.lease.processingVersion || reading.visibleScalarOffset != event.scalar) current
             else current.copy(reading = reading.copy(ebookPresented = true))
         }
+        observeNewPositionReady(mount, event)
+    }
+
+    private fun observeNewPositionReady(mount: ReaderEbookUiMount, event: ReaderEbookReady) {
+        val reading = state.value.reading ?: return
+        val intent = reading.newPositionIntent ?: return
+        if (currentEbookMount(mount.view) !== mount || mount.ready != event || !reading.ebookPresented ||
+            reading.identity != mount.readingOwner || reading.chapter.sessionToken != intent.sessionToken) return
+        if (!library.observeNewPositionReady(intent, mount.view, event.lease, event.layoutEpoch, event.layoutToken, event.scalar)) return
+        mutableState.update { state ->
+            val current = state.reading
+            if (current == null || !sameReadingScope(current, reading) || current.newPositionIntent !== intent) state
+            else state.copy(reading = current.copy(newPositionIntentPresented = true))
+        }
     }
 
     /** True means this exact visible observation was admitted, never that Core saved it. */
     internal fun ebookVisibleAnchor(view: ReaderEbookViewLease, event: ReaderEbookVisibleAnchor): Boolean {
         val mount = readyEbookMount(view, event.lease, event.layoutEpoch, event.layoutToken) ?: return false
         if (event.scalar !in 0..mount.chapter.scalarCount) return false
-        return acceptVisibleAnchor(mount.readingOwner, event.scalar)
+        return acceptVisibleAnchor(mount.readingOwner, event.scalar) {
+            val intent = state.value.reading?.newPositionIntent
+            intent == null || library.observeNewPositionAnchor(intent, view, event.lease, event.layoutEpoch, event.layoutToken, event.scalar)
+        }
     }
 
     internal fun ebookBodyTap(view: ReaderEbookViewLease, event: ReaderEbookBodyTap) {
@@ -804,21 +887,25 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         retainProtocolPending(event.cause) // Do not misclassify a resource/protocol failure as an import pending operation.
     }
 
-    fun visibleAnchor(session: Long, scalarOffset: Int) { acceptVisibleAnchor(session, scalarOffset) }
+    fun visibleAnchor(session: Long, scalarOffset: Int) {
+        if (state.value.reading?.format != ReaderLocalBookFormat.TXT) return
+        acceptVisibleAnchor(session, scalarOffset) // Ebook positions use only their full view/lease/epoch path above.
+    }
 
-    private fun acceptVisibleAnchor(session: Long, scalarOffset: Int): Boolean {
+    private fun acceptVisibleAnchor(session: Long, scalarOffset: Int, admitBeforePublish: () -> Boolean = { true }): Boolean {
         val reading = state.value.reading ?: return false
         if (state.value.route != ReaderRoute.Reading || state.value.busy ||
-            state.value.pendingPosition != null || reading.identity != session) return false
+            state.value.positionSaveBarrier != null || reading.identity != session) return false
         val offset = scalarOffset.coerceIn(0, reading.chapter.text.codePointCount(0, reading.chapter.text.length))
         if (reading.visibleScalarOffset == offset) return true
+        if (!admitBeforePublish()) return false
         mutableState.update { it.copy(reading = reading.copy(visibleScalarOffset = offset)) }
         delayedSave?.cancel()
         delayedSave = viewModelScope.launch {
             delay(450)
             gate.withLock {
                 val current = state.value.reading
-                if (current?.identity != session || state.value.busy || state.value.pendingPosition != null) return@withLock
+                if (current?.identity != session || state.value.busy || state.value.positionSaveBarrier != null) return@withLock
                 try { persist(current) }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
@@ -833,26 +920,40 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         return true
     }
 
-    private suspend fun persist(reading: ReadingSession?) {
-        if (reading == null) return
+    private suspend fun persist(reading: ReadingSession?): ReaderPositionSaveResult? {
+        if (reading == null) return null
         if (reading.format != ReaderLocalBookFormat.TXT) {
-            // Read the current same-session fact: a caller may have captured the session before Ready.
-            // A transient mount.ready=null must not erase a previously admitted visible position.
-            val current = state.value.reading ?: return
-            if (!current.ebookPresented || current.identity != reading.identity || current.format != reading.format ||
-                current.book.id != reading.book.id || current.chapter.bookId != reading.chapter.bookId ||
-                current.chapter.index != reading.chapter.index || current.chapter.sessionToken != reading.chapter.sessionToken ||
-                current.chapter.bodyVersion != reading.chapter.bodyVersion || current.chapter.processingVersion != reading.chapter.processingVersion) return
+            val current = state.value.reading ?: return null
+            if (!current.ebookPresented || !sameReadingScope(current, reading)) return null
         }
-        library.savePosition(reading.book.id, reading.chapter.index,
+        val result = library.savePosition(reading.book.id, reading.chapter.index,
             reading.visibleScalarOffset, reading.chapter.sessionToken)
+        when (result) {
+            is ReaderPositionSaveResult.SkippedUnchanged -> check(result.bookId == reading.book.id &&
+                result.chapterIndex == reading.chapter.index && result.scalarOffset == reading.visibleScalarOffset &&
+                reading.newPositionIntent != null && result.scalarOffset == reading.newPositionIntent.baselineScalarOffset &&
+                result.retainedUnknownIds.toSet() == reading.newPositionIntent.retainedUnknownIds.toSet())
+            is ReaderPositionSaveResult.ConfirmedNewOriginal -> check(result.bookId == reading.book.id &&
+                result.chapterIndex == reading.chapter.index && result.scalarOffset == reading.visibleScalarOffset &&
+                result.bodyVersion == reading.chapter.bodyVersion && result.processingVersion == reading.chapter.processingVersion &&
+                result.originalId !in reading.newPositionIntent?.retainedUnknownIds.orEmpty() && result.requestId > 0 &&
+                result.progressRevision.isNotBlank() &&
+                (reading.newPositionIntent == null || result.runtimeSession == reading.newPositionIntent.runtimeSession))
+        }
+        mutableState.update { state ->
+            val current = state.reading
+            if (current == null || !sameReadingScope(current, reading) || current.visibleScalarOffset != reading.visibleScalarOffset) state
+            else state.copy(lastPositionSaveAttempt = ReaderPositionSaveProjection(reading.identity, reading.chapter.sessionToken, result))
+        }
+        // Skipped is only a no-dispatch observation. No Saved message, ACK counter or pending removal follows it.
+        return result
     }
 
-    /** Back leaves only after the captured session's actual save receipt. */
+    /** New-save confirmation remains typed; unchanged/blocked exit never fabricates a receipt. */
     fun exitReading() {
         if (state.value.busy) return
         val reading = state.value.reading ?: return
-        val pending = state.value.pendingPosition
+        val pending = state.value.positionSaveBarrier
         perform { request ->
             if (pending == null) persist(reading)
             val books = readShelf()
@@ -876,17 +977,17 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onBackground() {
-        if (state.value.pendingPosition != null) return
+        if (state.value.positionSaveBarrier != null) return
         val reading = state.value.reading ?: return
         delayedSave?.cancel()
         viewModelScope.launch {
             gate.withLock {
-                if (state.value.reading?.identity != reading.identity || state.value.pendingPosition != null) return@withLock
+                if (state.value.reading?.identity != reading.identity || state.value.positionSaveBarrier != null) return@withLock
                 try { persist(reading) }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
                     if (retainProtocolPending(error)) Unit
-                    else if (error is PendingOperationException) retainPositionPending(error)
+                    else if (error is PendingOperationException) retainPositionPending(error, reading)
                     else mutableState.update { it.copy(error = "阅读位置尚未保存：${error.userMessage()}") }
                 }
             }

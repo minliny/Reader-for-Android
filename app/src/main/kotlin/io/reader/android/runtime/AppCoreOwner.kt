@@ -1,6 +1,7 @@
 package io.reader.android.runtime
 
 import android.app.Application
+import io.reader.android.ReaderApplication
 import android.os.Looper
 import io.reader.android.runtime.http.ReaderHttpHost
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,12 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val publicationLease = AtomicReference<ReaderOperationOwner.ClientLease?>()
     private val applicationContext = application.applicationContext
     private val ebookAssets = ReaderEbookAssetRegistry()
+    private val progressIntentIssuer = Any()
+    private val progressApplication = application as? ReaderApplication
+    private val progressBoundary by lazy {
+        ReaderProgressOriginBoundary(checkNotNull(progressApplication) { "PROGRESS_INTENT_READER_APPLICATION_REQUIRED" },
+            this, root, operations.dataDirectory)
+    }
     private val httpHost = ReaderHttpHost()
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
@@ -178,6 +185,33 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
                 }
             })
             return ReaderEbookOwnedPublication(original, assets)
+        }
+
+        /** Only the real process singleton can turn its cold-incarnation invariant into a capability. */
+        internal suspend fun newPositionAuthority(chapter: ReaderChapter, expectedIds: List<String>): ReaderProgressColdAuthority {
+            owner.requireBusinessLane(lease)
+            assertCurrentAdmission()
+            owner.progressBoundary.requireSupported()
+            owner.actor.awaitReady() // Successful first/only App actor publication, not a test/native UUID.
+            val state = owner.actor.snapshot()
+            check(state.admissionOpen && state.faults.isEmpty() && state.unparsedOriginals.isEmpty()) { "PROGRESS_INTENT_PROTOCOL_FAULT" }
+            val runtime = owner.actor.runtimeSession
+            val originals = owner.journal.progressOriginalsForContinuation(owner.root, chapter.bookId)
+            val actualIds = originals.map { it.id }.toSet()
+            if (actualIds != expectedIds.toSet()) {
+                originals.firstOrNull { it.id !in expectedIds }?.let { throw PendingOperationException(it.id, "reading.progress.update") }
+                error("PROGRESS_INTENT_ORIGINAL_SET_CHANGED")
+            }
+            check(originals.isNotEmpty() && expectedIds.toSet().size == expectedIds.size) { "PROGRESS_INTENT_ORIGINAL_SET_CHANGED" }
+            originals.forEach { ReaderProgressNewIntentPolicy.qualify(it, runtime, chapter) }
+            assertCurrentAdmission()
+            return ReaderProgressColdAuthority(owner.progressIntentIssuer, lease, runtime, originals)
+        }
+        internal suspend fun requireNewPositionAuthority(authority: ReaderProgressColdAuthority, chapter: ReaderChapter) {
+            check(authority.issuer === owner.progressIntentIssuer && authority.client == lease) { "PROGRESS_INTENT_FOREIGN_AUTHORITY" }
+            val current = newPositionAuthority(chapter, authority.originals.map { it.id })
+            check(current.runtimeSession == authority.runtimeSession &&
+                ReaderProgressNewIntentPolicy.sameOriginals(authority.originals, current.originals)) { "PROGRESS_INTENT_ORIGINAL_BYTES_CHANGED" }
         }
 
         fun retire() {

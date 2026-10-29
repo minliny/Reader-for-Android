@@ -86,6 +86,25 @@ internal class DurableJournal(private val directory: File) {
         .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
         .distinct().sorted().map { sourceRulesOriginalForQuery(it) ?: error("SOURCE_JOURNAL_MISSING") }
 
+    /** Exact read-only source of supported originals; never AtomicFile.openRead or candidate recovery. */
+    @Synchronized
+    internal fun progressOriginalsForContinuation(root: File, bookId: String): List<ReaderProgressOriginalSnapshot> {
+        check(directory.canonicalFile == File(root, "Operations").canonicalFile) { "PROGRESS_INTENT_FOREIGN_JOURNAL" }
+        ReaderProgressOriginBoundary.requireRealDirectory(directory)
+        val files = checkNotNull(directory.listFiles()) { "PROGRESS_INTENT_JOURNAL_LIST_FAILED" }
+            .filter { it.name.startsWith("android-progress-") &&
+                (it.name.endsWith(".json") || it.name.endsWith(".json.bak") || it.name.endsWith(".json.new")) }
+        check(files.none { it.name.endsWith(".bak") || it.name.endsWith(".new") }) { "PROGRESS_INTENT_BACKUP_OR_CANDIDATE" }
+        return files.sortedBy { it.name }.mapNotNull { file ->
+            ReaderProgressOriginBoundary.requireRegular(file)
+            check(file.canonicalFile.parentFile == directory.canonicalFile && !File(File(directory, "Completed"), file.name).exists()) { "PROGRESS_INTENT_CONFLICTING_ORIGINAL" }
+            val raw = readBounded(file)
+            val record = ProgressJournalCandidatePolicy.parse(raw)
+            check(record.getString("id") + ".json" == file.name) { "PROGRESS_INTENT_FILE_IDENTITY" }
+            if (record.getString("bookId") != bookId) null else ReaderProgressOriginalSnapshot.from(raw)
+        }
+    }
+
     /** Only explicit original-progress reconcile uses this. Ordinary reads still return base pending. */
     @Synchronized
     fun progressCandidateForReconcile(id: String, bookId: String): JSONObject? {
