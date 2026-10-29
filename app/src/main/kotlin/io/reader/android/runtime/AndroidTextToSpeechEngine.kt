@@ -25,12 +25,14 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     override fun setListener(listener: ReaderTtsPlaybackEngine.Listener) { this.listener = listener }
 
     override fun initialize() {
+        Log.i("ReaderTts", "TextToSpeech initialize requested main=${Looper.myLooper() == Looper.getMainLooper()}")
         main.post {
             if (speaker != null) return@post
             val generation = ++initializationGeneration
             val enginePackage = applicationContext.packageManager
                 .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), PackageManager.MATCH_ALL)
                 .firstOrNull()?.serviceInfo?.packageName
+            Log.i("ReaderTts", "TextToSpeech initialize on main generation=$generation engine=$enginePackage")
             if (enginePackage.isNullOrBlank()) {
                 ready = false
                 Log.w("ReaderTts", "No Android TextToSpeech service is available")
@@ -67,6 +69,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
         // callback to the same main handler used for construction and speak,
         // otherwise an unexpected callback thread can leave the coordinator in
         // PREPARING without a terminal onReady result.
+        Log.i("ReaderTts", "TextToSpeech onInit callback status=$status main=${Looper.myLooper() == Looper.getMainLooper()}")
         main.post {
             val generation = initializationGeneration
             if (generation == 0L || initializedGeneration == generation) return@post
@@ -83,7 +86,9 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
             val value = speaker
             if (value == null || !ready) { listener?.onError(utteranceId); return@post }
             val params = Bundle().apply { putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId) }
-            if (value.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId) != TextToSpeech.SUCCESS) listener?.onError(utteranceId)
+            val result = value.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            Log.i("ReaderTts", "TextToSpeech speak id=$utteranceId chars=${text.codePointCount(0, text.length)} result=$result")
+            if (result != TextToSpeech.SUCCESS) listener?.onError(utteranceId)
         }
     }
 

@@ -1,5 +1,6 @@
 package io.reader.android.runtime
 
+import android.util.Log
 import java.util.UUID
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
@@ -89,6 +90,7 @@ internal class ReaderTtsPlaybackCoordinator(
         check(snapshot.currentSliceIndex == startSliceIndex) { "TTS_QUEUE_START_BINDING" }
         plan = nextPlan; currentIndex = startSliceIndex
         publish(ReaderTtsPlaybackStatus.PREPARING, currentIndex, null)
+        Log.i("ReaderTts", "Coordinator start chapter=${nextPlan.chapter.bookId}/${nextPlan.chapter.index} slices=${nextPlan.slices.size} engineReady=${engine.ready}")
         if (engine.ready) speakCurrent() else engine.initialize()
     }
 
@@ -137,6 +139,7 @@ internal class ReaderTtsPlaybackCoordinator(
 
     override fun onReady(success: Boolean) = dispatch {
         synchronized(this) {
+            Log.i("ReaderTts", "Coordinator onReady success=$success status=${state.status}")
             if (closed || state.status != ReaderTtsPlaybackStatus.PREPARING) return@synchronized
             if (!success) { fail(IllegalStateException("TTS_ENGINE_UNAVAILABLE")); return@synchronized }
             try { speakCurrent() } catch (error: Throwable) { fail(error) }
@@ -187,6 +190,7 @@ internal class ReaderTtsPlaybackCoordinator(
         // Core has accepted the queue transition, but the platform engine has
         // not confirmed vocalization yet. PLAYING is published from onStart.
         publish(ReaderTtsPlaybackStatus.PREPARING, index, null)
+        Log.i("ReaderTts", "Coordinator speak slice=$index id=$id")
         engine.speak(id, active.slices[index].text)
     }
 
