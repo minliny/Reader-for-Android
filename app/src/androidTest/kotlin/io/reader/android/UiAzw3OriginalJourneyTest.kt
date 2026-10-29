@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.webkit.WebView
+import android.webkit.MimeTypeMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -27,6 +28,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiSelector
+import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiWatcher
 import io.reader.android.runtime.ReaderPositionSaveResult
 import io.reader.android.runtime.ProgressReceiptPolicy
@@ -47,6 +49,7 @@ import org.junit.rules.Timeout
 import org.junit.runner.RunWith
 import java.io.File
 import java.security.MessageDigest
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -60,6 +63,7 @@ class UiAzw3OriginalJourneyTest {
     private var scenario: ActivityScenario<MainActivity>? = null
     private lateinit var current: MainActivity
     private val bookId = "local:$SOURCE_SHA"
+    private var failureDiagnosticCaptured = false
     @get:Rule val rules: TestRule = RuleChain.outerRule(
         Timeout.builder().withTimeout(240, TimeUnit.SECONDS).withLookingForStuckThread(true).build()).around(compose)
 
@@ -291,6 +295,8 @@ class UiAzw3OriginalJourneyTest {
             primary = failure
             try { marker("method-failure", Bundle().apply { putString("phase", phase); putString("failureClass", failure.javaClass.name); putString("message", failure.message?.take(256)) }) }
             catch (secondary: Throwable) { failure.addSuppressed(secondary) }
+            try { capturePickerFailure(phase) }
+            catch (secondary: Throwable) { failure.addSuppressed(secondary) }
             throw failure
         } finally {
             try { finishOnlyBookshelf() }
@@ -488,7 +494,7 @@ class UiAzw3OriginalJourneyTest {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    // Frozen SAF helper with its reviewed file + optional navigation Boolean-observation changes for this new input only.
+    // Source-bound SAF document rows, one optional navigation and at most two observed container scrolls.
     private fun selectRealDocument(name: String) {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val watcherName = "reader-original-picker-open-consent"
@@ -527,23 +533,33 @@ class UiAzw3OriginalJourneyTest {
             assertTrue("System document picker must actually open",
                 device.findObject(providerSelector).waitForExists(10_000))
             marker("picker-visible")
-            val file = providerSelector.text(name)
-            val folder = providerSelector.text("Reader")
+            // android:id/title is a real document-row title. Toolbar and breadcrumb
+            // labels can name Reader too; they never authorize folder navigation.
+            val file = providerSelector.resourceId("android:id/title").text(name)
+            val folder = providerSelector.resourceId("android:id/title").text("Reader")
             val drawer = providerSelector.resourceIdMatches(".*:id/roots_list")
-            val downloads = drawer.childSelector(UiSelector().textMatches("Downloads|下载|下载内容"))
+            val downloads = drawer.childSelector(UiSelector().packageNameMatches(provider).textMatches("Downloads|下载|下载内容"))
+            val readerBreadcrumb = providerSelector.resourceIdMatches(".*:id/breadcrumb_text").text("Reader")
+            val downloadsBreadcrumb = providerSelector.resourceIdMatches(".*:id/breadcrumb_text").textMatches("Downloads|下载|下载内容")
+            val exactPreview = providerSelector.resourceIdMatches(".*:id/preview_icon").description("预览“$name”文件")
             if (!device.findObject(file).exists()) {
-                // The previous picker can retain its drawer. Do not toggle an already
-                // open drawer, and never carry UiObject2 across its animation.
-                if (device.findObject(drawer).exists()) {
+                // The observed exact preview plus both breadcrumb identities proves
+                // this retained Reader folder; the preview itself is never clicked.
+                val alreadyInReader = device.findObject(readerBreadcrumb).exists() &&
+                    device.findObject(downloadsBreadcrumb).exists() && device.findObject(exactPreview).exists()
+                if (!alreadyInReader) {
+                    // One roots -> Downloads -> Reader document-row navigation only.
+                    if (!device.findObject(drawer).exists()) {
+                        val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
+                        clickPickerOnce(device, roots, "picker-roots", drawer)
+                    }
                     marker("picker-drawer-ready")
                     clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
-                } else if (!device.findObject(folder).exists()) {
-                    val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
-                    clickPickerOnce(device, roots, "picker-roots", drawer)
-                    marker("picker-drawer-ready")
-                    clickPickerOnce(device, downloads, "picker-downloads", folder, gone = drawer)
+                    clickPickerOnce(device, folder, "picker-folder", readerBreadcrumb)
                 }
-                if (!device.findObject(file).exists()) clickPickerOnce(device, folder, "picker-folder", file)
+                assertTrue("Current Reader breadcrumb absent", device.findObject(readerBreadcrumb).waitForExists(5_000))
+                assertTrue("Downloads ancestor breadcrumb absent", device.findObject(downloadsBreadcrumb).waitForExists(5_000))
+                exposeDocumentTitle(device, provider, file)
             }
             assertTrue("Original input missing: $name", device.findObject(file).waitForExists(5_000))
             marker("picker-file-click")
@@ -561,6 +577,51 @@ class UiAzw3OriginalJourneyTest {
         } finally {
             device.removeWatcher(watcherName)
         }
+    }
+
+    /** At most two real scrolls in the unique actual DocumentsUI scroll container. */
+    private fun exposeDocumentTitle(device: UiDevice, provider: String, file: UiSelector) {
+        val container = UiSelector().packageNameMatches(provider).className("android.widget.ScrollView").scrollable(true)
+        for (attempt in 1..2) {
+            val beforeVisible = device.findObject(file).waitForExists(750)
+            if (beforeVisible) return
+            assertTrue("Unique DocumentsUI scroll container absent", device.findObject(container.instance(0)).exists())
+            assertFalse("DocumentsUI scroll container ambiguous", device.findObject(container.instance(1)).exists())
+            val returned = UiScrollable(container).scrollForward(35)
+            val afterVisible = device.findObject(file).waitForExists(1_000)
+            marker("picker-document-scroll-$attempt", Bundle().apply {
+                putInt("attempt", attempt); putInt("maxScrolls", 2); putInt("scrollSteps", 35)
+                putString("containerClass", "android.widget.ScrollView")
+                putBoolean("beforeVisible", beforeVisible); putBoolean("scrollReturned", returned); putBoolean("afterVisible", afterVisible)
+            })
+            if (afterVisible) return // The Boolean alone does not prove the original file became visible.
+        }
+        throw AssertionError("Exact document-row title absent after two bounded DocumentsUI scrolls")
+    }
+
+    /** One read-only failure observation; no picker action, URI injection or provider query. */
+    private fun capturePickerFailure(phase: String) {
+        if (failureDiagnosticCaptured) return
+        failureDiagnosticCaptured = true // Reserve the sole attempt even if its dump/marker fails.
+        val details = Bundle().apply {
+            putString("failurePhase", phase); putString("mimeExtension", "azw3")
+            val mapped = MimeTypeMap.getSingleton().getMimeTypeFromExtension("azw3")
+            putBoolean("mappedMimePresent", mapped != null)
+            if (mapped != null) putString("mappedMime", mapped)
+            putString("mimeClaim", "MIMETYPEMAP_LOOKUP_ONLY_NOT_DOCUMENT_PROVIDER_OR_RETURNED_URI")
+        }
+        val file = File(instrumentation.targetContext.cacheDir, "reader-a3-azw3-picker-failure-${UUID.randomUUID()}.xml")
+        details.putString("cacheFile", file.name)
+        try {
+            UiDevice.getInstance(instrumentation).dumpWindowHierarchy(file)
+            val bytes = file.length(); details.putLong("hierarchyBytes", bytes)
+            val bounded = file.isFile && bytes in 1..2L * 1024 * 1024
+            details.putBoolean("hierarchySaved", bounded)
+            if (bounded) details.putString("hierarchySha256", shaFile(file))
+        } catch (error: Exception) {
+            details.putBoolean("hierarchySaved", false); details.putString("hierarchyFailureClass", error.javaClass.name)
+        }
+        marker("azw3-picker-failure-diagnostic", details)
     }
 
     private fun clickPickerOnce(device: UiDevice, selector: UiSelector, stage: String, next: UiSelector, gone: UiSelector? = null) {

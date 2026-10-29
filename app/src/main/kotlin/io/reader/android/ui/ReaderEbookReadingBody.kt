@@ -34,7 +34,8 @@ internal class ReaderEbookUiMount(val readingOwner: Long, val chapter: ReaderCha
 
 /** A committed physical mount mints once. It never waits for a WebView callback while holding a Library turn. */
 @Composable
-internal fun ReaderEbookReadingBody(state: ReaderUiState, model: ReaderViewModel, modifier: Modifier = Modifier) {
+internal fun ReaderEbookReadingBody(state: ReaderUiState, model: ReaderViewModel, modifier: Modifier = Modifier,
+    reservedFooterHeightPx: Int = 0) {
     val reading = state.reading ?: return
     val chapter = reading.chapter
     val scope = rememberCoroutineScope()
@@ -67,7 +68,8 @@ internal fun ReaderEbookReadingBody(state: ReaderUiState, model: ReaderViewModel
     } else {
         val density = LocalDensity.current
         val geometry = with(density) { ReaderEbookGeometry(22.dp.roundToPx(), 32.dp.roundToPx(), 22.dp.roundToPx(),
-            52.dp.roundToPx(), this.density, fontScale) }
+            // The screen already reserves the measured footer outside the clipped viewport.
+            (52.dp.roundToPx() - reservedFooterHeightPx).coerceAtLeast(0), this.density, fontScale) }
         ReaderEbookBody(
             input = ReaderEbookRenderInput(prepared = publication.publication, chapter = chapter,
                 currentAnchor = reading.visibleScalarOffset, paper = state.paper, fontSizeSp = state.fontSize,

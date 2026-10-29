@@ -22,14 +22,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +65,22 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             when (reading.format) {
                 ReaderLocalBookFormat.TXT -> ReaderNativeChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
                     onVisibleAnchor = { model.visibleAnchor(reading.identity, it) }, onTap = model::toggleControls, modifier = bodyModifier)
-                ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW -> ReaderEbookReadingBody(state, model, bodyModifier)
+                ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW -> {
+                    var footerHeightPx by remember(reading.identity, reading.chapter.sessionToken) { mutableIntStateOf(0) }
+                    // The footer owns real viewport space even while controls cover it. Its measured
+                    // footprint is also removed from the existing end inset by the ebook body.
+                    Column(bodyModifier) {
+                        Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("reader_ebook_viewport")) {
+                            ReaderEbookReadingBody(state, model, Modifier.fillMaxSize(), reservedFooterHeightPx = footerHeightPx)
+                        }
+                        Text("${reading.chapter.index + 1} / ${reading.book.chapterCount}", color = state.paper.ink().copy(alpha = .6f),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.align(Alignment.End).alpha(if (state.controlsVisible) 0f else 1f)
+                                .testTag("reader_ebook_footer").onSizeChanged { footerHeightPx = it.height }
+                                .then(if (state.controlsVisible) Modifier.clearAndSetSemantics { } else Modifier)
+                                .padding(horizontal = 22.dp, vertical = 8.dp))
+                    }
+                }
             }
         }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
@@ -148,7 +171,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                     }
                 }
             }
-        } else {
+        } else if (reading.format == ReaderLocalBookFormat.TXT) {
             Text("${reading.chapter.index + 1} / ${reading.book.chapterCount}", color = state.paper.ink().copy(alpha = .6f),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 22.dp, vertical = 8.dp))
