@@ -1,6 +1,8 @@
 package io.reader.android.runtime
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,7 +24,15 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     override fun initialize() {
         main.post {
             if (speaker != null) return@post
-            speaker = TextToSpeech(applicationContext, this@AndroidTextToSpeechEngine).also {
+            val enginePackage = applicationContext.packageManager
+                .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), PackageManager.MATCH_ALL)
+                .firstOrNull()?.serviceInfo?.packageName
+            if (enginePackage.isNullOrBlank()) {
+                ready = false
+                listener?.onReady(false)
+                return@post
+            }
+            speaker = TextToSpeech(applicationContext, this@AndroidTextToSpeechEngine, enginePackage).also {
                 it.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String) { listener?.onStart(utteranceId) }
                     override fun onDone(utteranceId: String) { listener?.onDone(utteranceId) }
@@ -35,8 +45,8 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
 
     override fun onInit(status: Int) {
         check(Looper.myLooper() == Looper.getMainLooper()) { "TTS_INIT_MAIN_THREAD_REQUIRED" }
-        ready = status == TextToSpeech.SUCCESS
-        if (ready) speaker?.language = Locale.getDefault()
+        ready = status == TextToSpeech.SUCCESS && speaker?.setLanguage(Locale.getDefault()) !in
+            setOf(TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED)
         listener?.onReady(ready)
     }
 
