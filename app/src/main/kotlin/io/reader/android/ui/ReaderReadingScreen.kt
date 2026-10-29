@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.reader.android.R
 import io.reader.android.runtime.ReaderLocalBookFormat
+import io.reader.android.runtime.ReaderTextPresentationKind
+import io.reader.android.runtime.ReaderTtsPlaybackStatus
 
 val ReaderScalarOffsetKey = SemanticsPropertyKey<Int>("ReaderScalarOffset")
 var SemanticsPropertyReceiver.readerScalarOffset by ReaderScalarOffsetKey
@@ -143,6 +145,34 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                                 modifier = Modifier.testTag("reader_open_bookmarks")) { Text("书签") }
                             TextButton(onClick = model::showContentSearch, enabled = !state.busy,
                                 modifier = Modifier.testTag("reader_open_content_search")) { Text("正文搜索") }
+                        }
+                        if (reading.chapter.presentationKind == ReaderTextPresentationKind.LOCAL_DOCUMENT) {
+                            val ttsStatus = state.ttsPlayback.status
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("朗读：${when (ttsStatus) {
+                                    ReaderTtsPlaybackStatus.PLAYING -> "播放中"
+                                    ReaderTtsPlaybackStatus.PREPARING -> "准备中"
+                                    ReaderTtsPlaybackStatus.PAUSED -> "已暂停"
+                                    ReaderTtsPlaybackStatus.COMPLETED -> "已完成"
+                                    ReaderTtsPlaybackStatus.FAILED -> "不可用"
+                                    ReaderTtsPlaybackStatus.STOPPED -> "已停止"
+                                    ReaderTtsPlaybackStatus.IDLE -> "未开始"
+                                }}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)
+                                    .testTag("reader_tts_status"))
+                                TextButton(onClick = model::toggleTts, enabled = !state.busy && state.pendingPosition == null,
+                                    modifier = Modifier.testTag("reader_tts_toggle")) {
+                                    Text(when (ttsStatus) {
+                                        ReaderTtsPlaybackStatus.PLAYING, ReaderTtsPlaybackStatus.PREPARING -> "暂停"
+                                        ReaderTtsPlaybackStatus.PAUSED -> "继续"
+                                        else -> "朗读"
+                                    })
+                                }
+                                if (ttsStatus in setOf(ReaderTtsPlaybackStatus.PLAYING, ReaderTtsPlaybackStatus.PREPARING,
+                                        ReaderTtsPlaybackStatus.PAUSED)) {
+                                    TextButton(onClick = model::stopTts, enabled = !state.busy,
+                                        modifier = Modifier.testTag("reader_tts_stop")) { Text("停止") }
+                                }
+                            }
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { model.changeChapter(-1) }, enabled = !state.busy && state.pendingPosition == null && reading.chapter.index > 0,
