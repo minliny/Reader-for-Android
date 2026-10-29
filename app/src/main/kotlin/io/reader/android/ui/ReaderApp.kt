@@ -165,9 +165,13 @@ fun ReaderApp(model: ReaderViewModel) {
                         ReaderRecoveryNotice("原书签操作尚未确认，原记录会继续保留。", state.busy,
                             { model.reconcileBookmark(pending) }, "核对原书签操作", "reader_reconcile_bookmark")
                     }
-                    state.pendingSearchClose?.let { original -> ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。",
-                        state.searchBusy, { model.reconcileSearchClose(original, state.route, state.reading?.identity) },
-                        "核对原搜索", "reader_reconcile_search") }
+                    state.pendingSearchClose?.let { original ->
+                        val hostRoute = state.route
+                        val hostReadingOwner = state.reading?.identity
+                        ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。", state.searchBusy,
+                            { model.reconcileSearchClose(original, hostRoute, hostReadingOwner) },
+                            "核对原搜索", "reader_reconcile_search")
+                    }
                     when (state.route) {
                         ReaderRoute.Bookshelf -> BookshelfScreen(state, model, requestImport)
                         ReaderRoute.Settings -> SettingsScreen(state, model)
