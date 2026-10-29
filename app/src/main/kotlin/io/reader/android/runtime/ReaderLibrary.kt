@@ -406,6 +406,9 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         check(record.getString("kind") == "progress" && record.getString("bookId") == bookId) {
             "ORIGINAL_PROGRESS_OWNER_MISMATCH"
         }
+        if (!record.optBoolean("completed") && record.optJSONObject("wireTerminal") == null) {
+            record = journal.progressCandidateForReconcile(operationId, bookId) ?: record
+        }
         if (record.optJSONObject("wireTerminal") == null &&
             record.getString("runtimeSession") == transport.session && !record.optBoolean("completed")) {
             transport.drainOriginalTerminal(record.getLong("requestId"))

@@ -3,6 +3,7 @@ package io.reader.android.runtime
 import android.system.Os
 import android.system.OsConstants
 import android.util.AtomicFile
+import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 
@@ -11,24 +12,28 @@ internal class DurableJournal(private val directory: File) {
     init { check(directory.mkdirs() || directory.isDirectory) }
 
     @Synchronized
-    fun readAll(): List<JSONObject> = directory.listFiles()
+    fun readAll(): List<JSONObject> {
+        rejectOrphanCandidates()
+        return directory.listFiles()
         .orEmpty().filter { it.name.endsWith(".json") || it.name.endsWith(".json.bak") }
         .map { if (it.name.endsWith(".bak")) File(directory, it.name.removeSuffix(".bak")) else it }
         .distinctBy { it.name }.sortedBy { it.name }.map { file ->
             // A corrupt record blocks mutation; it must never disappear via mapNotNull.
-            JSONObject(AtomicFile(file).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() })
+            readRecord(file)
                 .also { check(it.getInt("journalSchema") == 1) { "UNSUPPORTED_HOST_JOURNAL" } }
         }
+    }
 
     @Synchronized
     fun terminal(id: String, requestId: Long, session: String, event: JSONObject) {
         require(id.matches(Regex("[a-zA-Z0-9-]{1,100}")))
         val base = File(directory, "$id.json")
+        rejectOrphanCandidate(base)
         if (!base.exists() && !File(directory, "$id.json.bak").exists()) {
             check(File(File(directory, "Completed"), "$id.json").isFile) { "ORIGINAL_JOURNAL_MISSING" }
             return
         }
-        val record = JSONObject(AtomicFile(base).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() })
+        val record = readRecord(base)
         // Querying an original receipt can advance the operation before its wire
         // callback arrives. Such a callback cannot overwrite the later journal.
         if (record.optBoolean("completed") || record.optLong("requestId", -1) != requestId ||
@@ -42,41 +47,153 @@ internal class DurableJournal(private val directory: File) {
     fun exact(id: String, includeCompleted: Boolean = false): JSONObject? {
         require(id.matches(Regex("[a-zA-Z0-9-]{1,100}")))
         var base = File(directory, "$id.json")
+        rejectOrphanCandidate(base)
         if (!base.exists() && !File(directory, "$id.json.bak").exists()) {
             if (!includeCompleted) return null
             base = File(File(directory, "Completed"), "$id.json")
             if (!base.exists() && !File(base.parentFile, base.name + ".bak").exists()) return null
         }
-        return JSONObject(AtomicFile(base).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() })
+        return readRecord(base)
             .also { check(it.getInt("journalSchema") == 1 && it.getString("id") == id) { "ORIGINAL_JOURNAL_IDENTITY" } }
+    }
+
+    /** Only explicit original-progress reconcile uses this. Ordinary reads still return base pending. */
+    @Synchronized
+    fun progressCandidateForReconcile(id: String, bookId: String): JSONObject? {
+        require(id.matches(Regex("[a-zA-Z0-9-]{1,100}")))
+        val base = File(directory, "$id.json")
+        if (!File(base.path + ".new").exists()) return null
+        val candidate = qualifiedCandidate(base)
+        check(candidate.id == id && candidate.bookId == bookId) { "ORIGINAL_PROGRESS_OWNER_MISMATCH" }
+        val provenance = retainCandidate(candidate)
+        return candidate.record().put("originalWireCandidate", provenance) // completed remains false.
+    }
+
+    private fun readRecord(base: File): JSONObject {
+        if (File(base.path + ".new").exists()) {
+            qualifiedCandidate(base) // Validate, but never openRead, promote, delete or return the candidate as committed.
+            return ProgressJournalCandidatePolicy.parse(readBounded(base))
+        }
+        return JSONObject(AtomicFile(base).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() })
+    }
+
+    private fun qualifiedCandidate(base: File): ProgressJournalCandidatePolicy.Qualified {
+        check(base.parentFile == directory && base.isFile && !File(base.path + ".bak").exists()) { "JOURNAL_CANDIDATE_OWNER_OR_BACKUP_CONFLICT" }
+        return ProgressJournalCandidatePolicy.qualify(readBounded(base), readBounded(File(base.path + ".new")))
+            .also { check(base.name == it.id + ".json") { "JOURNAL_CANDIDATE_FILE_IDENTITY" } }
+    }
+
+    private fun rejectOrphanCandidate(base: File) {
+        check(!File(base.path + ".new").exists() || base.isFile) { "JOURNAL_ORPHAN_CANDIDATE_RETAINED" }
+    }
+
+    private fun rejectOrphanCandidates() {
+        directory.listFiles().orEmpty().filter { it.name.endsWith(".json.new") }.forEach {
+            rejectOrphanCandidate(File(directory, it.name.removeSuffix(".new")))
+        }
+    }
+
+    private fun readBounded(file: File, limit: Int = ProgressJournalCandidatePolicy.MAX_BYTES): ByteArray = file.inputStream().use { input ->
+        check(file.length() in 1..limit.toLong()) { "JOURNAL_CANDIDATE_BYTE_BUDGET" }
+        val buffer = ByteArray(limit + 1)
+        var count = 0
+        while (count < buffer.size) {
+            val amount = input.read(buffer, count, buffer.size - count)
+            if (amount == -1) break
+            check(amount > 0) { "JOURNAL_CANDIDATE_READ_STALLED" }
+            count += amount
+        }
+        check(count in 1..limit) { "JOURNAL_CANDIDATE_BYTE_BUDGET" }
+        buffer.copyOf(count)
+    }
+
+    private fun candidateProvenance(candidate: ProgressJournalCandidatePolicy.Qualified): Pair<File, ByteArray> =
+        File(File(directory, "OriginalWireCandidates"), "${candidate.id}-${candidate.candidateSha256}.json") to provenanceBytes(candidate)
+
+    private fun provenanceBytes(candidate: ProgressJournalCandidatePolicy.Qualified): ByteArray {
+        val active = candidate.activeBytesCopy(); val next = candidate.candidateBytesCopy()
+        return JSONObject().put("schemaVersion", 1).put("operationId", candidate.id)
+            .put("activeSha256", candidate.activeSha256).put("candidateSha256", candidate.candidateSha256)
+            .put("activeBytes", active.size).put("candidateBytes", next.size)
+            .put("activeBase64", Base64.encodeToString(active, Base64.NO_WRAP))
+            .put("candidateBase64", Base64.encodeToString(next, Base64.NO_WRAP)).toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun retainCandidate(candidate: ProgressJournalCandidatePolicy.Qualified): JSONObject {
+        val base = File(directory, candidate.id + ".json")
+        check(candidate.unchanged(readBounded(base), readBounded(File(base.path + ".new")))) { "JOURNAL_CANDIDATE_CHANGED_BEFORE_RETENTION" }
+        val (target, bytes) = candidateProvenance(candidate)
+        check(bytes.size <= PROVENANCE_LIMIT)
+        check(target.parentFile.mkdirs() || target.parentFile.isDirectory)
+        if (target.exists()) {
+            check(readBounded(target, PROVENANCE_LIMIT).contentEquals(bytes)) { "JOURNAL_CANDIDATE_PROVENANCE_CONFLICT" }
+        } else {
+            val atomic = AtomicFile(target)
+            val stream = atomic.startWrite()
+            var finished = false
+            try {
+                stream.write(bytes); stream.fd.sync(); atomic.finishWrite(stream); finished = true
+            } catch (error: Throwable) {
+                if (!finished) atomic.failWrite(stream)
+                throw error
+            }
+            check(readBounded(target, PROVENANCE_LIMIT).contentEquals(bytes)) { "JOURNAL_CANDIDATE_PROVENANCE_PUBLICATION" }
+        }
+        syncDirectory(target.parentFile); syncDirectory(directory)
+        return provenanceIdentity(candidate, target, bytes)
+    }
+
+    private fun provenanceIdentity(candidate: ProgressJournalCandidatePolicy.Qualified, file: File, bytes: ByteArray): JSONObject = JSONObject()
+        .put("path", "OriginalWireCandidates/" + file.name).put("bytes", bytes.size).put("sha256", ProgressJournalCandidatePolicy.hash(bytes))
+        .put("activeSha256", candidate.activeSha256).put("candidateSha256", candidate.candidateSha256)
+
+    private fun requireCandidateCompletion(record: JSONObject): Boolean {
+        val base = File(directory, record.getString("id") + ".json")
+        if (!File(base.path + ".new").exists()) return false
+        val candidate = qualifiedCandidate(base)
+        val (target, bytes) = candidateProvenance(candidate)
+        check(target.isFile && readBounded(target, PROVENANCE_LIMIT).contentEquals(bytes)) { "JOURNAL_CANDIDATE_PROVENANCE_REQUIRED" }
+        val expected = candidate.record().put("originalWireCandidate", provenanceIdentity(candidate, target, bytes)).put("completed", true)
+        check(ProgressJournalCandidatePolicy.sameObject(record, expected)) { "JOURNAL_CANDIDATE_WRITE_REQUIRES_EXPLICIT_ORIGINAL_COMPLETION" }
+        return true
     }
 
     @Synchronized
     fun write(record: JSONObject) {
         val id = record.getString("id")
         require(id.matches(Regex("[a-zA-Z0-9-]{1,100}")))
+        val candidateCompletion = requireCandidateCompletion(record)
         // Completed records are retained as original evidence outside the active
         // scan. Frequent position saves must not reread every prior preview/ACK.
         val parent = if (record.optBoolean("completed")) File(directory, "Completed") else directory
         check(parent.mkdirs() || parent.isDirectory)
-        val atomic = AtomicFile(File(parent, "$id.json"))
-        val stream = atomic.startWrite()
-        try {
-            stream.write(record.toString().toByteArray(Charsets.UTF_8))
-            stream.fd.sync()
-            atomic.finishWrite(stream)
-        } catch (error: Throwable) {
-            atomic.failWrite(stream)
-            throw error
+        val target = File(parent, "$id.json")
+        val encoded = record.toString().toByteArray(Charsets.UTF_8)
+        if (candidateCompletion && target.exists()) {
+            check(readBounded(target).contentEquals(encoded)) { "ORIGINAL_COMPLETED_CANDIDATE_CONFLICT" }
+        } else {
+            val atomic = AtomicFile(target)
+            val stream = atomic.startWrite()
+            try {
+                stream.write(encoded)
+                stream.fd.sync()
+                atomic.finishWrite(stream)
+            } catch (error: Throwable) {
+                atomic.failWrite(stream)
+                throw error
+            }
         }
         // finishWrite has committed the file. A later fsync failure must not
         // invoke failWrite and erase its durable original terminal evidence.
+        if (candidateCompletion) check(readBounded(target).contentEquals(encoded)) { "ORIGINAL_CANDIDATE_COMPLETION_PUBLICATION" }
         syncDirectory(parent)
         if (parent != directory) {
             AtomicFile(File(directory, "$id.json")).delete()
             syncDirectory(directory)
         }
     }
+
+    private companion object { const val PROVENANCE_LIMIT = ProgressJournalCandidatePolicy.MAX_BYTES * 3 }
 }
 
 internal fun syncDirectory(directory: File) {
