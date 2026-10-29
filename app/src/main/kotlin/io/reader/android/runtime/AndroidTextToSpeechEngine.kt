@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import java.util.Locale
 
 /** Main-thread Android TextToSpeech adapter. It owns no Core or Reader state. */
@@ -18,28 +19,45 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     @Volatile override var ready: Boolean = false
         private set
     @Volatile private var listener: ReaderTtsPlaybackEngine.Listener? = null
+    private var initializationGeneration = 0L
 
     override fun setListener(listener: ReaderTtsPlaybackEngine.Listener) { this.listener = listener }
 
     override fun initialize() {
         main.post {
             if (speaker != null) return@post
+            val generation = ++initializationGeneration
             val enginePackage = applicationContext.packageManager
                 .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), PackageManager.MATCH_ALL)
                 .firstOrNull()?.serviceInfo?.packageName
             if (enginePackage.isNullOrBlank()) {
                 ready = false
+                Log.w("ReaderTts", "No Android TextToSpeech service is available")
                 listener?.onReady(false)
                 return@post
             }
-            speaker = TextToSpeech(applicationContext, this@AndroidTextToSpeechEngine, enginePackage).also {
-                it.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String) { listener?.onStart(utteranceId) }
-                    override fun onDone(utteranceId: String) { listener?.onDone(utteranceId) }
-                    override fun onError(utteranceId: String) { listener?.onError(utteranceId) }
-                    override fun onError(utteranceId: String, errorCode: Int) { listener?.onError(utteranceId) }
-                })
+            try {
+                speaker = TextToSpeech(applicationContext, this@AndroidTextToSpeechEngine, enginePackage).also {
+                    it.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String) { listener?.onStart(utteranceId) }
+                        override fun onDone(utteranceId: String) { listener?.onDone(utteranceId) }
+                        override fun onError(utteranceId: String) { listener?.onError(utteranceId) }
+                        override fun onError(utteranceId: String, errorCode: Int) { listener?.onError(utteranceId) }
+                    })
+                }
+            } catch (error: Throwable) {
+                Log.e("ReaderTts", "TextToSpeech initialization failed for $enginePackage", error)
+                speaker = null
+                ready = false
+                listener?.onReady(false)
+                return@post
             }
+            main.postDelayed({
+                if (generation == initializationGeneration && speaker != null && !ready) {
+                    Log.w("ReaderTts", "TextToSpeech initialization timed out for $enginePackage")
+                    listener?.onReady(false)
+                }
+            }, 8_000)
         }
     }
 
@@ -47,6 +65,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
         check(Looper.myLooper() == Looper.getMainLooper()) { "TTS_INIT_MAIN_THREAD_REQUIRED" }
         ready = status == TextToSpeech.SUCCESS && speaker?.setLanguage(Locale.getDefault()) !in
             setOf(TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED)
+        Log.i("ReaderTts", "TextToSpeech init status=$status ready=$ready")
         listener?.onReady(ready)
     }
 
