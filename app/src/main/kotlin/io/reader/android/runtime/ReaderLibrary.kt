@@ -13,6 +13,9 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import io.reader.android.runtime.ebookdraft.EbookLeaseGuard
+import io.reader.android.runtime.ebookdraft.EbookRenderLease
 
 data class LibraryBook(
     val id: String,
@@ -43,7 +46,7 @@ data class PendingImport(val id: String, val fileName: String, val stage: String
 data class PendingPosition(val id: String, val bookId: String, val stage: String)
 
 /**
- * A1's real local TXT product adapter. Core f322 owns parsing, shelf, TOC,
+ * Local TXT/EPUB/MOBI product adapter draft. Fixed Core 1fe owns parsing, shelf, TOC,
  * documents, progress and transactions. Kotlin owns SAF, source bytes and the
  * original-operation journal, following the existing iOS local-import v2 lane.
  */
@@ -65,6 +68,95 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
     private val readingSessions = mutableMapOf<String, Session>()
+    private val originalAuthorities = ReaderLocalOriginalAuthorityReader(File(root, "Operations/Completed"))
+    private val ebookViewIdentity = Any()
+    private data class EbookRenderState(val lease: EbookRenderLease, val chapterToken: String,
+        val view: ReaderEbookViewLease, val publication: ReaderEbookPreparedPublication? = null)
+    private val ebookRender = AtomicReference<EbookRenderState?>()
+    private val ebookGuard = EbookLeaseGuard { lease ->
+        client.requireEbookCurrent(lease)
+        val captured = ebookRender.get() ?: error("RETIRED_EBOOK_RENDER_LEASE")
+        check(!closed.get() && captured.lease == lease) { "RETIRED_EBOOK_RENDER_LEASE" }
+        captured.view.requireCurrent(ebookViewIdentity)
+        client.requireEbookCurrent(lease)
+        check(ebookRender.get() === captured) { "EBOOK_RENDER_CHANGED_DURING_OBSERVATION" }
+    }
+
+    /** Exact original import fact for renderer selection; no book-extension or genre inference. */
+    suspend fun localBookFormat(bookId: String): ReaderLocalBookFormat = onIO(WholeTurnMode.OBSERVER_READ) {
+        localIdentity(bookId)
+        originalAuthorities.forBook(bookId).format
+    }
+
+    /** Mint before launching preparation; close may win before, during or after its whole turn. */
+    internal fun newEbookView(): ReaderEbookViewLease {
+        check(!closed.get()) { "LIBRARY_CLOSED" }; client.assertCurrentAdmission()
+        return ReaderEbookViewLease(ebookViewIdentity, client.lease, ::retireEbookView)
+    }
+
+    /** One token, one actual view. Caller must leave the turn before awaiting WebView readiness. */
+    internal suspend fun prepareEbookForView(view: ReaderEbookViewLease, bookId: String, index: Int,
+        sessionToken: String): ReaderEbookViewPreparation {
+        view.claim(ebookViewIdentity)
+        try {
+            val publication = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+                view.requireCurrent(ebookViewIdentity); check(view.ownerLease == client.lease)
+                val chapter = activeChapter(bookId, sessionToken, index)
+                val turn = client.currentTurn()
+                check(turn.lease == client.lease) { "FOREIGN_EBOOK_WHOLE_TURN" }
+                val original = originalAuthorities.forBook(bookId)
+                check(original.format in setOf(ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI)) { "EBOOK_FORMAT_REQUIRED" }
+                val lease = EbookRenderLease(client.lease.ownerId, client.lease.clientId, client.lease.ownerGeneration,
+                    transport.session, view.physicalViewId, chapter.bookId, chapter.index, chapter.bodyVersion, chapter.processingVersion)
+                retirePreparedEbook()
+                val admitted = EbookRenderState(lease, chapter.sessionToken, view)
+                ebookRender.set(admitted)
+                var prepared: ReaderEbookPreparedPublication? = null
+                try {
+                    ebookGuard.requireCurrent(lease)
+                    val value = ReaderEbookOwnerPreparation(client, ebookGuard).prepare(lease, chapter, original.sourceBytes, original.format.wire)
+                    prepared = value
+                    turn.assertActive(); activeChapter(bookId, sessionToken, index); view.requireCurrent(ebookViewIdentity)
+                    ebookGuard.requireCurrent(lease)
+                    if (!ebookRender.compareAndSet(admitted, admitted.copy(publication = value))) error("RETIRED_EBOOK_PREPARATION")
+                    value
+                } catch (error: Throwable) {
+                    prepared?.retire(); ebookRender.compareAndSet(admitted, null); throw error
+                }
+            }
+            val capturedGuard = EbookLeaseGuard { lease ->
+                view.requireCurrent(ebookViewIdentity)
+                val current = ebookRender.get() ?: error("RETIRED_EBOOK_VIEW")
+                check(current.view === view && current.publication === publication && publication.lease == lease) { "FOREIGN_PHYSICAL_EBOOK_VIEW" }
+                ebookGuard.requireCurrent(lease)
+                check(ebookRender.get() === current) { "RETIRED_EBOOK_VIEW_OBSERVATION" }
+            }
+            capturedGuard.requireCurrent(publication.lease)
+            return ReaderEbookViewPreparation(view, publication, capturedGuard)
+        } catch (error: Throwable) {
+            try { view.close() } catch (cleanup: Throwable) { if (cleanup !== error) error.addSuppressed(cleanup) }
+            throw error
+        }
+    }
+
+    private fun retireEbookView(view: ReaderEbookViewLease) {
+        while (true) {
+            val captured = ebookRender.get() ?: return
+            if (captured.view !== view) return
+            if (ebookRender.compareAndSet(captured, null)) { captured.publication?.retire(); return }
+        }
+    }
+
+    /** A late unmount can retire only its captured render, never the new one. No business gate is entered. */
+    internal fun retireEbook(renderId: UUID) {
+        while (true) {
+            val captured = ebookRender.get() ?: return
+            if (captured.lease.renderId != renderId) return
+            if (ebookRender.compareAndSet(captured, null)) { captured.publication?.retire(); return }
+        }
+    }
+
+    private fun retirePreparedEbook() { ebookRender.getAndSet(null)?.publication?.retire() }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }
@@ -144,6 +236,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         validate(content)
         val revision = readProgress(bookId).getString("progressRevision")
         check(revision.isNotEmpty()) { "PROGRESS_OBSERVATION_MISSING" }
+        retirePreparedEbook() // Only after the new chapter/jump scope passed all validation.
         readingSessions[bookId] = Session(content, revision)
         return content
     }
@@ -345,7 +438,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         val pending = pendingImportRecords().firstOrNull()
         if (pending != null) throw PendingOperationException(pending.getString("id"), pending.getString("nextStage"))
         val filename = displayName(uri)
-        require(filename.substringAfterLast('.', "").lowercase() == "txt") { "A1_SUPPORTS_LOCAL_TXT_ONLY" }
+        require(filename.substringAfterLast('.', "").lowercase() in setOf("txt", "epub", "mobi")) { "LOCAL_EXTENSION_NOT_ADMITTED" }
         check(staging.mkdirs() || staging.isDirectory)
         check(originals.mkdirs() || originals.isDirectory)
         val id = "android-import-${UUID.randomUUID()}"
@@ -390,10 +483,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
                 .put("title", filename.substringBeforeLast('.'))), timeoutMs = 120_000)
             val preview = parsed.getJSONObject("preview")
             val summary = preview.getJSONObject("summary")
+            val format = ReaderLocalBookFormat.fromCore(summary.getString("format"))
             val integrity = summary.getJSONObject("integrity")
             check(integrity.getInt("schemaVersion") == 1 &&
                 integrity.getString("readability") in setOf("complete", "recoverable") &&
-                summary.getString("format") == "txt" && summary.getLong("byteLen") == size) { "UNREADABLE_LOCAL_SOURCE" }
+                summary.getLong("byteLen") == size) { "UNREADABLE_LOCAL_SOURCE" }
             currentCoroutineContext().ensureActive()
             val authority = transport.request("import.local.authority.v2")
             ImportReceiptPolicy.authority(authority)
@@ -402,7 +496,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             check(sequence in 0 until Long.MAX_VALUE) { "IMPORT_SEQUENCE_EXHAUSTED" }
             val binding = JSONObject().put("authorityEpoch", authority.getString("authorityEpoch"))
                 .put("sequence", sequence + 1).put("transactionId", id).put("sourceId", "local")
-                .put("bookId", bookId).put("sourceSha256", hash).put("sourceBytes", size).put("format", "txt")
+                .put("bookId", bookId).put("sourceSha256", hash).put("sourceBytes", size).put("format", format.wire)
             val record = JSONObject().put("journalSchema", 1).put("kind", "import").put("id", id)
                 .put("fileName", filename).put("stagedName", staged.name).put("hash", hash).put("sourceBytes", size)
                 .put("binding", binding).put("preview", preview).put("receipts", JSONObject())
@@ -624,7 +718,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) client.retire()
+        if (closed.compareAndSet(false, true)) { retirePreparedEbook(); client.retire() }
         // Existing ViewModel.onCleared() still calls this, but no native destroy,
         // detached close thread, current-cursor close, or old-session map clearing.
     }

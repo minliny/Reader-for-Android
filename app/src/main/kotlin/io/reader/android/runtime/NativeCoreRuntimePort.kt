@@ -1,6 +1,7 @@
 package io.reader.android.runtime
 
 import com.reader.core.ReaderCoreException
+import com.reader.core.NativeCoreBridge
 import com.reader.core.ReaderCoreRuntime
 import org.json.JSONObject
 import java.io.File
@@ -10,7 +11,7 @@ import java.util.concurrent.TimeUnit
 internal class NativeCoreRuntimePort(
     private val data: File,
     private val cache: File,
-) : ReaderCoreEventActor.RuntimePort {
+) : ReaderEbookBinaryRuntimePort {
     private var runtime: ReaderCoreRuntime? = null
     private var closed = false
 
@@ -52,6 +53,14 @@ internal class NativeCoreRuntimePort(
                 error.lastError()?.let { ReaderCoreEventActor.Diagnostic(it.code(), it.message()) })
         }
     }
+
+    override fun readEpubEntry(authorizedArchivePath: String, canonicalEntry: String, maximumBytes: Long): ByteArray {
+        runtime() // Same actor-owned live runtime lifecycle; no new/secondary handle.
+        // Fixed 1fe asset C ABI is path-based and has NO handle parameter.
+        // Do not wrap ReaderCoreAssetException as runtime send status/diagnostic.
+        return NativeCoreBridge.readEpubEntry(authorizedArchivePath, canonicalEntry, maximumBytes)
+    }
+
 
     override fun close() {
         if (closed) return

@@ -26,6 +26,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val lane = ThreadLocal<Lane?>()
     private val readObservers = ReaderReadObservers()
     private val publicationLease = AtomicReference<ReaderOperationOwner.ClientLease?>()
+    private val applicationContext = application.applicationContext
+    private val ebookAssets = ReaderEbookAssetRegistry()
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
             NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),
@@ -137,6 +139,45 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
                 })
             } finally { observer.closeObservation() }
         }
+        /** Real owner authority; safe for UI/IO observation, not permission to dispatch a native action. */
+        fun assertCurrentAdmission() {
+            check(!retired.get()) { "LIBRARY_CLIENT_RETIRED" }
+            owner.operations.assertCurrentAdmission(lease)
+        }
+        fun requireEbookCurrent(render: io.reader.android.runtime.ebookdraft.EbookRenderLease) {
+            assertCurrentAdmission()
+            check(render.ownerId == lease.ownerId && render.clientId == lease.clientId &&
+                render.ownerGeneration == lease.ownerGeneration) { "FOREIGN_EBOOK_CLIENT" }
+            check(owner.actorDelegate.isInitialized()) { "EBOOK_RUNTIME_NOT_PREPARED" }
+            // isInitialized + immutable UUID read cannot create Native or call the actor/mailbox.
+            check(owner.actorDelegate.value.runtimeSession == render.runtimeSession) { "FOREIGN_EBOOK_RUNTIME" }
+            assertCurrentAdmission()
+        }
+
+        /** Called only inside the Library's already-admitted presentation turn.
+         * sourceBytes must come from the original finalized import/retained source
+         * authority. No WebView/SAF path or unverified file length grants authority. */
+        fun authorizeEbookAssets(render: io.reader.android.runtime.ebookdraft.EbookRenderLease,
+            sourceBytes: Long, guard: io.reader.android.runtime.ebookdraft.EbookLeaseGuard): ReaderEbookOwnedPublication {
+            owner.requireBusinessLane(lease)
+            check(render.ownerId == lease.ownerId && render.clientId == lease.clientId &&
+                render.ownerGeneration == lease.ownerGeneration && render.runtimeSession == owner.actor.runtimeSession)
+            guard.requireCurrent(render)
+            val original = io.reader.android.runtime.ebookdraft.AuthorizedEbookOriginal.authorize(
+                owner.applicationContext, render.bookId, sourceBytes)
+            val permit = owner.ebookAssets.issue(render, lease, owner.publicationLease, retired) { assertCurrentAdmission() }
+            val assets = ReaderEbookOwnedAssets(render, original, permit, guard, object : ReaderEbookAssetTurn {
+                override suspend fun read(original: ReaderEbookNativeAssetRead): ByteArray {
+                    // WebView shouldInterceptRequest is a separate IO callback.
+                    // Re-entering this whole-turn mutex from its own lane would deadlock.
+                    check(owner.lane.get() == null) { "NESTED_EBOOK_RESOURCE_OWNER_TURN" }
+                    return wholeTurn(WholeTurnMode.RETAIN_ORIGINAL,
+                        block = { owner.actor.readEbookAsset(original) }, protectedFinally = {})
+                }
+            })
+            return ReaderEbookOwnedPublication(original, assets)
+        }
+
         fun retire() {
             if (retired.compareAndSet(false, true)) {
                 owner.readObservers.retire(lease) // Direct Job cancellation; never waits for the read's gate.
@@ -163,7 +204,9 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     fun newClient(clientId: UUID = UUID.randomUUID(), localGeneration: Long = 0): Client {
         val lease = operations.activateClient(clientId, localGeneration)
         readObservers.activate(lease) // Monotonic owner generation prevents a delayed old activation.
-        publicationLease.set(lease) // An actually issued lease, never a made-up entity/book owner.
+        publicationLease.updateAndGet { current ->
+            if (current == null || current.ownerGeneration < lease.ownerGeneration) lease else current
+        } // Monotonic mirror only; operations remains the admission authority.
         return Client(this, lease)
     }
     private enum class Purpose { Business, TurnFinally, Maintenance, Cleanup }
@@ -234,6 +277,9 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val exact = this
         withContext(Dispatchers.IO + lane.asContextElement(Lane(lease, Purpose.Maintenance, { exact.assertActive() }, null))) { block() }
     }
-    fun closeForExplicitOwner() = operations.close()
+    fun closeForExplicitOwner(): kotlinx.coroutines.Deferred<ReaderOperationOwner.CloseState> {
+        ebookAssets.retire()
+        return operations.close()
+    }
     fun lastActorCloseReport(): ReaderCoreEventActor.CloseReport? = lastActorClose
 }

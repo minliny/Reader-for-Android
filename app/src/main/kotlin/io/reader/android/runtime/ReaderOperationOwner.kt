@@ -73,6 +73,9 @@ internal class ReaderOperationOwner private constructor(
         return lease
     }
 
+    /** Point-in-time admission observation only. Never takes operationMutex or runs a cleanup/native action. */
+    fun assertCurrentAdmission(lease: ClientLease) = synchronized(stateLock) { requireAdmission(lease) }
+
     /** Retiring an old lease cannot retire a newly activated client. */
     fun retireClient(lease: ClientLease): Boolean {
         val retired = synchronized(stateLock) {

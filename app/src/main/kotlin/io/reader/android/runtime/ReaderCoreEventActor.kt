@@ -206,6 +206,21 @@ internal class ReaderCoreEventActor(
 
     suspend fun awaitReady() = initialized.await()
 
+    /** Typed same-port asset action. Never await a business gate from this actor.
+     * The caller's App-owned whole turn stays alive until the synchronous call
+     * really returns, even if its UI observer was cancelled meanwhile. */
+    internal suspend fun readEbookAsset(request: ReaderEbookNativeAssetRead): ByteArray = withContext(NonCancellable) {
+        call {
+            requireAdmission()
+            request.requireNativeAdmission(runtimeSession) // Full lease and short actual-admission fence immediately before Native.
+            val assets = port as? ReaderEbookBinaryRuntimePort ?: error("BINARY_ASSET_PORT_UNAVAILABLE")
+            val bytes = assets.readEpubEntry(request.authorizedArchivePath, request.canonicalEntry, request.maximumBytes)
+            request.requireNativeAdmission(runtimeSession) // Retirement discards output, never cancels Native.
+            check(bytes.size.toLong() <= request.maximumBytes) { "NATIVE_ASSET_BOUND_EXCEEDED" }
+            bytes
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun receiveOrIdleTick(): (() -> Unit)? = select {
         // A timer clause does NOT cancel a destructive receive. withTimeout's
