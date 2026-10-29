@@ -79,6 +79,17 @@ class ReaderMangaResourceHostTest {
         assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
     }
 
+    @Test fun inspectInputStageIsClosedUntilResourceStoreOwnsEncodedBytes() = runBlocking {
+        val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
+            runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
+            capability = ReaderMangaResourceHost.CAPABILITY,
+            parametersJson = JSONObject().put("stage", "inspectInput")
+                .put("transferId", "transfer-1").put("sha256", "a".repeat(64)).put("bytes", 128).toString(),
+        ))
+        assertError(reply, "manga resource output/decode is not implemented in this slice")
+        assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
+    }
+
     private fun assertError(reply: ReaderCoreEventActor.HostReply, message: String) {
         assertTrue(reply is ReaderCoreEventActor.HostReply.Error)
         assertEquals(message, (reply as ReaderCoreEventActor.HostReply.Error).message)
