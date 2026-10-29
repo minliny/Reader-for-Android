@@ -3,6 +3,11 @@ package com.reader.core;
 import java.nio.charset.StandardCharsets;
 
 public final class NativeCoreBridge {
+    /** Core-owned response asset chunk bound; mirrors the fixed C ABI. */
+    public static final int MAX_ASSET_CHUNK_BYTES = 1024 * 1024;
+    /** Core-owned response asset total bound; mirrors the fixed C ABI. */
+    public static final long MAX_ASSET_TOTAL_BYTES = 128L * 1024 * 1024;
+
     static {
         System.loadLibrary("reader_core_jni");
     }
@@ -65,6 +70,60 @@ public final class NativeCoreBridge {
 
     public static native void runtimeDestroy(long handle);
 
+    /** Begin a Core-owned response asset for one request/operation owner. */
+    public static long assetBegin(long handle, long requestId, long operationId, long declaredBytes) {
+        requirePositive(requestId, "requestId");
+        requirePositive(operationId, "operationId");
+        requireDeclaredBytes(declaredBytes);
+        return nativeAssetBegin(handle, requestId, operationId, declaredBytes);
+    }
+
+    /** Append at most one 1 MiB chunk; the return value is cumulative bytes written. */
+    public static long assetWrite(long handle, long requestId, long operationId,
+            long assetId, byte[] bytes) {
+        requirePositive(requestId, "requestId");
+        requirePositive(operationId, "operationId");
+        requirePositive(assetId, "assetId");
+        if (bytes == null) {
+            throw new NullPointerException("bytes");
+        }
+        if (bytes.length > MAX_ASSET_CHUNK_BYTES) {
+            throw new IllegalArgumentException("asset chunk must be at most 1 MiB");
+        }
+        return nativeAssetWrite(handle, requestId, operationId, assetId, bytes);
+    }
+
+    /** Seal a response asset and return its committed byte count. */
+    public static long assetCommit(long handle, long requestId, long operationId, long assetId) {
+        requirePositive(requestId, "requestId");
+        requirePositive(operationId, "operationId");
+        requirePositive(assetId, "assetId");
+        return nativeAssetCommit(handle, requestId, operationId, assetId);
+    }
+
+    /** Read one committed response asset chunk; EOF is returned as an empty array. */
+    public static byte[] assetReadChunk(long handle, long requestId, long operationId,
+            long assetId, long offset, int limit) {
+        requirePositive(requestId, "requestId");
+        requirePositive(operationId, "operationId");
+        requirePositive(assetId, "assetId");
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be non-negative");
+        }
+        if (limit < 1 || limit > MAX_ASSET_CHUNK_BYTES) {
+            throw new IllegalArgumentException("asset read limit must be in 1..1 MiB");
+        }
+        return nativeAssetReadChunk(handle, requestId, operationId, assetId, offset, limit);
+    }
+
+    /** Release a response asset owned by the request/operation tuple. */
+    public static void assetRelease(long handle, long requestId, long operationId, long assetId) {
+        requirePositive(requestId, "requestId");
+        requirePositive(operationId, "operationId");
+        requirePositive(assetId, "assetId");
+        nativeAssetRelease(handle, requestId, operationId, assetId);
+    }
+
     static long create(byte[] configJson) {
         return nativeCreate(configJson);
     }
@@ -107,6 +166,21 @@ public final class NativeCoreBridge {
 
     private static native void nativeDestroy(long handle);
 
+    private static native long nativeAssetBegin(
+            long handle, long requestId, long operationId, long declaredBytes);
+
+    private static native long nativeAssetWrite(
+            long handle, long requestId, long operationId, long assetId, byte[] bytes);
+
+    private static native long nativeAssetCommit(
+            long handle, long requestId, long operationId, long assetId);
+
+    private static native byte[] nativeAssetReadChunk(
+            long handle, long requestId, long operationId, long assetId, long offset, int limit);
+
+    private static native void nativeAssetRelease(
+            long handle, long requestId, long operationId, long assetId);
+
     private static native int nativeSend(long handle, byte[] commandJson);
 
     private static native int nativeCancel(long handle, long requestId);
@@ -117,4 +191,16 @@ public final class NativeCoreBridge {
 
     private static native byte[] nativeReadEpubEntry(
             byte[] authorizedArchivePathUtf8, byte[] canonicalEntryUtf8, long maximumBytes);
+
+    private static void requirePositive(long value, String field) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(field + " must be positive");
+        }
+    }
+
+    private static void requireDeclaredBytes(long value) {
+        if (value < 0 || value > MAX_ASSET_TOTAL_BYTES) {
+            throw new IllegalArgumentException("declaredBytes must be in 0..128 MiB");
+        }
+    }
 }

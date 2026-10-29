@@ -105,6 +105,33 @@ public final class ReaderCoreRuntime implements Closeable {
         return status;
     }
 
+    /** Begin a Core-owned response asset for one request/operation owner. */
+    public synchronized long assetBegin(long requestId, long operationId, long declaredBytes) {
+        return NativeCoreBridge.assetBegin(requireHandle(), requestId, operationId, declaredBytes);
+    }
+
+    /** Append at most one 1 MiB chunk; returns cumulative bytes written. */
+    public synchronized long assetWrite(long requestId, long operationId, long assetId, byte[] bytes) {
+        return NativeCoreBridge.assetWrite(requireHandle(), requestId, operationId, assetId, bytes);
+    }
+
+    /** Seal a response asset and return its committed byte count. */
+    public synchronized long assetCommit(long requestId, long operationId, long assetId) {
+        return NativeCoreBridge.assetCommit(requireHandle(), requestId, operationId, assetId);
+    }
+
+    /** Read one committed response asset chunk; EOF is returned as an empty array. */
+    public synchronized byte[] assetReadChunk(long requestId, long operationId, long assetId,
+            long offset, int limit) {
+        return NativeCoreBridge.assetReadChunk(requireHandle(), requestId, operationId,
+                assetId, offset, limit);
+    }
+
+    /** Release a response asset owned by the request/operation tuple. */
+    public synchronized void assetRelease(long requestId, long operationId, long assetId) {
+        NativeCoreBridge.assetRelease(requireHandle(), requestId, operationId, assetId);
+    }
+
     public synchronized byte[] pollEventBytes(long timeout, TimeUnit unit) {
         long runtimeHandle = requireHandle();
         if (undecodedEventBytes != null) {

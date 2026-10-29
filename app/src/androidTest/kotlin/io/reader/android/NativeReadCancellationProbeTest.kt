@@ -231,7 +231,7 @@ class NativeReadCancellationProbeTest {
         InstrumentationRegistry.getInstrumentation().sendStatus(2, fields)
     }
     companion object {
-        private const val PIN = "1fe86c34e426e0288523850e3b87600f1efcaf3d"
+        private const val PIN = "c3109d570dd62a636eff1ffb88f4e242ede0bf3a"
         private const val METHOD = "realHostReadObserverCancellationKeepsOriginalCancelledReceipt"
     }
 }
