@@ -296,6 +296,12 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     suspend fun mangaPagesExtract(request: ReaderMangaExtractRequest): ReaderMangaPagesExtract =
         onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract(request) }
 
+    suspend fun mangaChapter(request: ReaderMangaChapterRequest): ReaderMangaChapterData =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaService.chapter(request) }
+
+    suspend fun mangaPagesWindow(request: ReaderMangaPageWindowRequest): ReaderMangaPageWindow =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesWindow(request) }
+
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }
     suspend fun reconcileShelfManagement(id: String, continueOriginal: Boolean = false): ManagementResult =

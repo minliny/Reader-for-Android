@@ -79,6 +79,70 @@ class ReaderMangaServiceTest {
         assertTrue("A6 extraction must use observer-read lane", "onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract" in source)
     }
 
+    @Test
+    fun chapterGetBindsManifestAndPagesWindowBindsAbsoluteOrdinals() {
+        val chapterIdentity = ReaderMangaChapterIdentity("source-a", "book-a", "chapter-7")
+        val calls = mutableListOf<Pair<String, JSONObject>>()
+        val service = ReaderMangaService(fakeTransport { method, params ->
+            calls += method to params
+            val manifest = JSONObject().put("chapter", JSONObject().put("sourceId", "source-a")
+                .put("bookId", "book-a").put("chapterId", "chapter-7"))
+                .put("sourceRuleVersion", "rules-1").put("manifestVersion", "manifest-1")
+                .put("decodeRevision", "decode-1").put("pages", JSONArray()
+                    .put(JSONObject().put("pageId", "page-0").put("ordinal", 0).put("resourceRef", "manga:page-0"))
+                    .put(JSONObject().put("pageId", "page-1").put("ordinal", 1).put("resourceRef", "manga:page-1")))
+            when (method) {
+                "manga.chapter.get" -> JSONObject().put("manifest", manifest).put("chapterIndex", 7)
+                    .put("chapterTitle", "第七话").put("cached", false).put("resources", JSONArray()
+                        .put(JSONObject().put("resourceRef", "manga:page-0")
+                            .put("request", JSONObject().put("url", "https://img.test/0.jpg").put("sourcePageId", "p0"))))
+                else -> JSONObject().put("manifest", JSONObject().put("chapter", JSONObject().put("sourceId", "source-a")
+                    .put("bookId", "book-a").put("chapterId", "chapter-7"))
+                    .put("sourceRuleVersion", "rules-1").put("manifestVersion", "manifest-1")
+                    .put("decodeRevision", "decode-1").put("pages", JSONArray()
+                        .put(JSONObject().put("pageId", "page-1").put("ordinal", 1).put("resourceRef", "manga:page-1"))))
+                    .put("chapterIndex", 7).put("chapterTitle", "第七话").put("cached", true)
+                    .put("pageStart", 1).put("totalPages", 2).put("resources", JSONArray()
+                        .put(JSONObject().put("resourceRef", "manga:page-1")
+                            .put("request", JSONObject().put("url", "https://img.test/1.jpg"))))
+            }
+        })
+        val chapter = service.chapter(ReaderMangaChapterRequest(ReaderMangaChapterRef("source-a", "book-a"), 7,
+            expectedManifestVersion = "manifest-1"))
+        assertEquals(chapterIdentity, chapter.manifest.chapter)
+        assertEquals("p0", chapter.resources.single().request.sourcePageId)
+        assertEquals("manga.chapter.get", calls[0].first)
+        assertEquals("cacheFirst", calls[0].second.getString("policy"))
+        val window = service.pagesWindow(ReaderMangaPageWindowRequest(chapterIdentity, "manifest-1", 1, 1))
+        assertEquals(1, window.pageStart)
+        assertEquals(1, window.manifest.pages.single().ordinal)
+        assertEquals("manga.pages.window", calls[1].first)
+        assertEquals(1, calls[1].second.getInt("limit"))
+    }
+
+    @Test
+    fun chapterAndWindowRejectManifestOrWindowScopeDrift() {
+        val identity = ReaderMangaChapterIdentity("source-a", "book-a", "chapter-7")
+        val manifest = JSONObject().put("chapter", JSONObject().put("sourceId", "source-a")
+            .put("bookId", "other").put("chapterId", "chapter-7"))
+            .put("sourceRuleVersion", "rules-1").put("manifestVersion", "manifest-1")
+            .put("decodeRevision", "decode-1").put("pages", JSONArray()
+                .put(JSONObject().put("pageId", "page-0").put("ordinal", 0).put("resourceRef", "manga:page-0")))
+        val chapterValue = JSONObject().put("manifest", manifest).put("chapterIndex", 7)
+            .put("chapterTitle", "第七话").put("cached", false).put("resources", JSONArray())
+        assertThrows(IllegalStateException::class.java) {
+            ReaderMangaPolicy.chapterData(chapterValue,
+                ReaderMangaChapterRequest(ReaderMangaChapterRef("source-a", "book-a"), 7))
+        }
+        val windowValue = JSONObject().put("manifest", manifest.put("chapter", JSONObject()
+            .put("sourceId", "source-a").put("bookId", "book-a").put("chapterId", "chapter-7")))
+            .put("chapterIndex", 7).put("chapterTitle", "第七话").put("cached", false)
+            .put("pageStart", 3).put("totalPages", 4).put("resources", JSONArray())
+        assertThrows(IllegalStateException::class.java) {
+            ReaderMangaPolicy.pageWindow(windowValue, ReaderMangaPageWindowRequest(identity, "manifest-1", 3, 1))
+        }
+    }
+
     private fun fakeTransport(response: (String, JSONObject) -> JSONObject) = object : CoreTransport {
         override val session = "manga-test"
         override fun request(method: String, params: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
