@@ -43,6 +43,7 @@ class ReaderTtsPlaybackCoordinatorTest {
         coordinator.resume()
         assertEquals(2, engine.spoken.size)
         assertTrue(engine.spoken[0] != engine.spoken[1])
+        engine.emitStart(engine.spoken[1])
         assertEquals(ReaderTtsPlaybackStatus.PLAYING, coordinator.state.status)
     }
 
@@ -76,6 +77,7 @@ class ReaderTtsPlaybackCoordinatorTest {
         val first = engine.spoken.single()
         engine.emitError(first)
         assertEquals(2, engine.spoken.size)
+        engine.emitStart(engine.spoken[1])
         assertEquals(ReaderTtsPlaybackStatus.PLAYING, coordinator.state.status)
     }
 

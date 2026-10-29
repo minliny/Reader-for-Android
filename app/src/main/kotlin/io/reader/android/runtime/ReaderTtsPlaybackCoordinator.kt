@@ -184,7 +184,9 @@ internal class ReaderTtsPlaybackCoordinator(
         val generationValue = generation.incrementAndGet()
         val id = "reader-tts-$sessionId-$generationValue-$index"
         activeToken = ReaderTtsPlaybackToken(sessionId, generationValue, active.chapter, index, id)
-        publish(ReaderTtsPlaybackStatus.PLAYING, index, null)
+        // Core has accepted the queue transition, but the platform engine has
+        // not confirmed vocalization yet. PLAYING is published from onStart.
+        publish(ReaderTtsPlaybackStatus.PREPARING, index, null)
         engine.speak(id, active.slices[index].text)
     }
 
