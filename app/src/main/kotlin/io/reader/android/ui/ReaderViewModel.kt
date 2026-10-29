@@ -799,6 +799,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     /** Local chapter TTS only. The coordinator owns the utterance lifecycle; Core remains the queue owner. */
     fun toggleTts() {
         val reading = state.value.reading ?: return
+        Log.i("ReaderTts", "toggle requested route=${state.value.route} busy=${state.value.busy} kind=${reading.chapter.presentationKind} status=${state.value.ttsPlayback.status}")
         if (state.value.route != ReaderRoute.Reading || state.value.busy ||
             reading.chapter.presentationKind != ReaderTextPresentationKind.LOCAL_DOCUMENT) return
         when (state.value.ttsPlayback.status) {
@@ -818,7 +819,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val chapterToken = reading.chapter.sessionToken
         ttsAction {
             val chapter = reading.chapter
+            Log.i("ReaderTts", "start requested book=${chapter.bookId} chapter=${chapter.index} chars=${chapter.text.codePointCount(0, chapter.text.length)}")
             val plan = library.ttsSlice(ReaderTtsChapterRef("local", chapter.bookId, chapter.index, chapter.title), chapter.text)
+            Log.i("ReaderTts", "slice received count=${plan.slices.size} chapter=${plan.chapter.chapterIndex}")
             if (state.value.route != ReaderRoute.Reading || state.value.reading?.identity != owner ||
                 state.value.reading?.chapter?.sessionToken != chapterToken) return@ttsAction
             ttsCoordinator().start(plan)
