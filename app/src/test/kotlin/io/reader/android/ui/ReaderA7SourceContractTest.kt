@@ -17,6 +17,8 @@ class ReaderA7SourceContractTest {
         assertTrue("BackHandler(enabled = state.route != ReaderRoute.Bookshelf)" in app)
         assertTrue("WindowInsets.safeDrawing" in app)
         assertTrue("testTagsAsResourceId = true" in app)
+        assertTrue("Icon(painterResource(R.drawable.reader_back), \"返回\")" in app)
+        assertTrue("Icon(painterResource(R.drawable.reader_import), \"导入本地书\")" in app)
     }
 
     @Test
@@ -26,6 +28,8 @@ class ReaderA7SourceContractTest {
         assertTrue("reader_exit" in screen)
         assertTrue("reader_open_directory" in screen)
         assertTrue("reader_ebook_footer" in screen)
+        assertTrue("Icon(painterResource(R.drawable.reader_back), \"返回书架\"" in screen)
+        assertTrue("Icon(painterResource(R.drawable.reader_directory), \"目录\"" in screen)
     }
 
     @Test
