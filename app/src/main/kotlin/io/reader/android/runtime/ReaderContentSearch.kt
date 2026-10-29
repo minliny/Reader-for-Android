@@ -137,6 +137,9 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
     private class Call(val closing: Boolean, val cursor: String?) {
         var requestId = 0L
         var terminal: JSONObject? = null
+        var parametersJson: String? = null
+        var transportAcknowledged = false
+        var protocolFailure: Throwable? = null
     }
 
     private class Search(val session: ReaderContentSearchSession) {
@@ -147,10 +150,12 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
         var pending: Call? = null
         var cleanupAttempted = false
         var cleanupFailure: Throwable? = null
+        var closeObservation: ReaderContentSearchCloseObservation? = null
     }
 
     private val runtimeSession = transport.session
     private val searches = linkedMapOf<String, Search>()
+    private var lastConfirmedClose: ReaderContentSearchCloseObservation? = null // One bounded immutable original only.
     private var current: Search? = null
     private var generation = 0L
     private var cursorCapability = false
@@ -190,16 +195,23 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
         return ContentSearchReceiptPolicy.jump(session, hit, chapter)
     }
 
-    fun close(session: ReaderContentSearchSession) {
+    fun close(session: ReaderContentSearchSession): ReaderContentSearchCloseObservation? {
         checkRuntime()
         check(session.runtimeSession == runtimeSession) { "CONTENT_SEARCH_RUNTIME_RETIRED" }
-        val search = searches[session.id] ?: return // Already closed; never touches a newer session.
+        val search = searches[session.id] ?: return lastConfirmedClose?.takeIf { it.session == session }
         check(search.session == session) { "CONTENT_SEARCH_SESSION_MISMATCH" }
         retire(search)
         val pending = search.pending
-        if (pending != null && pending.terminal == null) {
-            try { transport.drainOriginalTerminal(pending.requestId, 1_000) }
-            catch (error: Exception) { throw ContentSearchPendingException(session, "original", error) }
+        if (pending != null && !pending.transportAcknowledged) {
+            try {
+                transport.drainOriginalTerminal(pending.requestId, 1_000)
+                // Exact original first consumption/ACK, or already ACKed/removed.
+                // A drain that has no terminal does not qualify any result.
+                if (pending.terminal != null) pending.transportAcknowledged = true
+            } catch (error: Exception) {
+                val typed = error.takeIf { it.coreProtocolPending() != null } ?: pending.protocolFailure ?: error
+                throw ContentSearchPendingException(session, "original", typed)
+            }
         }
         consumeForCleanup(search)
         if (search.pending != null) throw ContentSearchPendingException(session, "original", search.cleanupFailure)
@@ -210,12 +222,13 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
         }
         check(search.snapshotClosed) { "CONTENT_SEARCH_CLOSE_UNCONFIRMED" }
         searches.remove(session.id)
+        return search.closeObservation ?: lastConfirmedClose?.takeIf { it.session == session }
     }
 
     /** Called after the existing owner finishes polling, including unrelated library reads. */
     fun finishOwnerTurn() {
         searches.values.toList().forEach { search ->
-            if (search.pending?.terminal != null) consumeForCleanup(search)
+            if (search.pending?.let { it.transportAcknowledged && it.terminal != null } == true) consumeForCleanup(search)
             if ((search.retired || search.nextCursor == null) && search.pending == null &&
                 !search.snapshotClosed && !search.cleanupAttempted && search.lastCursor != null) {
                 try { closeSnapshot(search) } catch (error: Exception) { search.cleanupFailure = error }
@@ -245,11 +258,16 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
 
     private fun dispatch(search: Search, call: Call, params: JSONObject, timeoutMs: Long) {
         search.pending = call
+        call.parametersJson = params.toString() // Parsed JSON representation, never transport-byte capture.
         try {
             transport.request("search.content", params, timeoutMs,
                 beforeSend = { call.requestId = it },
                 terminal = { event -> call.terminal = JSONObject(event.toString()) })
+            call.transportAcknowledged = true
         } catch (error: Exception) {
+            if (error.coreProtocolPending() != null) call.protocolFailure = error
+            // A Core error is decoded by the bridge after its original delivery ACK.
+            if (error is CoreCommandException && call.terminal != null) call.transportAcknowledged = true
             if (call.requestId == 0L) {
                 search.pending = null // The transport never admitted this command.
                 if (!call.closing && call.cursor == null) search.snapshotClosed = true
@@ -261,7 +279,8 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
     private fun consume(search: Search): ReaderContentSearchPage? {
         val call = search.pending ?: return null
         val event = call.terminal ?: return null
-        search.pending = null
+        if (!call.transportAcknowledged) return null // Keep original across ACK failure/maintenance.
+        if (!call.closing) search.pending = null
         check(call.requestId > 0 && event.getLong("requestId") == call.requestId) { "CONTENT_SEARCH_ORIGINAL_IDENTITY" }
         if (event.getString("type") == "error" && !call.closing && call.cursor == null &&
             event.getJSONObject("error").optJSONObject("details")?.optBoolean("originalPending") != true) {
@@ -272,6 +291,11 @@ internal class ReaderContentSearch(private val transport: CoreTransport) {
         if (call.closing) {
             check(data.getJSONArray("results").length() == 0 && ContentSearchReceiptPolicy.cursor(data) == null &&
                 (!data.has("hasMore") || data.get("hasMore") == false)) { "INVALID_CONTENT_SEARCH_CLOSE_RECEIPT" }
+            val observation = ReaderContentSearchCloseObservation(search.session, checkNotNull(call.cursor), call.requestId,
+                search.session.runtimeSession, checkNotNull(call.parametersJson), event.toString())
+            search.pending = null // Close errors/malformed receipts retain the exact original; no quiet replay.
+            search.closeObservation = observation
+            lastConfirmedClose = observation
             search.snapshotClosed = true
             search.nextCursor = null
             return null

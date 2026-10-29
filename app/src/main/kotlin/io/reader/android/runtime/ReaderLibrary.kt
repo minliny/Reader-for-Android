@@ -213,10 +213,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         searchService.next(session, cursor)
     }
 
-    suspend fun closeContentSearch(session: ReaderContentSearchSession): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
-        searchService.close(session) // Returns only after the exact original cursor close is confirmed.
+    suspend fun closeContentSearch(session: ReaderContentSearchSession): ReaderContentSearchCloseObservation? = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        val observation = searchService.close(session) // No fabricated observation for already-closed/no-dispatch.
         client.currentTurn().cleanupCompleted("search:${session.id}")
         registeredSearchCleanups.remove(session.id)
+        observation
     }
 
     suspend fun openContentSearchHit(session: ReaderContentSearchSession, hit: ReaderContentSearchHit): ReaderChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {

@@ -22,6 +22,10 @@ import io.reader.android.runtime.LibrarySortDirection
 import io.reader.android.runtime.ReaderBookmark
 import io.reader.android.runtime.PendingBookmark
 import io.reader.android.runtime.ReaderContentSearchSession
+import io.reader.android.runtime.ReaderContentSearchCloseObservation
+import io.reader.android.runtime.ReaderSearchCloseScope
+import io.reader.android.runtime.ReaderSearchCloseConfirmation
+import io.reader.android.runtime.ReaderSearchClosePublicationPolicy
 import io.reader.android.runtime.ReaderContentSearchHit
 import io.reader.android.runtime.BookmarkTargetStaleException
 import io.reader.android.runtime.ContentSearchPendingException
@@ -91,6 +95,8 @@ data class ReaderUiState(
     val searchReady: Boolean = false,
     val searchError: String? = null,
     val pendingSearchClose: ReaderContentSearchSession? = null,
+    val searchCloseInFlight: ReaderSearchCloseScope? = null,
+    val lastSearchCloseConfirmation: ReaderSearchCloseConfirmation? = null,
     val protocolRecoveryReference: CoreProtocolReference? = null,
 ) {
     val pendingPosition: PendingPosition? get() = pendingPositions.firstOrNull { it.bookId == reading?.book?.id }
@@ -110,6 +116,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     private var delayedSave: Job? = null
     private var shelfRead: Job? = null
     private var searchGeneration = 0L
+    private var lastRetiredSearchScope: ReaderSearchCloseScope? = null
     private var deletionOwner: Long? = null
     private var directoryReturn = ReaderRoute.Bookshelf
     private val mutableState = MutableStateFlow(
@@ -545,15 +552,35 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun publishSearchClose(scope: ReaderSearchCloseScope?, observation: ReaderContentSearchCloseObservation?) {
+        if (scope == null) return
+        mutableState.update { current ->
+            if (current.searchCloseInFlight != scope) current else {
+                val confirmation = ReaderSearchClosePublicationPolicy.confirmed(scope, current.reading?.identity,
+                    searchGeneration, current.searchCloseInFlight, observation)
+                current.copy(searchCloseInFlight = null, lastSearchCloseConfirmation = confirmation)
+            }
+        }
+    }
+
+    private fun clearSearchCloseInFlight(scope: ReaderSearchCloseScope?) {
+        if (scope != null) mutableState.update { if (it.searchCloseInFlight == scope) it.copy(searchCloseInFlight = null) else it }
+    }
+
     private fun retireSearch() {
-        ++searchGeneration
-        val session = state.value.searchSession
+        val request = ++searchGeneration
+        val captured = state.value
+        val session = captured.searchSession
+        val scope = session?.let { original -> captured.reading?.identity?.let { ReaderSearchCloseScope(it, request, original) } }
+        if (session != null) lastRetiredSearchScope = scope
         mutableState.update { it.copy(searchSession = null, searchResults = emptyList(), searchCursor = null,
-            searchHasMore = false, searchBusy = false, searchReady = false, searchError = null) }
+            searchHasMore = false, searchBusy = false, searchReady = false, searchError = null,
+            searchCloseInFlight = scope, lastSearchCloseConfirmation = null) }
         if (session != null) viewModelScope.launch {
             try {
-                library.closeContentSearch(session)
-                mutableState.update { if (it.pendingSearchClose?.id == session.id) it.copy(pendingSearchClose = null) else it }
+                val observation = library.closeContentSearch(session)
+                publishSearchClose(scope, observation)
+                mutableState.update { if (it.pendingSearchClose == session) it.copy(pendingSearchClose = null) else it }
             }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (pending: ContentSearchPendingException) {
@@ -565,17 +592,24 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 Log.w("ReaderUI", "Original search cursor close failed", error)
                 mutableState.update { it.copy(pendingSearchClose = session) }
             }
+            finally { clearSearchCloseInFlight(scope) }
         }
     }
 
-    fun reconcileSearchClose() {
-        val session = state.value.pendingSearchClose ?: return
-        if (state.value.searchBusy) return
-        mutableState.update { it.copy(searchBusy = true) }
+    fun reconcileSearchClose(session: ReaderContentSearchSession, expectedRoute: ReaderRoute, expectedReadingOwner: Long?) {
+        val current = state.value
+        if (current.pendingSearchClose != session || current.route != expectedRoute ||
+            current.reading?.identity != expectedReadingOwner || current.searchBusy) return
+        val generation = searchGeneration
+        val scope = lastRetiredSearchScope?.takeIf { it.session == session && it.searchGeneration == generation &&
+            it.readingOwner == state.value.reading?.identity }
+        mutableState.update { if (scope == null) it.copy(searchBusy = true) else
+            it.copy(searchBusy = true, searchCloseInFlight = scope, lastSearchCloseConfirmation = null) }
         viewModelScope.launch {
             try {
-                library.closeContentSearch(session)
-                mutableState.update { if (it.pendingSearchClose?.id == session.id) it.copy(pendingSearchClose = null) else it }
+                val observation = library.closeContentSearch(session)
+                publishSearchClose(scope, observation)
+                mutableState.update { if (it.pendingSearchClose == session) it.copy(pendingSearchClose = null) else it }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (pending: ContentSearchPendingException) {
                 retainProtocolPending(pending)
@@ -585,7 +619,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 retainProtocolPending(error)
                 Log.w("ReaderUI", "Original search close remains unconfirmed", error)
             }
-            finally { mutableState.update { it.copy(searchBusy = false) } }
+            finally {
+                clearSearchCloseInFlight(scope)
+                if (generation == searchGeneration) mutableState.update { it.copy(searchBusy = false) }
+            }
         }
     }
 

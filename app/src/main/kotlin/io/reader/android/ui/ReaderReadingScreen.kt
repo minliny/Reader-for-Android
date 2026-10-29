@@ -84,8 +84,9 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
                 ReaderRecoveryNotice("原书签操作尚未确认，请先核对原操作。", state.busy,
                     { model.reconcileBookmark(pending) }, "核对原书签操作", "reader_reconcile_bookmark")
             }
-            if (state.pendingSearchClose != null) ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。",
-                state.searchBusy, model::reconcileSearchClose, "核对原搜索", "reader_reconcile_search")
+            state.pendingSearchClose?.let { original -> ReaderRecoveryNotice("原搜索尚未结束，请核对并关闭原搜索。",
+                state.searchBusy, { model.reconcileSearchClose(original, state.route, state.reading?.identity) },
+                "核对原搜索", "reader_reconcile_search") }
             if (state.busy) LoadingLine()
         }
         if (state.controlsVisible) {
