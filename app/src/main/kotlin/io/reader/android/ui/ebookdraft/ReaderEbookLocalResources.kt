@@ -14,6 +14,7 @@ import io.reader.android.runtime.ebookdraft.ReaderEbookWebViewBoundary
 import io.reader.android.ui.background
 import io.reader.android.ui.ink
 import org.json.JSONObject
+import java.io.BufferedWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
@@ -146,7 +147,7 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
                 check(length <= maximum - count) { "BOOTSTRAP_BYTE_LIMIT" }; super.write(bytes, offset, length)
             }
         }
-        JsonWriter(OutputStreamWriter(out, UTF_8)).use { writer ->
+        JsonWriter(BufferedWriter(OutputStreamWriter(out, UTF_8))).use { writer ->
             writer.beginObject().name("protocolVersion").value(1).name("session").value(session).name("entryUrl").value(entryUrl)
             writer.name("dom").beginObject().name("canonical").value(dom.getString("canonical"))
             val identity = dom.getBoolean("originalIsContent")
