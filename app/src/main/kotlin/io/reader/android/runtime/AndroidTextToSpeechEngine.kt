@@ -20,6 +20,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
         private set
     @Volatile private var listener: ReaderTtsPlaybackEngine.Listener? = null
     private var initializationGeneration = 0L
+    private var initializedGeneration = 0L
 
     override fun setListener(listener: ReaderTtsPlaybackEngine.Listener) { this.listener = listener }
 
@@ -53,7 +54,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
                 return@post
             }
             main.postDelayed({
-                if (generation == initializationGeneration && speaker != null && !ready) {
+                if (generation == initializationGeneration && initializedGeneration != generation && speaker != null && !ready) {
                     Log.w("ReaderTts", "TextToSpeech initialization timed out for $enginePackage")
                     listener?.onReady(false)
                 }
@@ -62,11 +63,19 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     }
 
     override fun onInit(status: Int) {
-        check(Looper.myLooper() == Looper.getMainLooper()) { "TTS_INIT_MAIN_THREAD_REQUIRED" }
-        ready = status == TextToSpeech.SUCCESS && speaker?.setLanguage(Locale.getDefault()) !in
-            setOf(TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED)
-        Log.i("ReaderTts", "TextToSpeech init status=$status ready=$ready")
-        listener?.onReady(ready)
+        // OEM engines may invoke OnInit from a binder thread. Marshal the
+        // callback to the same main handler used for construction and speak,
+        // otherwise an unexpected callback thread can leave the coordinator in
+        // PREPARING without a terminal onReady result.
+        main.post {
+            val generation = initializationGeneration
+            if (generation == 0L || initializedGeneration == generation) return@post
+            initializedGeneration = generation
+            ready = status == TextToSpeech.SUCCESS && speaker?.setLanguage(Locale.getDefault()) !in
+                setOf(TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED)
+            Log.i("ReaderTts", "TextToSpeech init status=$status ready=$ready")
+            listener?.onReady(ready)
+        }
     }
 
     override fun speak(utteranceId: String, text: String) {
