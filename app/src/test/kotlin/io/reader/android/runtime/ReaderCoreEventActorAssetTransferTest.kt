@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -221,6 +222,40 @@ class ReaderCoreEventActorAssetTransferTest {
             assertEquals(listOf("MANGA_ASSET_CONSUME_FAILED", "MANGA_ASSET_CONSUME_FAILED"), outcomes.toList())
             assertEquals(listOf(99L, 99L), port.releases.toList())
         } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
+            dispatcher.close(); executor.shutdownNow()
+        }
+    }
+
+    @Test fun actorCloseCancelsActiveAssetConsumerAndReleasesExactlyOnce() = runBlocking {
+        val port = Port().also {
+            it.readReplies.add(byteArrayOf(1, 2)); it.readReplies.add(byteArrayOf())
+        }
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "asset-owner") }
+        val dispatcher = executor.asCoroutineDispatcher()
+        val entered = CompletableDeferred<Unit>()
+        val continueConsumer = CompletableDeferred<Unit>()
+        val actor = ReaderCoreEventActor(port, dispatcher,
+            hostHandler = ReaderCoreEventActor.HostHandler {
+                ReaderCoreEventActor.HostReply.AssetConsume(99L, it.operationId, 2L) {
+                    entered.complete(Unit)
+                    continueConsumer.await()
+                    ReaderCoreEventActor.HostReply.Complete("{}")
+                }
+            }, pollIntervalMs = 1)
+        try {
+            actor.awaitReady()
+            val plan = actor.prepare("runtime.hostSmoke", kind = ReaderCoreEventActor.Kind.DURABLE_WRITE)
+            actor.dispatch(plan) {}
+            port.events.add(hostRequest(plan.requestId, 45, 79, stage = "output"))
+            withTimeout(3_000) { entered.await() }
+            val report = withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
+            assertFalse(report.hostHandlersDrained)
+            assertEquals(listOf(99L), port.releases.toList())
+            assertEquals(1, port.releases.size)
+            assertTrue(port.commands.none { it.optString("method") == "host.complete" })
+        } finally {
+            continueConsumer.cancel()
             withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
             dispatcher.close(); executor.shutdownNow()
         }
