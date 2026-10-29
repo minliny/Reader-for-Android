@@ -2,6 +2,7 @@ package io.reader.android.runtime
 
 import android.app.Application
 import android.os.Looper
+import io.reader.android.runtime.http.ReaderHttpHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -28,13 +29,11 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val publicationLease = AtomicReference<ReaderOperationOwner.ClientLease?>()
     private val applicationContext = application.applicationContext
     private val ebookAssets = ReaderEbookAssetRegistry()
+    private val httpHost = ReaderHttpHost()
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
             NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),
-            hostHandler = ReaderCoreEventActor.HostHandler {
-                ReaderCoreEventActor.HostReply.Error("UNKNOWN_METHOD",
-                    "Android capability is not available in this product slice", false)
-            },
+            hostHandler = ReaderCoreEventActor.HostHandler { original -> httpHost.execute(original) },
         )
     }
     private val actor by actorDelegate
@@ -43,6 +42,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     // The directory is claimed before any lazy bridge can cause Native handle creation.
     // Native destroy does not prove worker join: this directory is never released/reopened here.
     private val operations = ReaderOperationOwner.create(File(root, "Core"), closeAction = {
+        httpHost.beginClose()
         if (actorDelegate.isInitialized()) {
             val report = actor.close()
             lastActorClose = report

@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -9,7 +8,8 @@ val readerCoreDependency = groovy.json.JsonSlurper()
 
 android {
     namespace = "io.reader.android"
-    compileSdk = 36
+    compileSdk = 37
+    compileSdkMinor = 0
     buildToolsVersion = "36.1.0"
     defaultConfig {
         applicationId = "io.reader.minliny"
@@ -24,11 +24,18 @@ android {
     }
     sourceSets {
         getByName("main") {
-            java.setSrcDirs(listOf("src/main/kotlin/io", "src/core/java"))
+            java.setSrcDirs(listOf("src/core/java"))
+            kotlin.setSrcDirs(listOf("src/main/kotlin/io"))
             jniLibs.setSrcDirs(listOf("src/core/jniLibs"))
         }
-        getByName("test") { java.setSrcDirs(listOf("src/test/kotlin/io")) }
-        getByName("androidTest") { java.setSrcDirs(listOf("src/androidTest/kotlin/io")) }
+        getByName("test") {
+            java.setSrcDirs(emptyList<String>())
+            kotlin.setSrcDirs(listOf("src/test/kotlin/io"))
+        }
+        getByName("androidTest") {
+            java.setSrcDirs(emptyList<String>())
+            kotlin.setSrcDirs(listOf("src/androidTest/kotlin/io"))
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -60,11 +67,6 @@ tasks.register("writeDebugRuntimeArtifacts") {
 
 kotlin {
     jvmToolchain(17)
-    sourceSets {
-        getByName("main").kotlin.setSrcDirs(listOf("src/main/kotlin/io"))
-        getByName("test").kotlin.setSrcDirs(listOf("src/test/kotlin/io"))
-        getByName("androidTest").kotlin.setSrcDirs(listOf("src/androidTest/kotlin/io"))
-    }
 }
 
 dependencies {
@@ -81,12 +83,15 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.webkit:webkit:1.18.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")
+    testImplementation("com.squareup.okhttp3:mockwebserver3:5.5.1")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:5.5.1")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
