@@ -108,6 +108,14 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         ReaderOnlineCatalog(serviceTransport, { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane)
     }
 
+    private val onlineReadingService by lazy {
+        requireHeldLane()
+        ReaderOnlineReading(serviceTransport, onlineCatalogService,
+            { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane,
+            { key -> check(sourceRulesService.pending().none { it.sourceId == key.sourceId } &&
+                onlineAddService.pending().none { it.key == key } && managementService.pending().isEmpty()) { "ONLINE_READING_ORIGINAL_WRITER_PENDING" } })
+    }
+
     internal class Client internal constructor(internal val owner: AppCoreOwner, val lease: ReaderOperationOwner.ClientLease) {
         private val retired = AtomicBoolean(false)
         val root get() = owner.root
@@ -117,6 +125,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val bookmarks: ReaderBookmarks get() { owner.requireLane(lease); return owner.bookmarkService }
         val management: ReaderBookshelfManagement get() { owner.requireLane(lease); return owner.managementService }
         val sourceRules: ReaderSourceRules get() { owner.requireLane(lease); return owner.sourceRulesService }
+        val onlineReading: ReaderOnlineReading get() { owner.requireLane(lease); return owner.onlineReadingService }
         val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
         val onlineAdds: ReaderOnlineAdd get() { owner.requireLane(lease); return owner.onlineAddService }
         // Constructing a Library/client/status observer does not create Native.

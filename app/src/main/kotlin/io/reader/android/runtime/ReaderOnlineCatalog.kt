@@ -85,6 +85,14 @@ internal class ReaderOnlineCatalog(
         check(issued.first === preview && preview.contentKind == ReaderOnlineContentKind.TEXT && originals.pending().isEmpty()) { "ONLINE_ADD_PREVIEW_RETIRED" }
         return ReaderOnlineAddAuthority(preview, lease, transport.session)
     }
+    /** Stored-source reading only; shares all current-runtime unknown/acquisition barriers. */
+    fun readStored(method: String, key: ShelfBookKey, params: JSONObject): JSONObject {
+        checkLane(); ReaderOnlineReadingPolicy.remote(key)
+        check(method in ReaderOnlineReadingPolicy.METHODS) { "ONLINE_READING_METHOD_NOT_ADMITTED" }
+        ReaderOnlineReadingPolicy.scope(params, key)
+        configureCapabilities()
+        return originals.request(method, key.sourceId, params)
+    }
     fun pending(): List<ReaderOnlineOriginalObservation> { assertHeld(); return originals.pending() }
     fun observeOriginal(id: String): ReaderOnlineOriginalObservation { assertHeld(); return originals.observe(id) }
 

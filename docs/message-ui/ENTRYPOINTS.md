@@ -61,3 +61,19 @@ unadmitted, not a success message or a new generic Alert/Toast flow.
 | 旧 UNKNOWN 已获本 reading 的非 barrier 资格，但原结果仍未知 | Recovery / 阅读 controls 展开时沿原顶部消息列，书架仍沿原宿主显示 | 真实 Library-issued intent 对象 + readingOwner/session/fullscope；只使用现有“原记录会继续保留”文案，无原结果确认动作 | 合上 controls、退出或替换 reading 仅退休该显示/callback；pendingPositions 原列表不删、不写旧 Completed。当前章以外导航/书签/搜索 guard 不因该资格开放 |
 
 lastPositionSaveAttempt 是当前捕获 readingOwner/session/位置对 typed 保存结果的投影。SkippedUnchanged 只表示未派发，不更新 ACK、Saved 消息或原 pending；ConfirmedNewOriginal 必须来自其新 UUID/request/current runtime 的真实回执并匹配完整 scope。旧回调不能将其投影给新阅读。新 Ready/restore/reflow 本身不生成新的业务位置；新 visible anchor 必须先经原 Native 完整 gate 与 backend 原子观察资格。本文记录接入和生命周期合同；源码、准确测试、产物与设备证据分别记账。
+
+
+## A4 书源与在线搜索工作区（源码接入合同）
+
+宿主为 ReaderRoute.Online 的 ReaderOnlineWorkspaceScreen；现有 App protocol recovery 仍位于同一 ReaderApp 消息列，协议原事实优先。ReaderOnlineWorkspace 只拥有展示、文件选择票据与查询代次；业务由同一个 Library/client、App serviceTransport 与原事务服务持有。
+
+| 入口与事实 | 公共类别/物理组件 | 身份与准入 | 失效与清理 |
+| --- | --- | --- | --- |
+| 书源列表/搜索/详情读取，未加载、已确认空结果、有限失败 | PageState / ReaderPageState；有限加载沿现 Material 指示器 | Workspace UUID + 可见 host + query generation + revision；VM gate 后再核；空搜索态只来自已成功解析的当前页，不把未知/错误当空结果 | 改查询、换源、返回、离页、VM 退场分别退休旧展示；失败 session 禁止 next/detail，只允许用户明确发起新 query；不是自动重试 |
+| 完整 JSON 对象/数组文件预览、单项选择/标准解码失败 | PageState / ReaderPageState | picker UUID 绑定完整原 UI ticket；只读预览保完整原 bytes/SHA/count；选择再核原 document UUID + epoch/index + host/query/revision ticket，且未 busy/pending。文件结果本身不导入 | 取消/换文件/离页只清预览与选择；旧 file/result/choice 不得导入。文件只经 ContentResolver 有界读一次，不保 URI 授权、不写裁剪文件；选中完整对象使用 org.json 一次冻结的序列化字段，明确不是全文原字节；规则仍由 Core 单笔处理 |
+| 原书源导入、原在线入架未确认 | Recovery / ReaderRecoveryNotice | 原 SourceImport/Add operationId + 当前 UI revision + pending membership；VM gate 与实际 backend 均核准确原操作 | 仅 reconcile 原记录；不以 source.list/bookshelf.list/status 清原未决，不重派 unknown。candidateRetained 或协议未决继续保留；隐藏不取消业务 |
+| 原搜索/详情获取未确认 | Recovery / ReaderRecoveryNotice | 原 acquisition UUID、method/source/runtime/request、原 immutable params 的业务投影；UI 仅转交原 id | “读取原状态”只读既有 original facts，不重发 HTTP/Core 请求、不自动宣布 ACK。catalog transportAcknowledged 的后续原收尾缺口仍 OPEN |
+| 已获 durable 原导入/入架结果 | Transient / ReaderTransientFeedback | 当前 feedback UUID 与真实 service confirmation；只在实际 durable APPLIED/ADDED/原有入架结果后发 | 仅同 feedback UUID 到时退展示。Add 后的书架读取失败不改变已确认 Add、不会重新入架 |
+| 已入架在线文字书的书架元数据 | 常规书架内容；不可用阅读入口不生成消息或假按钮 | 精确 ShelfBookKey(sourceId,bookId)，Core bookshelf.list(sourceKind=online,contentKind=text)；与本地 LibraryBook、Original 和 readingSessions 分离 | 仅重新读取投影；不产生本地 TOC/格式/进度、不开放远程阅读。该中间投影不表示在线阅读已经完成 |
+
+Online 离页只关闭准确原 Host 搜索 session（Core 没有 online search cursor/close RPC）；每个 session 同时登记于既有 App client retiring-cleanup gate，VM scope 取消不取消已准入 original turn。关闭展示、退 session、释放大候选数据均不清原 acquisition/事务记录。标准文件入口读取完整单对象或数组，展示实际名称/URL后，用户明确只导入选中一个完整对象；不逐元素批量导入，不增 Host 批次事务或规则解释器。本文登记源码接入合同；准确方法、真实书源、网络、UI、产物和设备验收分别记账。

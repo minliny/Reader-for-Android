@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.reader.android.runtime.ChapterItem
 import io.reader.android.runtime.LibraryBook
+import io.reader.android.runtime.ReaderRemoteShelfBook
 import io.reader.android.runtime.ReaderChapter
 import io.reader.android.runtime.ReaderLibrary
 import io.reader.android.runtime.ReaderLocalBookFormat
@@ -53,7 +54,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-enum class ReaderRoute { Bookshelf, Settings, Directory, Reading, Management }
+enum class ReaderRoute { Bookshelf, Settings, Directory, Reading, Management, Online }
 enum class ReaderAppTheme { System, Light, Dark }
 enum class ReaderPaper { Paper, Warm, Night }
 enum class ReaderPanel { Bookmarks, Search }
@@ -87,6 +88,7 @@ data class ReaderPositionSaveProjection(val readingOwner: Long, val sessionToken
 data class ReaderUiState(
     val route: ReaderRoute = ReaderRoute.Bookshelf,
     val books: List<LibraryBook> = emptyList(),
+    val remoteBooks: List<ReaderRemoteShelfBook> = emptyList(),
     val ready: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
@@ -168,6 +170,37 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         )
     )
     val state = mutableState.asStateFlow()
+
+    private var onlineBusyGeneration: Long? = null
+    private val onlineDelegate = lazy {
+        ReaderOnlineWorkspace(viewModelScope, { library }, { state.value.route == ReaderRoute.Online },
+            onVmLane = { action -> gate.withLock {
+                if (onlineBusyGeneration != generation) return@withLock
+                withContext(Dispatchers.IO) { library }; action()
+            } },
+            cleanupLane = { action -> gate.withLock { if (libraryDelegate.isInitialized()) action() } },
+            mainBusy = { value ->
+                if (value) {
+                    onlineBusyGeneration = ++generation; shelfRead?.cancel(); delayedSave?.cancel()
+                    mutableState.update { it.copy(busy = true) }
+                } else {
+                    val original = onlineBusyGeneration; onlineBusyGeneration = null
+                    if (original == generation) mutableState.update { it.copy(busy = false) }
+                }
+            }, retainProtocol = ::retainProtocolPending, reloadShelf = {
+                val captured = state.value
+                val books = readShelf()
+                val remote = library.remoteShelfMetadata(captured.shelfQuery.ifBlank { null }, captured.shelfSort, captured.shelfDirection)
+                mutableState.update { it.copy(books = books, remoteBooks = remote, ready = true) }
+            })
+    }
+    internal val onlineSources get() = onlineDelegate.value
+    fun showOnlineSources() {
+        if (state.value.busy || state.value.route != ReaderRoute.Bookshelf || !state.value.ready) return
+        ++generation; shelfRead?.cancel(); delayedSave?.cancel()
+        mutableState.update { it.copy(route = ReaderRoute.Online, error = null) }
+        onlineSources.open()
+    }
 
     private var managementBusyGeneration: Long? = null
     private val managementDelegate = lazy {
@@ -305,8 +338,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val positions = library.pendingPositions()
         val bookmarks = library.pendingBookmarks()
         val books = readShelf()
+        val captured = state.value
+        val remote = library.remoteShelfMetadata(captured.shelfQuery.ifBlank { null }, captured.shelfSort, captured.shelfDirection)
         if (request == generation) mutableState.update {
-            it.copy(books = books, ready = true, pendingImports = pending, pendingReady = true,
+            it.copy(books = books, remoteBooks = remote, ready = true, pendingImports = pending, pendingReady = true,
                 pendingPositions = positions, pendingBookmarks = bookmarks)
         }
     }
@@ -414,6 +449,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun showSettings() {
         if (!state.value.busy) {
             if (state.value.route == ReaderRoute.Management) shelfManagement.retirePresentation()
+            if (state.value.route == ReaderRoute.Online) onlineSources.leave()
             mutableState.update { it.copy(route = ReaderRoute.Settings, error = null) }
         }
     }
@@ -421,10 +457,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun showBookshelf() {
         if (state.value.reading != null) { exitReading(); return }
         if (!state.value.busy) {
+            val fromOnline = state.value.route == ReaderRoute.Online
+            if (fromOnline) onlineSources.leave()
             val fromManagement = state.value.route == ReaderRoute.Management
             if (fromManagement) shelfManagement.retirePresentation()
             mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
-            if (fromManagement) refreshBooks()
+            if (fromManagement || fromOnline) refreshBooks()
         }
     }
 
@@ -971,6 +1009,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         when (state.value.route) {
             ReaderRoute.Reading -> if (state.value.controlsVisible) toggleControls() else exitReading()
             ReaderRoute.Directory -> mutableState.update { it.copy(route = directoryReturn, error = null) }
+            ReaderRoute.Online -> if (!onlineSources.back()) showBookshelf()
             ReaderRoute.Settings, ReaderRoute.Management -> showBookshelf()
             ReaderRoute.Bookshelf -> Unit
         }
@@ -1029,6 +1068,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         ebookMount?.view?.close(); ebookMount = null
         delayedSave?.cancel()
         shelfRead?.cancel()
+        if (onlineDelegate.isInitialized()) onlineSources.close()
         if (managementDelegate.isInitialized()) shelfManagement.close()
         if (libraryDelegate.isInitialized()) library.close()
         super.onCleared()

@@ -21,12 +21,12 @@ class ReaderNewPositionIntent internal constructor(
 
 sealed interface ReaderPositionSaveResult {
     data class SkippedUnchanged(val retainedUnknownIds: List<String>, val bookId: String,
-        val chapterIndex: Int, val scalarOffset: Int) : ReaderPositionSaveResult
+        val chapterIndex: Int, val scalarOffset: Int, val sourceId: String = "local") : ReaderPositionSaveResult
     /** Serialized parsed JSON, not byte-exact wire. This is only the new original's durable ACK. */
     data class ConfirmedNewOriginal(val originalId: String, val bookId: String, val chapterIndex: Int,
         val scalarOffset: Int, val requestId: Long, val runtimeSession: String,
         val bodyVersion: String, val processingVersion: String, val progressRevision: String,
-        val originalParametersJson: String, val parsedTerminalJson: String) : ReaderPositionSaveResult
+        val originalParametersJson: String, val parsedTerminalJson: String, val sourceId: String = "local") : ReaderPositionSaveResult
 }
 
 internal class ReaderProgressOriginalSnapshot private constructor(private val raw: ByteArray,
@@ -65,7 +65,7 @@ internal object ReaderProgressNewIntentPolicy {
             uuid(original.runtimeSession) && uuid(currentRuntime) && original.runtimeSession != currentRuntime &&
             integer(record, "requestId") in 1..9_007_199_254_740_991L) { "PROGRESS_INTENT_NOT_COLD_ORIGINAL" }
         val p = record.getJSONObject("parameters")
-        check(p.keys().asSequence().toSet() == parameters && p.get("sourceId") == "local" &&
+        check(p.keys().asSequence().toSet() == parameters && p.get("sourceId") == "local" && chapter.sourceId == "local" &&
             record.get("bookId") == original.bookId && p.get("bookId") == chapter.bookId && original.bookId == chapter.bookId &&
             chapter.bookId.matches(Regex("local:[a-f0-9]{64}")) && integer(p, "chapterIndex") == chapter.index.toLong() &&
             integer(p, "chapterOffset") in 0..chapter.scalarCount.toLong()) { "PROGRESS_INTENT_ORIGINAL_SCOPE" }
@@ -88,7 +88,7 @@ internal object ReaderProgressNewIntentPolicy {
         val p = record.getJSONObject("parameters"); val data = event.getJSONObject("data")
         return ReaderPositionSaveResult.ConfirmedNewOriginal(record.getString("id"), record.getString("bookId"),
             p.getInt("chapterIndex"), p.getInt("chapterOffset"), record.getLong("requestId"), record.getString("runtimeSession"),
-            data.getString("bodyVersion"), data.getString("processingVersion"), revision, p.toString(), event.toString())
+            data.getString("bodyVersion"), data.getString("processingVersion"), revision, p.toString(), event.toString(), sourceId = p.getString("sourceId"))
     }
 }
 

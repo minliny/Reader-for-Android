@@ -24,6 +24,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
+import io.reader.android.runtime.ReaderChapter
+import io.reader.android.runtime.ReaderOnlineChapter
+import io.reader.android.runtime.ReaderTextPresentationKind
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,14 +41,38 @@ import kotlin.math.roundToInt
 
 private enum class NativeLayoutPhase { Restoring, Ready, Failed }
 
+/** Presentation input only; never a local format/Original or an online business session. */
+private data class ReaderNativeTextOwner(val identity: Long, val chapter: ReaderChapter, val visibleScalarOffset: Int, val requiresVisibleAdmission: Boolean = false)
+
+/** Existing local entry retains its signature, rendering and Unit callback semantics. */
+@Composable
+internal fun ReaderNativeChapterBody(reading: ReadingSession, fontSize: Int, paper: ReaderPaper,
+    userScrollEnabled: Boolean, onVisibleAnchor: (Int) -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
+    ReaderNativeTextPresentationBody(ReaderNativeTextOwner(reading.identity, reading.chapter, reading.visibleScalarOffset),
+        fontSize, paper, userScrollEnabled, { onVisibleAnchor(it); true }, onTap, modifier)
+}
+
+/** Stored-source text uses the SAME native body; accepted means display admission, never Core ACK. */
+@Composable
+internal fun ReaderOnlineNativeChapterBody(readingOwner: Long, opened: ReaderOnlineChapter, visibleScalarOffset: Int,
+    fontSize: Int, paper: ReaderPaper, userScrollEnabled: Boolean, onVisibleAnchor: (Int) -> Boolean,
+    onTap: () -> Unit, modifier: Modifier = Modifier) {
+    val chapter = opened.chapter
+    check(chapter.sourceId != "local" && chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT && visibleScalarOffset in 0..chapter.scalarCount)
+    key(readingOwner, chapter.sourceId, chapter.bookId, chapter.sessionToken) {
+        ReaderNativeTextPresentationBody(ReaderNativeTextOwner(readingOwner, chapter, visibleScalarOffset, requiresVisibleAdmission = true),
+            fontSize, paper, userScrollEnabled, onVisibleAnchor, onTap, modifier)
+    }
+}
+
 /** One native text/selection owner per immutable reading session; never reused across keys. */
 @Composable
-internal fun ReaderNativeChapterBody(
-    reading: ReadingSession,
+private fun ReaderNativeTextPresentationBody(
+    reading: ReaderNativeTextOwner,
     fontSize: Int,
     paper: ReaderPaper,
     userScrollEnabled: Boolean,
-    onVisibleAnchor: (Int) -> Unit,
+    onVisibleAnchor: (Int) -> Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -82,7 +110,7 @@ private class NativeParagraphGap(private val pixels: Int) : LineHeightSpan {
     }
 }
 
-private class ReaderNativeScrollView(context: Context, private val owner: ReadingSession) : ScrollView(context) {
+private class ReaderNativeScrollView(context: Context, private val owner: ReaderNativeTextOwner) : ScrollView(context) {
     private val density = resources.displayMetrics.density
     private fun dp(value: Int) = (value * density).roundToInt()
     private val titleView = TextView(context).apply {
@@ -115,7 +143,7 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
     private var finishPostedEpoch = -1L
     private var userGestureObserved = false
     private var userMoved = false
-    private var anchor: (Int) -> Unit = {}
+    private var anchor: (Int) -> Boolean = { false }
     private var tap: () -> Unit = {}
     private var phase: (NativeLayoutPhase) -> Unit = {}
     private val timeout: Runnable = Runnable {
@@ -224,9 +252,9 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         return top < scrollY + height - paddingBottom && bottom > scrollY + paddingTop
     }
 
-    fun bind(reading: ReadingSession, fontSize: Int, paper: ReaderPaper, scrollEnabled: Boolean,
-        onAnchor: (Int) -> Unit, onTap: () -> Unit, onPhase: (NativeLayoutPhase) -> Unit) {
-        check(reading.identity == owner.identity && reading.chapter.sessionToken == owner.chapter.sessionToken)
+    fun bind(reading: ReaderNativeTextOwner, fontSize: Int, paper: ReaderPaper, scrollEnabled: Boolean,
+        onAnchor: (Int) -> Boolean, onTap: () -> Unit, onPhase: (NativeLayoutPhase) -> Unit) {
+        check(reading.identity == owner.identity && reading.chapter.key == owner.chapter.key && reading.chapter.sessionToken == owner.chapter.sessionToken)
         if (released) return
         anchor = onAnchor
         tap = onTap
@@ -330,8 +358,11 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         val utf16 = layout.getLineStart(layout.getLineForVertical(y))
         val scalar = ReaderTextCoordinates.scalarOffset(rawText, utf16)
         if (logicalScalar != scalar) {
-            logicalScalar = scalar
-            anchor(scalar)
+            if (owner.requiresVisibleAdmission) {
+                if (anchor(scalar)) logicalScalar = scalar // Only accepted remote display observations become a reflow baseline.
+            } else {
+                logicalScalar = scalar; anchor(scalar) // Preserve the existing local Unit callback order.
+            }
         }
     }
 
@@ -347,6 +378,6 @@ private class ReaderNativeScrollView(context: Context, private val owner: Readin
         }
         bodyView.clearFocus()
         bodyView.setTextIsSelectable(false)
-        anchor = {}; tap = {}; phase = {}
+        anchor = { false }; tap = {}; phase = {}
     }
 }

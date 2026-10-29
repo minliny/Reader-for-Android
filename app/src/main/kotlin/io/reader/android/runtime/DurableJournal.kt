@@ -127,18 +127,21 @@ internal class DurableJournal(private val directory: File) {
             val raw = readBounded(file)
             val record = ProgressJournalCandidatePolicy.parse(raw)
             check(record.getString("id") + ".json" == file.name) { "PROGRESS_INTENT_FILE_IDENTITY" }
-            if (record.getString("bookId") != bookId) null else ReaderProgressOriginalSnapshot.from(raw)
+            if (record.getString("bookId") != bookId || record.getJSONObject("parameters").getString("sourceId") != "local") null else ReaderProgressOriginalSnapshot.from(raw)
         }
     }
 
     /** Only explicit original-progress reconcile uses this. Ordinary reads still return base pending. */
     @Synchronized
-    fun progressCandidateForReconcile(id: String, bookId: String): JSONObject? {
+    fun progressCandidateForReconcile(id: String, bookId: String): JSONObject? = progressCandidateForReconcile(id, ShelfBookKey("local", bookId))
+
+    @Synchronized
+    fun progressCandidateForReconcile(id: String, owner: ShelfBookKey): JSONObject? {
         require(id.matches(Regex("[a-zA-Z0-9-]{1,100}")))
         val base = File(directory, "$id.json")
         if (!File(base.path + ".new").exists()) return null
         val candidate = qualifiedCandidate(base)
-        check(candidate.id == id && candidate.bookId == bookId) { "ORIGINAL_PROGRESS_OWNER_MISMATCH" }
+        check(candidate.id == id && candidate.bookId == owner.bookId && candidate.sourceId == owner.sourceId) { "ORIGINAL_PROGRESS_OWNER_MISMATCH" }
         val provenance = retainCandidate(candidate)
         return candidate.record().put("originalWireCandidate", provenance) // completed remains false.
     }

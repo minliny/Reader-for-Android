@@ -44,6 +44,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,7 @@ fun ReaderApp(model: ReaderViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     val protocol by model.coreProtocolRecoveries.collectAsStateWithLifecycle()
     val management by model.shelfManagement.state.collectAsStateWithLifecycle()
+    val online by model.onlineSources.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current
     val view = LocalView.current
     DisposableEffect(lifecycle, model) {
@@ -85,6 +87,18 @@ fun ReaderApp(model: ReaderViewModel) {
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) model.importDocument(uri)
+    }
+    var sourcePickerTicket by rememberSaveable { mutableStateOf<String?>(null) }
+    val sourcePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val ticket = sourcePickerTicket; sourcePickerTicket = null
+        if (ticket != null) model.onlineSources.fileResult(ticket, uri)
+    }
+    val sourcePickerRevision = online.revision
+    val requestSourceFile = {
+        if (sourcePickerTicket == null) { // The original result alone consumes this single ActivityResult slot.
+            val ticket = model.onlineSources.pickFile(sourcePickerRevision)
+            if (ticket != null) { sourcePickerTicket = ticket; sourcePicker.launch(arrayOf("application/json", "text/json", "text/plain", "application/octet-stream")) }
+        }
     }
     val importAllowed = !state.busy && state.pendingReady && state.pendingImports.isEmpty() &&
         (!protocol.initialized || protocol.admissionOpen)
@@ -110,7 +124,7 @@ fun ReaderApp(model: ReaderViewModel) {
                             Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 12.dp).testTag("reader_app_top_bar"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management) {
+                            if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management || state.route == ReaderRoute.Online) {
                                 IconButton(onClick = model::back, enabled = !state.busy,
                                     modifier = Modifier.testTag("reader_back")) {
                                     Icon(painterResource(R.drawable.reader_back), "返回")
@@ -121,6 +135,7 @@ fun ReaderApp(model: ReaderViewModel) {
                                 ReaderRoute.Settings -> "设置"
                                 ReaderRoute.Directory -> "目录"
                                 ReaderRoute.Management -> "书架管理"
+                                ReaderRoute.Online -> "书源与搜索"
                                 else -> "阅读"
                             }, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f).testTag("reader_page_title"))
                             if (state.route == ReaderRoute.Bookshelf) {
@@ -153,6 +168,7 @@ fun ReaderApp(model: ReaderViewModel) {
                 Column(Modifier.fillMaxSize().padding(padding)) {
                     ReaderProtocolRecoveryHost(model)
                     if (state.route == ReaderRoute.Management) ReaderShelfManagementRecovery(management, model.shelfManagement)
+                    if (state.route != ReaderRoute.Online) {
                     if (state.pendingImports.isNotEmpty() || (!state.pendingReady && state.ready)) {
                         ReaderRecoveryNotice("有一次导入尚未确认。核对原操作后再导入新的书籍。", state.busy,
                             model::reconcilePendingImports)
@@ -175,11 +191,13 @@ fun ReaderApp(model: ReaderViewModel) {
                             { model.reconcileSearchClose(original, hostRoute, hostReadingOwner) },
                             "核对原搜索", "reader_reconcile_search")
                     }
+                    }
                     when (state.route) {
                         ReaderRoute.Bookshelf -> BookshelfScreen(state, model, requestImport)
                         ReaderRoute.Settings -> SettingsScreen(state, model)
                         ReaderRoute.Directory -> DirectoryScreen(state, model)
                         ReaderRoute.Management -> ReaderShelfManagementScreen(management, model.shelfManagement)
+                        ReaderRoute.Online -> ReaderOnlineWorkspaceScreen(online, model.onlineSources, requestSourceFile)
                         else -> Unit
                     }
                 }
@@ -203,6 +221,8 @@ private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImpo
     Column(Modifier.fillMaxSize()) {
         if (state.ready) {
             ShelfSearchAndOrder(state, model)
+            TextButton(onClick = model::showOnlineSources, enabled = !state.busy,
+                modifier = Modifier.padding(horizontal = 19.dp).testTag("reader_online_sources")) { Text("书源与在线搜索") }
             TextButton(onClick = model::showShelfManagement, enabled = !state.busy,
                 modifier = Modifier.padding(horizontal = 19.dp).testTag("reader_shelf_management")) { Text("管理分组和书架") }
         }
@@ -212,9 +232,9 @@ private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImpo
                     CircularProgressIndicator(Modifier.size(28.dp))
                 }
                 !state.ready -> ReaderPageState("书架暂时不可用", "请重试读取已有书籍。", "重试", model::refreshBooks)
-                state.books.isEmpty() && state.shelfQuery.isNotBlank() -> ReaderPageState("没有符合条件的书籍",
+                state.books.isEmpty() && state.remoteBooks.isEmpty() && state.shelfQuery.isNotBlank() -> ReaderPageState("没有符合条件的书籍",
                     "试试其他书名或作者。", "清空搜索", { model.setShelfQuery("") })
-                state.books.isEmpty() -> Column(Modifier.widthIn(max = 480.dp).padding(24.dp).testTag("reader_empty_shelf")) {
+                state.books.isEmpty() && state.remoteBooks.isEmpty() -> Column(Modifier.widthIn(max = 480.dp).padding(24.dp).testTag("reader_empty_shelf")) {
                     Text("我的书架", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(18.dp))
                     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
@@ -234,9 +254,21 @@ private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImpo
                 else -> LazyColumn(Modifier.widthIn(max = 760.dp).fillMaxSize().testTag("reader_bookshelf"),
                     contentPadding = PaddingValues(horizontal = 19.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("我的书架 · ${state.books.size}", style = MaterialTheme.typography.labelLarge,
+                    item { Text("我的书架 · ${state.books.size + state.remoteBooks.size}", style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (state.books.isNotEmpty()) item { Text("本地书籍", style = MaterialTheme.typography.labelLarge) }
                     items(state.books, key = { it.id }) { book -> BookRow(book, state.busy, model) }
+                    if (state.remoteBooks.isNotEmpty()) item { Text("在线书籍", style = MaterialTheme.typography.labelLarge) }
+                    items(state.remoteBooks, key = { arrayListOf(it.key.sourceId, it.key.bookId) }) { book ->
+                        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+                            Column(Modifier.fillMaxWidth().padding(15.dp).testTag("reader_remote_shelf_metadata")) {
+                                Text(book.title, style = MaterialTheme.typography.titleMedium)
+                                if (book.author.isNotBlank()) Text(book.author, style = MaterialTheme.typography.bodySmall)
+                                Text(book.sourceName ?: "在线书籍", style = MaterialTheme.typography.bodySmall)
+                                Text("阅读暂不可用", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             }
         }

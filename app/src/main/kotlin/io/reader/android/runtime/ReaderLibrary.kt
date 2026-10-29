@@ -26,9 +26,11 @@ data class LibraryBook(
     val progressOffset: Int = 0,
     val sourceId: String = "local",
     val group: String? = null,
-)
+) { val key get() = ShelfBookKey(sourceId, id) }
 
 data class ChapterItem(val index: Int, val title: String)
+
+enum class ReaderTextPresentationKind { LOCAL_DOCUMENT, ONLINE_TEXT }
 
 data class ReaderChapter(
     val bookId: String,
@@ -38,12 +40,17 @@ data class ReaderChapter(
     val bodyVersion: String,
     val processingVersion: String,
     val sessionToken: String = UUID.randomUUID().toString(),
+    val sourceId: String = "local",
+    val presentationKind: ReaderTextPresentationKind = ReaderTextPresentationKind.LOCAL_DOCUMENT,
 ) {
+    val key get() = ShelfBookKey(sourceId, bookId)
     val scalarCount: Int get() = text.codePointCount(0, text.length)
 }
 
 data class PendingImport(val id: String, val fileName: String, val stage: String)
-data class PendingPosition(val id: String, val bookId: String, val stage: String)
+data class PendingPosition(val id: String, val bookId: String, val stage: String, val sourceId: String = "local") {
+    val key get() = ShelfBookKey(sourceId, bookId)
+}
 
 /**
  * Local TXT/EPUB/MOBI/AZW product adapter draft. Fixed Core 1fe owns parsing, shelf, TOC,
@@ -65,12 +72,14 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val sourceRulesService get() = client.sourceRules
     private val onlineCatalog get() = client.onlineCatalog
     private val onlineAdds get() = client.onlineAdds
+    private val onlineReading get() = client.onlineReading
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
     private val closed = AtomicBoolean(false)
     private data class Session(val chapter: ReaderChapter, var revision: String)
-    private val readingSessions = mutableMapOf<String, Session>()
+    private val readingSessions = mutableMapOf<ShelfBookKey, Session>()
+    private val progressDispatchSessions = mutableMapOf<String, Session>()
     private val positionIntent = AtomicReference<ReaderPositionIntentState?>()
     private val originalAuthorities = ReaderLocalOriginalAuthorityReader(File(root, "Operations/Completed"))
     private val ebookViewIdentity = Any()
@@ -162,6 +171,37 @@ class ReaderLibrary(context: Context) : AutoCloseable {
 
     private fun retirePreparedEbook() { ebookRender.getAndSet(null)?.publication?.retire() }
 
+    /** Preview a complete original document. No mutation, persistent URI permission, temporary file or local-book authority. */
+    internal suspend fun previewSourceDocument(uri: Uri): ReaderSourceDocumentPreview {
+        val preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ReaderSourceJsonDocument.read(application.contentResolver, uri) }
+        return onIO(WholeTurnMode.OBSERVER_READ) { preview } // Recheck this actual client after file IO; no Core RPC.
+    }
+    /** One explicit selected definition; full object fields, one existing durable sourceRules transaction. */
+    internal suspend fun importSourceDocumentSelection(document: ReaderSourceDocumentPreview, index: Int): SourceImportResult {
+        val input = document.select(index)
+        return importSourceJson(input.sourceId, input.selectedDefinitionJson)
+    }
+
+    /** Remote metadata only. No local format/TOC/Original/read-session fallback. */
+    suspend fun remoteShelfMetadata(keyword: String?, sort: LibrarySort, direction: LibrarySortDirection): List<ReaderRemoteShelfBook> = onIO(WholeTurnMode.OBSERVER_READ) {
+        val output = mutableListOf<ReaderRemoteShelfBook>(); val seen = mutableSetOf<ShelfBookKey>(); var offset = 0
+        repeat(10_000) {
+            val parameters = JSONObject().put("contentKind", "text").put("sourceKind", "online").put("sortBy", sort.wire).put("sortDirection", direction.wire)
+                .put("offset", offset).put("limit", 128)
+            keyword?.takeIf { it.isNotBlank() }?.let { parameters.put("keyword", it) }
+            val page = transport.request("bookshelf.list", parameters); val rows = page.getJSONArray("books")
+            for (index in 0 until rows.length()) {
+                val row = rows.getJSONObject(index); val key = ShelfBookKey(row.getString("sourceId"), row.getString("bookId"))
+                check(key.sourceId != "local" && key.sourceId.isNotBlank() && key.bookId.isNotBlank() && seen.add(key)) { "REMOTE_SHELF_IDENTITY" }
+                output.add(ReaderRemoteShelfBook(key, row.getString("title"), row.getString("author"),
+                    if (row.has("sourceName") && !row.isNull("sourceName")) row.getString("sourceName") else null))
+            }
+            offset += rows.length()
+            if (rows.length() == 0 || offset >= page.getInt("total")) return@onIO output
+        }
+        error("REMOTE_SHELF_PAGE_LIMIT")
+    }
+
     suspend fun sources(sourceId: String? = null, enabledOnly: Boolean? = null): List<ReaderSourceEntry> =
         onIO(WholeTurnMode.OBSERVER_READ) { sourceRulesService.list(sourceId, enabledOnly) }
     suspend fun pendingSourceImports(): List<PendingSourceImport> =
@@ -175,13 +215,20 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     suspend fun selectOnlineSource(sourceId: String): ReaderOnlineSourceSelection =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.select(client.lease, sourceId) }
     suspend fun beginOnlineSearch(source: ReaderOnlineSourceSelection, keyword: String): ReaderOnlineSearchSession =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.start(client.lease, source, keyword) }
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            val session = onlineCatalog.start(client.lease, source, keyword)
+            client.registerSearchCleanup(client.currentTurn(), "online:" + session.id) { onlineCatalog.close(session) }
+            session
+        }
     suspend fun onlineSearchPage(session: ReaderOnlineSearchSession, page: Int): ReaderOnlineSearchPage =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.page(client.lease, session, page) }
     suspend fun previewOnlineBook(session: ReaderOnlineSearchSession, selected: ReaderOnlineBook): ReaderOnlineDetailPreview =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.preview(client.lease, session, selected) }
     suspend fun closeOnlineSearch(session: ReaderOnlineSearchSession): Unit =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.close(session) }
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            onlineCatalog.close(session)
+            client.currentTurn().cleanupCompleted("search:online:" + session.id)
+        }
     suspend fun pendingOnlineAcquisitions(): List<ReaderOnlineOriginalObservation> =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.pending() }
     suspend fun observeOnlineOriginal(id: String): ReaderOnlineOriginalObservation =
@@ -276,8 +323,30 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         check(revision.isNotEmpty()) { "PROGRESS_OBSERVATION_MISSING" }
         retirePreparedEbook() // Only after the new chapter/jump scope passed all validation.
         positionIntent.set(null) // A fresh chapter/session never inherits another reading's new-intent capability.
-        readingSessions[bookId] = Session(content, revision)
+        readingSessions[ShelfBookKey("local", bookId)] = Session(content, revision)
         return content
+    }
+
+    /** Actual stored-source entry. This does not use localBookFormat, Original or local_book commands. */
+    suspend fun onlineDirectory(key: ShelfBookKey): ReaderOnlineDirectoryPage = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        val page = onlineReading.directory(client.lease, key)
+        client.registerSearchCleanup(client.currentTurn(), "online-dir:" + page.directory.id) { onlineReading.close(page.directory) }
+        page
+    }
+    suspend fun nextOnlineDirectory(page: ReaderOnlineDirectory, offset: Int): ReaderOnlineDirectoryPage =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineReading.next(client.lease, page, offset) }
+    suspend fun resolveOnlineDirectory(node: ReaderOnlineDirectoryNode): ReaderOnlineDirectoryTarget =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineReading.resolve(client.lease, node) }
+    suspend fun closeOnlineDirectory(directory: ReaderOnlineDirectory): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        onlineReading.close(directory); client.currentTurn().cleanupCompleted("search:online-dir:" + directory.id)
+    }
+    suspend fun openOnlineChapter(key: ShelfBookKey, target: ReaderOnlineDirectoryTarget? = null): ReaderOnlineChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        val opened = onlineReading.open(client.lease, key, target)
+        check(opened.chapter.key == key && opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT)
+        // Publish only after complete Core entry + current CAS observation and scalar admission.
+        retirePreparedEbook(); positionIntent.set(null)
+        readingSessions[key] = Session(opened.chapter, opened.progressRevision)
+        opened
     }
 
     suspend fun bookmarks(bookId: String, query: String? = null): List<ReaderBookmark> = onIO(WholeTurnMode.OBSERVER_READ) {
@@ -358,7 +427,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
 
     private fun activeChapter(bookId: String, sessionToken: String, index: Int? = null): ReaderChapter {
         localIdentity(bookId)
-        val chapter = readingSessions[bookId]?.chapter ?: error("READING_SESSION_MISSING")
+        val chapter = readingSessions[ShelfBookKey("local", bookId)]?.chapter ?: error("READING_SESSION_MISSING")
         check(chapter.sessionToken == sessionToken && (index == null || chapter.index == index)) { "RETIRED_READING_SESSION_TOKEN" }
         return chapter
     }
@@ -396,12 +465,12 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             check(offset in 0..chapter.scalarCount.toLong()) { "NEW_POSITION_INTENT_CURRENT_SCALAR" }
             val revision = observed.getString("progressRevision")
             check(revision.matches(Regex("reader-progress-v1:[a-f0-9]{64}"))) { "NEW_POSITION_INTENT_OBSERVATION_REQUIRED" }
-            check(revision == readingSessions.getValue(bookId).revision) { "NEW_POSITION_INTENT_REOPEN_CURRENT_POSITION" }
+            check(revision == readingSessions.getValue(ShelfBookKey("local", bookId)).revision) { "NEW_POSITION_INTENT_REOPEN_CURRENT_POSITION" }
             client.requireNewPositionAuthority(authority, chapter) // Revalidate after the read, still in the same whole turn.
             val intent = ReaderNewPositionIntent(UUID.randomUUID().toString(), "local", bookId, index, sessionToken,
                 chapter.bodyVersion, chapter.processingVersion, authority.runtimeSession, offset.toInt(), revision,
                 authority.originals.map { it.identity() })
-            readingSessions.getValue(bookId).revision = revision // Baseline for a different future CAS; never an old ACK.
+            readingSessions.getValue(ShelfBookKey("local", bookId)).revision = revision // Baseline for a different future CAS; never an old ACK.
             positionIntent.set(ReaderPositionIntentState(intent, authority, chapter.scalarCount, offset.toInt()))
             intent
         }
@@ -449,13 +518,20 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         } catch (_: IllegalStateException) { false }
     }
 
-    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): ReaderPositionSaveResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+    suspend fun savePosition(bookId: String, index: Int, scalarOffset: Int, sessionToken: String? = null): ReaderPositionSaveResult {
         localIdentity(bookId)
-        val session = readingSessions[bookId] ?: error("READING_SESSION_MISSING")
-        check(session.chapter.index == index) { "RETIRED_READING_SESSION" }
-        check(sessionToken != null && sessionToken == session.chapter.sessionToken) { "RETIRED_READING_SESSION_TOKEN" }
+        return savePosition(ShelfBookKey("local", bookId), index, scalarOffset, checkNotNull(sessionToken) { "RETIRED_READING_SESSION_TOKEN" })
+    }
+
+    suspend fun savePosition(key: ShelfBookKey, index: Int, scalarOffset: Int, sessionToken: String): ReaderPositionSaveResult = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        if (key.sourceId == "local") localIdentity(key.bookId) else ReaderOnlineReadingPolicy.remote(key)
+        val bookId = key.bookId
+        val session = readingSessions[key] ?: error("READING_SESSION_MISSING")
+        check((key.sourceId == "local" || session.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT) &&
+            session.chapter.key == key && session.chapter.index == index) { "RETIRED_READING_SESSION" }
+        check(sessionToken == session.chapter.sessionToken) { "RETIRED_READING_SESSION_TOKEN" }
         require(scalarOffset in 0..session.chapter.scalarCount)
-        val continued = positionIntent.get()
+        val continued = if (key.sourceId == "local") positionIntent.get() else null
         if (continued != null) {
             check(continued.intent.bookId == bookId && continued.intent.chapterIndex == index && continued.intent.sessionToken == sessionToken) { "NEW_POSITION_INTENT_READING_CHANGED" }
             client.requireNewPositionAuthority(continued.authority, session.chapter)
@@ -465,15 +541,18 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             }
         } else {
             val pending = journal.readAll().firstOrNull {
-                it.optString("kind") == "progress" && it.optString("bookId") == bookId && !it.optBoolean("completed")
+                it.optString("kind") == "progress" && ProgressReceiptPolicy.key(it) == key && !it.optBoolean("completed")
             }
             if (pending != null) {
                 val terminal = pending.optJSONObject("wireTerminal")
                     ?: throw PendingOperationException(pending.getString("id"), "reading.progress.update")
                 consumeProgressTerminal(pending, terminal)
+                check(key.sourceId == "local" || session.revision == ProgressReceiptPolicy.revision(pending, terminal)) {
+                    "ONLINE_REOPEN_AFTER_ORIGINAL_CONFIRMATION"
+                }
             }
         }
-        val parameters = JSONObject().put("sourceId", "local").put("bookId", bookId)
+        val parameters = JSONObject().put("sourceId", key.sourceId).put("bookId", bookId)
             .put("chapterIndex", index).put("chapterOffset", scalarOffset)
             .put("chapterProgress", if (session.chapter.scalarCount == 0) 0.0 else scalarOffset.toDouble() / session.chapter.scalarCount)
             .put("expectedBodyVersion", session.chapter.bodyVersion)
@@ -486,6 +565,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             transport.request("reading.progress.update", parameters,
                 beforeSend = { id ->
                     record.put("requestId", id).put("runtimeSession", transport.session)
+                    progressDispatchSessions[record.getString("id")] = session
                     journal.write(record)
                 }, terminal = { event ->
                     record.put("wireTerminal", event)
@@ -513,32 +593,43 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             }
             record.put("completed", true)
             journal.write(record)
+            progressDispatchSessions.remove(record.getString("id"))
             CoreTerminal.result("reading.progress.update", event)
         }
         val parameters = record.getJSONObject("parameters")
         val revision = ProgressReceiptPolicy.revision(record, event)
         record.put("completed", true)
         journal.write(record)
-        readingSessions[record.getString("bookId")]?.let { session ->
-            if (session.revision == parameters.getString("expectedProgressRevision")) session.revision = revision
+        val owner = ProgressReceiptPolicy.key(record)
+        val dispatched = progressDispatchSessions.remove(record.getString("id"))
+        readingSessions[owner]?.let { session ->
+            val sameScope = session.chapter.key == owner && session.chapter.index == parameters.getInt("chapterIndex") &&
+                session.chapter.bodyVersion == parameters.getString("expectedBodyVersion") && session.chapter.processingVersion == parameters.getString("expectedProcessingVersion")
+            // A remote old terminal never rewrites a later session's CAS. Cold reconcile requires a new entry observation.
+            if (session.revision == parameters.getString("expectedProgressRevision") &&
+                (owner.sourceId == "local" || (session === dispatched && sameScope))) session.revision = revision
         }
     }
 
     suspend fun pendingPositions(): List<PendingPosition> = onIO(WholeTurnMode.OBSERVER_READ) {
         journal.readAll().filter { it.getString("kind") == "progress" && !it.optBoolean("completed") }
-            .map { PendingPosition(it.getString("id"), it.getString("bookId"), "reading.progress.update") }
+            .map { PendingPosition(it.getString("id"), it.getString("bookId"), "reading.progress.update", ProgressReceiptPolicy.key(it).sourceId) }
     }
 
     /** Explicitly inspect one original ACK. No get, new save, cancellation or replay. */
-    suspend fun reconcilePendingPosition(bookId: String, operationId: String): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+    suspend fun reconcilePendingPosition(bookId: String, operationId: String) {
         localIdentity(bookId)
+        reconcilePendingPosition(ShelfBookKey("local", bookId), operationId)
+    }
+    suspend fun reconcilePendingPosition(key: ShelfBookKey, operationId: String): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        if (key.sourceId == "local") localIdentity(key.bookId) else ReaderOnlineReadingPolicy.remote(key)
         var record = journal.exact(operationId, includeCompleted = true)
             ?: throw PendingOperationException(operationId, "reading.progress.update")
-        check(record.getString("kind") == "progress" && record.getString("bookId") == bookId) {
+        check(record.getString("kind") == "progress" && ProgressReceiptPolicy.key(record) == key) {
             "ORIGINAL_PROGRESS_OWNER_MISMATCH"
         }
         if (!record.optBoolean("completed") && record.optJSONObject("wireTerminal") == null) {
-            record = journal.progressCandidateForReconcile(operationId, bookId) ?: record
+            record = journal.progressCandidateForReconcile(operationId, key) ?: record
         }
         if (record.optJSONObject("wireTerminal") == null &&
             record.getString("runtimeSession") == transport.session && !record.optBoolean("completed")) {

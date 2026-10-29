@@ -11,7 +11,7 @@ internal object ProgressJournalCandidatePolicy {
     const val MAX_BYTES = 64 * 1024
     private val fields = setOf("journalSchema", "kind", "id", "bookId", "parameters", "completed", "requestId", "runtimeSession")
 
-    class Qualified internal constructor(base: ByteArray, candidate: ByteArray, val id: String, val bookId: String) {
+    class Qualified internal constructor(base: ByteArray, candidate: ByteArray, val id: String, val bookId: String, val sourceId: String) {
         private val baseBytes = base.copyOf()
         private val candidateBytes = candidate.copyOf()
         val activeSha256: String = hash(baseBytes)
@@ -33,7 +33,8 @@ internal object ProgressJournalCandidatePolicy {
         check((active.get("runtimeSession") as? String)?.isNotBlank() == true && integer(active, "requestId") > 0) { "PROGRESS_CANDIDATE_DISPATCH" }
         val params = active.getJSONObject("parameters")
         val book = active.get("bookId") as? String ?: error("PROGRESS_CANDIDATE_BOOK")
-        check(book.matches(Regex("local:[a-f0-9]{64}")) && params.get("sourceId") == "local" && params.get("bookId") == book) { "PROGRESS_CANDIDATE_LOCAL_OWNER" }
+        val owner = ProgressReceiptPolicy.key(active)
+        check((owner.sourceId != "local" || book.matches(Regex("local:[a-f0-9]{64}"))) && params.get("bookId") == book) { "PROGRESS_CANDIDATE_OWNER" }
         val event = candidate.getJSONObject("wireTerminal")
         check(event.get("type") == "result" && integer(event, "protocolVersion") == 1L && integer(event, "requestId") == integer(active, "requestId")
             && integer(event, "deliveryId") > 0) { "PROGRESS_CANDIDATE_TERMINAL_IDENTITY" }
@@ -51,7 +52,7 @@ internal object ProgressJournalCandidatePolicy {
             && (data.get("progressRevision") as? String)?.startsWith("reader-progress-v1:") == true) { "PROGRESS_CANDIDATE_CAS" }
         integer(data, "updatedAt")
         ProgressReceiptPolicy.revision(candidate, event) // Same business policy as explicit reconcile; no fresh get.
-        return Qualified(activeBytes, candidateBytes, id, book)
+        return Qualified(activeBytes, candidateBytes, id, book, owner.sourceId)
     }
 
     fun parse(bytes: ByteArray): JSONObject {

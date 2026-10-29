@@ -28,7 +28,7 @@ internal class ReaderOnlineCatalogOriginals(private val transport: CoreTransport
     }
     fun request(method: String, sourceId: String, params: JSONObject): JSONObject {
         assertHeld()
-        check(method in setOf("runtime.setHostCapabilities", "book.search", "book.detail")) { "ONLINE_METHOD_NOT_ADMITTED" }
+        check(method in setOf("runtime.setHostCapabilities", "book.search", "book.detail") || method in ReaderOnlineReadingPolicy.METHODS) { "ONLINE_METHOD_NOT_ADMITTED" }
         pending().firstOrNull()?.let { throw ReaderOnlineOriginalPending(it) }
         // Retain all unresolved records; discard only acknowledged observational history before admitting more.
         while (calls.isNotEmpty()) {

@@ -7,7 +7,7 @@ import org.junit.Test
 
 class ProgressReceiptPolicyTest {
     private fun record() = JSONObject().put("requestId", 1001L).put("bookId", "local:original")
-        .put("parameters", JSONObject().put("chapterIndex", 2).put("chapterOffset", 17)
+        .put("parameters", JSONObject().put("sourceId", "local").put("bookId", "local:original").put("chapterIndex", 2).put("chapterOffset", 17)
             .put("expectedBodyVersion", "body-original").put("expectedProcessingVersion", "processing-original"))
 
     private fun ack() = JSONObject().put("type", "result").put("requestId", 1001L)
