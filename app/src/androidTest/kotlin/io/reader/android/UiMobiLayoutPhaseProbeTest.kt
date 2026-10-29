@@ -207,7 +207,7 @@ class UiMobiLayoutPhaseProbeTest {
     companion object {
         private const val METHOD = "existingMobiUnknownPendingOpensOnlyToObserveLayoutPhaseWithoutSaving"
         private const val SOURCE_SHA = "a25dcde710240f9c2c03d7b7b98aa09277d83392f3dc0da9779f6bc78e7c0cef"
-        private const val BASELINE_SHA = "671dc60a42a5cf04a711bd54042c1b306f2c4b997c78a8f0f252e96f6c57450e"
+        private const val BASELINE_SHA = "34dd23f369ac762c42e261c715616a4b36eb5857136c9f9a7e011d5eeb772bf0"
         private const val PENDING_ID = "android-progress-34f21d9a-6dc6-478e-a551-f85219609563"
         private const val ACTIVE_SHA = "c4a496c111870155bd93435b76aae2dd70402fbd65e834bf4ebb91297df1ec82"
         private const val ORIGINAL_RUNTIME = "aa519b17-bc13-4f47-841b-a31f9de9a1cc"
