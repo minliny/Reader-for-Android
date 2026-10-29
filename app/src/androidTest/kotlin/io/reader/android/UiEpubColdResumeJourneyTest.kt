@@ -77,16 +77,17 @@ class UiEpubColdResumeJourneyTest {
             assertEquals("第1章 牢房", args.getString("chapterTitle"))
             assertEquals("OEBPS/Text/Cha1.xhtml", args.getString("entryPath"))
             assertEquals(EXPECTED_SCALAR, args.getString("expectedBaselineScalar")?.toIntOrNull() ?: throw AssertionError("expectedBaselineScalar required"))
-            val previousPid = args.getString("previousProcessPid")?.toIntOrNull() ?: throw AssertionError("previousProcessPid required")
-            val previousStart = args.getString("previousProcessStartElapsedMs")?.toLongOrNull() ?: throw AssertionError("previousProcessStartElapsedMs required")
-            val previousRuntime = args.getString("previousRuntimeSession") ?: throw AssertionError("previousRuntimeSession required")
-            assertEquals(PREVIOUS_PID, previousPid); assertEquals(PREVIOUS_START, previousStart); assertEquals(PREVIOUS_RUNTIME, previousRuntime)
+            val lastInstrumentedPid = args.getString("lastInstrumentedProcessPid")?.toIntOrNull() ?: throw AssertionError("lastInstrumentedProcessPid required")
+            val lastInstrumentedStart = args.getString("lastInstrumentedProcessStartElapsedMs")?.toLongOrNull() ?: throw AssertionError("lastInstrumentedProcessStartElapsedMs required")
+            val expectedBaselineRuntimeSession = args.getString("expectedBaselineRuntimeSession") ?: throw AssertionError("expectedBaselineRuntimeSession required")
+            assertEquals(LAST_INSTRUMENTED_PID, lastInstrumentedPid); assertEquals(LAST_INSTRUMENTED_START, lastInstrumentedStart); assertEquals(EXPECTED_BASELINE_RUNTIME_SESSION, expectedBaselineRuntimeSession)
             val processStart = AndroidProcess.getStartElapsedRealtime()
-            assertTrue(AndroidProcess.myPid() > 0 && processStart > previousStart)
-            assertFalse(AndroidProcess.myPid() == previousPid && processStart == previousStart) // Numeric PID reuse alone is legal.
+            assertTrue(AndroidProcess.myPid() > 0 && processStart > lastInstrumentedStart)
+            assertFalse(AndroidProcess.myPid() == lastInstrumentedPid && processStart == lastInstrumentedStart) // Numeric PID reuse alone is legal.
             marker("epub-cold-process-observed", Bundle().apply {
-                putInt("previousProcessPid", previousPid); putLong("previousProcessStartElapsedMs", previousStart)
-                putString("previousRuntimeSession", previousRuntime); putBoolean("distinctProcessIdentity", true)
+                putInt("lastInstrumentedProcessPid", lastInstrumentedPid); putLong("lastInstrumentedProcessStartElapsedMs", lastInstrumentedStart)
+                putString("processReferenceClaim", "B8BE_LAST_INSTRUMENTED_PROCESS_NOT_EXTERNAL_START_IDENTITY")
+                putString("expectedBaselineRuntimeSession", expectedBaselineRuntimeSession); putBoolean("distinctProcessIdentity", true)
             })
             scenario = ActivityScenario.launch(MainActivity::class.java)
             scenario!!.onActivity { current = it }
@@ -127,7 +128,7 @@ class UiEpubColdResumeJourneyTest {
             val baselineRecord = JSONObject(baselineRaw.toString(Charsets.UTF_8))
             assertEquals(BASELINE_PROGRESS_ID, baselineRecord.getString("id")); assertTrue(baselineRecord.getBoolean("completed"))
             assertEquals("progress", baselineRecord.getString("kind")); assertEquals(bookId, baselineRecord.getString("bookId"))
-            assertEquals(previousRuntime, baselineRecord.getString("runtimeSession"))
+            assertEquals(expectedBaselineRuntimeSession, baselineRecord.getString("runtimeSession"))
             val baselineWire = baselineRecord.getJSONObject("wireTerminal")
             assertEquals(BASELINE_REVISION, ProgressReceiptPolicy.revision(baselineRecord, baselineWire))
             assertEquals(2, baselineRecord.getJSONObject("parameters").getInt("chapterIndex"))
@@ -162,8 +163,9 @@ class UiEpubColdResumeJourneyTest {
 
             marker("epub-cold-core-restored", Bundle().apply {
                 putString("bookId", bookId); putInt("chapter", book.progressChapter); putInt("scalarOffset", book.progressOffset)
-                putInt("previousProcessPid", previousPid); putLong("previousProcessStartElapsedMs", previousStart)
-                putString("previousRuntimeSession", previousRuntime); putLong("importRevision", initial.importRevision)
+                putInt("lastInstrumentedProcessPid", lastInstrumentedPid); putLong("lastInstrumentedProcessStartElapsedMs", lastInstrumentedStart)
+                putString("processReferenceClaim", "B8BE_LAST_INSTRUMENTED_PROCESS_NOT_EXTERNAL_START_IDENTITY")
+                putString("expectedBaselineRuntimeSession", expectedBaselineRuntimeSession); putLong("importRevision", initial.importRevision)
                 putBoolean("noInitialReading", initial.reading == null); putBoolean("distinctProcessIdentity", true)
             })
             phase = "one-real-bookshelf-resume"
@@ -219,7 +221,7 @@ class UiEpubColdResumeJourneyTest {
             glyphTapCoordinates(web, probe) // Initial real glyph/viewport observation; not clicked.
             assertTrue(Build.VERSION.SDK_INT >= 26)
             val provider = WebView.getCurrentWebViewPackage() ?: throw AssertionError("Actual WebView provider absent")
-            assertEquals(EXPECTED_SCALAR, ready.scalar); assertNotEquals(previousRuntime, lease.runtimeSession)
+            assertEquals(EXPECTED_SCALAR, ready.scalar); assertNotEquals(expectedBaselineRuntimeSession, lease.runtimeSession)
             val ownerFacts = restoredOwnerFacts(mount, web, ready)
             val browser = browserScrollObservation(web)
             assertFalse(browser.has("probeError")); assertTrue(browser.getBoolean("documentComplete")); assertEquals(probe.getString("entryUrl"), browser.getString("entryUrl"))
@@ -495,11 +497,11 @@ class UiEpubColdResumeJourneyTest {
         private const val METHOD = "existingRealZhongSongColdShelfRestoresStoredAnchorAndExitsWithOriginalReceipt"
         private const val IMPORT_ID = "android-import-9f0f562e-ce8a-4fb6-88c0-dbac5f3fbc85"
         private const val EXPECTED_SCALAR = 69
-        private const val PREVIOUS_PID = 21705
-        private const val PREVIOUS_START = 43982205L
-        private const val PREVIOUS_RUNTIME = "4f95b1c2-5fd5-4358-803a-7be73f6aa24f"
-        private const val BASELINE_PROGRESS_ID = "android-progress-da2de515-8c89-4d98-838b-b0e166cac8e3"
-        private const val BASELINE_REVISION = "reader-progress-v1:63cc7bc75f1fcc4768e8306e0e6bced93013979324f6ef36fafce6f5dc963092"
+        private const val LAST_INSTRUMENTED_PID = 21705
+        private const val LAST_INSTRUMENTED_START = 43982205L
+        private const val EXPECTED_BASELINE_RUNTIME_SESSION = "ecc0d15c-84a8-43ec-a114-6f2987a2a9dd"
+        private const val BASELINE_PROGRESS_ID = "android-progress-d0efe23f-acda-4c5b-a9f7-c7b18e67fce4"
+        private const val BASELINE_REVISION = "reader-progress-v1:af25518b76303a1e7bc622799ac59d4e048b816bdf56a5f4f2d897f8db75f0a9"
         private const val SOURCE_SHA = "5d6d9dd26bbea9ed0db4e4f7a127a538dfe439f5694c3370a30ac33503db9d67"
         private const val SOURCE_BYTES = 7406795L
         private const val PROTECTED_SHA = "aac01dbeb5e10710ee802466f077889f5b83d27db70a69e68a33af9ac51658a5"
