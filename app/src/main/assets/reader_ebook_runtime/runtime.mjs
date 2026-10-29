@@ -51,7 +51,19 @@ const loadDocument = () => documentPromise ||= (async () => {
   });
   const win = frame.contentWindow, doc = frame.contentDocument;
   if (retired || !doc || !doc.head || win.location.href !== expected.href) throw Error('FOREIGN_CHILD_DOCUMENT');
-  const input = {...data.dom, original: data.dom.chapterText, content: data.dom.chapterText, edits: []};
+  const metadata = data.dom;
+  if (!metadata || typeof metadata.originalIsContent !== 'boolean' || !Array.isArray(metadata.edits))
+    throw Error('NATIVE_PROCESSED_TEXT_METADATA_REQUIRED');
+  let input;
+  if (metadata.originalIsContent) {
+    if (Object.prototype.hasOwnProperty.call(metadata, 'original') || metadata.edits.length !== 0)
+      throw Error('NATIVE_IDENTITY_ALIAS_MISMATCH');
+    input = {...metadata, original: metadata.content}; // Explicit Native-proven identity, no second 16MiB text copy.
+  } else {
+    if (typeof metadata.original !== 'string' || metadata.original === metadata.content || metadata.edits.length === 0)
+      throw Error('NATIVE_PROCESSED_EDITS_REQUIRED');
+    input = metadata; // Preserve the exact supplied original/content/edits; never overwrite confirmed edits.
+  }
   const dom = createReaderEbookDom({document: doc, window: win, Node: win.Node, NodeFilter: win.NodeFilter, Range: win.Range,
     isCurrent: () => !retired && frame.contentDocument === doc && win.document === doc}, input);
   dom.admit(); // Full canonical entry authenticates before the existing Range chapter crop.

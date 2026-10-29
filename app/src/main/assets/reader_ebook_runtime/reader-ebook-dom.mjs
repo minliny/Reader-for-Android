@@ -25,13 +25,34 @@ export function createReaderEbookDom(context, input) {
     return value;
   };
   const scalarCount = countScalars(input.content), fullCount = countScalars(input.canonical);
-  if (input.original !== input.content || !Array.isArray(input.edits) || input.edits.length !== 0)
-    throw Error('CORE_PROCESSED_EDITS_REQUIRE_AN_APPROVED_ADAPTER');
+  const originalCount = countScalars(input.original);
+  if (!Array.isArray(input.edits) || input.edits.length > 100000) throw Error('CORE_EDIT_LIST_REQUIRED');
   const start = integer(input.start, fullCount), end = integer(input.end, fullCount);
-  if (start > end || input.scalarCount !== scalarCount) throw Error('CORE_WINDOW_MISMATCH');
+  if (start > end || input.scalarCount !== scalarCount || originalCount !== end - start) throw Error('CORE_WINDOW_MISMATCH');
+  if (input.original === input.content && input.edits.length !== 0) throw Error('CORE_IDENTITY_EDITS_NOT_EMPTY');
+  const edits = [];
+  if (input.original !== input.content || input.edits.length !== 0) {
+    if (originalCount > 32768 || scalarCount > 32768) throw Error('CORE_EDIT_SCALAR_LIMIT');
+    const source = Array.from(input.original); let cursor = 0, replay = '', changed = 0;
+    for (const edit of input.edits) {
+      if (!edit || typeof edit !== 'object' || Array.isArray(edit) || Object.keys(edit).sort().join(',') !== 'endScalar,startScalar,text')
+        throw Error('CORE_EDIT_SCHEMA');
+      const first = integer(edit.startScalar, originalCount), past = integer(edit.endScalar, originalCount);
+      const inserted = countScalars(edit.text);
+      if (first < cursor || past < first || (first === past && inserted === 0) || edit.text.includes('\uFFFC'))
+        throw Error('CORE_EDIT_RANGE_OR_INSERTED_IMAGE');
+      changed += past - first + inserted;
+      if (changed > 100000) throw Error('CORE_EDIT_CHANGE_LIMIT');
+      replay += source.slice(cursor, first).join('') + edit.text;
+      if (replay.length > input.content.length) throw Error('CORE_EDIT_REPLAY_LENGTH');
+      edits.push(Object.freeze({startScalar: first, endScalar: past, text: edit.text})); cursor = past;
+    }
+    replay += source.slice(cursor).join('');
+    if (replay !== input.content) throw Error('CORE_EDIT_REPLAY_MISMATCH');
+  }
   const config = {canonical: input.canonical, original: input.original, content: input.content,
     start, end, scalarCount, offset: integer(input.offset, scalarCount),
-    topInset: integer(input.topInset, 100000), edits: []};
+    topInset: integer(input.topInset, 100000), edits: Object.freeze(edits)};
   current();
 // BEGIN SAME-BYTE iOS ReaderEbookScript.swift:105-233
 const whitespace=c=>/^\p{White_Space}$/u.test(c);

@@ -128,9 +128,22 @@ internal class ReaderEbookLocalResources(context: Context, private val original:
         JsonWriter(OutputStreamWriter(out, UTF_8)).use { writer ->
             writer.beginObject().name("protocolVersion").value(1).name("session").value(session).name("entryUrl").value(entryUrl)
             writer.name("dom").beginObject().name("canonical").value(dom.getString("canonical"))
-                .name("chapterText").value(dom.getString("content")).name("start").value(dom.getInt("start"))
+            val identity = dom.getBoolean("originalIsContent")
+            writer.name("originalIsContent").value(identity)
+            // Preserve the existing one-copy bootstrap for unchanged chapters, including 16MiB windows.
+            if (!identity) writer.name("original").value(dom.getString("original"))
+            writer.name("content").value(dom.getString("content"))
+                .name("start").value(dom.getInt("start"))
                 .name("end").value(dom.getInt("end")).name("scalarCount").value(dom.getInt("scalarCount"))
-                .name("offset").value(original.currentAnchor).name("topInset").value(0).endObject().endObject()
+                .name("offset").value(original.currentAnchor).name("topInset").value(0)
+            writer.name("edits").beginArray()
+            val edits = dom.getJSONArray("edits")
+            for (index in 0 until edits.length()) {
+                val edit = edits.getJSONObject(index)
+                writer.beginObject().name("startScalar").value(edit.getInt("startScalar"))
+                    .name("endScalar").value(edit.getInt("endScalar")).name("text").value(edit.getString("text")).endObject()
+            }
+            writer.endArray().endObject().endObject()
         }
         return out.toByteArray()
     }
