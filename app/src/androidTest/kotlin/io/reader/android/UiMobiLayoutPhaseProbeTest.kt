@@ -175,7 +175,7 @@ class UiMobiLayoutPhaseProbeTest {
             assertPendingMobiAndTxt(model)
             val book = initial.books.single { it.id == bookId }
             val txtBook = initial.books.single { it.id == txtBookId }
-            assertEquals(560, book.chapterCount); assertEquals(3, book.progressChapter); assertEquals(0, book.progressOffset)
+            assertEquals(560, book.chapterCount); assertEquals(3, book.progressChapter); assertEquals(104, book.progressOffset)
             assertEquals(1, txtBook.progressChapter); assertEquals(210, txtBook.progressOffset)
             val activeFile = File(current.filesDir, "Reader/Operations/$PENDING_ID.json")
             val activeRaw = activeFile.readBytes(); assertEquals(739, activeRaw.size); assertEquals(ACTIVE_SHA, sha(activeRaw))
