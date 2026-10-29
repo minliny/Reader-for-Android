@@ -91,16 +91,23 @@ fun ReaderApp(model: ReaderViewModel) {
     val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
-        if (state.route == ReaderRoute.Reading && state.reading != null) {
+        val readingVisible = state.route == ReaderRoute.Reading && state.reading != null
+        val windowBackground = if (readingVisible) state.paper.background() else MaterialTheme.colorScheme.background
+        ReaderSystemBarAppearance(windowBackground)
+        if (readingVisible) {
             ReaderReadingScreen(state, model)
         } else {
             Scaffold(
-                modifier = Modifier.semantics { testTagsAsResourceId = true },
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .semantics { testTagsAsResourceId = true },
                 containerColor = MaterialTheme.colorScheme.background,
+                // The outer modifier owns/consumes safeDrawing for bars and body alike.
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
                     Column {
                         Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 12.dp),
+                            Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 12.dp).testTag("reader_app_top_bar"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management) {
@@ -115,7 +122,7 @@ fun ReaderApp(model: ReaderViewModel) {
                                 ReaderRoute.Directory -> "目录"
                                 ReaderRoute.Management -> "书架管理"
                                 else -> "阅读"
-                            }, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                            }, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f).testTag("reader_page_title"))
                             if (state.route == ReaderRoute.Bookshelf) {
                                 IconButton(onClick = requestImport, enabled = importAllowed,
                                     modifier = Modifier.testTag("reader_import")) {
@@ -131,7 +138,7 @@ fun ReaderApp(model: ReaderViewModel) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.Center) {
                             Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(28.dp),
-                                tonalElevation = 1.dp, shadowElevation = 3.dp) {
+                                tonalElevation = 1.dp, shadowElevation = 3.dp, modifier = Modifier.testTag("reader_app_navigation")) {
                                 Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                                     TabAction("书架", R.drawable.reader_library, state.route == ReaderRoute.Bookshelf,
                                         !state.busy, "reader_tab_library", model::showBookshelf)
