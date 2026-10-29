@@ -53,6 +53,7 @@ var SemanticsPropertyReceiver.readerChapterIndex by ReaderChapterIndexKey
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
+    if (state.route == ReaderRoute.OnlineReading) { ReaderOnlineReadingScreen(state, model); return }
     val reading = state.reading ?: return
     Box(Modifier.fillMaxSize().background(state.paper.background()).windowInsetsPadding(WindowInsets.safeDrawing)
         .testTag("reader_reading").semantics {
@@ -103,7 +104,7 @@ internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
             ReaderProtocolRecoveryHost(model)
             if (state.error != null) ReaderTransientFeedback(state.error, model::clearError)
             state.positionSaveBarrier?.let { pending ->
-                val retainedIds = state.pendingPositions.filter { it.bookId == reading.book.id }.map { it.id }
+                val retainedIds = state.pendingPositions.filter { it.sourceId == "local" && it.bookId == reading.book.id }.map { it.id }
                 val canRequestNewIntent = reading.newPositionIntent == null && reading.format != ReaderLocalBookFormat.TXT
                 ReaderRecoveryNotice("原进度保存尚未确认，已暂停后续保存。当前正文仍可阅读。", state.busy,
                     { model.reconcilePendingPosition(pending, ReaderRoute.Reading, reading.identity) },

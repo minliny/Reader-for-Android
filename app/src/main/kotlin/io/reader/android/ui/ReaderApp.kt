@@ -82,7 +82,7 @@ fun ReaderApp(model: ReaderViewModel) {
     }
     DisposableEffect(view, state.keepScreenOn, state.route) {
         val old = view.keepScreenOn
-        view.keepScreenOn = state.keepScreenOn && state.route == ReaderRoute.Reading
+        view.keepScreenOn = state.keepScreenOn && state.route in setOf(ReaderRoute.Reading, ReaderRoute.OnlineReading)
         onDispose { view.keepScreenOn = old }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -105,7 +105,7 @@ fun ReaderApp(model: ReaderViewModel) {
     val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/epub+zip", "application/x-mobipocket-ebook", "application/vnd.amazon.ebook", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
-        val readingVisible = state.route == ReaderRoute.Reading && state.reading != null
+        val readingVisible = (state.route == ReaderRoute.Reading && state.reading != null) || (state.route == ReaderRoute.OnlineReading && state.onlineReading != null)
         val windowBackground = if (readingVisible) state.paper.background() else MaterialTheme.colorScheme.background
         ReaderSystemBarAppearance(windowBackground)
         if (readingVisible) {
@@ -124,7 +124,7 @@ fun ReaderApp(model: ReaderViewModel) {
                             Modifier.fillMaxWidth().padding(horizontal = 19.dp, vertical = 12.dp).testTag("reader_app_top_bar"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management || state.route == ReaderRoute.Online) {
+                            if (state.route == ReaderRoute.Directory || state.route == ReaderRoute.Management || state.route == ReaderRoute.Online || state.route == ReaderRoute.OnlineDirectory) {
                                 IconButton(onClick = model::back, enabled = !state.busy,
                                     modifier = Modifier.testTag("reader_back")) {
                                     Icon(painterResource(R.drawable.reader_back), "返回")
@@ -136,6 +136,7 @@ fun ReaderApp(model: ReaderViewModel) {
                                 ReaderRoute.Directory -> "目录"
                                 ReaderRoute.Management -> "书架管理"
                                 ReaderRoute.Online -> "书源与搜索"
+                                ReaderRoute.OnlineDirectory -> "在线目录"
                                 else -> "阅读"
                             }, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f).testTag("reader_page_title"))
                             if (state.route == ReaderRoute.Bookshelf) {
@@ -149,7 +150,7 @@ fun ReaderApp(model: ReaderViewModel) {
                     }
                 },
                 bottomBar = {
-                    if (state.route != ReaderRoute.Directory) {
+                    if (state.route != ReaderRoute.Directory && state.route != ReaderRoute.OnlineDirectory) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.Center) {
                             Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(28.dp),
@@ -167,13 +168,26 @@ fun ReaderApp(model: ReaderViewModel) {
             ) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding)) {
                     ReaderProtocolRecoveryHost(model)
+                    if (state.route == ReaderRoute.Bookshelf) {
+                        state.onlineFeedback?.let { message -> androidx.compose.runtime.key(state.onlineFeedbackId) {
+                            ReaderTransientFeedback(message) { model.retireOnlineFeedback(state.onlineFeedbackId) }
+                        } }
+                        state.pendingPositions.filter { it.sourceId != "local" }.forEach { original ->
+                            val host = model.protocolRecoveryHost()
+                            ReaderRecoveryNotice("原在线阅读位置尚未确认，原记录会继续保留。", state.busy,
+                                { model.reconcileOnlineShelfPosition(original, host) }, "核对原保存", "reader_online_shelf_reconcile")
+                        }
+                    }
+                    if (state.route == ReaderRoute.Bookshelf && state.onlineError != null) ReaderPageState("书架读取未完成", state.onlineError.orEmpty(),
+                        "重新读取", model::refreshBooks)
+                    if (state.route == ReaderRoute.Bookshelf && state.onlineOriginal != null) ReaderOnlineOriginalNotice(state, model)
                     if (state.route == ReaderRoute.Management) ReaderShelfManagementRecovery(management, model.shelfManagement)
-                    if (state.route != ReaderRoute.Online) {
+                    if (state.route != ReaderRoute.Online && state.route != ReaderRoute.OnlineDirectory) {
                     if (state.pendingImports.isNotEmpty() || (!state.pendingReady && state.ready)) {
                         ReaderRecoveryNotice("有一次导入尚未确认。核对原操作后再导入新的书籍。", state.busy,
                             model::reconcilePendingImports)
                     } else state.error?.let { ReaderTransientFeedback(it, model::clearError) }
-                    state.pendingPositions.firstOrNull()?.let { pending ->
+                    state.pendingPositions.firstOrNull { it.sourceId == "local" }?.let { pending ->
                         val positionHostRoute = state.route
                         val positionHostReadingOwner = state.reading?.identity
                         ReaderRecoveryNotice("原进度保存尚未确认，原记录会继续保留。", state.busy,
@@ -197,6 +211,7 @@ fun ReaderApp(model: ReaderViewModel) {
                         ReaderRoute.Settings -> SettingsScreen(state, model)
                         ReaderRoute.Directory -> DirectoryScreen(state, model)
                         ReaderRoute.Management -> ReaderShelfManagementScreen(management, model.shelfManagement)
+                        ReaderRoute.OnlineDirectory -> ReaderOnlineDirectoryScreen(state, model)
                         ReaderRoute.Online -> ReaderOnlineWorkspaceScreen(online, model.onlineSources, requestSourceFile)
                         else -> Unit
                     }
@@ -260,12 +275,13 @@ private fun BookshelfScreen(state: ReaderUiState, model: ReaderViewModel, onImpo
                     items(state.books, key = { it.id }) { book -> BookRow(book, state.busy, model) }
                     if (state.remoteBooks.isNotEmpty()) item { Text("在线书籍", style = MaterialTheme.typography.labelLarge) }
                     items(state.remoteBooks, key = { arrayListOf(it.key.sourceId, it.key.bookId) }) { book ->
-                        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+                        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.clickable(enabled = !state.busy && state.onlineOriginal == null) { model.openRemoteBook(book) }) {
                             Column(Modifier.fillMaxWidth().padding(15.dp).testTag("reader_remote_shelf_metadata")) {
                                 Text(book.title, style = MaterialTheme.typography.titleMedium)
                                 if (book.author.isNotBlank()) Text(book.author, style = MaterialTheme.typography.bodySmall)
                                 Text(book.sourceName ?: "在线书籍", style = MaterialTheme.typography.bodySmall)
-                                Text("阅读暂不可用", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("目录与阅读", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

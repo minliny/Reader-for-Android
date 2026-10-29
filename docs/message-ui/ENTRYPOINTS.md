@@ -74,6 +74,21 @@ lastPositionSaveAttempt 是当前捕获 readingOwner/session/位置对 typed 保
 | 原书源导入、原在线入架未确认 | Recovery / ReaderRecoveryNotice | 原 SourceImport/Add operationId + 当前 UI revision + pending membership；VM gate 与实际 backend 均核准确原操作 | 仅 reconcile 原记录；不以 source.list/bookshelf.list/status 清原未决，不重派 unknown。candidateRetained 或协议未决继续保留；隐藏不取消业务 |
 | 原搜索/详情获取未确认 | Recovery / ReaderRecoveryNotice | 原 acquisition UUID、method/source/runtime/request、原 immutable params 的业务投影；UI 仅转交原 id | “读取原状态”只读既有 original facts，不重发 HTTP/Core 请求、不自动宣布 ACK。catalog transportAcknowledged 的后续原收尾缺口仍 OPEN |
 | 已获 durable 原导入/入架结果 | Transient / ReaderTransientFeedback | 当前 feedback UUID 与真实 service confirmation；只在实际 durable APPLIED/ADDED/原有入架结果后发 | 仅同 feedback UUID 到时退展示。Add 后的书架读取失败不改变已确认 Add、不会重新入架 |
-| 已入架在线文字书的书架元数据 | 常规书架内容；不可用阅读入口不生成消息或假按钮 | 精确 ShelfBookKey(sourceId,bookId)，Core bookshelf.list(sourceKind=online,contentKind=text)；与本地 LibraryBook、Original 和 readingSessions 分离 | 仅重新读取投影；不产生本地 TOC/格式/进度、不开放远程阅读。该中间投影不表示在线阅读已经完成 |
+| 已入架在线文字书及目录/阅读入口（源码候选，执行未证） | 常规书架行 → OnlineDirectory / OnlineReading；读取/未决消息走本节下方已登记公共宿主 | 精确 ShelfBookKey(sourceId,bookId)，真实 Core 目录 v2 issued target、entry.snapshot 完整 source/chapter/body/processing 与独立 progress.get CAS；与本地 LibraryBook/Original/ReadingSession 分离 | 正常退出仅同新 original ACK 后返回书架；unknown 保原记录、不重派，远程书签/搜索/TTS等未接工具不开放；本行不表示真实来源/网络/设备验收 |
 
 Online 离页只关闭准确原 Host 搜索 session（Core 没有 online search cursor/close RPC）；每个 session 同时登记于既有 App client retiring-cleanup gate，VM scope 取消不取消已准入 original turn。关闭展示、退 session、释放大候选数据均不清原 acquisition/事务记录。标准文件入口读取完整单对象或数组，展示实际名称/URL后，用户明确只导入选中一个完整对象；不逐元素批量导入，不增 Host 批次事务或规则解释器。本文登记源码接入合同；准确方法、真实书源、网络、UI、产物和设备验收分别记账。
+
+
+## A4 在线文字阅读宿主
+
+本入口通过同 Library/client/gate 与实际 Core entry/progress 接线；在线内容不拥有 local format 或 Original。该登记随源码候选，尚无真实书源/网络/设备验收。
+
+| 事实 | 公共组件及物理宿主 | 身份、准入与失效 |
+| --- | --- | --- |
+| 读取目录/规范正文失败或原保存确认后的书架读取失败 | ReaderPageState；OnlineDirectory / OnlineReading，或已退出后的 Bookshelf | 实际复合 key + UI directory UUID / reading UUID、Core chapter session token、同 VM generation；已知失败只展示，不自动重做 Core/HTTP。已确认退出先结束 reading，再刷新书架；刷新失败不派第二次保存 |
+| 原在线进度保存未决 | ReaderRecoveryNotice；当前 online reading/directory 或 Bookshelf 原记录宿主 | 原 operationId + sourceId/bookId + 捕获 host UUID/generation；gate 后重新核原条目。只 reconcile 该原 wire；fresh get/列表/其它 ACK 不确认它，未决时不派新 save，不离开当前 reading 冒保存成功 |
+| 原在线获取请求未决 | ReaderRecoveryNotice；原 reading/directory，返回 Bookshelf 后仅展示 | 实际 original id/request/runtime/immutable params；读状态只观察同 original，不清 barrier、不重发 HTTP。无有效原宿主不开放动作；现有 catalog later-ACK projection 缺口仍保守 OPEN |
+| 已持久归档的原保存明确拒绝 | ReaderTransientFeedback；当时的 online host 或 Bookshelf | 独立 feedback UUID；只在 backend reconcile 已归档原 definite rejection 后发。仅同 UUID 退展示，不取消/重试/导航 |
+| 协议未决 | 既有 ReaderProtocolRecoveryHost，reading 与非 reading 互斥宿主 | 原 protocol reference/presentation；仍先于业务错误分类。页面不冒认 ACK、不释放新外来 fault |
+
+Native anchor 的 Boolean 仅为当前完整 reading/token/key 范围内的显示接纳；busy/同 key 未决/旧 opened 对象被拒，不推进 reflow 基准、不生成保存。现有450ms调度与正常退出均走同原 progress journal/ACK；离页、VM取消及隐藏消息不取消已准入 App turn。远程书签/正文搜索/TTS/格式/原件工具未接入，入口保持缺席。local 进度提示及旧新意图列表明确 sourceId=local，不能借相同 bookId 认领在线原件。
