@@ -49,4 +49,44 @@ internal class ReaderMangaService(private val transport: CoreTransport) {
             .put("limit", request.limit)
         return ReaderMangaPolicy.pageWindow(transport.request("manga.pages.window", params), request)
     }
+
+    /** These methods only cross the Core contract; Host transfer/decode is still not implemented. */
+    fun resourcePrepare(request: ReaderMangaResourcePrepareRequest): ReaderMangaResourcePrepareResult {
+        check(request.manifestVersion.isNotBlank() && request.resourceRef.isNotBlank() && request.sourceRuleVersion.isNotBlank()) {
+            "MANGA_RESOURCE_PREPARE_SCOPE"
+        }
+        val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
+            .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
+            .put("manifestVersion", request.manifestVersion).put("resourceRef", request.resourceRef)
+            .put("sourceRuleVersion", request.sourceRuleVersion).put("transferId", request.transferId)
+        return ReaderMangaPolicy.resourcePrepare(transport.request("manga.resource.prepare", params), request)
+    }
+
+    fun resourceInspect(request: ReaderMangaResourceInspectRequest): ReaderMangaResourceInspectResult {
+        check(request.transferId.isNotBlank() && request.bytes in 1..16 * 1024 * 1024 && request.sha256.matches(Regex("[0-9a-f]{64}"))) {
+            "MANGA_RESOURCE_INSPECT_SCOPE"
+        }
+        val params = JSONObject().put("transferId", request.transferId).put("sha256", request.sha256).put("bytes", request.bytes)
+        return ReaderMangaPolicy.resourceInspect(transport.request("manga.resource.inspect", params), request)
+    }
+
+    fun materializationPrepare(request: ReaderMangaMaterializationPrepareRequest): ReaderMangaMaterializationPrepareResult {
+        val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
+            .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
+            .put("manifestVersion", request.manifestVersion).put("intent", request.intent.wire)
+        return ReaderMangaPolicy.materializationPrepare(transport.request("manga.cache.materialization.prepare", params), request)
+    }
+
+    fun materializationComplete(request: ReaderMangaMaterializationCompleteRequest): ReaderMangaMaterializationCompleteResult {
+        val refs = JSONArray().also { request.resourceRefs.forEach(it::put) }
+        val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
+            .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
+            .put("manifestVersion", request.manifestVersion).put("token", request.token).put("resourceRefs", refs)
+        return ReaderMangaPolicy.materializationComplete(transport.request("manga.cache.materialization.complete", params), request)
+    }
+
+    fun materializationAbort(token: String): ReaderMangaMaterializationAbortResult {
+        check(token.isNotBlank()) { "MANGA_MATERIALIZATION_TOKEN" }
+        return ReaderMangaPolicy.materializationAbort(transport.request("manga.cache.materialization.abort", JSONObject().put("token", token)))
+    }
 }

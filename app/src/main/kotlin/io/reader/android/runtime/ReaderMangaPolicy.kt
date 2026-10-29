@@ -63,6 +63,53 @@ internal object ReaderMangaPolicy {
             value.optBoolean("resumeOnly", false))
     }
 
+    fun resourcePrepare(value: JSONObject, expected: ReaderMangaResourcePrepareRequest): ReaderMangaResourcePrepareResult {
+        check(value.optBoolean("prepared", false)) { "MANGA_RESOURCE_NOT_PREPARED" }
+        val ref = value.getString("resourceRef").also { check(it == expected.resourceRef && it.isNotBlank()) { "MANGA_RESOURCE_REF" } }
+        val transferId = value.getString("transferId").also { check(it == expected.transferId && it.isNotBlank()) { "MANGA_TRANSFER_ID" } }
+        val bytes = value.getInt("bytes").also { check(it in 1..16 * 1024 * 1024) { "MANGA_RESOURCE_BYTES" } }
+        return ReaderMangaResourcePrepareResult(true, ref, transferId, bytes)
+    }
+
+    fun resourceInspect(value: JSONObject, expected: ReaderMangaResourceInspectRequest): ReaderMangaResourceInspectResult {
+        val transferId = value.getString("transferId").also { check(it == expected.transferId && it.isNotBlank()) { "MANGA_TRANSFER_ID" } }
+        val sha256 = value.getString("sha256").also { check(it == expected.sha256 && it.matches(Regex("[0-9a-f]{64}"))) { "MANGA_RESOURCE_SHA" } }
+        val bytes = value.getInt("bytes").also { check(it == expected.bytes && it in 1..16 * 1024 * 1024) { "MANGA_RESOURCE_BYTES" } }
+        val status = when (value.getString("status")) {
+            "absent" -> ReaderMangaResourceStatus.ABSENT
+            "present" -> ReaderMangaResourceStatus.PRESENT
+            else -> error("MANGA_RESOURCE_STATUS")
+        }
+        val orientation = if (!value.has("orientation") || value.isNull("orientation")) null else value.getInt("orientation")
+            .also { check(it in 1..8) { "MANGA_RESOURCE_ORIENTATION" } }
+        check(status == ReaderMangaResourceStatus.ABSENT && orientation == null || status == ReaderMangaResourceStatus.PRESENT && orientation != null) {
+            "MANGA_RESOURCE_ORIENTATION_SCOPE"
+        }
+        val profile = decodeProfile(value.getJSONObject("decodeProfile"))
+        return ReaderMangaResourceInspectResult(transferId, sha256, bytes, status, orientation, profile)
+    }
+
+    fun materializationPrepare(value: JSONObject, expected: ReaderMangaMaterializationPrepareRequest): ReaderMangaMaterializationPrepareResult {
+        val token = value.getString("token").also { check(it.isNotBlank()) { "MANGA_MATERIALIZATION_TOKEN" } }
+        val chapter = identity(value.getJSONObject("chapter"))
+        check(chapter == expected.chapter && value.getString("manifestVersion") == expected.manifestVersion) { "MANGA_MATERIALIZATION_SCOPE" }
+        val intent = materializationIntent(value.getString("intent"))
+        check(intent == expected.intent) { "MANGA_MATERIALIZATION_INTENT" }
+        return ReaderMangaMaterializationPrepareResult(token, chapter, expected.manifestVersion, intent)
+    }
+
+    fun materializationComplete(value: JSONObject, expected: ReaderMangaMaterializationCompleteRequest): ReaderMangaMaterializationCompleteResult {
+        check(value.has("completed")) { "MANGA_MATERIALIZATION_COMPLETED" }
+        val version = value.getString("manifestVersion").also { check(it == expected.manifestVersion && it.isNotBlank()) { "MANGA_MANIFEST_VERSION" } }
+        check(expected.token.isNotBlank() && expected.resourceRefs.isNotEmpty() && expected.resourceRefs.distinct().size == expected.resourceRefs.size) {
+            "MANGA_MATERIALIZATION_REQUEST"
+        }
+        return ReaderMangaMaterializationCompleteResult(value.getBoolean("completed"), version)
+    }
+
+    fun materializationAbort(value: JSONObject): ReaderMangaMaterializationAbortResult =
+        ReaderMangaMaterializationAbortResult(value.getBoolean("aborted"))
+
     private fun manifest(value: JSONObject, sourceId: String, bookId: String, chapterId: String? = null,
         manifestVersion: String? = null, ordinalStart: Int? = null): ReaderMangaManifest {
         val chapter = value.getJSONObject("chapter")
@@ -86,6 +133,44 @@ internal object ReaderMangaPolicy {
         val sourceRuleVersion = value.getString("sourceRuleVersion").also { check(it.isNotBlank()) { "MANGA_SOURCE_RULE_VERSION" } }
         val decodeRevision = value.getString("decodeRevision").also { check(it.isNotBlank()) { "MANGA_DECODE_REVISION" } }
         return ReaderMangaManifest(identity, sourceRuleVersion, version, decodeRevision, pages)
+    }
+
+    private fun identity(value: JSONObject): ReaderMangaChapterIdentity = ReaderMangaChapterIdentity(
+        value.getString("sourceId"), value.getString("bookId"), value.getString("chapterId"),
+    ).also { check(it.sourceId.isNotBlank() && it.bookId.isNotBlank() && it.chapterId.isNotBlank()) { "MANGA_CHAPTER_IDENTITY" } }
+
+    private fun materializationIntent(value: String): ReaderMangaMaterializationIntent = when (value) {
+        "cache" -> ReaderMangaMaterializationIntent.CACHE
+        "download" -> ReaderMangaMaterializationIntent.DOWNLOAD
+        else -> error("MANGA_MATERIALIZATION_INTENT")
+    }
+
+    private fun decodeProfile(value: JSONObject): ReaderMangaImageDecodeProfile {
+        val format = when (value.getString("format")) {
+            "jpeg" -> ReaderMangaImageFormat.JPEG
+            "png" -> ReaderMangaImageFormat.PNG
+            "webp" -> ReaderMangaImageFormat.WEBP
+            else -> error("MANGA_IMAGE_FORMAT")
+        }
+        val allocation = when (value.getString("allocationClass")) {
+            "scanline" -> ReaderMangaAllocationClass.SCANLINE
+            "pngInterlaced" -> ReaderMangaAllocationClass.PNG_INTERLACED
+            "fullFrame" -> ReaderMangaAllocationClass.FULL_FRAME
+            else -> error("MANGA_ALLOCATION_CLASS")
+        }
+        val width = value.optionalPositiveLong("encodedWidth")
+        val height = value.optionalPositiveLong("encodedHeight")
+        check((format == ReaderMangaImageFormat.WEBP || width != null && height != null) &&
+            (format != ReaderMangaImageFormat.WEBP || allocation == ReaderMangaAllocationClass.FULL_FRAME) &&
+            (allocation != ReaderMangaAllocationClass.PNG_INTERLACED || format == ReaderMangaImageFormat.PNG)) {
+            "MANGA_DECODE_PROFILE"
+        }
+        return ReaderMangaImageDecodeProfile(format, width, height, allocation)
+    }
+
+    private fun JSONObject.optionalPositiveLong(name: String): Long? = when {
+        !has(name) || isNull(name) -> null
+        else -> getLong(name).also { check(it > 0) { "MANGA_DECODE_DIMENSION" } }
     }
 
     private fun resources(rows: org.json.JSONArray?, manifest: ReaderMangaManifest): List<ReaderMangaResource> {

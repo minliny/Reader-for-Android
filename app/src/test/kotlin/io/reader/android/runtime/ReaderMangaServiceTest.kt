@@ -143,6 +143,39 @@ class ReaderMangaServiceTest {
         }
     }
 
+    @Test
+    fun resourcePrepareInspectAndMaterializationContractsBindTransferAndManifestIdentity() {
+        val calls = mutableListOf<String>()
+        val identity = ReaderMangaChapterIdentity("source-a", "book-a", "chapter-7")
+        val service = ReaderMangaService(fakeTransport { method, _ ->
+            calls += method
+            when (method) {
+                "manga.resource.prepare" -> JSONObject().put("prepared", true).put("resourceRef", "manga:page-0")
+                    .put("transferId", "transfer-1").put("bytes", 1234)
+                "manga.resource.inspect" -> JSONObject().put("transferId", "transfer-1")
+                    .put("sha256", "a".repeat(64)).put("bytes", 1234).put("status", "present")
+                    .put("orientation", 1).put("decodeProfile", JSONObject().put("format", "jpeg")
+                        .put("encodedWidth", 1080).put("encodedHeight", 1920).put("allocationClass", "scanline"))
+                "manga.cache.materialization.prepare" -> JSONObject().put("token", "mat-token")
+                    .put("chapter", JSONObject().put("sourceId", identity.sourceId).put("bookId", identity.bookId).put("chapterId", identity.chapterId))
+                    .put("manifestVersion", "manifest-1").put("intent", "cache")
+                "manga.cache.materialization.complete" -> JSONObject().put("completed", true).put("manifestVersion", "manifest-1")
+                else -> JSONObject().put("aborted", true)
+            }
+        })
+        val prepared = service.resourcePrepare(ReaderMangaResourcePrepareRequest(identity, "manifest-1", "manga:page-0", "rules-1", "transfer-1"))
+        assertEquals(1234, prepared.bytes)
+        val inspected = service.resourceInspect(ReaderMangaResourceInspectRequest("transfer-1", "a".repeat(64), 1234))
+        assertEquals(ReaderMangaResourceStatus.PRESENT, inspected.status)
+        assertEquals(ReaderMangaImageFormat.JPEG, inspected.decodeProfile.format)
+        val materialized = service.materializationPrepare(ReaderMangaMaterializationPrepareRequest(identity, "manifest-1", ReaderMangaMaterializationIntent.CACHE))
+        assertEquals("mat-token", materialized.token)
+        assertEquals(true, service.materializationComplete(ReaderMangaMaterializationCompleteRequest(identity, "manifest-1", "mat-token", listOf("manga:page-0"))).completed)
+        assertEquals(true, service.materializationAbort("mat-token").aborted)
+        assertEquals(listOf("manga.resource.prepare", "manga.resource.inspect", "manga.cache.materialization.prepare",
+            "manga.cache.materialization.complete", "manga.cache.materialization.abort"), calls)
+    }
+
     private fun fakeTransport(response: (String, JSONObject) -> JSONObject) = object : CoreTransport {
         override val session = "manga-test"
         override fun request(method: String, params: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,

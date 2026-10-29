@@ -76,3 +76,65 @@ data class ReaderMangaPageWindowRequest(
     val start: Int,
     val limit: Int,
 )
+
+data class ReaderMangaResourcePrepareRequest(
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val resourceRef: String,
+    val sourceRuleVersion: String,
+    val transferId: String,
+)
+
+data class ReaderMangaResourcePrepareResult(
+    val prepared: Boolean,
+    val resourceRef: String,
+    val transferId: String,
+    val bytes: Int,
+)
+
+data class ReaderMangaResourceInspectRequest(val transferId: String, val sha256: String, val bytes: Int)
+
+enum class ReaderMangaResourceStatus { ABSENT, PRESENT }
+enum class ReaderMangaImageFormat { JPEG, PNG, WEBP }
+enum class ReaderMangaAllocationClass { SCANLINE, PNG_INTERLACED, FULL_FRAME }
+
+data class ReaderMangaImageDecodeProfile(
+    val format: ReaderMangaImageFormat,
+    val encodedWidth: Long?,
+    val encodedHeight: Long?,
+    val allocationClass: ReaderMangaAllocationClass,
+)
+
+data class ReaderMangaResourceInspectResult(
+    val transferId: String,
+    val sha256: String,
+    val bytes: Int,
+    val status: ReaderMangaResourceStatus,
+    val orientation: Int?,
+    val decodeProfile: ReaderMangaImageDecodeProfile,
+)
+
+enum class ReaderMangaMaterializationIntent(val wire: String) { CACHE("cache"), DOWNLOAD("download") }
+
+data class ReaderMangaMaterializationPrepareRequest(
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val intent: ReaderMangaMaterializationIntent,
+)
+
+data class ReaderMangaMaterializationPrepareResult(
+    val token: String,
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val intent: ReaderMangaMaterializationIntent,
+)
+
+data class ReaderMangaMaterializationCompleteRequest(
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val token: String,
+    val resourceRefs: List<String>,
+)
+
+data class ReaderMangaMaterializationCompleteResult(val completed: Boolean, val manifestVersion: String)
+data class ReaderMangaMaterializationAbortResult(val aborted: Boolean)
