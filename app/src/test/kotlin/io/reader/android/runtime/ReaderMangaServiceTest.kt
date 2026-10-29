@@ -4,7 +4,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /** Core manga descriptor boundary only; no image request, decode, cache or device path. */
 class ReaderMangaServiceTest {
@@ -55,6 +57,22 @@ class ReaderMangaServiceTest {
             .put("pages", JSONArray().put(JSONObject().put("url", "https://img.test/1.jpg")
                 .put("headers", JSONObject().put("X-Count", 1))))
         assertThrows(IllegalStateException::class.java) { ReaderMangaPolicy.pagesExtract(nonStringHeader, chapter) }
+    }
+
+    @Test
+    fun explicitNullOptionalPageFieldsAndReaderLibraryObserverLaneRemainAdmitted() {
+        val empty = JSONObject().put("sourceId", chapter.sourceId).put("bookId", chapter.bookId)
+            .put("pages", JSONArray().put(JSONObject().put("url", "https://img.test/1.jpg")
+                .put("requestRule", JSONObject.NULL).put("referrer", JSONObject.NULL)))
+        val result = ReaderMangaPolicy.pagesExtract(empty, chapter)
+        assertEquals(null, result.pages.single().requestRule)
+        assertEquals(null, result.pages.single().referrer)
+        val source = sequenceOf(
+            File("src/main/kotlin/io/reader/android/runtime/ReaderLibrary.kt"),
+            File("app/src/main/kotlin/io/reader/android/runtime/ReaderLibrary.kt"),
+        ).first { it.isFile }.readText()
+        assertTrue("ReaderLibrary must expose the A6 Core adapter" , "mangaPagesExtract" in source)
+        assertTrue("A6 extraction must use observer-read lane", "onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract" in source)
     }
 
     private fun fakeTransport(response: (String, JSONObject) -> JSONObject) = object : CoreTransport {
