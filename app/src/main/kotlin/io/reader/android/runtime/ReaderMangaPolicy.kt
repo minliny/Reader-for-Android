@@ -83,8 +83,9 @@ internal object ReaderMangaPolicy {
                 check(it.pageId.isNotBlank() && it.resourceRef.isNotBlank()) { "MANGA_PAGE_IDENTITY" }
             }
         }
-        return ReaderMangaManifest(identity, value.getString("sourceRuleVersion"), version,
-            value.getString("decodeRevision"), pages)
+        val sourceRuleVersion = value.getString("sourceRuleVersion").also { check(it.isNotBlank()) { "MANGA_SOURCE_RULE_VERSION" } }
+        val decodeRevision = value.getString("decodeRevision").also { check(it.isNotBlank()) { "MANGA_DECODE_REVISION" } }
+        return ReaderMangaManifest(identity, sourceRuleVersion, version, decodeRevision, pages)
     }
 
     private fun resources(rows: org.json.JSONArray?, manifest: ReaderMangaManifest): List<ReaderMangaResource> {
