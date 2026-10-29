@@ -63,6 +63,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val bookmarkService get() = client.bookmarks
     private val managementService get() = client.management
     private val sourceRulesService get() = client.sourceRules
+    private val onlineCatalog get() = client.onlineCatalog
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -168,6 +169,22 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.importJson(sourceId, originalBookSourceJson) }
     suspend fun reconcileSourceImport(operationId: String): SourceImportResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { sourceRulesService.reconcile(operationId) }
+
+    // Metadata acquisition never creates ReadingSession, local format/Original authority, shelf or progress writes.
+    suspend fun selectOnlineSource(sourceId: String): ReaderOnlineSourceSelection =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.select(client.lease, sourceId) }
+    suspend fun beginOnlineSearch(source: ReaderOnlineSourceSelection, keyword: String): ReaderOnlineSearchSession =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.start(client.lease, source, keyword) }
+    suspend fun onlineSearchPage(session: ReaderOnlineSearchSession, page: Int): ReaderOnlineSearchPage =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.page(client.lease, session, page) }
+    suspend fun previewOnlineBook(session: ReaderOnlineSearchSession, selected: ReaderOnlineBook): ReaderOnlineDetailPreview =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.preview(client.lease, session, selected) }
+    suspend fun closeOnlineSearch(session: ReaderOnlineSearchSession): Unit =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.close(session) }
+    suspend fun pendingOnlineAcquisitions(): List<ReaderOnlineOriginalObservation> =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.pending() }
+    suspend fun observeOnlineOriginal(id: String): ReaderOnlineOriginalObservation =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.observeOriginal(id) }
 
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }

@@ -96,6 +96,10 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
     private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal) }
+    private val onlineCatalogService by lazy {
+        requireHeldLane()
+        ReaderOnlineCatalog(serviceTransport, { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane)
+    }
 
     internal class Client internal constructor(internal val owner: AppCoreOwner, val lease: ReaderOperationOwner.ClientLease) {
         private val retired = AtomicBoolean(false)
@@ -106,6 +110,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val bookmarks: ReaderBookmarks get() { owner.requireLane(lease); return owner.bookmarkService }
         val management: ReaderBookshelfManagement get() { owner.requireLane(lease); return owner.managementService }
         val sourceRules: ReaderSourceRules get() { owner.requireLane(lease); return owner.sourceRulesService }
+        val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {
