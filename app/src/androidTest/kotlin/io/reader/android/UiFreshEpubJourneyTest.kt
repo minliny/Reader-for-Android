@@ -1,7 +1,10 @@
 package io.reader.android
 
 import android.os.Bundle
-import android.view.KeyEvent
+import android.graphics.Rect
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,6 +21,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.UiWatcher
+import org.json.JSONObject
 import io.reader.android.runtime.ReaderLocalBookFormat
 import io.reader.android.ui.ReaderRoute
 import org.junit.Assert.assertEquals
@@ -25,6 +29,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Fresh empty-shelf EPUB slice; no protected-book or historical receipt prerequisite. */
 @RunWith(AndroidJUnit4::class)
@@ -63,7 +69,8 @@ class UiFreshEpubJourneyTest {
             compose.onNodeWithTag("reader_book_${book.id}").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
             assertEquals(ReaderLocalBookFormat.EPUB, model.state.value.reading?.format)
-            tapVisibleViewport()
+            waitForEpubWebView()
+            tapVisibleContent()
             compose.waitUntil(5_000) {
                 model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_open_directory")).fetchSemanticsNodes().isNotEmpty()
             }
@@ -78,7 +85,7 @@ class UiFreshEpubJourneyTest {
             assertEquals(ReaderLocalBookFormat.EPUB, reading.format)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
             marker("fresh-epub-reading-ready", Bundle().apply { putString("bookId", book.id); putInt("chapter", reading.chapter.index); putInt("scalarCount", reading.chapter.scalarCount) })
-            tapVisibleViewport()
+            tapVisibleContent()
             compose.waitUntil(5_000) { model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("reader_exit").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
@@ -94,11 +101,43 @@ class UiFreshEpubJourneyTest {
 
     private fun activity(): MainActivity { var result: MainActivity? = null; scenario!!.onActivity { result = it }; return checkNotNull(result) }
 
-    private fun tapVisibleViewport() {
-        val bounds = compose.onNodeWithTag("reader_ebook_viewport").fetchSemanticsNode().boundsInWindow
-        val x = (bounds.left + bounds.right) / 2f
-        val y = (bounds.top + bounds.bottom) / 2f
-        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).click(x.toInt(), y.toInt()))
+    private fun waitForEpubWebView() {
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasTestTag("reader_ebook_restore_loading")).fetchSemanticsNodes().isEmpty() &&
+                currentWebViewOrNull()?.let { it.isAttachedToWindow && it.isShown && it.url?.contains("reader-ebook.invalid") == true } == true
+        }
+    }
+
+    private fun currentWebViewOrNull(): WebView? {
+        var result: WebView? = null
+        compose.runOnUiThread {
+            fun visit(view: View) {
+                if (view is WebView && view.isAttachedToWindow && view.isShown && view.url?.contains("reader-ebook.invalid") == true) result = view
+                if (result == null && view is ViewGroup) for (index in 0 until view.childCount) visit(view.getChildAt(index))
+            }
+            visit(activity().window.decorView)
+        }
+        return result
+    }
+
+    private fun tapVisibleContent() {
+        val web = currentWebViewOrNull() ?: error("EPUB WebView is not attached")
+        val latch = CountDownLatch(1)
+        var raw: String? = null
+        compose.runOnUiThread { web.evaluateJavascript(DOM_TAP) { raw = it; latch.countDown() } }
+        assertTrue("EPUB DOM tap callback missing", latch.await(5, TimeUnit.SECONDS))
+        val probe = JSONObject(raw ?: error("EPUB DOM tap result missing"))
+        assertTrue("EPUB DOM has no visible text tap: ${probe.optString("probeError")}", !probe.has("probeError"))
+        val tap = probe.getJSONObject("tap")
+        val frameLeft = probe.getDouble("frameLeft")
+        val frameTop = probe.getDouble("frameTop")
+        val density = web.resources.displayMetrics.density.toDouble()
+        val location = IntArray(2).also(web::getLocationOnScreen)
+        val x = location[0] + ((frameLeft + (tap.getDouble("left") + tap.getDouble("right")) / 2.0) * density).toInt()
+        val y = location[1] + ((frameTop + (tap.getDouble("top") + tap.getDouble("bottom")) / 2.0) * density).toInt()
+        val visible = Rect()
+        assertTrue(web.getGlobalVisibleRect(visible) && visible.contains(x, y))
+        assertTrue("Visible EPUB content tap was not dispatched", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).click(x, y))
     }
 
     private fun selectDocument(name: String) {
@@ -196,6 +235,24 @@ class UiFreshEpubJourneyTest {
             if (afterVisible) return
         }
         throw AssertionError("Exact fresh EPUB document title absent after two bounded picker scrolls")
+    }
+
+    companion object {
+        private val DOM_TAP = """
+            (()=>{try{
+              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
+              if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
+              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
+              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
+              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
+              while(n=walker.nextNode()){
+                const e=n.parentElement;if(!eligible(e))continue;const i=n.data.search(/\S/u);if(i<0)continue;
+                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+1);const q=r.getBoundingClientRect();if(usable(q)){tap={left:q.left,right:q.right,top:q.top,bottom:q.bottom};break;}
+              }
+              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT'};const fr=f.getBoundingClientRect();
+              return {frameLeft:fr.left,frameTop:fr.top,width:w.innerWidth,height:w.innerHeight,tap};
+            }catch(e){return {probeError:String(e)}}})()
+        """.trimIndent()
     }
 
     private fun marker(step: String, details: Bundle = Bundle()) {
