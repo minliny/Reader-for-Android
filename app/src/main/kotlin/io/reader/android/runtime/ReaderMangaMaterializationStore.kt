@@ -10,7 +10,10 @@ import java.util.UUID
 internal class ReaderMangaMaterializationStore(private val resourceStore: ReaderMangaResourceStore, private val root: File) {
     private data class Pending(val token: String, val chapterKey: String, val manifestVersion: String, val intent: String, val refs: List<String> = emptyList())
 
-    init { root.mkdirs() }
+    init {
+        root.mkdirs()
+        restoreProtections()
+    }
 
     @Synchronized
     fun prepare(result: ReaderMangaMaterializationPrepareResult) {
@@ -27,6 +30,8 @@ internal class ReaderMangaMaterializationStore(private val resourceStore: Reader
         check(pending.chapterKey == key(chapter) && pending.manifestVersion == manifestVersion) { "MANGA_MATERIALIZATION_SCOPE" }
         check(refs.isNotEmpty() && refs.distinct().size == refs.size) { "MANGA_MATERIALIZATION_REFS" }
         refs.forEach { ref -> resourceStore.readDecodedByResourceRef(ref) }
+        pending.refs.forEach(resourceStore::unprotectResourceRef)
+        refs.forEach(resourceStore::protectResourceRef)
         write(File(root, ".pending-$token"), JSONObject()
             .put("token", pending.token).put("chapter", pending.chapterKey)
             .put("manifestVersion", pending.manifestVersion).put("intent", pending.intent)
@@ -42,7 +47,7 @@ internal class ReaderMangaMaterializationStore(private val resourceStore: Reader
             val finalFile = File(root, "materialized-${token}.json")
             write(finalFile, pendingFile.readText(Charsets.UTF_8))
             pending.refs.forEach(resourceStore::protectResourceRef)
-        }
+        } else pending.refs.forEach(resourceStore::unprotectResourceRef)
         pendingFile.delete()
     }
 
@@ -57,6 +62,19 @@ internal class ReaderMangaMaterializationStore(private val resourceStore: Reader
         val value = JSONObject(File(root, ".pending-$token").readText(Charsets.UTF_8))
         val refs = value.optJSONArray("resourceRefs")?.let { array -> (0 until array.length()).map { array.getString(it) } } ?: emptyList()
         return Pending(value.getString("token"), value.getString("chapter"), value.getString("manifestVersion"), value.getString("intent"), refs)
+    }
+
+    /** Rehydrate protection from durable pending/final records after a cold process start. */
+    private fun restoreProtections() {
+        root.listFiles().orEmpty().filter {
+            it.isFile && (it.name.startsWith(".pending-") || it.name.startsWith("materialized-"))
+        }.forEach { file ->
+            runCatching {
+                val value = JSONObject(file.readText(Charsets.UTF_8))
+                val refs = value.optJSONArray("resourceRefs") ?: JSONArray()
+                (0 until refs.length()).forEach { index -> resourceStore.protectResourceRef(refs.getString(index)) }
+            }
+        }
     }
 
     private fun write(file: File, text: String) {
