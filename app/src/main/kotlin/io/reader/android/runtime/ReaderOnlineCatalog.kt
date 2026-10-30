@@ -75,7 +75,8 @@ internal class ReaderOnlineCatalog(
     }
 
     /** Prepare a manga chapter's source catalog while the issued search/detail session is alive. */
-    fun mangaToc(lease: ReaderOperationOwner.ClientLease, preview: ReaderOnlineDetailPreview): ReaderMangaChapterRequest {
+    fun mangaToc(lease: ReaderOperationOwner.ClientLease, preview: ReaderOnlineDetailPreview,
+        resumeChapterId: String? = null): ReaderMangaChapterRequest {
         checkLane()
         val issued = checkNotNull(addPreview) { "ONLINE_MANGA_PREVIEW_NOT_ISSUED" }
         active(lease, issued.second)
@@ -89,13 +90,22 @@ internal class ReaderOnlineCatalog(
         ReaderOnlineAddPolicy.scope(toc, preview.key)
         ReaderOnlineAddPolicy.sourceVersion(toc, preview.sourceVersion)
         check(toc.optString("catalogDeferredReason").isEmpty()) { "ONLINE_MANGA_CATALOG_NOT_ADMITTED" }
-        val firstIndex = ReaderOnlineAddPolicy.readableChapterIndexes(toc).first()
+        val readable = ReaderOnlineAddPolicy.readableChapterIndexes(toc)
         val chapters = toc.getJSONArray("toc")
-        check((0 until chapters.length()).count { chapters.getJSONObject(it).getInt("index") == firstIndex } == 1) {
+        val selectedIndex = if (resumeChapterId == null) readable.first() else {
+            // Core's manga chapter identity is the source TOC URL, not an assumed contiguous index.
+            val matching = (0 until chapters.length()).map { chapters.getJSONObject(it) }
+                .filter { it.optString("url") == resumeChapterId }
+            check(resumeChapterId.isNotBlank() && matching.size == 1 && matching.single().getInt("index") in readable) {
+                "ONLINE_MANGA_SAVED_CHAPTER_NOT_READABLE"
+            }
+            matching.single().getInt("index")
+        }
+        check((0 until chapters.length()).count { chapters.getJSONObject(it).getInt("index") == selectedIndex } == 1) {
             "ONLINE_MANGA_CHAPTER_IDENTITY"
         }
         return ReaderMangaChapterRequest(ReaderMangaChapterRef(preview.key.sourceId, preview.key.bookId),
-            firstIndex, ReaderMangaReadPolicy.CACHE_FIRST)
+            selectedIndex, ReaderMangaReadPolicy.CACHE_FIRST)
     }
     fun close(session: ReaderOnlineSearchSession) {
         checkLane()

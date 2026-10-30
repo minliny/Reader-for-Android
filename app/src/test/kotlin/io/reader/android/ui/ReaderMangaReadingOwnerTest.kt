@@ -1,6 +1,10 @@
 package io.reader.android.ui
 
 import io.reader.android.runtime.ReaderMangaChapterData
+import io.reader.android.runtime.ReaderMangaProgressPending
+import io.reader.android.runtime.ReaderMangaProgressSaveRequest
+import io.reader.android.runtime.ReaderMangaProgressState
+import io.reader.android.runtime.ReaderMangaProgressToken
 import io.reader.android.runtime.ReaderMangaChapterIdentity
 import io.reader.android.runtime.ReaderMangaChapterRef
 import io.reader.android.runtime.ReaderMangaChapterRequest
@@ -109,7 +113,7 @@ class ReaderMangaReadingOwnerTest {
         try {
             fixture.open()
             val original = fixture.owner.state.value
-            fixture.owner.setCurrentOrdinal(5)
+            fixture.observe(5)
             val release = CompletableDeferred<Unit>()
             fixture.library.windowGates[2] = release
             fixture.owner.loadWindow(2, 2)
@@ -158,7 +162,7 @@ class ReaderMangaReadingOwnerTest {
         val fixture = WindowFixture()
         try {
             fixture.open()
-            fixture.owner.setCurrentOrdinal(5)
+            fixture.observe(5)
             val original = fixture.owner.state.value
             fixture.library.failedResources += 9
             fixture.owner.loadWindow(8, 2)
@@ -173,6 +177,13 @@ class ReaderMangaReadingOwnerTest {
             assertEquals("WINDOW_RESOURCE_FAILED_9", failed.windowError)
             assertFalse(fixture.library.evict(0))
             assertTrue(fixture.library.evict(8))
+            assertEquals(8, checkNotNull(failed.failedWindow).start)
+            assertTrue(failed.progressDirty)
+            fixture.library.failedResources.remove(9)
+            fixture.owner.retryWindow()
+            awaitWindow(fixture.owner, 8)
+            assertNull(fixture.owner.state.value.failedWindow)
+            assertTrue(fixture.owner.state.value.progressDirty)
         } finally { fixture.close() }
     }
 
@@ -253,10 +264,23 @@ class ReaderMangaReadingOwnerTest {
             }
             check(owner.state.value.phase == ReaderMangaReadingPhase.READY)
         }
+        fun observe(ordinal: Int) {
+            val state = owner.state.value
+            val ticket = checkNotNull(owner.viewportChanged(checkNotNull(state.visibleWindow), 400, 700))
+            val restore = checkNotNull(owner.state.value.restoreRequest)
+            check(owner.observeVisible(ReaderMangaMeasuredAnchor(ticket, restore.anchor, restore.id, restore.anchor.pageId)))
+            val page = checkNotNull(state.chapter).manifest.pages.single { it.ordinal == ordinal }
+            check(owner.observeVisible(ReaderMangaMeasuredAnchor(ticket, ReaderMangaAnchor(page.pageId, page.ordinal, page.resourceRef, 0.0, 0.2))))
+        }
         override fun close() { owner.close(); job.cancel() }
     }
 
     private class WindowLibrary : ReaderMangaLibrary {
+        override suspend fun progress(owner: ReaderMangaChapterRef) = ReaderMangaProgressState(ReaderMangaProgressToken(1, 0), null)
+        override suspend fun pendingProgress(): List<ReaderMangaProgressPending> = emptyList()
+        override suspend fun saveProgress(request: ReaderMangaProgressSaveRequest): ReaderMangaProgressState = error("UNEXPECTED_PROGRESS_WRITE")
+        override suspend fun reconcileProgress(owner: ReaderMangaChapterRef, operationId: String): ReaderMangaProgressState = error("UNEXPECTED_PROGRESS_RECONCILE")
+
         private val store = ReaderMangaResourceStore(Files.createTempDirectory("reader-manga-window-").toFile())
         private val chapterIdentity = ReaderMangaChapterIdentity("source", "book", "chapter-0")
         private val manifest = ReaderMangaManifest(chapterIdentity, "rules-1", "manifest-1", "decode-1",
@@ -317,6 +341,11 @@ class ReaderMangaReadingOwnerTest {
         private val foreignScope: Boolean = false,
         private val failAfterFirst: Boolean = false,
     ) : ReaderMangaLibrary {
+        override suspend fun progress(owner: ReaderMangaChapterRef) = ReaderMangaProgressState(ReaderMangaProgressToken(1, 0), null)
+        override suspend fun pendingProgress(): List<ReaderMangaProgressPending> = emptyList()
+        override suspend fun saveProgress(request: ReaderMangaProgressSaveRequest): ReaderMangaProgressState = error("UNEXPECTED_PROGRESS_WRITE")
+        override suspend fun reconcileProgress(owner: ReaderMangaChapterRef, operationId: String): ReaderMangaProgressState = error("UNEXPECTED_PROGRESS_RECONCILE")
+
         private val root = Files.createTempDirectory("reader-manga-owner-").toFile()
         private val store = ReaderMangaResourceStore(root)
         private val chapterIdentity = ReaderMangaChapterIdentity("source", "book", "chapter-0")

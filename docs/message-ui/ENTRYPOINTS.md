@@ -105,3 +105,14 @@ Native anchor 的 Boolean 仅为当前完整 reading/token/key 范围内的显�
 | 窗口 acquisition/protocol 未决 | 本节既有 ReaderRecoveryNotice / ReaderProtocolRecoveryHost | 保实际原 request/runtime/params/terminal；晚结果仍归 App 原 owner。退休只停止后续调度，不能称 Native.cancel、join 或原 ACK |
 
 “继续阅读（缓存）”只请求 Core 现存 entry，缺正文不隐式联网/升级。源已停用、删除或版本不同不抹除缓存正文与原位置；Core ready/fullscope 仍是正文准入，新 begin/read 与缺章网络获取另要求当前启用且同 sourceVersion。±1/±2 只来自 Core indexed navigation，显式切邻章须先同当前章实际新 Completed 原 ACK；窗口、缓存存在、当前位置查询都不是保存 ACK。本候选不开放近末尾目录刷新、整书下载、换源或后台退休 client 的新写入。
+
+## A6 漫画阅读位置与图片窗口（源码候选）
+
+| 事实 | 公共组件及宿主 | 身份、动作与失效 |
+| --- | --- | --- |
+| 首次章节/图片加载失败、保存位置的章节/manifest/page 无法匹配 | ReaderPageState；ReaderMangaReadingScreen | 当前 owner generation + 完整 chapter/manifest；重新打开须先无 dirty/在途原保存。失配不回落页首并覆盖原位置；没有 dirty/pending 时可以退出 |
+| 后续图片窗口失败，原图片仍有效 | ReaderRecoveryNotice；漫画图片区域上方 | 原失败窗口 generation/revision/chapter/manifest/sourceRule/decode/start/limit；明确重试仅请求同失败窗口，新窗口原子接管后退休旧提示，不清已有位置 |
+| 漫画原进度保存未知或尚未确认 | ReaderRecoveryNotice；当前漫画宿主，协议事实另走既有 ReaderProtocolRecoveryHost | 实际 mangaProgress operationId + sourceId/bookId + owner generation；只查询该原件。隐藏提示、get 当前位置或新布局均不能确认原写入；未确认不自动重派、不完成退出 |
+| 实际保存执行中 | 页面现有进度状态与退出禁用 | 原 measured anchor + layout ticket + CAS token；只原 ACK 更新 lastConfirmedProgress。后台与退出经同串行 owner，450ms 调度仅取消未派发 timer，不取消已准入原操作 |
+
+布局票据由 owner 单调签发；图片真实坐标和 draw/idle 观察只归当前 ticket/resource。首次恢复、尺寸变化、缩放和窗口替换建立显示基线，不制造保存；重排前真实 dirty 位置保留。旧 callback 不修改新页面；退出先冻结新测量，原保存确认或确实没有新写入后退休。此表登记接入与生命周期，不表示设备或用户验收。

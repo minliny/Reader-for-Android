@@ -235,7 +235,10 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.preview(client.lease, session, selected) }
     /** Manga chapter acquisition needs the issued detail session to admit its source TOC first. */
     internal suspend fun prepareMangaChapter(preview: ReaderOnlineDetailPreview): ReaderMangaChapterRequest =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.mangaToc(client.lease, preview) }
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            val saved = mangaProgressService.get(ReaderMangaChapterRef(preview.key.sourceId, preview.key.bookId))
+            onlineCatalog.mangaToc(client.lease, preview, saved.location?.chapter?.chapterId)
+        }
     suspend fun closeOnlineSearch(session: ReaderOnlineSearchSession): Unit =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) {
             onlineCatalog.close(session)

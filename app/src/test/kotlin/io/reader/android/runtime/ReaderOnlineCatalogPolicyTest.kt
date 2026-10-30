@@ -125,6 +125,29 @@ class ReaderOnlineCatalogPolicyTest {
             fixture.requests.map { it.first })
     }
 
+    @Test fun mangaTocResumesExactSavedUrlAtItsCurrentSparseIndex() {
+        val fixture = MangaFixture()
+        val request = fixture.catalog.mangaToc(lease, fixture.preview, "/chapter/12")
+        assertEquals(12, request.chapterIndex)
+        assertEquals(1, fixture.requests.count { it.first == "book.toc" })
+        assertFalse(fixture.requests.any { it.first.startsWith("manga.") })
+    }
+
+    @Test fun mangaTocNeverFallsBackToFirstChapterForMissingAmbiguousOrUnreadableSavedUrl() {
+        val variants = listOf<Pair<String, (JSONObject) -> Unit>>(
+            "/chapter/missing" to {},
+            "" to {},
+            "/chapter/12" to { it.getJSONArray("toc").put(JSONObject().put("index", 13).put("title", "duplicate URL").put("url", "/chapter/12")) },
+            "/chapter/12" to { it.put("readableChapterIndexes", JSONArray().put(7)) },
+        )
+        variants.forEach { (saved, change) ->
+            val fixture = MangaFixture(change)
+            val error = assertThrows(IllegalStateException::class.java) { fixture.catalog.mangaToc(lease, fixture.preview, saved) }
+            assertEquals("ONLINE_MANGA_SAVED_CHAPTER_NOT_READABLE", error.message)
+            assertEquals(1, fixture.requests.count { it.first == "book.toc" })
+        }
+    }
+
     @Test fun mangaTocRejectsForeignIdentityVersionDeferredAndUnreadableCatalogs() {
         val invalidTocs = listOf<(JSONObject) -> Unit>(
             { it.put("sourceId", "foreign-source") },

@@ -19,6 +19,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.reader.android.runtime.ReaderLibrary
 import io.reader.android.runtime.ReaderOnlineContentKind
 import io.reader.android.runtime.SourceImportConfirmation
+import io.reader.android.runtime.ReaderMangaProgressPolicy
+import io.reader.android.runtime.ReaderMangaLocation
 import io.reader.android.ui.ReaderMangaReadingPhase
 import io.reader.android.ui.ReaderRoute
 import io.reader.android.ui.ReaderViewModel
@@ -49,7 +51,8 @@ import kotlin.concurrent.thread
 /**
  * Actual MainActivity/Compose/Library journey over an owned loopback source.
  * The source is seeded through the real Library; SAF import, remote-source
- * compatibility, progress writes and cold recovery are outside this method.
+ * compatibility and cold recovery are outside this method. Measured UI progress,
+ * its original ACK, and same-process reopen are checked separately below.
  */
 @RunWith(AndroidJUnit4::class)
 class UiMangaComposeJourneyTest {
@@ -72,6 +75,7 @@ class UiMangaComposeJourneyTest {
         val fixture = Fixture()
         val library = ReaderLibrary(ApplicationProvider.getApplicationContext())
         var scenario: ActivityScenario<MainActivity>? = null
+        var observedModel: ReaderViewModel? = null
         var phase = "source-seed"
         var failure: Throwable? = null
         var complete = false
@@ -88,6 +92,7 @@ class UiMangaComposeJourneyTest {
             scenario = launched
             launched.onActivity { activity = it }
             val model = activity.readerViewModel
+            observedModel = model
             compose.waitUntil(20_000) {
                 !model.state.value.busy && (model.state.value.ready || model.state.value.error != null ||
                     model.state.value.protocolRecoveryReference != null)
@@ -139,6 +144,9 @@ class UiMangaComposeJourneyTest {
             assertEquals(1f, loaded.zoom)
             compose.onNodeWithTag("reader_manga_reading").assertIsDisplayed()
             compose.onNodeWithTag("reader_manga_page_0").assertIsDisplayed()
+            compose.waitUntil(5_000) { model.mangaReadingState.value.let { it.visibleAnchor != null && it.restoreRequest == null } }
+            assertFalse(model.mangaReadingState.value.progressDirty)
+            val firstLayoutEpoch = checkNotNull(model.mangaReadingState.value.layoutTicket).epoch
             capturePage(runId, 0, red = true)
             marker("manga-first-page-visible")
 
@@ -155,14 +163,44 @@ class UiMangaComposeJourneyTest {
             capturePage(runId, 1, red = false)
             marker("manga-second-page-scrolled-visible", Bundle().apply { putFloat("scrollPosition", scrollPosition()) })
 
+            phase = "measured-progress-original-ACK"
+            compose.waitUntil(10_000) { model.mangaReadingState.value.let {
+                (!it.progressBusy && !it.progressDirty && it.lastConfirmedProgress?.pageOrdinalFallback == 1) || it.progressError != null
+            } }
+            val confirmed = model.mangaReadingState.value.lastConfirmedProgress
+            assertNull(model.mangaReadingState.value.progressError)
+            assertNotNull("Real idle image measurement must reach the original save ACK", confirmed)
+            val acknowledged = checkNotNull(confirmed)
+            val measured = checkNotNull(model.mangaReadingState.value.visibleAnchor)
+            assertEquals(measured.pageId, acknowledged.pageId)
+            assertEquals(measured.x, acknowledged.x, 0.000001)
+            assertEquals(measured.y, acknowledged.y, 0.000001)
+            val original = originalProgress(sourceId, acknowledged)
+            val originalSnapshot = completedProgressRecords(sourceId).associate { it.getString("id") to it.toString() }
+            marker("manga-measured-progress-original-ACK", Bundle().apply {
+                putString("sourceId", sourceId); putString("operationId", original.getString("id"))
+                val originalBytes = File(instrumentation.targetContext.filesDir,
+                    "Reader/Operations/Completed/${original.getString("id")}.json").readBytes()
+                putString("originalRecordSha256", MessageDigest.getInstance("SHA-256").digest(originalBytes).joinToString("") { "%02x".format(it) })
+                putInt("originalRecordBytes", originalBytes.size)
+                putString("pageId", measured.pageId); putDouble("x", measured.x); putDouble("y", measured.y)
+                putLong("revision", acknowledged.progressRevision)
+                putLong("layoutEpoch", checkNotNull(model.mangaReadingState.value.layoutTicket).epoch)
+            })
+
             phase = "native-zoom-controls"
             compose.onNodeWithTag("reader_manga_zoom_in").assertIsDisplayed().assertIsEnabled().performClick()
             compose.waitUntil(3_000) { model.mangaReadingState.value.zoom == 1.25f }
+            compose.waitUntil(5_000) { model.mangaReadingState.value.restoreRequest == null }
             compose.onNodeWithText("125%").assertIsDisplayed()
             compose.onNodeWithTag("reader_manga_zoom_out").assertIsDisplayed().assertIsEnabled().performClick()
             compose.waitUntil(3_000) { model.mangaReadingState.value.zoom == 1f }
+            compose.waitUntil(5_000) { model.mangaReadingState.value.restoreRequest == null }
             compose.onNodeWithText("100%").assertIsDisplayed()
             assertEquals(1, model.mangaReadingState.value.currentOrdinal)
+            assertFalse(model.mangaReadingState.value.progressDirty)
+            assertEquals(acknowledged, model.mangaReadingState.value.lastConfirmedProgress)
+            assertEquals(originalSnapshot, completedProgressRecords(sourceId).associate { it.getString("id") to it.toString() })
             marker("manga-zoom-controls-visible")
 
             phase = "native-exit"
@@ -176,6 +214,51 @@ class UiMangaComposeJourneyTest {
             assertEquals(shelfBefore, model.state.value.books)
             assertEquals(remoteBefore, model.state.value.remoteBooks)
             marker("manga-exit-retired")
+
+            phase = "same-process-reopen"
+            compose.onNodeWithTag("reader_online_sources").performClick()
+            onlineIdle(model)
+            val reopenedIndex = workspace.state.value.sources.indexOfFirst { it.sourceId == sourceId }
+            assertTrue(reopenedIndex >= 0)
+            clickWorkspace("reader_source_select_$reopenedIndex")
+            onlineIdle(model)
+            compose.onNodeWithTag("reader_online_query").performTextClearance().performTextInput("Comic")
+            launched.onActivity { current -> current.getSystemService(InputMethodManager::class.java)
+                .hideSoftInputFromWindow(current.window.decorView.windowToken, 0) }
+            clickWorkspace("reader_online_search"); onlineIdle(model)
+            clickWorkspace("reader_online_detail_0"); onlineIdle(model)
+            clickWorkspace("reader_online_manga_read")
+            compose.waitUntil(30_000) { model.mangaReadingState.value.let {
+                (it.phase == ReaderMangaReadingPhase.READY && it.restoreRequest == null && it.visibleAnchor != null) ||
+                    it.phase == ReaderMangaReadingPhase.ERROR
+            } }
+            healthy(model)
+            val restored = model.mangaReadingState.value
+            assertEquals("Reopen: ${restored.error}", ReaderMangaReadingPhase.READY, restored.phase)
+            val anchor = checkNotNull(restored.visibleAnchor)
+            assertEquals(acknowledged.pageId, anchor.pageId)
+            assertEquals(acknowledged.x, anchor.x, 0.002)
+            assertEquals(acknowledged.y, anchor.y, 0.002)
+            assertEquals(acknowledged.progressRevision, checkNotNull(restored.progressToken).revision)
+            assertNull(restored.lastConfirmedProgress) // Opening get is not a new save ACK.
+            assertFalse(restored.progressBusy || restored.progressDirty)
+            assertTrue(restored.progressPending.isEmpty())
+            assertTrue(checkNotNull(restored.layoutTicket).epoch > firstLayoutEpoch)
+            compose.onNodeWithTag("reader_manga_page_1").assertIsDisplayed()
+            capturePage(runId, 1, red = false, suffix = "-reopen")
+            assertEquals(original.toString(), originalProgress(sourceId, acknowledged).toString())
+            assertEquals(originalSnapshot, completedProgressRecords(sourceId).associate { it.getString("id") to it.toString() })
+            marker("manga-same-process-reopen-restored-without-write", Bundle().apply {
+                putString("pageId", anchor.pageId); putDouble("x", anchor.x); putDouble("y", anchor.y)
+                putLong("revision", checkNotNull(restored.progressToken).revision)
+                putLong("layoutEpoch", checkNotNull(restored.layoutTicket).epoch)
+            })
+            compose.onNodeWithTag("reader_manga_exit").performClick()
+            compose.waitUntil(5_000) { model.state.value.route == ReaderRoute.Bookshelf &&
+                model.mangaReadingState.value.phase == ReaderMangaReadingPhase.IDLE }
+            assertEquals(original.toString(), originalProgress(sourceId, acknowledged).toString())
+            assertEquals(originalSnapshot, completedProgressRecords(sourceId).associate { it.getString("id") to it.toString() })
+            marker("manga-reopen-exit-no-change")
             complete = true
         } catch (error: Throwable) {
             failure = error
@@ -190,7 +273,8 @@ class UiMangaComposeJourneyTest {
                 if (original == null) { failure = error; throw error } else original.addSuppressed(error)
             }
             try {
-                cleanup { scenario?.close() }
+                // Destroying an active reader would trigger an unobserved onBackground save after a failure.
+                if (complete || observedModel?.state?.value?.route == ReaderRoute.Bookshelf) cleanup { scenario?.close() }
                 // Failed runs retain their exact owned source for diagnosis; never replay a pending original.
                 if (complete) cleanup {
                     // MainActivity activated a newer client. The seed client cannot
@@ -222,6 +306,27 @@ class UiMangaComposeJourneyTest {
         assertNull(state.pendingSearchClose)
     }
 
+    private fun originalProgress(sourceId: String, location: ReaderMangaLocation): JSONObject {
+        val records = completedProgressRecords(sourceId)
+        val record = records.single { it.getJSONObject("wireTerminal").getJSONObject("data")
+            .getJSONObject("token").getLong("revision") == location.progressRevision }
+        assertTrue(record.getBoolean("completed")); assertTrue(record.getBoolean("transportConfirmed"))
+        assertEquals(location, ReaderMangaProgressPolicy.acknowledgement(record, record.getJSONObject("wireTerminal")).location)
+        assertFalse(records.any { it.getJSONObject("wireTerminal").getJSONObject("data")
+            .getJSONObject("token").getLong("revision") > location.progressRevision })
+        return record
+    }
+
+    private fun completedProgressRecords(sourceId: String): List<JSONObject> {
+        val active = File(instrumentation.targetContext.filesDir, "Reader/Operations").listFiles().orEmpty().filter { it.isFile }
+        assertTrue("An active original must remain visible instead of being called no change", active.isEmpty())
+        val directory = File(instrumentation.targetContext.filesDir, "Reader/Operations/Completed")
+        val files = directory.listFiles().orEmpty().filter { it.name.startsWith("android-manga-progress-") }
+        assertFalse("Do not promote any uncommitted AtomicFile candidate", files.any { it.name.endsWith(".new") || it.name.endsWith(".bak") })
+        return files.filter { it.extension == "json" }.map { JSONObject(it.readText()) }
+            .filter { it.getString("sourceId") == sourceId }
+    }
+
     private fun onlineIdle(model: ReaderViewModel) {
         compose.waitUntil(30_000) { !model.state.value.busy && !model.onlineSources.state.value.busy }
         healthy(model)
@@ -244,7 +349,7 @@ class UiMangaComposeJourneyTest {
         }
     }
 
-    private fun capturePage(runId: String, ordinal: Int, red: Boolean) {
+    private fun capturePage(runId: String, ordinal: Int, red: Boolean, suffix: String = "") {
         val image = compose.onNodeWithTag("reader_manga_page_$ordinal").captureToImage()
         assertTrue("Actual image must occupy a visible area", image.width > 64 && image.height > 64)
         val pixels = image.toPixelMap()
@@ -259,7 +364,7 @@ class UiMangaComposeJourneyTest {
             }
         }
         assertTrue("Expected fixture colors must be drawn by Compose, not just present in Owner bytes", colored * 5 > sampled)
-        val relative = "reader-manga-compose/$runId/page-$ordinal.png"
+        val relative = "reader-manga-compose/$runId/page-$ordinal$suffix.png"
         val file = File(instrumentation.targetContext.cacheDir, relative)
         check(file.parentFile!!.mkdirs() || file.parentFile!!.isDirectory)
         file.outputStream().use { check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)) }

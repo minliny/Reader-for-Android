@@ -183,10 +183,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     internal val coreProtocolRecoveries = protocolFeed.view
     private val libraryDelegate = lazy { ReaderLibrary(application) }
     private val library by libraryDelegate
-    private val mangaOwnerDelegate = lazy { ReaderMangaReadingOwner(viewModelScope) { ReaderMangaLibraryAdapter(library) } }
+    private val mangaOwnerDelegate = lazy {
+        ReaderMangaReadingOwner(viewModelScope, onFailure = { retainProtocolPending(it) }) { ReaderMangaLibraryAdapter(library) }
+    }
     private val mangaState = MutableStateFlow(ReaderMangaReadingUiState())
     internal val mangaReadingState = mangaState.asStateFlow()
     private var mangaStateJob: Job? = null
+    private var mangaSaveDelay: Job? = null
 
     private fun mangaOwner(): ReaderMangaReadingOwner {
         val owner = mangaOwnerDelegate.value
@@ -273,6 +276,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
+                    retainProtocolPending(error)
                     if (requestGeneration == generation) mutableState.update {
                         it.copy(busy = false, onlineError = error.userMessage())
                     }
@@ -289,19 +293,84 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     internal fun setMangaZoom(value: Float) {
-        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.setZoom(value)
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.requestZoom(value)
     }
 
-    internal fun setMangaOrdinal(ordinal: Int) {
-        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.setCurrentOrdinal(ordinal)
+    internal fun beginMangaLayout(window: ReaderMangaWindowTicket, width: Int, height: Int): ReaderMangaLayoutTicket? {
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return null
+        return mangaOwnerDelegate.value.viewportChanged(window, width, height)
+    }
+
+    internal fun observeMangaVisible(measured: ReaderMangaMeasuredAnchor): Boolean {
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return false
+        val owner = mangaOwnerDelegate.value
+        val accepted = owner.observeVisible(measured)
+        if (accepted && owner.state.value.progressDirty) scheduleMangaSave(owner.state.value.generation)
+        return accepted
+    }
+
+    private fun scheduleMangaSave(ownerGeneration: Long) {
+        mangaSaveDelay?.cancel()
+        mangaSaveDelay = viewModelScope.launch {
+            delay(450)
+            // Only the timer may be replaced. An admitted original must finish even if another measurement arrives.
+            mangaSaveDelay = null
+            flushMangaIfCurrent(ownerGeneration)
+        }
+    }
+
+    private suspend fun flushMangaIfCurrent(ownerGeneration: Long) = gate.withLock {
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return@withLock
+        val owner = mangaOwnerDelegate.value
+        if (owner.state.value.generation == ownerGeneration) owner.flushVisibleProgress()
+    }
+
+    internal fun loadMangaWindow(start: Int) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.loadWindow(start)
+    }
+
+    internal fun retryMangaWindow() {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.retryWindow()
+    }
+
+    internal fun reconcileMangaProgress(operationId: String) {
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return
+        val owner = mangaOwnerDelegate.value
+        val ownerGeneration = owner.state.value.generation
+        viewModelScope.launch {
+            gate.withLock {
+                if (state.value.route == ReaderRoute.MangaReading && owner.state.value.generation == ownerGeneration) {
+                    val confirmed = owner.reconcileProgress(operationId)
+                    val snapshot = owner.state.value
+                    if (confirmed && snapshot.generation == ownerGeneration && snapshot.progressDirty &&
+                        snapshot.progressPending.isEmpty() && !snapshot.progressBusy && !snapshot.exitPending) {
+                        scheduleMangaSave(ownerGeneration)
+                    }
+                }
+            }
+        }
     }
 
     internal fun closeMangaReading() {
-        if (state.value.route != ReaderRoute.MangaReading) return
-        if (mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.retire()
-        mangaState.value = ReaderMangaReadingUiState()
-        mangaRequest = null
-        mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return
+        val owner = mangaOwnerDelegate.value
+        val ownerGeneration = owner.beginExit() ?: return
+        mangaSaveDelay?.cancel(); mangaSaveDelay = null
+        viewModelScope.launch {
+            gate.withLock {
+                if (state.value.route != ReaderRoute.MangaReading || owner.state.value.generation != ownerGeneration) return@withLock
+                val result = owner.flushVisibleProgress()
+                if (state.value.route != ReaderRoute.MangaReading || owner.state.value.generation != ownerGeneration) return@withLock
+                if (result == ReaderMangaFlushResult.BLOCKED) {
+                    owner.cancelExit(ownerGeneration)
+                } else {
+                    owner.retire()
+                    mangaState.value = owner.state.value
+                    mangaRequest = null
+                    mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
+                }
+            }
+        }
     }
 
     private var managementBusyGeneration: Long? = null
@@ -1211,6 +1280,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onBackground() {
+        if (state.value.route == ReaderRoute.MangaReading) {
+            mangaSaveDelay?.cancel(); mangaSaveDelay = null
+            if (mangaOwnerDelegate.isInitialized()) {
+                val ownerGeneration = mangaOwnerDelegate.value.state.value.generation
+                viewModelScope.launch { flushMangaIfCurrent(ownerGeneration) }
+            }
+            return
+        }
         if (state.value.route == ReaderRoute.OnlineReading) { backgroundOnline(); return }
         if (state.value.positionSaveBarrier != null) return
         val reading = state.value.reading ?: return
@@ -1592,6 +1669,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         ebookMount?.view?.close(); ebookMount = null
         delayedSave?.cancel()
         shelfRead?.cancel()
+        mangaSaveDelay?.cancel()
         if (onlineDelegate.isInitialized()) onlineSources.close()
         if (managementDelegate.isInitialized()) shelfManagement.close()
         if (mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.close()
