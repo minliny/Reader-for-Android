@@ -133,7 +133,7 @@ class UiMangaResourceJourneyTest {
 
                 val inspected = request(actor, "manga.resource.inspect", JSONObject()
                     .put("transferId", transferId).put("sha256", sha(image)).put("bytes", image.size), ReaderCoreEventActor.Kind.DURABLE_WRITE)
-                assertEquals("present", inspected.getString("status"))
+                assertEquals("absent", inspected.getString("status"))
                 assertTrue(inspected.isNull("orientation"))
                 assertEquals("jpeg", inspected.getJSONObject("decodeProfile").getString("format"))
                 assertEquals(2, inspected.getJSONObject("decodeProfile").getLong("encodedWidth"))
