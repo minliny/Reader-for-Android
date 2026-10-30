@@ -1,5 +1,6 @@
 package io.reader.android.runtime.http
 
+import android.graphics.BitmapFactory
 import io.reader.android.runtime.ReaderCoreEventActor
 import io.reader.android.runtime.ReaderMangaResourceStore
 import io.reader.android.runtime.ReaderMangaTransferIdentity
@@ -24,6 +25,7 @@ internal class ReaderMangaResourceHost(
         }
         val stage = raw.optString("stage", "")
         if (stage == STAGE_INSPECT) return inspect(raw)
+        if (stage == STAGE_OUTPUT) return output(raw)
         if (stage != STAGE_INPUT) return ReaderCoreEventActor.HostReply.Error(
             "UNKNOWN_METHOD", "manga resource output/decode is not implemented in this slice", false,
         )
@@ -81,6 +83,45 @@ internal class ReaderMangaResourceHost(
             ReaderCoreEventActor.HostReply.Error("INTERNAL", error.message ?: "MANGA_RESOURCE_INSPECT_READ", false)
         } catch (_: java.io.IOException) {
             ReaderCoreEventActor.HostReply.Error("INTERNAL", "MANGA_RESOURCE_INSPECT_READ", false)
+        }
+    }
+
+    private fun output(value: JSONObject): ReaderCoreEventActor.HostReply {
+        return try {
+            exactKeys(value, setOf("stage", "graphicsPlan", "transferId", "resourceRef", "assetId", "operationId", "bytes"))
+            val transferId = nonBlank(value.getString("transferId"), "transferId", 128)
+            val resourceRef = nonBlank(value.getString("resourceRef"), "resourceRef", 512)
+            ReaderMangaTransferIdentity.decode(transferId, resourceRef)
+            val assetId = exactLong(value.get("assetId"), "assetId")
+            val operationId = exactLong(value.get("operationId"), "operationId")
+            val bytes = exactLong(value.get("bytes"), "bytes")
+            require(assetId > 0 && operationId > 0 && bytes in 1..MAX_BYTES) { "MANGA_OUTPUT_IDENTITY" }
+            val graphicsPlan = value.opt("graphicsPlan")
+            if (graphicsPlan != JSONObject.NULL && graphicsPlan != null) {
+                return ReaderCoreEventActor.HostReply.Error("UNKNOWN_METHOD", "MANGA_GRAPHICS_PLAN_UNSUPPORTED", false)
+            }
+            ReaderCoreEventActor.HostReply.AssetConsume(assetId, operationId, bytes) { encoded ->
+                require(encoded.size.toLong() == bytes) { "MANGA_OUTPUT_BYTES" }
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0) { "MANGA_IMAGE_DECODE" }
+                val bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.size,
+                    BitmapFactory.Options().apply { inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888 })
+                    ?: error("MANGA_IMAGE_DECODE")
+                try {
+                    val preparedBytes = bitmap.allocationByteCount.toLong()
+                    require(preparedBytes in 1..MAX_PREPARED_BYTES) { "MANGA_IMAGE_PIXEL_BUDGET" }
+                    ReaderCoreEventActor.HostReply.Complete(JSONObject()
+                        .put("consumed", true).put("assetId", assetId).put("bytes", bytes)
+                        .put("preparedBytes", bytes).toString())
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        } catch (error: IllegalArgumentException) {
+            ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", error.message ?: "MANGA_OUTPUT_INVALID", false)
+        } catch (error: IllegalStateException) {
+            ReaderCoreEventActor.HostReply.Error("INTERNAL", error.message ?: "MANGA_OUTPUT_DECODE", false)
         }
     }
 
@@ -166,7 +207,9 @@ internal class ReaderMangaResourceHost(
         internal const val CAPABILITY = "manga.resource.transfer"
         internal const val STAGE_INPUT = "input"
         internal const val STAGE_INSPECT = "inspectInput"
+        internal const val STAGE_OUTPUT = "output"
         internal const val CHUNK_BYTES = 1024 * 1024
         internal const val MAX_BYTES = 16L * 1024 * 1024
+        internal const val MAX_PREPARED_BYTES = 16L * 1024 * 1024
     }
 }

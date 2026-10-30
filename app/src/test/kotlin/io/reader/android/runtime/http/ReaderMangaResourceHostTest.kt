@@ -74,14 +74,15 @@ class ReaderMangaResourceHostTest {
         assertError(host.parseHttpResult(tooLarge.toString(), 2), "MANGA_IMAGE_MAX_BYTES")
     }
 
-    @Test fun outputStageIsExplicitlyClosedWithoutDecodeOrCache() = runBlocking {
+    @Test fun outputStageAdmitsIdentityConsumerButDefersGraphicsPlans() = runBlocking {
         val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
             runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
             capability = ReaderMangaResourceHost.CAPABILITY,
-            parametersJson = JSONObject().put("stage", "output").put("assetId", 1).toString(),
+            parametersJson = JSONObject().put("stage", "output").put("graphicsPlan", JSONObject.NULL)
+                .put("transferId", "rmt1:${"a".repeat(64)}").put("resourceRef", "resource-1")
+                .put("assetId", 1).put("operationId", 2).put("bytes", 3).toString(),
         ))
-        assertError(reply, "manga resource output/decode is not implemented in this slice")
-        assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
+        assertTrue(reply is ReaderCoreEventActor.HostReply.AssetConsume)
     }
 
     @Test fun inspectInputStageRequiresACommittedResource() = runBlocking {
