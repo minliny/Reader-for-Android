@@ -41,6 +41,7 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 /** Real JNI/Core manga resource path over a private loopback source fixture. */
@@ -48,6 +49,15 @@ import kotlin.concurrent.thread
 class UiMangaResourceJourneyTest {
     @Test(timeout = 120_000)
     fun realMangaResourcePrepareDecodesPixelsAndCompletesMaterialization(): Unit = runBlocking {
+        runMangaJourney(graphics = false)
+    }
+
+    @Test(timeout = 120_000)
+    fun realMangaGraphicsPlanDecodesRegionsAndCompletesMaterialization(): Unit = runBlocking {
+        runMangaJourney(graphics = true)
+    }
+
+    private suspend fun runMangaJourney(graphics: Boolean) {
         marker("method-enter")
         val context = ApplicationProvider.getApplicationContext<Context>()
         assertEquals("io.reader.minliny", context.packageName)
@@ -58,12 +68,13 @@ class UiMangaResourceJourneyTest {
         assertTrue(probe.mkdirs())
         val data = File(probe, "data").also { assertTrue(it.mkdir()) }
         val cache = File(probe, "cache").also { assertTrue(it.mkdir()) }
-        val image = fixtureJpeg()
-        LoopbackFixture(image).use { server ->
+        val image = if (graphics) fixtureGraphicsJpeg() else fixtureJpeg()
+        LoopbackFixture(image, graphics).use { server ->
             val store = ReaderMangaResourceStore(File(data, "Manga/Resources"))
             val materializations = File(data, "Manga/Materializations")
             val http = ReaderHttpHost()
             val mangaHost = ReaderMangaResourceHost(http, store)
+            val graphicsPlanObserved = AtomicReference<JSONObject?>()
             val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
             val actor = ReaderCoreEventActor(
                 NativeCoreRuntimePort(data, cache), dispatcher,
@@ -72,6 +83,10 @@ class UiMangaResourceJourneyTest {
                         putString("capability", envelope.capability)
                         putString("parametersJson", envelope.parametersJson)
                     })
+                    if (envelope.capability == ReaderMangaResourceHost.CAPABILITY) {
+                        val params = JSONObject(envelope.parametersJson)
+                        if (params.optString("stage") == "output") graphicsPlanObserved.set(params.optJSONObject("graphicsPlan"))
+                    }
                     if (envelope.capability == ReaderMangaResourceHost.CAPABILITY) mangaHost.execute(envelope)
                     else http.execute(envelope)
                 }, pollIntervalMs = 5,
@@ -80,7 +95,7 @@ class UiMangaResourceJourneyTest {
                 withTimeout(10_000) { actor.awaitReady() }
                 marker("real-actor-ready", Bundle().apply { putString("runtimeSession", actor.runtimeSession) })
                 val sourceId = "android-manga-probe"
-                val source = sourceJson(sourceId, server.baseUrl)
+                val source = sourceJson(sourceId, server.baseUrl, graphics)
                 val imported = request(actor, "source.import", JSONObject()
                     .put("sourceId", sourceId).put("name", "Android manga probe")
                     .put("baseUrl", server.baseUrl).put("rules", JSONObject())
@@ -123,12 +138,20 @@ class UiMangaResourceJourneyTest {
                 val decoded = store.readDecodedByTransferId(transferId)
                 val bitmap = BitmapFactory.decodeByteArray(decoded, 0, decoded.size)
                 assertNotNull(bitmap)
-                assertEquals(2, bitmap!!.width)
-                assertEquals(2, bitmap.height)
+                val expectedWidth = if (graphics) 4 else 2
+                val expectedHeight = if (graphics) 103 else 2
+                assertEquals(expectedWidth, bitmap!!.width)
+                assertEquals(expectedHeight, bitmap.height)
                 bitmap.recycle()
+                if (graphics) {
+                    val plan = graphicsPlanObserved.get() ?: throw AssertionError("Core graphicsPlan output was not observed")
+                    assertEquals(4, plan.getInt("width")); assertEquals(103, plan.getInt("height"))
+                    assertEquals(14, plan.getJSONArray("strips").length())
+                } else assertTrue(graphicsPlanObserved.get() == null)
                 marker("native-image-decoded", Bundle().apply {
                     putString("transferId", transferId); putInt("encodedBytes", image.size); putInt("decodedBytes", decoded.size)
-                    putString("decodedSha256", sha(decoded)); putInt("decodedWidth", 2); putInt("decodedHeight", 2)
+                    putString("decodedSha256", sha(decoded)); putInt("decodedWidth", expectedWidth); putInt("decodedHeight", expectedHeight)
+                    putBoolean("graphicsPlan", graphics)
                 })
 
                 val inspected = request(actor, "manga.resource.inspect", JSONObject()
@@ -136,8 +159,8 @@ class UiMangaResourceJourneyTest {
                 assertEquals("absent", inspected.getString("status"))
                 assertTrue(inspected.isNull("orientation"))
                 assertEquals("jpeg", inspected.getJSONObject("decodeProfile").getString("format"))
-                assertEquals(2, inspected.getJSONObject("decodeProfile").getLong("encodedWidth"))
-                assertEquals(2, inspected.getJSONObject("decodeProfile").getLong("encodedHeight"))
+                assertEquals(if (graphics) 4 else 2, inspected.getJSONObject("decodeProfile").getLong("encodedWidth"))
+                assertEquals(if (graphics) 103 else 2, inspected.getJSONObject("decodeProfile").getLong("encodedHeight"))
                 marker("resource-inspected", Bundle().apply { putString("transferId", transferId); putString("status", inspected.getString("status")) })
 
                 val materialization = request(actor, "manga.cache.materialization.prepare", JSONObject()
@@ -180,7 +203,7 @@ class UiMangaResourceJourneyTest {
         return data
     }
 
-    private fun sourceJson(sourceId: String, base: String): JSONObject {
+    private fun sourceJson(sourceId: String, base: String, graphics: Boolean): JSONObject {
         fun js(path: String) = "<js>eval(String(Reload('$base/$path.js')))</js>"
         return JSONObject().put("bookSourceUrl", base).put("bookSourceName", "Android manga probe")
             .put("bookSourceType", 2).put("enabled", true).put("enabledCookieJar", false)
@@ -191,11 +214,48 @@ class UiMangaResourceJourneyTest {
             .put("ruleBookInfo", JSONObject().put("init", js("detail-rule")).put("name", "name").put("author", "author")
                 .put("intro", "intro").put("tocUrl", "url"))
             .put("ruleToc", JSONObject().put("chapterList", js("toc-rule")).put("chapterName", "name").put("chapterUrl", "url"))
-            .put("ruleContent", JSONObject().put("content", js("content-rule")))
+            .put("ruleContent", JSONObject().put("content", js("content-rule"))
+                .apply { if (graphics) put("imageDecode", graphicsDecodeRule()) })
     }
+
+    private fun graphicsDecodeRule(): String = """
+        (function() {
+            if (src.indexOf("sr:1") == -1) return result;
+            try {
+                var Magua = new JavaImporter();
+                Magua.importPackage(Packages.java.io, Packages.android.graphics);
+                with(Magua) {
+                    var img = BitmapFactory.decodeByteArray(result, 0, result.length);
+                    if (!img) return result;
+                    var h = img.getHeight(), w = img.getWidth(), n = 7;
+                    var y = Math.floor(h / n), rem = h % n;
+                    var newImg = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565);
+                    var canvas = new Canvas(newImg), paint = new Paint();
+                    for (var i = 1; i <= n; i++) {
+                        var current = (i === n) ? (y + rem) : y;
+                        var srcY = y * (i - 1), dstY = h - srcY - current;
+                        canvas.drawBitmap(img, new Rect(0, srcY, w, srcY + current),
+                            new Rect(0, dstY, w, dstY + current), paint);
+                    }
+                    var baos = new ByteArrayOutputStream();
+                    newImg.compress(Bitmap.CompressFormat.JPEG, 90, baos);
+                    var finalRes = baos.toByteArray();
+                    img.recycle(); newImg.recycle(); return finalRes;
+                }
+            } catch (e) { return result; }
+        })()
+    """.trimIndent()
 
     private fun fixtureJpeg(): ByteArray {
         val bitmap = Bitmap.createBitmap(intArrayOf(Color.RED, Color.GREEN, Color.BLUE, Color.WHITE), 2, 2, Bitmap.Config.ARGB_8888)
+        return ByteArrayOutputStream().also { output -> check(bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)); bitmap.recycle() }.toByteArray()
+    }
+
+    private fun fixtureGraphicsJpeg(): ByteArray {
+        val pixels = IntArray(4 * 103) { index ->
+            when (index % 4) { 0 -> Color.RED; 1 -> Color.GREEN; 2 -> Color.BLUE; else -> Color.WHITE }
+        }
+        val bitmap = Bitmap.createBitmap(pixels, 4, 103, Bitmap.Config.ARGB_8888)
         return ByteArrayOutputStream().also { output -> check(bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)); bitmap.recycle() }.toByteArray()
     }
 
@@ -207,7 +267,7 @@ class UiMangaResourceJourneyTest {
         InstrumentationRegistry.getInstrumentation().sendStatus(2, fields)
     }
 
-    private class LoopbackFixture(private val image: ByteArray) : AutoCloseable {
+    private class LoopbackFixture(private val image: ByteArray, private val graphics: Boolean) : AutoCloseable {
         private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
         private val workers = Executors.newCachedThreadPool()
         val baseUrl: String = "http://127.0.0.1:${server.localPort}"
@@ -233,11 +293,11 @@ class UiMangaResourceJourneyTest {
                 "/search-rule.js" -> "[{name:'Comic',author:'Author',url:'$baseUrl/book'}]"
                 "/detail-rule.js" -> "({name:'Comic',author:'Author',intro:'Synopsis',url:'$baseUrl/toc'})"
                 "/toc-rule.js" -> "[{name:'Chapter 1',url:'$baseUrl/chapter/1'}]"
-                "/content-rule.js" -> "'<img src=\"$baseUrl/images/1.jpg\">'"
+                "/content-rule.js" -> if (graphics) "'<img src=\"$baseUrl/sr:1/cGFnZQ==.jpg\">'" else "'<img src=\"$baseUrl/images/1.jpg\">'"
                 "/search", "/book", "/toc", "/chapter/1" -> "fixture"
                 else -> null
             }
-            if (path == "/images/1.jpg") return Triple(200, "image/jpeg", image)
+            if (path == "/images/1.jpg" || path == "/sr:1/cGFnZQ==.jpg") return Triple(200, "image/jpeg", image)
             return if (text == null) Triple(404, "text/plain", "missing".toByteArray())
             else Triple(200, "application/javascript", text.toByteArray())
         }
