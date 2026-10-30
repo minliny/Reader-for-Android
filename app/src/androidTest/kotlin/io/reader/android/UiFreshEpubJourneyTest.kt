@@ -63,7 +63,7 @@ class UiFreshEpubJourneyTest {
             compose.onNodeWithTag("reader_book_${book.id}").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
             assertEquals(ReaderLocalBookFormat.EPUB, model.state.value.reading?.format)
-            compose.onNodeWithTag("reader_ebook_viewport").performTouchInput { click(center) }
+            tapVisibleViewport()
             compose.waitUntil(5_000) {
                 model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_open_directory")).fetchSemanticsNodes().isNotEmpty()
             }
@@ -78,7 +78,7 @@ class UiFreshEpubJourneyTest {
             assertEquals(ReaderLocalBookFormat.EPUB, reading.format)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
             marker("fresh-epub-reading-ready", Bundle().apply { putString("bookId", book.id); putInt("chapter", reading.chapter.index); putInt("scalarCount", reading.chapter.scalarCount) })
-            compose.onNodeWithTag("reader_ebook_viewport").performTouchInput { click(center) }
+            tapVisibleViewport()
             compose.waitUntil(5_000) { model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("reader_exit").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
@@ -93,6 +93,13 @@ class UiFreshEpubJourneyTest {
     }
 
     private fun activity(): MainActivity { var result: MainActivity? = null; scenario!!.onActivity { result = it }; return checkNotNull(result) }
+
+    private fun tapVisibleViewport() {
+        val bounds = compose.onNodeWithTag("reader_ebook_viewport").fetchSemanticsNode().boundsInWindow
+        val x = (bounds.left + bounds.right) / 2f
+        val y = (bounds.top + bounds.bottom) / 2f
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).click(x.toInt(), y.toInt()))
+    }
 
     private fun selectDocument(name: String) {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
