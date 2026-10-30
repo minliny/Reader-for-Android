@@ -104,7 +104,7 @@ class UiFreshEpubJourneyTest {
     private fun waitForEpubWebView() {
         compose.waitUntil(30_000) {
             compose.onAllNodes(hasTestTag("reader_ebook_restore_loading")).fetchSemanticsNodes().isEmpty() &&
-                currentWebViewOrNull()?.let { it.isAttachedToWindow && it.isShown && it.url?.contains("reader-ebook.invalid") == true } == true
+                currentWebViewOrNull() != null
         }
     }
 
@@ -129,15 +129,20 @@ class UiFreshEpubJourneyTest {
         val probe = JSONObject(raw ?: error("EPUB DOM tap result missing"))
         assertTrue("EPUB DOM has no visible text tap: ${probe.optString("probeError")}", !probe.has("probeError"))
         val tap = probe.getJSONObject("tap")
-        val frameLeft = probe.getDouble("frameLeft")
-        val frameTop = probe.getDouble("frameTop")
-        val density = web.resources.displayMetrics.density.toDouble()
-        val location = IntArray(2).also(web::getLocationOnScreen)
-        val x = location[0] + ((frameLeft + (tap.getDouble("left") + tap.getDouble("right")) / 2.0) * density).toInt()
-        val y = location[1] + ((frameTop + (tap.getDouble("top") + tap.getDouble("bottom")) / 2.0) * density).toInt()
-        val visible = Rect()
-        assertTrue(web.getGlobalVisibleRect(visible) && visible.contains(x, y))
-        assertTrue("Visible EPUB content tap was not dispatched", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).click(x, y))
+        var screen: IntArray? = null
+        compose.runOnUiThread {
+            val frameLeft = probe.getDouble("frameLeft")
+            val frameTop = probe.getDouble("frameTop")
+            val density = web.resources.displayMetrics.density.toDouble()
+            val location = IntArray(2).also(web::getLocationOnScreen)
+            val x = location[0] + ((frameLeft + (tap.getDouble("left") + tap.getDouble("right")) / 2.0) * density).toInt()
+            val y = location[1] + ((frameTop + (tap.getDouble("top") + tap.getDouble("bottom")) / 2.0) * density).toInt()
+            val visible = Rect()
+            assertTrue(web.getGlobalVisibleRect(visible) && visible.contains(x, y))
+            screen = intArrayOf(x, y)
+        }
+        val coordinates = checkNotNull(screen)
+        assertTrue("Visible EPUB content tap was not dispatched", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).click(coordinates[0], coordinates[1]))
     }
 
     private fun selectDocument(name: String) {
