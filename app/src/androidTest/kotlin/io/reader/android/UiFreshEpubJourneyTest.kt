@@ -80,7 +80,7 @@ class UiFreshEpubJourneyTest {
             compose.onNodeWithTag("reader_directory").performScrollToNode(hasTestTag("reader_chapter_${target.index}"))
             compose.onNodeWithTag("reader_chapter_${target.index}").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && model.state.value.reading?.chapter?.index == 1 && !model.state.value.busy }
-            compose.waitUntil(30_000) { compose.onAllNodes(hasTestTag("reader_ebook_restore_loading")).fetchSemanticsNodes().isEmpty() }
+            waitForEpubWebView()
             val reading = model.state.value.reading ?: error("EPUB reading absent")
             assertEquals(ReaderLocalBookFormat.EPUB, reading.format)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
