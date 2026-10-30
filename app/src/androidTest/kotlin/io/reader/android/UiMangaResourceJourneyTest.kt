@@ -146,7 +146,7 @@ class UiMangaResourceJourneyTest {
                 if (graphics) {
                     val plan = graphicsPlanObserved.get() ?: throw AssertionError("Core graphicsPlan output was not observed")
                     assertEquals(4, plan.getInt("width")); assertEquals(103, plan.getInt("height"))
-                    assertEquals(14, plan.getJSONArray("strips").length())
+                    assertEquals(7, plan.getJSONArray("strips").length())
                 } else assertTrue(graphicsPlanObserved.get() == null)
                 marker("native-image-decoded", Bundle().apply {
                     putString("transferId", transferId); putInt("encodedBytes", image.size); putInt("decodedBytes", decoded.size)

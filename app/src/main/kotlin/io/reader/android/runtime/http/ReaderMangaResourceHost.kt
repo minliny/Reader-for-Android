@@ -61,15 +61,17 @@ internal class ReaderMangaResourceHost(
                 catch (_: IllegalArgumentException) {
                     return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_TRANSFER_IDENTITY", false)
                 }
-                val dimensions = try { imageDimensions(transfer.chunks) }
-                catch (_: IllegalArgumentException) {
-                    return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_IMAGE_DIMENSIONS", false)
-                }
+                val dimensions = if (input.inspectGraphics) {
+                    try { imageDimensions(transfer.chunks) }
+                    catch (_: IllegalArgumentException) {
+                        return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_IMAGE_DIMENSIONS", false)
+                    }
+                } else null
                 val staged = try { resourceStore.stage(identity, transfer.chunks, transfer.contentType) }
                 catch (_: IllegalArgumentException) {
                     return ReaderCoreEventActor.HostReply.Error("RESOURCE_EXHAUSTED", "MANGA_RESOURCE_STAGE", false)
                 }
-                transfer.copy(width = dimensions.first, height = dimensions.second,
+                transfer.copy(width = dimensions?.first, height = dimensions?.second,
                     onCommitted = { resourceStore.commit(staged) })
             }
         }
@@ -224,7 +226,8 @@ internal class ReaderMangaResourceHost(
         if (value.has("inspectGraphics") && value.get("inspectGraphics") !is Boolean) {
             throw IllegalArgumentException("inspectGraphics must be boolean")
         }
-        return ParsedInput(stage, transferId, resourceRef, request, maxBytes)
+        return ParsedInput(stage, transferId, resourceRef, request, maxBytes,
+            inspectGraphics = value.optBoolean("inspectGraphics", false))
     }
 
     internal fun parseHttpResult(raw: String, maxBytes: Long): ReaderCoreEventActor.HostReply {
@@ -265,6 +268,7 @@ internal class ReaderMangaResourceHost(
         val resourceRef: String,
         val request: JSONObject,
         val maxBytes: Long,
+        val inspectGraphics: Boolean,
     )
 
     private fun exactKeys(value: JSONObject, allowed: Set<String>) {
