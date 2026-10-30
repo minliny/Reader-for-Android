@@ -222,7 +222,8 @@ class UiMangaComposeJourneyTest {
             assertTrue(reopenedIndex >= 0)
             clickWorkspace("reader_source_select_$reopenedIndex")
             onlineIdle(model)
-            compose.onNodeWithTag("reader_online_query").performTextClearance().performTextInput("Comic")
+            compose.onNodeWithTag("reader_online_query").performTextClearance()
+            compose.onNodeWithTag("reader_online_query").performTextInput("Comic")
             launched.onActivity { current -> current.getSystemService(InputMethodManager::class.java)
                 .hideSoftInputFromWindow(current.window.decorView.windowToken, 0) }
             clickWorkspace("reader_online_search"); onlineIdle(model)
