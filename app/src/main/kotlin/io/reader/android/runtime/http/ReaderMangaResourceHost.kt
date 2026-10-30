@@ -111,8 +111,9 @@ internal class ReaderMangaResourceHost(
                     val preparedBytes = if (graphicsPlan == null) bytes else {
                         val compressed = ByteArrayOutputStream()
                         check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, compressed)) { "MANGA_GRAPHICS_PLAN_COMPRESS" }
+                        resourceStore.putDecodedByTransferId(transferId, compressed.toByteArray())
                         compressed.size().toLong()
-                    }
+                    }.also { if (graphicsPlan == null) resourceStore.putDecodedByTransferId(transferId, encoded) }
                     require(preparedBytes in 1..MAX_PREPARED_BYTES) { "MANGA_IMAGE_PIXEL_BUDGET" }
                     ReaderCoreEventActor.HostReply.Complete(JSONObject()
                         .put("consumed", true).put("assetId", assetId).put("bytes", bytes)

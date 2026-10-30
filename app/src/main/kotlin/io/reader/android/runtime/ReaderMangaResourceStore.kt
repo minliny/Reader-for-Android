@@ -93,17 +93,33 @@ internal class ReaderMangaResourceStore(private val root: File) {
     fun readByTransferId(wireId: String, sha256: String, bytes: Long): Resource {
         require(wireId.matches(Regex("rmt1:[0-9a-f]{64}"))) { "MANGA_TRANSFER_IDENTITY" }
         require(sha256.matches(Regex("[0-9a-f]{64}")) && bytes in 1..MAX_BYTES) { "MANGA_RESOURCE_EXPECTED" }
-        val directory = root.listFiles().orEmpty().firstOrNull { candidate ->
-            !candidate.name.startsWith(".") && candidate.isDirectory && runCatching {
-                val meta = readMeta(candidate)
-                meta.first == wireId && meta.third == bytes && meta.fourth == sha256
-            }.getOrDefault(false)
-        } ?: error("MANGA_RESOURCE_ABSENT")
+        val directory = findDirectory(wireId) { meta -> meta.third == bytes && meta.fourth == sha256 }
         val meta = readMeta(directory)
         val encoded = File(directory, ENCODED).readBytes()
         check(encoded.size.toLong() == bytes && sha256(encoded) == sha256) { "MANGA_RESOURCE_DIGEST" }
         return Resource(ReaderMangaTransferIdentity(wireId, meta.second), bytes, sha256,
             meta.fifth.ifBlank { null }, encoded)
+    }
+
+    @Synchronized
+    fun putDecodedByTransferId(wireId: String, bytes: ByteArray): String {
+        require(wireId.matches(Regex("rmt1:[0-9a-f]{64}")) && bytes.isNotEmpty() && bytes.size.toLong() <= MAX_PREPARED_BYTES) {
+            "MANGA_DECODED_RESOURCE"
+        }
+        val directory = findDirectory(wireId) { true }
+        val staged = File(directory, ".decoded-${UUID.randomUUID()}")
+        FileOutputStream(staged).use { output -> output.write(bytes); output.fd.sync() }
+        val decoded = File(directory, DECODED)
+        check(staged.renameTo(decoded)) { "MANGA_DECODED_COMMIT" }
+        return sha256(decoded)
+    }
+
+    @Synchronized
+    fun readDecodedByTransferId(wireId: String): ByteArray {
+        val directory = findDirectory(wireId) { true }
+        val decoded = File(directory, DECODED)
+        check(decoded.isFile && decoded.length() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
+        return decoded.readBytes()
     }
 
     @Synchronized
@@ -115,6 +131,14 @@ internal class ReaderMangaResourceStore(private val root: File) {
     private fun cleanupAbandonedStages() {
         root.listFiles().orEmpty().filter { it.name.startsWith(".stage-") }.forEach { it.deleteRecursively() }
     }
+
+    private fun findDirectory(wireId: String, predicate: (Meta) -> Boolean): File =
+        root.listFiles().orEmpty().firstOrNull { candidate ->
+            !candidate.name.startsWith(".") && candidate.isDirectory && runCatching {
+                val meta = readMeta(candidate)
+                meta.first == wireId && predicate(meta)
+            }.getOrDefault(false)
+        } ?: error("MANGA_RESOURCE_ABSENT")
 
     private fun key(identity: ReaderMangaTransferIdentity, sha256: String): String =
         identity.wireId.removePrefix("rmt1:") + "-" + sha256
@@ -145,7 +169,9 @@ internal class ReaderMangaResourceStore(private val root: File) {
     companion object {
         private const val ENCODED = "encoded.bin"
         private const val META = "meta.txt"
+        private const val DECODED = "decoded.bin"
         private const val MAX_CHUNK_BYTES = 1024 * 1024
         private const val MAX_BYTES = 16L * 1024 * 1024
+        private const val MAX_PREPARED_BYTES = 16L * 1024 * 1024
     }
 }

@@ -42,4 +42,16 @@ class ReaderMangaResourceStoreTest {
             throw AssertionError("wrong byte count was admitted")
         } catch (_: IllegalStateException) { }
     }
+
+    @Test
+    fun decodedBytesCommitAndReadUnderTheSameTransferIdentity() {
+        val root = Files.createTempDirectory("reader-manga-store-").toFile()
+        val store = ReaderMangaResourceStore(root)
+        val identity = ReaderMangaTransferIdentity("rmt1:${"c".repeat(64)}", "manga:page-2")
+        val staged = store.stage(identity, listOf(byteArrayOf(1, 2, 3)), "image/jpeg")
+        store.commit(staged)
+        val decodedSha = store.putDecodedByTransferId(identity.wireId, byteArrayOf(9, 8, 7, 6))
+        assertEquals(64, decodedSha.length)
+        assertArrayEquals(byteArrayOf(9, 8, 7, 6), store.readDecodedByTransferId(identity.wireId))
+    }
 }
