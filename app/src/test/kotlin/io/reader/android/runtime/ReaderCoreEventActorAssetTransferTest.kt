@@ -85,7 +85,7 @@ class ReaderCoreEventActorAssetTransferTest {
             assertEquals(99L, result.getLong("assetId"))
             assertEquals(77L, result.getLong("operationId"))
             assertEquals(3L, result.getLong("bytes"))
-            assertEquals("image/jpeg", result.getString("contentType"))
+            assertTrue("Core asset transfer receipt must not widen the fixed InputReceipt", !result.has("contentType"))
         } finally {
             withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
             dispatcher.close(); executor.shutdownNow()

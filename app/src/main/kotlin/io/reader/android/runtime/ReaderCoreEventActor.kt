@@ -831,7 +831,6 @@ internal class ReaderCoreEventActor(
             return JSONObject().put("assetId", assetId)
                 .put("operationId", envelope.operationId).put("bytes", total)
                 .apply {
-                    reply.contentType?.let { put("contentType", it) }
                     reply.width?.let { put("width", it) }
                     reply.height?.let { put("height", it) }
                 }
