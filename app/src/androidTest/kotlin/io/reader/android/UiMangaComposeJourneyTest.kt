@@ -192,12 +192,20 @@ class UiMangaComposeJourneyTest {
             try {
                 cleanup { scenario?.close() }
                 // Failed runs retain their exact owned source for diagnosis; never replay a pending original.
-                if (complete) cleanup { runBlocking {
-                    val source = library.sources(sourceId).single()
-                    val deleted = library.deleteSource(sourceId, source.sourceVersion)
-                    assertTrue(deleted.durable)
-                    assertEquals(SourceImportConfirmation.APPLIED, deleted.confirmation)
-                } }
+                if (complete) cleanup {
+                    // MainActivity activated a newer client. The seed client cannot
+                    // observe or mutate again after that production ownership change.
+                    ReaderLibrary(ApplicationProvider.getApplicationContext()).use { cleanupLibrary ->
+                        runBlocking {
+                            marker("owned-source-cleanup-enter")
+                            val source = cleanupLibrary.sources(sourceId).single()
+                            val deleted = cleanupLibrary.deleteSource(sourceId, source.sourceVersion)
+                            assertTrue(deleted.durable)
+                            assertEquals(SourceImportConfirmation.APPLIED, deleted.confirmation)
+                            marker("owned-source-cleanup-ACK")
+                        }
+                    }
+                }
             } finally {
                 try { cleanup { library.close() } } finally { cleanup { fixture.close() } }
             }
