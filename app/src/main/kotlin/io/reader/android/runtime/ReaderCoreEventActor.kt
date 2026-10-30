@@ -668,7 +668,11 @@ internal class ReaderCoreEventActor(
         }
         work.response = response
         val envelope = work.envelope
-        val identityValid = response.operationId == envelope.operationId && response.assetId > 0 &&
+        // Core output requests use a new Host operation id while the asset's
+        // operationId remains the owner returned by assetCommit. Keep those
+        // identities separate: host.complete is routed by envelope.operationId,
+        // asset read/release by response.operationId.
+        val identityValid = response.operationId > 0 && response.assetId > 0 &&
             response.bytes in 1..MAX_ASSET_CONSUME_BYTES
         if (!identityValid) {
             work.response = HostReply.Error("INVALID_PARAMS", "MANGA_ASSET_CONSUME_IDENTITY", false)

@@ -23,6 +23,7 @@ class ReaderCoreEventActorAssetTransferTest {
         val reads = ConcurrentLinkedQueue<Triple<Long, Int, Long>>()
         val readReplies = ConcurrentLinkedQueue<ByteArray>()
         val releases = ConcurrentLinkedQueue<Long>()
+        val releaseOwners = ConcurrentLinkedQueue<Long>()
         var failCommit = false
         override fun deliveryCapabilities() = 1
         override fun enableEventAcknowledgements() = ok("rc_runtime_enable_event_ack")
@@ -46,7 +47,9 @@ class ReaderCoreEventActorAssetTransferTest {
             reads.add(Triple(offset, limit, assetId))
             return readReplies.poll()?.copyOf() ?: byteArrayOf()
         }
-        override fun assetRelease(requestId: Long, operationId: Long, assetId: Long) { releases.add(assetId) }
+        override fun assetRelease(requestId: Long, operationId: Long, assetId: Long) {
+            releases.add(assetId); releaseOwners.add(operationId)
+        }
         override fun close() = Unit
     }
 
@@ -129,7 +132,9 @@ class ReaderCoreEventActorAssetTransferTest {
         val consumed = CompletableDeferred<List<Byte>>()
         val actor = ReaderCoreEventActor(port, dispatcher,
             hostHandler = ReaderCoreEventActor.HostHandler {
-                ReaderCoreEventActor.HostReply.AssetConsume(99L, 77L, 5L) { bytes ->
+                // Host operation 77 owns the delivery; Core asset operation 88
+                // owns the output bytes and is the identity used for release.
+                ReaderCoreEventActor.HostReply.AssetConsume(99L, 88L, 5L) { bytes ->
                     consumed.complete(bytes.toList())
                     ReaderCoreEventActor.HostReply.Complete("{}")
                 }
@@ -148,6 +153,7 @@ class ReaderCoreEventActorAssetTransferTest {
             assertEquals(listOf(Triple(0L, 5, 99L), Triple(2L, 3, 99L),
                 Triple(4L, 1, 99L), Triple(5L, 1, 99L)), port.reads.toList())
             assertEquals(listOf(99L), port.releases.toList())
+            assertEquals(listOf(88L), port.releaseOwners.toList())
             assertEquals("host.complete", port.commands.first { it.optString("method") == "host.complete" }.getString("method"))
         } finally {
             withContext(kotlinx.coroutines.NonCancellable) { actor.close() }
