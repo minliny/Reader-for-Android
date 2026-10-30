@@ -165,6 +165,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val tts: ReaderTtsService get() { owner.requireLane(lease); return owner.ttsService }
         internal val mangaMaterializationStore: ReaderMangaMaterializationStore
             get() { owner.requireLane(lease); return owner.mangaMaterializationStore }
+        internal val mangaResourceStore: ReaderMangaResourceStore
+            get() { owner.requireLane(lease); return owner.mangaResourceStore }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {

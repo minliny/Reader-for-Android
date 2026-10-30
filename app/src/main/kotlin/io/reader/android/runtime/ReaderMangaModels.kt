@@ -120,6 +120,30 @@ data class ReaderMangaResourcePrepareResult(
     val bytes: Int,
 )
 
+/**
+ * A decoded page owned by the current manga reading owner. The lease keeps
+ * the decoded file from being evicted until the UI releases this handle.
+ */
+class ReaderMangaDecodedResource internal constructor(
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val resourceRef: String,
+    val transferId: String,
+    bytes: ByteArray,
+    private val lease: ReaderMangaResourceStore.DecodedLease,
+) : AutoCloseable {
+    val bytes: ByteArray = bytes.copyOf()
+
+    private var closed = false
+
+    override fun close() {
+        if (!closed) {
+            closed = true
+            lease.close()
+        }
+    }
+}
+
 data class ReaderMangaResourceInspectRequest(val transferId: String, val sha256: String, val bytes: Int)
 
 enum class ReaderMangaResourceStatus { ABSENT, PRESENT }

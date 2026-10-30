@@ -128,6 +128,15 @@ internal class ReaderMangaResourceStore(private val root: File) {
     }
 
     @Synchronized
+    fun readDecodedByTransferId(wireId: String, resourceRef: String): ByteArray {
+        require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
+        val directory = findDirectory(wireId) { meta -> meta.second == resourceRef }
+        val decoded = File(directory, DECODED)
+        check(decoded.isFile && decoded.length() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
+        return decoded.readBytes()
+    }
+
+    @Synchronized
     fun readDecodedByResourceRef(resourceRef: String): ByteArray {
         require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
         val directory = root.listFiles().orEmpty().firstOrNull { candidate ->
@@ -190,6 +199,13 @@ internal class ReaderMangaResourceStore(private val root: File) {
     @Synchronized
     fun acquireDecodedLease(wireId: String): DecodedLease {
         readDecodedByTransferId(wireId)
+        decodedLeases[wireId] = (decodedLeases[wireId] ?: 0) + 1
+        return DecodedLease { releaseDecodedLease(wireId) }
+    }
+
+    @Synchronized
+    fun acquireDecodedLease(wireId: String, resourceRef: String): DecodedLease {
+        readDecodedByTransferId(wireId, resourceRef)
         decodedLeases[wireId] = (decodedLeases[wireId] ?: 0) + 1
         return DecodedLease { releaseDecodedLease(wireId) }
     }

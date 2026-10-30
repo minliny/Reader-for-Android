@@ -307,6 +307,35 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     suspend fun mangaResourcePrepare(request: ReaderMangaResourcePrepareRequest): ReaderMangaResourcePrepareResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.resourcePrepare(request) }
 
+    /**
+     * Prepare one Core resource, then return a lease-bound decoded page handle
+     * for a future manga surface. The transfer/resource identity is checked
+     * before the Host store is exposed to the caller.
+     */
+    suspend fun mangaDecodedResource(request: ReaderMangaResourcePrepareRequest): ReaderMangaDecodedResource =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            val expected = ReaderMangaTransferIdentity.forPrepare(request)
+            val prepared = mangaService.resourcePrepare(request)
+            check(prepared.transferId == expected.wireId && prepared.resourceRef == request.resourceRef) {
+                "MANGA_DECODED_RESOURCE_SCOPE"
+            }
+            val store = client.mangaResourceStore
+            val lease = store.acquireDecodedLease(prepared.transferId, prepared.resourceRef)
+            try {
+                ReaderMangaDecodedResource(
+                    chapter = request.chapter,
+                    manifestVersion = request.manifestVersion,
+                    resourceRef = prepared.resourceRef,
+                    transferId = prepared.transferId,
+                    bytes = store.readDecodedByTransferId(prepared.transferId, prepared.resourceRef),
+                    lease = lease,
+                )
+            } catch (failure: Throwable) {
+                lease.close()
+                throw failure
+            }
+        }
+
     suspend fun mangaResourceInspect(request: ReaderMangaResourceInspectRequest): ReaderMangaResourceInspectResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.resourceInspect(request) }
 
