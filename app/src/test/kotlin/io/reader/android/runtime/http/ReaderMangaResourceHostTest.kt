@@ -85,6 +85,25 @@ class ReaderMangaResourceHostTest {
         assertTrue(reply is ReaderCoreEventActor.HostReply.AssetConsume)
     }
 
+    @Test fun graphicsPlanShapeRequiresCanonical14StripPartition() = runBlocking {
+        val strips = org.json.JSONArray()
+        for (index in 0 until 14) {
+            val height = if (index == 13) 12 else 7
+            strips.put(JSONObject().put("sourceY", index * 7).put("targetY", 103 - index * 7 - height).put("height", height))
+        }
+        val plan = JSONObject().put("__readerMangaGraphicsPlan", true).put("toJSON", JSONObject.NULL)
+            .put("width", 4).put("height", 103).put("format", "jpeg").put("quality", 90)
+            .put("pixelFormat", "rgb565").put("strips", strips)
+        val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
+            runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
+            capability = ReaderMangaResourceHost.CAPABILITY,
+            parametersJson = JSONObject().put("stage", "output").put("graphicsPlan", plan)
+                .put("transferId", "rmt1:${"a".repeat(64)}").put("resourceRef", "resource-1")
+                .put("assetId", 1).put("operationId", 2).put("bytes", 3).toString(),
+        ))
+        assertTrue(reply is ReaderCoreEventActor.HostReply.AssetConsume)
+    }
+
     @Test fun inspectInputStageRequiresACommittedResource() = runBlocking {
         val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
             runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
