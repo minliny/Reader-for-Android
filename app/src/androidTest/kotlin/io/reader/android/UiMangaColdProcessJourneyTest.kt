@@ -182,7 +182,11 @@ class UiMangaColdProcessJourneyTest {
             val anchor = checkNotNull(state.visibleAnchor)
             assertEquals(expected.pageId, anchor.pageId); assertEquals(expected.pageOrdinalFallback, anchor.ordinal)
             assertEquals(expected.x, anchor.x, 0.002); assertEquals(expected.y, anchor.y, 0.002)
-            assertEquals(original.ack.token, state.progressToken)
+            // The immutable original authenticates its old ACK token. SQLite reopening advances
+            // the runtime CAS epoch while the stored location/revision stays unchanged.
+            val currentToken = checkNotNull(state.progressToken)
+            assertTrue("Current SQLite CAS epoch must advance after backend reopen", currentToken.epoch > original.ack.token.epoch)
+            assertEquals("Stored progress revision must survive backend reopen", original.ack.token.revision, currentToken.revision)
             assertNull(state.lastConfirmedProgress) // Opening observation never becomes a save acknowledgement.
             assertFalse(state.progressDirty || state.progressBusy); assertNull(state.progressError)
             assertTrue(state.progressPending.isEmpty()); assertNull(state.restoreRequest)
@@ -197,7 +201,8 @@ class UiMangaColdProcessJourneyTest {
                 putInt("chapterIndex", chapter.chapterIndex); putString("manifestVersion", chapter.manifest.manifestVersion)
                 putString("sourceRuleVersion", chapter.manifest.sourceRuleVersion); putString("decodeRevision", chapter.manifest.decodeRevision)
                 putString("pageId", anchor.pageId); putInt("pageOrdinal", anchor.ordinal); putDouble("x", anchor.x); putDouble("y", anchor.y)
-                putLong("tokenEpoch", original.ack.token.epoch); putLong("tokenRevision", original.ack.token.revision)
+                putLong("tokenEpoch", currentToken.epoch); putLong("tokenRevision", currentToken.revision)
+                putLong("originalAckEpoch", original.ack.token.epoch); putLong("originalAckRevision", original.ack.token.revision)
                 putLong("layoutEpoch", checkNotNull(state.layoutTicket).epoch)
                 putBoolean("lastConfirmedProgressAbsent", true); putBoolean("noNewProgressOriginal", true)
                 putString("restoreClaim", "PRODUCTION_DRAW_AND_IMAGE_MEASUREMENT_PLUS_CAPTURE_NOT_INDEPENDENT_COORDINATE_EXPORT")
