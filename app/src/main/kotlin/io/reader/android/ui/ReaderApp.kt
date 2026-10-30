@@ -73,6 +73,7 @@ fun ReaderApp(model: ReaderViewModel) {
     val protocol by model.coreProtocolRecoveries.collectAsStateWithLifecycle()
     val management by model.shelfManagement.state.collectAsStateWithLifecycle()
     val online by model.onlineSources.state.collectAsStateWithLifecycle()
+    val manga by model.mangaReadingState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current
     val view = LocalView.current
     DisposableEffect(lifecycle, model) {
@@ -82,7 +83,7 @@ fun ReaderApp(model: ReaderViewModel) {
     }
     DisposableEffect(view, state.keepScreenOn, state.route) {
         val old = view.keepScreenOn
-        view.keepScreenOn = state.keepScreenOn && state.route in setOf(ReaderRoute.Reading, ReaderRoute.OnlineReading)
+        view.keepScreenOn = state.keepScreenOn && state.route in setOf(ReaderRoute.Reading, ReaderRoute.OnlineReading, ReaderRoute.MangaReading)
         onDispose { view.keepScreenOn = old }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -105,11 +106,12 @@ fun ReaderApp(model: ReaderViewModel) {
     val requestImport = { if (importAllowed) picker.launch(arrayOf("text/plain", "text/*", "application/epub+zip", "application/x-mobipocket-ebook", "application/vnd.amazon.ebook", "application/octet-stream")) }
     BackHandler(enabled = state.route != ReaderRoute.Bookshelf) { model.back() }
     ReaderTheme(state.theme) {
-        val readingVisible = (state.route == ReaderRoute.Reading && state.reading != null) || (state.route == ReaderRoute.OnlineReading && state.onlineReading != null)
+        val readingVisible = (state.route == ReaderRoute.Reading && state.reading != null) ||
+            (state.route == ReaderRoute.OnlineReading && state.onlineReading != null) || state.route == ReaderRoute.MangaReading
         val windowBackground = if (readingVisible) state.paper.background() else MaterialTheme.colorScheme.background
         ReaderSystemBarAppearance(windowBackground)
         if (readingVisible) {
-            ReaderReadingScreen(state, model)
+            ReaderReadingScreen(state, model, manga)
         } else {
             Scaffold(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
@@ -214,7 +216,7 @@ fun ReaderApp(model: ReaderViewModel) {
                         ReaderRoute.Directory -> DirectoryScreen(state, model)
                         ReaderRoute.Management -> ReaderShelfManagementScreen(management, model.shelfManagement)
                         ReaderRoute.OnlineDirectory -> ReaderOnlineDirectoryScreen(state, model)
-                        ReaderRoute.Online -> ReaderOnlineWorkspaceScreen(online, model.onlineSources, requestSourceFile)
+                        ReaderRoute.Online -> ReaderOnlineWorkspaceScreen(online, model.onlineSources, requestSourceFile, model::openManga)
                         else -> Unit
                     }
                 }

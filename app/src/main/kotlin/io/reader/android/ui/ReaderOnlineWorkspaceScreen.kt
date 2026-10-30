@@ -10,10 +10,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.reader.android.runtime.ReaderOnlineContentKind
+import io.reader.android.runtime.ReaderOnlineDetailPreview
 
 /** Existing public message adapters; no raw JSON, rule parameters or pretend reading action. */
 @Composable
-internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: ReaderOnlineWorkspace, requestFile: () -> Unit) {
+internal fun ReaderOnlineWorkspaceScreen(
+    state: OnlineWorkspaceState,
+    owner: ReaderOnlineWorkspace,
+    requestFile: () -> Unit,
+    onOpenManga: (ReaderOnlineDetailPreview) -> Unit,
+) {
     val revision = state.revision; val enabled = !state.busy && !state.pending && state.sourceDeletion == null
     Column(Modifier.fillMaxSize().testTag("reader_online_workspace")) {
         state.feedback?.let { message -> key(state.feedbackId) { ReaderTransientFeedback(message) { owner.clearFeedback(state.feedbackId) } } }
@@ -101,8 +107,11 @@ internal fun ReaderOnlineWorkspaceScreen(state: OnlineWorkspaceState, owner: Rea
                     if (detail.contentKind == ReaderOnlineContentKind.TEXT) {
                         TextButton({ owner.add(revision) }, enabled = enabled && state.added != detail.key,
                             modifier = Modifier.testTag("reader_online_add")) { Text(if (state.added == detail.key) "已加入书架" else "加入书架") }
+                    } else if (detail.contentKind == ReaderOnlineContentKind.MANGA) {
+                        Text("漫画阅读位置暂不写入 Core。", style = MaterialTheme.typography.bodySmall)
+                        TextButton({ onOpenManga(detail) }, enabled = enabled,
+                            modifier = Modifier.testTag("reader_online_manga_read")) { Text("开始阅读漫画") }
                     } else ReaderPageState("暂不支持这类书籍入架", "当前入口仅开放在线文字书。")
-                    // Reading/TOC buttons stay absent until composite-source reading/progress is implemented.
                 } }
             }
         }

@@ -54,7 +54,12 @@ var SemanticsPropertyReceiver.readerChapterIndex by ReaderChapterIndexKey
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-internal fun ReaderReadingScreen(state: ReaderUiState, model: ReaderViewModel) {
+internal fun ReaderReadingScreen(
+    state: ReaderUiState,
+    model: ReaderViewModel,
+    manga: ReaderMangaReadingUiState,
+) {
+    if (state.route == ReaderRoute.MangaReading) { ReaderMangaReadingScreen(manga, model); return }
     if (state.route == ReaderRoute.OnlineReading) { ReaderOnlineReadingScreen(state, model); return }
     val reading = state.reading ?: return
     Box(Modifier.fillMaxSize().background(state.paper.background()).windowInsetsPadding(WindowInsets.safeDrawing)

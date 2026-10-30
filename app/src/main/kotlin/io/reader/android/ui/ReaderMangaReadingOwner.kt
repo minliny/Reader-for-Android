@@ -170,13 +170,20 @@ internal class ReaderMangaReadingOwner(
         mutable.value = mutable.value.copy(scrollFraction = value.coerceIn(0f, 1f))
     }
 
-    override fun close() {
+    /** Retire the visible chapter while keeping this ViewModel-owned owner reusable. */
+    fun retire() {
         if (closed) return
-        closed = true
         ++nextGeneration
         activeGeneration = null
         activeChapter = null
         retirePages()
+        mutable.value = ReaderMangaReadingUiState(generation = nextGeneration)
+    }
+
+    override fun close() {
+        if (closed) return
+        retire()
+        closed = true
         mutable.value = mutable.value.copy(generation = nextGeneration, phase = ReaderMangaReadingPhase.CLOSED,
             chapter = null, window = null, pages = emptyList(), error = null)
     }

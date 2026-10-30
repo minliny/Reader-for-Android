@@ -60,6 +60,9 @@ import io.reader.android.runtime.ReaderSearchClosePublicationPolicy
 import io.reader.android.runtime.ReaderContentSearchHit
 import io.reader.android.runtime.BookmarkTargetStaleException
 import io.reader.android.runtime.ContentSearchPendingException
+import io.reader.android.runtime.ReaderMangaChapterRequest
+import io.reader.android.runtime.ReaderMangaChapterRef
+import io.reader.android.runtime.ReaderMangaReadPolicy
 import java.io.FileNotFoundException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +80,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executor
 
-enum class ReaderRoute { Bookshelf, Settings, Directory, Reading, Management, Online, OnlineDirectory, OnlineReading }
+enum class ReaderRoute { Bookshelf, Settings, Directory, Reading, Management, Online, OnlineDirectory, OnlineReading, MangaReading }
 enum class ReaderAppTheme { System, Light, Dark }
 enum class ReaderPaper { Paper, Warm, Night }
 enum class ReaderPanel { Bookmarks, Search }
@@ -182,6 +185,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     internal val coreProtocolRecoveries = protocolFeed.view
     private val libraryDelegate = lazy { ReaderLibrary(application) }
     private val library by libraryDelegate
+    private val mangaOwnerDelegate = lazy { ReaderMangaReadingOwner(viewModelScope) { ReaderMangaLibraryAdapter(library) } }
+    private val mangaState = MutableStateFlow(ReaderMangaReadingUiState())
+    internal val mangaReadingState = mangaState.asStateFlow()
+    private var mangaStateJob: Job? = null
+
+    private fun mangaOwner(): ReaderMangaReadingOwner {
+        val owner = mangaOwnerDelegate.value
+        if (mangaStateJob == null) mangaStateJob = viewModelScope.launch {
+            owner.state.collect { mangaState.value = it }
+        }
+        return owner
+    }
     private val preferences = application.getSharedPreferences("reader.display", 0)
     private val gate = Mutex()
     private var generation = 0L
@@ -241,6 +256,42 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         ++generation; shelfRead?.cancel(); delayedSave?.cancel()
         mutableState.update { it.copy(route = ReaderRoute.Online, error = null) }
         onlineSources.open()
+    }
+
+    internal fun openManga(detail: io.reader.android.runtime.ReaderOnlineDetailPreview) {
+        if (state.value.busy || state.value.route != ReaderRoute.Online || detail.contentKind != io.reader.android.runtime.ReaderOnlineContentKind.MANGA) return
+        onlineSources.leave() // Retire the search session before opening the independent Manga owner.
+        ++generation; shelfRead?.cancel(); delayedSave?.cancel()
+        val request = ReaderMangaChapterRequest(
+            ReaderMangaChapterRef(detail.key.sourceId, detail.key.bookId), chapterIndex = 0,
+            policy = ReaderMangaReadPolicy.CACHE_FIRST,
+        )
+        mangaRequest = request
+        mutableState.update { it.copy(route = ReaderRoute.MangaReading, busy = false, error = null, onlineError = null) }
+        mangaOwner().open(request)
+    }
+
+    private var mangaRequest: ReaderMangaChapterRequest? = null
+
+    internal fun retryMangaReading() {
+        if (state.value.route != ReaderRoute.MangaReading || state.value.busy) return
+        mangaRequest?.let { mangaOwner().open(it) }
+    }
+
+    internal fun setMangaZoom(value: Float) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.setZoom(value)
+    }
+
+    internal fun setMangaOrdinal(ordinal: Int) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.setCurrentOrdinal(ordinal)
+    }
+
+    internal fun closeMangaReading() {
+        if (state.value.route != ReaderRoute.MangaReading) return
+        if (mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.retire()
+        mangaState.value = ReaderMangaReadingUiState()
+        mangaRequest = null
+        mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
     }
 
     private var managementBusyGeneration: Long? = null
@@ -489,7 +540,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             first.chapter.processingVersion == second.chapter.processingVersion
 
     fun showSettings() {
-        if (state.value.route in setOf(ReaderRoute.OnlineReading, ReaderRoute.OnlineDirectory)) return
+        if (state.value.route in setOf(ReaderRoute.OnlineReading, ReaderRoute.OnlineDirectory, ReaderRoute.MangaReading)) return
         if (!state.value.busy) {
             if (state.value.route == ReaderRoute.Management) shelfManagement.retirePresentation()
             if (state.value.route == ReaderRoute.Online) onlineSources.leave()
@@ -498,6 +549,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun showBookshelf() {
+        if (state.value.route == ReaderRoute.MangaReading) { closeMangaReading(); return }
         if (state.value.onlineReading != null) { exitOnlineReading(); return }
         if (state.value.route == ReaderRoute.OnlineDirectory) { backOnlineDirectory(); return }
         if (state.value.reading != null) { exitReading(); return }
@@ -1141,6 +1193,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             ReaderRoute.Directory -> mutableState.update { it.copy(route = directoryReturn, error = null) }
             ReaderRoute.OnlineReading -> exitOnlineReading()
             ReaderRoute.OnlineDirectory -> backOnlineDirectory()
+            ReaderRoute.MangaReading -> closeMangaReading()
             ReaderRoute.Online -> if (!onlineSources.back()) showBookshelf()
             ReaderRoute.Settings, ReaderRoute.Management -> showBookshelf()
             ReaderRoute.Bookshelf -> Unit
@@ -1531,6 +1584,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         shelfRead?.cancel()
         if (onlineDelegate.isInitialized()) onlineSources.close()
         if (managementDelegate.isInitialized()) shelfManagement.close()
+        if (mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.close()
+        mangaStateJob?.cancel()
         if (libraryDelegate.isInitialized()) library.close()
         super.onCleared()
     }
