@@ -120,20 +120,18 @@ internal class ReaderMangaResourceStore(private val root: File) {
     }
 
     @Synchronized
-    fun readDecodedByTransferId(wireId: String): ByteArray {
-        val directory = findDirectory(wireId) { true }
-        val decoded = File(directory, DECODED)
-        check(decoded.isFile && decoded.length() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
-        return decoded.readBytes()
-    }
+    fun readDecodedByTransferId(wireId: String): ByteArray = validatedDecodedFile(wireId).readBytes()
 
     @Synchronized
-    fun readDecodedByTransferId(wireId: String, resourceRef: String): ByteArray {
-        require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
-        val directory = findDirectory(wireId) { meta -> meta.second == resourceRef }
+    fun readDecodedByTransferId(wireId: String, resourceRef: String): ByteArray =
+        validatedDecodedFile(wireId, resourceRef).readBytes()
+
+    private fun validatedDecodedFile(wireId: String, resourceRef: String? = null): File {
+        if (resourceRef != null) require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
+        val directory = findDirectory(wireId) { meta -> resourceRef == null || meta.second == resourceRef }
         val decoded = File(directory, DECODED)
         check(decoded.isFile && decoded.length() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
-        return decoded.readBytes()
+        return decoded
     }
 
     @Synchronized
@@ -197,15 +195,17 @@ internal class ReaderMangaResourceStore(private val root: File) {
     private val protectedRefs = mutableSetOf<String>()
 
     @Synchronized
-    fun acquireDecodedLease(wireId: String): DecodedLease {
-        readDecodedByTransferId(wireId)
-        decodedLeases[wireId] = (decodedLeases[wireId] ?: 0) + 1
-        return DecodedLease { releaseDecodedLease(wireId) }
-    }
+    fun acquireDecodedLease(wireId: String): DecodedLease = acquireValidatedDecodedLease(wireId)
 
     @Synchronized
-    fun acquireDecodedLease(wireId: String, resourceRef: String): DecodedLease {
-        readDecodedByTransferId(wireId, resourceRef)
+    fun acquireDecodedLease(wireId: String, resourceRef: String): DecodedLease =
+        acquireValidatedDecodedLease(wireId, resourceRef)
+
+    private fun acquireValidatedDecodedLease(wireId: String, resourceRef: String? = null): DecodedLease {
+        // Verify the actual file can be opened before publishing a lease, without reading its payload.
+        FileInputStream(validatedDecodedFile(wireId, resourceRef)).use { input ->
+            check(input.channel.size() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
+        }
         decodedLeases[wireId] = (decodedLeases[wireId] ?: 0) + 1
         return DecodedLease { releaseDecodedLease(wireId) }
     }

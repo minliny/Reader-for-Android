@@ -3,8 +3,11 @@ package io.reader.android.runtime
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.io.RandomAccessFile
 import java.nio.file.Files
 
 class ReaderMangaResourceStoreTest {
@@ -73,5 +76,35 @@ class ReaderMangaResourceStoreTest {
         store.unprotectResourceRef(identity.resourceRef)
         assertTrue(store.evictDecodedByTransferId(identity.wireId))
         assertTrue(store.evict(identity, staged.sha256))
+    }
+
+    @Test
+    fun invalidDecodedFileCannotPublishAnEvictionLease() {
+        for (invalidKind in listOf("missing", "empty", "directory", "oversized")) {
+            val root = Files.createTempDirectory("reader-manga-invalid-lease-").toFile()
+            try {
+                val store = ReaderMangaResourceStore(root)
+                val identity = ReaderMangaTransferIdentity("rmt1:${"d".repeat(64)}", "manga:page-invalid")
+                val staged = store.stage(identity, listOf(byteArrayOf(1, 2, 3)), "image/jpeg")
+                store.commit(staged)
+                val directory = root.listFiles().orEmpty().single { it.isDirectory && !it.name.startsWith(".") }
+                val decoded = File(directory, "decoded.bin")
+                when (invalidKind) {
+                    "empty" -> decoded.writeBytes(byteArrayOf())
+                    "directory" -> assertTrue(decoded.mkdir())
+                    "oversized" -> RandomAccessFile(decoded, "rw").use { it.setLength(16L * 1024 * 1024 + 1) }
+                }
+                assertThrows(IllegalStateException::class.java) { store.acquireDecodedLease(identity.wireId) }
+                assertThrows(IllegalStateException::class.java) {
+                    store.acquireDecodedLease(identity.wireId, identity.resourceRef)
+                }
+                if (decoded.exists()) assertTrue(decoded.delete())
+                store.putDecodedByTransferId(identity.wireId, byteArrayOf(4, 5, 6))
+                assertTrue(store.evictDecodedByTransferId(identity.wireId))
+                assertTrue(store.evict(identity, staged.sha256))
+            } finally {
+                root.deleteRecursively()
+            }
+        }
     }
 }
