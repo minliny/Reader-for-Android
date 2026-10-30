@@ -47,4 +47,28 @@ class ReaderMangaMaterializationStoreTest {
         ReaderMangaMaterializationStore(reopenedResources, materializationsRoot)
         assertFalse(reopenedResources.evictDecodedByTransferId(identity.wireId))
     }
+
+    @Test
+    fun reopeningPendingMaterializationProtectsRefsUntilAbort() {
+        val root = Files.createTempDirectory("reader-manga-materialization-pending-reopen-").toFile()
+        val resourcesRoot = java.io.File(root, "resources")
+        val materializationsRoot = java.io.File(root, "materializations")
+        val resources = ReaderMangaResourceStore(resourcesRoot)
+        val store = ReaderMangaMaterializationStore(resources, materializationsRoot)
+        val chapter = ReaderMangaChapterIdentity("source", "book", "chapter")
+        val ref = "manga:page-pending"
+        val identity = ReaderMangaTransferIdentity("rmt1:${"a".repeat(64)}", ref)
+        val staged = resources.stage(identity, listOf(byteArrayOf(1, 2, 3)), "image/jpeg")
+        resources.commit(staged)
+        resources.putDecodedByTransferId(identity.wireId, byteArrayOf(9, 8, 7))
+        val token = "token-pending"
+        store.prepare(ReaderMangaMaterializationPrepareResult(token, chapter, "manifest", ReaderMangaMaterializationIntent.CACHE))
+        store.requireResources(token, chapter, "manifest", listOf(ref))
+
+        val reopenedResources = ReaderMangaResourceStore(resourcesRoot)
+        val reopenedStore = ReaderMangaMaterializationStore(reopenedResources, materializationsRoot)
+        assertFalse(reopenedResources.evictDecodedByTransferId(identity.wireId))
+        reopenedStore.abort(token)
+        assertTrue(reopenedResources.evictDecodedByTransferId(identity.wireId))
+    }
 }
