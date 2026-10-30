@@ -304,6 +304,23 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     suspend fun mangaPagesWindow(request: ReaderMangaPageWindowRequest): ReaderMangaPageWindow =
         onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesWindow(request) }
 
+    /** Resource preparation/inspection retain the original because Core waits on Host continuations. */
+    suspend fun mangaResourcePrepare(request: ReaderMangaResourcePrepareRequest): ReaderMangaResourcePrepareResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.resourcePrepare(request) }
+
+    suspend fun mangaResourceInspect(request: ReaderMangaResourceInspectRequest): ReaderMangaResourceInspectResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.resourceInspect(request) }
+
+    /** Materialization changes durable cache state and therefore owns a retained original turn. */
+    suspend fun mangaMaterializationPrepare(request: ReaderMangaMaterializationPrepareRequest): ReaderMangaMaterializationPrepareResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.materializationPrepare(request) }
+
+    suspend fun mangaMaterializationComplete(request: ReaderMangaMaterializationCompleteRequest): ReaderMangaMaterializationCompleteResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.materializationComplete(request) }
+
+    suspend fun mangaMaterializationAbort(token: String): ReaderMangaMaterializationAbortResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.materializationAbort(token) }
+
     suspend fun shelfGroups(): List<ShelfGroup> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.listGroups() }
     suspend fun pendingShelfManagement(): List<PendingManagement> = onIO(WholeTurnMode.OBSERVER_READ) { managementService.pending() }
     suspend fun reconcileShelfManagement(id: String, continueOriginal: Boolean = false): ManagementResult =
