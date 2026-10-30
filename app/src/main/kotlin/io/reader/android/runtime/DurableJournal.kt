@@ -112,6 +112,31 @@ internal class DurableJournal(private val directory: File) {
         .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
         .distinct().sorted().map { onlineAddOriginalForQuery(it) ?: error("ONLINE_ADD_JOURNAL_MISSING") }
 
+    /** Manga has a distinct ACK schema. A .new remains untrusted; query only the committed base. */
+    @Synchronized
+    fun mangaProgressOriginalForQuery(id: String): ReaderMangaProgressJournalSnapshot? {
+        require(ReaderMangaProgressPolicy.id.matches(id)) { "MANGA_PROGRESS_JOURNAL_ID" }
+        val active = File(directory, "$id.json")
+        val base = if (active.exists() || File(active.path + ".bak").exists() || File(active.path + ".new").exists()) active
+            else File(File(directory, "Completed"), "$id.json")
+        val retained = File(base.path + ".new").exists()
+        val record = if (retained) {
+            check(base.isFile && !File(base.path + ".bak").exists()) { "MANGA_PROGRESS_CANDIDATE_BASE_OR_BACKUP_CONFLICT" }
+            ReaderMangaProgressPolicy.decodeRecord(readBounded(base))
+        } else {
+            if (!base.exists() && !File(base.path + ".bak").exists()) return null
+            readRecord(base).also(ReaderMangaProgressPolicy::record)
+        }
+        check(record.getString("id") == id) { "MANGA_PROGRESS_JOURNAL_IDENTITY" }
+        return ReaderMangaProgressJournalSnapshot(record.toString(), retained)
+    }
+    @Synchronized
+    fun mangaProgressActiveForQuery(): List<ReaderMangaProgressJournalSnapshot> = directory.listFiles().orEmpty()
+        .filter { it.name.startsWith("android-manga-progress-") &&
+            (it.name.endsWith(".json") || it.name.endsWith(".json.bak") || it.name.endsWith(".json.new")) }
+        .map { it.name.removeSuffix(".new").removeSuffix(".bak").removeSuffix(".json") }
+        .distinct().sorted().map { mangaProgressOriginalForQuery(it) ?: error("MANGA_PROGRESS_JOURNAL_MISSING") }
+
     /** Exact read-only source of supported originals; never AtomicFile.openRead or candidate recovery. */
     @Synchronized
     internal fun progressOriginalsForContinuation(root: File, bookId: String): List<ReaderProgressOriginalSnapshot> {
@@ -148,6 +173,11 @@ internal class DurableJournal(private val directory: File) {
 
     private fun readRecord(base: File): JSONObject {
         if (File(base.path + ".new").exists()) {
+            if (ReaderMangaProgressPolicy.id.matches(base.name.removeSuffix(".json"))) {
+                check(base.isFile && !File(base.path + ".bak").exists()) { "MANGA_PROGRESS_CANDIDATE_BASE_OR_BACKUP_CONFLICT" }
+                // Other services may scan active kinds, but must never parse this as text progress or promote its candidate.
+                return ReaderMangaProgressPolicy.decodeRecord(readBounded(base))
+            }
             qualifiedCandidate(base) // Validate, but never openRead, promote, delete or return the candidate as committed.
             return ProgressJournalCandidatePolicy.parse(readBounded(base))
         }
@@ -227,6 +257,7 @@ internal class DurableJournal(private val directory: File) {
     private fun requireCandidateCompletion(record: JSONObject): Boolean {
         val base = File(directory, record.getString("id") + ".json")
         if (!File(base.path + ".new").exists()) return false
+        check(record.optString("kind") != ReaderMangaProgressPolicy.KIND) { "MANGA_PROGRESS_CANDIDATE_RETAINED" }
         val candidate = qualifiedCandidate(base)
         val (target, bytes) = candidateProvenance(candidate)
         check(target.isFile && readBounded(target, PROVENANCE_LIMIT).contentEquals(bytes)) { "JOURNAL_CANDIDATE_PROVENANCE_REQUIRED" }

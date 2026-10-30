@@ -29,6 +29,28 @@ data class ReaderMangaExtractRequest(
 
 data class ReaderMangaChapterIdentity(val sourceId: String, val bookId: String, val chapterId: String)
 
+/** Manga uses image coordinates and an epoch/revision CAS, never text scalar offsets. */
+data class ReaderMangaProgressToken(val epoch: Long, val revision: Long)
+data class ReaderMangaLocation(
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val pageId: String,
+    val pageOrdinalFallback: Int,
+    val x: Double,
+    val y: Double,
+    val progressRevision: Long,
+)
+data class ReaderMangaProgressState(val token: ReaderMangaProgressToken, val location: ReaderMangaLocation?)
+data class ReaderMangaProgressSaveRequest(
+    val manifest: ReaderMangaManifest,
+    val location: ReaderMangaLocation,
+    val expected: ReaderMangaProgressToken,
+)
+data class ReaderMangaProgressPending(val operationId: String, val chapter: ReaderMangaChapterRef,
+    val candidateRetained: Boolean, val hasOriginalTerminal: Boolean)
+class ReaderMangaProgressUnconfirmed(val operationId: String, cause: Throwable? = null) :
+    Exception("MANGA_PROGRESS_ORIGINAL_UNCONFIRMED: $operationId", cause)
+
 enum class ReaderMangaReadPolicy(val wire: String) {
     CACHE_ONLY("cacheOnly"), CACHE_FIRST("cacheFirst"), REFRESH("refresh"),
 }

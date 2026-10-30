@@ -76,6 +76,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val tts get() = client.tts
     /** Uses the App owner’s single store instance so Host leases and materialization protection agree. */
     private val mangaService by lazy { ReaderMangaService(transport, client.mangaMaterializationStore) }
+    private val mangaProgressService get() = client.mangaProgress
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -304,6 +305,16 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         // Chapter acquisition can execute source rules and wait for Host HTTP/image metadata;
         // it is not a pure observer turn even though the returned manifest is read-only.
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.chapter(request) }
+
+    /** Observes Core state only; it cannot resolve any original write. */
+    suspend fun mangaProgress(chapter: ReaderMangaChapterRef): ReaderMangaProgressState =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaProgressService.get(chapter) }
+    suspend fun saveMangaProgress(request: ReaderMangaProgressSaveRequest): ReaderMangaProgressState =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaProgressService.save(request) }
+    suspend fun pendingMangaProgress(): List<ReaderMangaProgressPending> =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaProgressService.pending() }
+    suspend fun reconcileMangaProgress(chapter: ReaderMangaChapterRef, operationId: String): ReaderMangaProgressState =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaProgressService.reconcile(chapter, operationId) }
 
     suspend fun mangaPagesWindow(request: ReaderMangaPageWindowRequest): ReaderMangaPageWindow =
         // Fixed Core reads the stored window; this RPC is not admitted by the Host observer allowlist.

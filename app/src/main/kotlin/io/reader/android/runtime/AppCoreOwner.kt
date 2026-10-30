@@ -105,10 +105,26 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = bound().drainOriginalTerminal(requestId, timeoutMs)
         override fun close() { error("SHARED_SERVICE_CANNOT_CLOSE_NATIVE") }
     }
-    private val bookmarkService by lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
+    private val bookmarkServiceDelegate = lazy { requireHeldLane(); ReaderBookmarks(serviceTransport, journal) }
+    private val bookmarkService by bookmarkServiceDelegate
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
     private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal, ::clearSourceHostSession) }
     private val ttsService by lazy { requireHeldLane(); ReaderTtsService(serviceTransport) }
+    private val mangaProgressService by lazy {
+        requireHeldLane()
+        ReaderMangaProgressService(serviceTransport, journal, ::requireHeldLane,
+            { requireHeldLane(); lane.get()!!.lease.toString() },
+            { if (actorDelegate.isInitialized()) actorDelegate.value.runtimeSession else null },
+            ::beforeMangaProgressWrite)
+    }
+    private fun beforeMangaProgressWrite() {
+        requireHeldLane()
+        check(sourceRulesService.pending().isEmpty() && onlineAddService.pending().isEmpty() && managementService.pending().isEmpty() &&
+            (!bookmarkServiceDelegate.isInitialized() || bookmarkService.pending().isEmpty()) &&
+            journal.readAll().none { it.optString("kind") in setOf("progress", "bookmark", "import") && !it.optBoolean("completed") }) {
+            "SHARED_WRITER_ORIGINAL_PENDING"
+        }
+    }
     /** No Core RPC. No old Native worker join claim. Old late Host frames remain actor-owned/quarantined. */
     private fun clearSourceHostSession(sourceId: String): SourceHostCleanupFact {
         requireHeldLane()
@@ -126,7 +142,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         ReaderOnlineAdd(serviceTransport, journal, ::requireHeldLane,
             { lease, preview -> onlineCatalogService.authorizeAdd(lease, preview) },
             { sourceId -> sourceRulesService.list(sourceId, true) },
-            { check(sourceRulesService.pending().isEmpty() && managementService.pending().isEmpty()) { "SHARED_WRITER_ORIGINAL_PENDING" } })
+            { check(sourceRulesService.pending().isEmpty() && managementService.pending().isEmpty() && mangaProgressService.pending().isEmpty()) { "SHARED_WRITER_ORIGINAL_PENDING" } })
     }
     private val onlineCatalogService by lazy {
         requireHeldLane()
@@ -137,7 +153,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
      * source list or remote search must never bypass an unresolved mutation elsewhere. */
     private fun beforeOnlineCatalogStage() {
         requireHeldLane()
-        check(sourceRulesService.pending().isEmpty() && onlineAddService.pending().isEmpty() && managementService.pending().isEmpty()) {
+        check(sourceRulesService.pending().isEmpty() && onlineAddService.pending().isEmpty() && managementService.pending().isEmpty() &&
+            mangaProgressService.pending().isEmpty()) {
             "SHARED_WRITER_ORIGINAL_PENDING"
         }
     }
@@ -147,7 +164,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         ReaderOnlineReading(serviceTransport, onlineCatalogService,
             { sourceId -> sourceRulesService.list(sourceId, true) }, ::requireHeldLane,
             { key -> check(sourceRulesService.pending().none { it.sourceId == key.sourceId } &&
-                onlineAddService.pending().none { it.key == key } && managementService.pending().isEmpty()) { "ONLINE_READING_ORIGINAL_WRITER_PENDING" } })
+                onlineAddService.pending().none { it.key == key } && managementService.pending().isEmpty() &&
+                mangaProgressService.pending().isEmpty()) { "ONLINE_READING_ORIGINAL_WRITER_PENDING" } })
     }
 
     internal class Client internal constructor(internal val owner: AppCoreOwner, val lease: ReaderOperationOwner.ClientLease) {
@@ -163,6 +181,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
         val onlineAdds: ReaderOnlineAdd get() { owner.requireLane(lease); return owner.onlineAddService }
         val tts: ReaderTtsService get() { owner.requireLane(lease); return owner.ttsService }
+        internal val mangaProgress: ReaderMangaProgressService get() { owner.requireLane(lease); return owner.mangaProgressService }
         internal val mangaMaterializationStore: ReaderMangaMaterializationStore
             get() { owner.requireLane(lease); return owner.mangaMaterializationStore }
         internal val mangaResourceStore: ReaderMangaResourceStore
@@ -328,6 +347,14 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         if (lane.get()!!.purpose != Purpose.Business) check(lane.get()!!.purpose in setOf(Purpose.Cleanup, Purpose.TurnFinally) &&
             method == "search.content" && params.optBoolean("closeCursor") && params.optString("cursor").isNotBlank()) {
             "MAINTENANCE_CANNOT_DISPATCH_NEW_BUSINESS"
+        }
+        // Guard existing publisher entrances before they reserve another mutation as well as the final apply.
+        // Original drains/recovery do not dispatch these methods and keep their existing exact route.
+        if (method in setOf("reading.progress.update", "rules.mutation.query", "rules.mutation.apply",
+                "bookshelf.management.mutation.query", "bookshelf.management.mutation.apply", "bookmark.operation.query",
+                "bookmark.create", "bookmark.delete", "bookshelf.add", "book.toc", "manga.chapter.get", "import.local.authority.v2") ||
+            method == "reading.preparation" && params.optString("action") != "status") {
+            mangaProgressService.requireSharedWriterAdmission(method, params)
         }
     }
     override fun protocolReference(): CoreProtocolReference {
