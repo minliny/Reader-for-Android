@@ -3,7 +3,8 @@ package io.reader.android.ui
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,13 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -76,6 +75,9 @@ internal fun ReaderMangaReadingScreen(state: ReaderMangaReadingUiState, model: R
                 state = listState, modifier = Modifier.fillMaxSize().testTag("reader_manga_pages"),
             ) {
                 items(state.pages, key = { it.ordinal }) { page ->
+                    val transform = rememberTransformableState { zoom, _, _ ->
+                        model.setMangaZoom(state.zoom * zoom)
+                    }
                     val image = remember(page.decoded.transferId, page.decoded.bytes) {
                         BitmapFactory.decodeByteArray(page.decoded.bytes, 0, page.decoded.bytes.size)?.asImageBitmap()
                     }
@@ -87,9 +89,9 @@ internal fun ReaderMangaReadingScreen(state: ReaderMangaReadingUiState, model: R
                             contentScale = ContentScale.FillWidth,
                             modifier = Modifier.fillMaxWidth().graphicsLayer {
                                 scaleX = state.zoom; scaleY = state.zoom
-                            }.pointerInput(state.generation, state.zoom) {
-                                detectTransformGestures { _, _, zoom, _ -> model.setMangaZoom(state.zoom * zoom) }
-                            }.testTag("reader_manga_page_${page.ordinal}"),
+                            // Vertical drag belongs to LazyColumn; this surface only owns pinch zoom.
+                            }.transformable(transform, canPan = { false })
+                                .testTag("reader_manga_page_${page.ordinal}"),
                         )
                     }
                 }
