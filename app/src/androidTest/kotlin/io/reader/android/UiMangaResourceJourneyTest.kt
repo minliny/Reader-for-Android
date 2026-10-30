@@ -58,6 +58,7 @@ class UiMangaResourceJourneyTest {
     }
 
     private suspend fun runMangaJourney(graphics: Boolean) {
+        activeMethod = if (graphics) GRAPHICS_METHOD else METHOD
         marker("method-enter")
         val context = ApplicationProvider.getApplicationContext<Context>()
         assertEquals("io.reader.minliny", context.packageName)
@@ -262,7 +263,7 @@ class UiMangaResourceJourneyTest {
     private fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
 
     private fun marker(step: String, fields: Bundle = Bundle()) {
-        fields.putString("readerMethod", METHOD); fields.putString("readerStep", step)
+        fields.putString("readerMethod", activeMethod); fields.putString("readerStep", step)
         fields.putInt("readerProcessPid", Process.myPid()); fields.putLong("readerElapsedMs", android.os.SystemClock.elapsedRealtime())
         InstrumentationRegistry.getInstrumentation().sendStatus(2, fields)
     }
@@ -307,5 +308,8 @@ class UiMangaResourceJourneyTest {
     companion object {
         private const val PIN = "c3109d570dd62a636eff1ffb88f4e242ede0bf3a"
         private const val METHOD = "realMangaResourcePrepareDecodesPixelsAndCompletesMaterialization"
+        private const val GRAPHICS_METHOD = "realMangaGraphicsPlanDecodesRegionsAndCompletesMaterialization"
     }
+
+    @Volatile private var activeMethod: String = METHOD
 }
