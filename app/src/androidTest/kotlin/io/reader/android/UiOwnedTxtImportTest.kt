@@ -125,7 +125,9 @@ class UiOwnedTxtImportTest {
         compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.route == ReaderRoute.Directory }
         val toc = model.state.value.chapters
         assertEquals(book.chapterCount, toc.size)
-        val selected = toc.firstOrNull { it.index > 0 } ?: toc.firstOrNull() ?: throw AssertionError("Real Core TOC is empty")
+        val selected = toc.firstOrNull { it.title == "Chapter 1" }
+            ?: throw AssertionError("Real Core TOC lacks the first nonempty Alice chapter")
+        assertEquals("Chapter 1", selected.title)
         marker("owned-core-directory-ACK", Bundle().apply {
             putString("bookId", book.id); putInt("chapterCount", toc.size); putInt("selectedChapter", selected.index)
         })
