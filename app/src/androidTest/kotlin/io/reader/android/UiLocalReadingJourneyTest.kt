@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.click
@@ -179,6 +180,7 @@ class UiLocalReadingJourneyTest {
         val targetChapter = model.state.value.chapters.getOrNull(targetIndex)
             ?: throw AssertionError("Real original's second catalog entry is absent")
         marker("directory-ready")
+        compose.onNodeWithTag("reader_directory").performScrollToNode(hasTestTag("reader_chapter_${targetChapter.index}"))
         compose.onNodeWithTag("reader_chapter_${targetChapter.index}").performClick()
         compose.waitUntil(20_000) {
             model.state.value.route == ReaderRoute.Reading && model.state.value.reading?.chapter?.index == targetChapter.index && !model.state.value.busy
