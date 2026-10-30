@@ -82,7 +82,14 @@ internal data class ReaderHttpDescriptor(
                     headers.add(name, field)
                 }
             }
-            val body = body(value.opt("body"), charset, headers, limits)
+            // Core's canonical GET descriptors carry an explicit empty body string.
+            // Preserve empty bodies for methods that require one, but do not hand
+            // OkHttp a request body for GET/HEAD-style methods.
+            val rawBody = value.opt("body")
+            val body = body(rawBody, charset, headers, limits).takeUnless {
+                it != null && rawBody is String && rawBody.isEmpty() &&
+                    method in setOf("GET", "HEAD", "DELETE", "OPTIONS", "TRACE")
+            }
             val actualBody = body ?: if (method in setOf("POST", "PUT", "PATCH", "PROPPATCH", "REPORT", "QUERY"))
                 ByteArray(0).toRequestBody() else null
             if (actualBody != null && actualBody.contentLength() > limits.maximumRequestBytes) exhausted("HTTP_REQUEST_BODY_BUDGET")
