@@ -22,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.UiWatcher
 import androidx.lifecycle.Lifecycle
@@ -34,6 +35,7 @@ import io.reader.android.ui.ReaderRoute
 import io.reader.android.ui.ReaderChapterIndexKey
 import io.reader.android.ui.ReaderScalarOffsetKey
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -537,19 +539,32 @@ class UiOwnedTxtImportTest {
             marker("picker-visible")
             val file = providerSelector.text(name)
             val folder = providerSelector.text("Reader")
+            val readerBreadcrumb = providerSelector.resourceIdMatches(".*:id/breadcrumb_text").text("Reader")
+            val downloadsBreadcrumb = providerSelector.resourceIdMatches(".*:id/breadcrumb_text").textMatches("Downloads|下载|下载内容")
             val drawer = providerSelector.resourceIdMatches(".*:id/roots_list")
             val downloads = drawer.childSelector(UiSelector().textMatches("Downloads|下载|下载内容"))
-            if (!device.findObject(file).exists()) {
-                if (device.findObject(drawer).exists()) {
-                    marker("picker-drawer-ready")
-                    clickPickerOnceObserved(device, downloads, "picker-downloads", folder, gone = drawer)
-                } else if (!device.findObject(folder).exists()) {
-                    val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
-                    clickPickerOnceObserved(device, roots, "picker-roots", drawer)
-                    marker("picker-drawer-ready")
-                    clickPickerOnceObserved(device, downloads, "picker-downloads", folder, gone = drawer)
+            if (!device.findObject(file).waitForExists(2_000)) {
+                val alreadyInReader = device.findObject(readerBreadcrumb).waitForExists(2_000) &&
+                    device.findObject(downloadsBreadcrumb).waitForExists(2_000)
+                if (!alreadyInReader) {
+                    if (device.findObject(drawer).exists()) {
+                        marker("picker-drawer-ready")
+                        clickPickerOnceObserved(device, downloads, "picker-downloads", folder, gone = drawer)
+                    } else if (!device.findObject(folder).exists()) {
+                        val roots = providerSelector.descriptionMatches("Show roots|显示根目录|显示位置|导航抽屉")
+                        clickPickerOnceObserved(device, roots, "picker-roots", drawer)
+                        marker("picker-drawer-ready")
+                        clickPickerOnceObserved(device, downloads, "picker-downloads", folder, gone = drawer)
+                    }
+                    if (!device.findObject(readerBreadcrumb).exists()) {
+                        clickPickerOnceObserved(device, folder, "picker-folder", readerBreadcrumb)
+                    }
+                    assertTrue("Reader breadcrumb absent", device.findObject(readerBreadcrumb).waitForExists(5_000))
+                    assertTrue("Downloads ancestor breadcrumb absent", device.findObject(downloadsBreadcrumb).waitForExists(5_000))
                 }
-                if (!device.findObject(file).exists()) clickPickerOnceObserved(device, folder, "picker-folder", file)
+                if (!device.findObject(file).waitForExists(2_000)) {
+                    exposeFreshDocumentTitle(device, provider, file)
+                }
             }
             assertTrue("Original input missing: $name", device.findObject(file).waitForExists(5_000))
             marker("picker-file-click")
@@ -566,6 +581,24 @@ class UiOwnedTxtImportTest {
         } finally {
             device.removeWatcher(watcherName)
         }
+    }
+
+    private fun exposeFreshDocumentTitle(device: UiDevice, provider: String, file: UiSelector) {
+        val container = UiSelector().packageNameMatches(provider).className("android.widget.ScrollView").scrollable(true)
+        for (attempt in 1..2) {
+            val beforeVisible = device.findObject(file).waitForExists(750)
+            if (beforeVisible) return
+            assertTrue("Unique DocumentsUI scroll container absent", device.findObject(container.instance(0)).exists())
+            assertFalse("DocumentsUI scroll container ambiguous", device.findObject(container.instance(1)).exists())
+            val returned = UiScrollable(container).scrollForward(35)
+            val afterVisible = device.findObject(file).waitForExists(1_000)
+            marker("picker-document-scroll-$attempt", Bundle().apply {
+                putInt("attempt", attempt); putInt("maxScrolls", 2); putInt("scrollSteps", 35)
+                putBoolean("beforeVisible", beforeVisible); putBoolean("scrollReturned", returned); putBoolean("afterVisible", afterVisible)
+            })
+            if (afterVisible) return
+        }
+        throw AssertionError("Exact fresh TXT document-row title absent after two bounded DocumentsUI scrolls")
     }
 
     private fun clickPickerOnceObserved(device: UiDevice, selector: UiSelector, stage: String, next: UiSelector, gone: UiSelector? = null) {
