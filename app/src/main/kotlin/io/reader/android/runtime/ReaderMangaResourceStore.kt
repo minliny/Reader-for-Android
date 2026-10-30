@@ -143,6 +143,7 @@ internal class ReaderMangaResourceStore(private val root: File) {
     @Synchronized
     fun evict(identity: ReaderMangaTransferIdentity, sha256: String): Boolean {
         val directory = File(root, key(identity, sha256))
+        if ((decodedLeases[identity.wireId] ?: 0) > 0 || identity.resourceRef in protectedRefs) return false
         return !directory.exists() || directory.deleteRecursively()
     }
 
