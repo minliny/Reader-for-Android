@@ -46,6 +46,7 @@ import org.junit.runners.model.Statement
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
 import kotlin.math.abs
 
 /** SOURCE-ONLY one-owned-TXT SAF import. Picker/native/teardown helpers reused unchanged. */
@@ -572,8 +573,20 @@ class UiOwnedTxtImportTest {
         marker("$stage-click")
         val returned = device.findObject(selector).click()
         marker("$stage-click-observed", Bundle().apply { putBoolean("clickReturned", returned) })
-        if (gone != null) assertTrue("$stage did not retire its drawer", device.findObject(gone).waitUntilGone(5_000))
-        assertTrue("$stage did not expose the next state", device.findObject(next).waitForExists(5_000))
+        try {
+            if (gone != null) assertTrue("$stage did not retire its drawer", device.findObject(gone).waitUntilGone(5_000))
+            assertTrue("$stage did not expose the next state", device.findObject(next).waitForExists(5_000))
+        } catch (failure: Throwable) {
+            try {
+                val hierarchy = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
+                    "reader-fresh-picker-${stage}-${System.currentTimeMillis()}.xml")
+                device.dumpWindowHierarchy(hierarchy)
+                marker("fresh-picker-hierarchy", Bundle().apply {
+                    putString("stage", stage); putString("path", hierarchy.absolutePath); putLong("bytes", hierarchy.length())
+                })
+            } catch (diagnostic: Throwable) { failure.addSuppressed(diagnostic) }
+            throw failure
+        }
         marker("$stage-ready")
     }
 
