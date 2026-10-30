@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
-import android.util.AtomicFile
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -38,6 +37,7 @@ import io.reader.android.ui.ReaderViewModel
 import io.reader.android.ui.ebookdraft.ReaderEbookReady
 import kotlinx.coroutines.Job
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -60,11 +60,24 @@ class UiFreshMobiJourneyTest {
     private var scenario: ActivityScenario<MainActivity>? = null
     private lateinit var current: MainActivity
     private val bookId = "local:$SOURCE_SHA"
+    private var currentMethod = METHOD
     @get:Rule val rules: TestRule = RuleChain.outerRule(
         Timeout.builder().withTimeout(240, TimeUnit.SECONDS).withLookingForStuckThread(true).build()).around(compose)
 
     @Test
     fun freshFuHanMobiImportsScrollsAndExitsWithOriginalReceipts() {
+        currentMethod = METHOD
+        runJourney(continueImported = false)
+    }
+
+    /** Continue the exact settled import after the first method stopped before its swipe/save slice. */
+    @Test
+    fun existingFreshFuHanMobiScrollsAndExitsWithOriginalReceipts() {
+        currentMethod = CONTINUATION_METHOD
+        runJourney(continueImported = true)
+    }
+
+    private fun runJourney(continueImported: Boolean) {
         marker("method-enter") // Before launch/current Activity access.
         var primary: Throwable? = null
         var phase = "precondition"
@@ -80,9 +93,16 @@ class UiFreshMobiJourneyTest {
             healthy(model, 0)
             val initial = model.state.value
             assertTrue(initial.pendingReady && initial.reading == null && initial.route == ReaderRoute.Bookshelf)
-            val otherBooks = initial.books.associateBy { it.key }
+            val otherBooks = initial.books.filter { it.id != bookId }.associateBy { it.key }
             val otherRemoteBooks = initial.remoteBooks
-            assertTrue(initial.books.none { it.id == bookId }); assertFalse(File(current.filesDir, "Reader/Originals/$SOURCE_SHA.source").exists())
+            val importRevision = if (continueImported) 0L else 1L
+            val original = File(current.filesDir, "Reader/Originals/$SOURCE_SHA.source")
+            if (continueImported) {
+                assertEquals(560, initial.books.single { it.id == bookId }.chapterCount)
+                assertEquals(SOURCE_BYTES, original.length()); assertEquals(SOURCE_SHA, shaFile(original))
+            } else {
+                assertTrue(initial.books.none { it.id == bookId }); assertFalse(original.exists())
+            }
             val retainedFiles = retainedNonTargetFiles()
             val beforeImport = completedNames()
             compose.waitUntil(5_000) { compose.runOnUiThread { current.window.decorView.hasWindowFocus() } }
@@ -98,22 +118,39 @@ class UiFreshMobiJourneyTest {
                 putInt("retainedOperationAndOriginalFiles", retainedFiles.size)
             })
 
-            phase = "one-saf-mobi-import"
-            compose.onNodeWithTag("reader_import").assertIsEnabled().performClick()
-            selectDocument(displayName)
-            compose.waitUntil(120_000) { val state = model.state.value; !state.busy && (state.importRevision > 0 || failed(model)) }
-            healthy(model, 1); assertEquals(bookId, model.state.value.lastImportedBookId)
+            val imported = if (continueImported) {
+                phase = "bind-existing-settled-original-import"
+                val id = args.getString("expectedImportId") ?: throw AssertionError("expectedImportId required")
+                val expectedRecordSha = args.getString("expectedImportRecordSha256") ?: throw AssertionError("expectedImportRecordSha256 required")
+                assertTrue(id.matches(Regex("android-import-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")))
+                assertTrue(expectedRecordSha.matches(Regex("[a-f0-9]{64}")))
+                val file = File(current.filesDir, "Reader/Operations/Completed/$id.json")
+                val bound = readCompletedRecord(file)
+                assertEquals(id, bound.second.getString("id")); assertEquals(expectedRecordSha, sha(bound.third))
+                assertFalse(File(current.filesDir, "Reader/Operations/$id.json").exists())
+                assertFalse(File(current.filesDir, "Reader/Operations/$id.json.new").exists())
+                assertFalse(File(current.filesDir, "Reader/Operations/$id.json.bak").exists())
+                assertEquals(beforeImport, completedNames())
+                bound
+            } else {
+                phase = "one-saf-mobi-import"
+                compose.onNodeWithTag("reader_import").assertIsEnabled().performClick()
+                selectDocument(displayName)
+                compose.waitUntil(120_000) { val state = model.state.value; !state.busy && (state.importRevision > 0 || failed(model)) }
+                healthy(model, importRevision); assertEquals(bookId, model.state.value.lastImportedBookId)
+                freshRecords(beforeImport).single()
+            }
+            healthy(model, importRevision)
             assertEquals(otherBooks, model.state.value.books.filter { it.id != bookId }.associateBy { it.key })
             assertEquals(otherRemoteBooks, model.state.value.remoteBooks)
             assertRetainedFiles(retainedFiles)
             val book = model.state.value.books.single { it.id == bookId }; assertEquals(560, book.chapterCount)
-            val imported = freshRecords(beforeImport).single(); val importFile = imported.first; val importRaw = imported.third; val record = imported.second
+            val importFile = imported.first; val importRaw = imported.third; val record = imported.second
             assertEquals("import", record.getString("kind")); assertTrue(record.getBoolean("completed"))
             assertEquals("finalize", record.getString("terminalStage")); assertEquals("settled", record.getJSONObject("settlement").getString("state"))
             val binding = record.getJSONObject("binding")
             assertEquals(bookId, binding.getString("bookId")); assertEquals(SOURCE_SHA, binding.getString("sourceSha256"))
             assertEquals(SOURCE_BYTES, binding.getLong("sourceBytes")); assertEquals("mobi", binding.getString("format"))
-            val original = File(current.filesDir, "Reader/Originals/$SOURCE_SHA.source")
             assertEquals(SOURCE_BYTES, original.length()); assertEquals(SOURCE_SHA, shaFile(original))
             val summary = record.getJSONObject("receipts").getJSONObject("persist").getJSONObject("data").getJSONObject("data")
             assertEquals(560, summary.getInt("chapterCount"))
@@ -126,9 +163,10 @@ class UiFreshMobiJourneyTest {
             val sourceStart = locator.getInt("chapterStartScalar"); val sourceEnd = locator.getInt("chapterEndScalar")
             val sourceCanonicalSha = locator.getString("chapterContentSha256")
             assertTrue(sourceStart >= 0 && sourceEnd > sourceStart && sourceCanonicalSha.matches(Regex("[a-f0-9]{64}")))
-            marker("fresh-mobi-import-finalized-settled-original", Bundle().apply {
+            marker(if (continueImported) "fresh-mobi-existing-import-finalized-settled-original" else "fresh-mobi-import-finalized-settled-original", Bundle().apply {
                 putString("bookId", bookId); putInt("chapterCount", book.chapterCount)
                 putString("originalId", record.getString("id")); putString("originalRecordSha256", sha(imported.third))
+                putLong("originalRecordBytes", importRaw.size.toLong()); putBoolean("reimportDispatched", !continueImported)
                 putString("format", binding.getString("format")); putString("authorityEpoch", binding.getString("authorityEpoch"))
                 putLong("sequence", binding.getLong("sequence")); putLong("sourceBytes", original.length()); putString("sourceSHA", SOURCE_SHA)
                 putLong("importRevision", model.state.value.importRevision)
@@ -139,7 +177,7 @@ class UiFreshMobiJourneyTest {
             compose.onNodeWithTag("reader_bookshelf").performScrollToNode(hasTestTag("reader_book_directory_$bookId"))
             compose.onNodeWithTag("reader_book_directory_$bookId").assertIsDisplayed().performClick()
             compose.waitUntil(20_000) { !model.state.value.busy && (model.state.value.route == ReaderRoute.Directory || failed(model)) }
-            healthy(model, 1); assertNull(model.state.value.reading)
+            healthy(model, importRevision); assertNull(model.state.value.reading)
             val toc = model.state.value.chapters; assertEquals(560, toc.size)
             val selected = toc.single { it.index == 3 }; assertEquals(sourceEntry.getString("title"), selected.title)
             marker("fresh-mobi-core-directory-bound", Bundle().apply {
@@ -151,7 +189,7 @@ class UiFreshMobiJourneyTest {
             compose.onNodeWithTag("reader_directory").performScrollToNode(hasTestTag("reader_chapter_${selected.index}"))
             compose.onNodeWithTag("reader_chapter_${selected.index}").assertIsDisplayed().performClick()
             compose.waitUntil(20_000) { !model.state.value.busy && (model.state.value.reading != null || failed(model)) }
-            healthy(model, 1)
+            healthy(model, importRevision)
             val reading = model.state.value.reading ?: throw AssertionError("Actual MOBI Core chapter absent")
             assertEquals(ReaderLocalBookFormat.MOBI, reading.format)
             assertEquals(bookId, reading.chapter.bookId); assertEquals(selected.index, reading.chapter.index)
@@ -161,7 +199,7 @@ class UiFreshMobiJourneyTest {
 
             phase = "actual-webview-ready-draw-dom"
             compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
-            healthy(model, 1)
+            healthy(model, importRevision)
             // Native Ready is synchronous; Compose must commit removal of its covering Surface too.
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
@@ -184,12 +222,21 @@ class UiFreshMobiJourneyTest {
             val presentation = prepared.publication.presentation
             assertEquals(selectedEntry, presentation.entryPath)
             assertEquals(sourceStart, presentation.chapterStartScalar); assertEquals(sourceEnd, presentation.chapterEndScalar)
-            assertEquals(sourceCanonicalSha, sha(reading.chapter.text.toByteArray(Charsets.UTF_8)))
             val canonical = presentation.documentCanonicalContent
             val canonicalScalars = canonical.codePointCount(0, canonical.length)
             assertTrue(presentation.chapterStartScalar >= 0 && presentation.chapterEndScalar in presentation.chapterStartScalar..canonicalScalars)
-            assertEquals(reading.chapter.text, canonical.substring(canonical.offsetByCodePoints(0, presentation.chapterStartScalar),
-                canonical.offsetByCodePoints(0, presentation.chapterEndScalar)))
+            val originalWindow = canonical.substring(canonical.offsetByCodePoints(0, presentation.chapterStartScalar),
+                canonical.offsetByCodePoints(0, presentation.chapterEndScalar))
+            assertEquals(sourceCanonicalSha, sha(originalWindow.toByteArray(Charsets.UTF_8)))
+            assertEquals(originalWindow, presentation.originalChapter); assertEquals(reading.chapter.text, presentation.processedChapter)
+            val editsJson = JSONArray().apply { presentation.edits.forEach { edit ->
+                put(JSONObject().put("startScalar", edit.startScalar).put("endScalar", edit.endScalar).put("text", edit.text))
+            } }
+            val replay = if (editsJson.length() == 0) originalWindow else replayProcessedEdits(originalWindow, editsJson)
+            assertEquals(reading.chapter.text, replay)
+            val originalScalarCount = originalWindow.codePointCount(0, originalWindow.length)
+            val processedSha = sha(reading.chapter.text.toByteArray(Charsets.UTF_8))
+            assertEquals(sourceEnd - sourceStart, originalScalarCount)
             assertEquals(mount.view.physicalViewId, lease.renderId)
             val entryUri = Uri.parse(probe.getString("entryUrl"))
             assertEquals("https", entryUri.scheme); assertEquals("reader-ebook.invalid", entryUri.encodedAuthority)
@@ -212,13 +259,18 @@ class UiFreshMobiJourneyTest {
                 putLong("layoutEpoch", ready.layoutEpoch); putString("layoutToken", ready.layoutToken)
                 putString("entryPath", presentation.entryPath); putString("origin", probe.getString("origin")); putString("format", "mobi")
                 putString("originalLocatorJson", locatorRaw)
+                putString("originalChapterSha256", sourceCanonicalSha); putInt("originalScalarCount", originalScalarCount)
+                putString("processedChapterSha256", processedSha); putInt("processedScalarCount", reading.chapter.scalarCount)
+                putString("processedEditsJson", editsJson.toString()); putInt("processedEditsCount", editsJson.length())
+                putString("processedEditsReplaySha256", sha(replay.toByteArray(Charsets.UTF_8)))
+                putBoolean("originalEqualsProcessed", originalWindow == reading.chapter.text)
                 putInt("chapterStartScalar", presentation.chapterStartScalar); putInt("chapterEndScalar", presentation.chapterEndScalar)
                 putInt("documentScalarCount", canonicalScalars); putString("documentCanonicalSha256", sha(canonical.toByteArray(Charsets.UTF_8)))
                 putString("providerPackage", provider.packageName); putString("providerVersion", provider.versionName)
                 putString("canonicalSha256", sha(reading.chapter.text.toByteArray(Charsets.UTF_8)))
                 putString("observedDomTextSampleSha256", sha(probe.getString("domText").toByteArray(Charsets.UTF_8)))
                 putString("probeMetrics", JSONObject(probe.toString()).apply { remove("domText") }.toString())
-                putString("textClaim", "LIVE_DOM_TEXT_SAMPLE_OBSERVATION_ONLY_CANONICAL_AUTHENTICATION_IS_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
+                putString("textClaim", "DOM_SAMPLE_ONLY_ORIGINAL_CANONICAL_AND_CORE_PROCESSED_EDITS_AUTHENTICATED_BY_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
             })
             assertEquals(beforeAuto, completedNames())
 
@@ -240,7 +292,7 @@ class UiFreshMobiJourneyTest {
             }
             assertTrue(UiDevice.getInstance(instrumentation).swipe(points[0], points[1], points[0], points[2], 35))
             compose.waitUntil(10_000) { failed(model) || compose.runOnUiThread { (capturedVisibleAnchor(mount, web, ready) ?: 0) > 0 } }
-            healthy(model, 1)
+            healthy(model, importRevision)
             compose.waitUntil(15_000) {
                 if (failed(model)) true else {
                     val names = completedNames() - beforeAuto
@@ -250,7 +302,7 @@ class UiFreshMobiJourneyTest {
                         !File(current.filesDir, "Reader/Operations/Completed/${names.single()}.new").exists()
                 }
             }
-            healthy(model, 1)
+            healthy(model, importRevision)
             val auto = freshRecords(beforeAuto).single()
             val autoRecord = auto.second; val autoParams = autoRecord.getJSONObject("parameters"); val autoWire = autoRecord.getJSONObject("wireTerminal")
             assertTrue(autoRecord.getBoolean("completed")); assertEquals("progress", autoRecord.getString("kind"))
@@ -306,12 +358,12 @@ class UiFreshMobiJourneyTest {
             assertTrue("Actual DOM-derived non-link visible content tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
             compose.waitUntil(5_000) { model.state.value.reading?.identity == reading.identity && model.state.value.controlsVisible && enabledExit() }
             attachedDraw(current.window.decorView)
-            assertTrue(enabledExit()); healthy(model, 1)
+            assertTrue(enabledExit()); healthy(model, importRevision)
             assertEquals(scrolled.visibleScalarOffset, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, completedNames())
             marker("fresh-mobi-trusted-body-tap-controls-draw", Bundle().apply { putLong("readingOwner", reading.identity) })
             compose.onNodeWithTag("reader_exit").assertIsEnabled().performClick()
             compose.waitUntil(15_000) { !model.state.value.busy && (model.state.value.reading == null || failed(model)) }
-            healthy(model, 1); assertNull(model.state.value.reading); assertEquals(ReaderRoute.Bookshelf, model.state.value.route)
+            healthy(model, importRevision); assertNull(model.state.value.reading); assertEquals(ReaderRoute.Bookshelf, model.state.value.route)
             val saved = freshRecords(beforeExit).single()
             val progress = saved.second; val parameters = progress.getJSONObject("parameters"); val wire = progress.getJSONObject("wireTerminal")
             assertEquals("progress", progress.getString("kind")); assertEquals(bookId, progress.getString("bookId"))
@@ -335,7 +387,7 @@ class UiFreshMobiJourneyTest {
             assertEquals(otherRemoteBooks, model.state.value.remoteBooks)
             assertRetainedFiles(retainedFiles)
             assertEquals(sha(importRaw), shaFile(importFile))
-            assertEquals(1L, model.state.value.importRevision)
+            assertEquals(importRevision, model.state.value.importRevision)
             compose.onNodeWithTag("reader_shelf_query").assertIsDisplayed()
         } catch (failure: Throwable) {
             primary = failure
@@ -365,6 +417,25 @@ class UiFreshMobiJourneyTest {
             assertTrue("Non-target retained file missing: $path", file.isFile)
             assertEquals("Non-target retained file length changed: $path", identity.first, file.length())
             assertEquals("Non-target retained file bytes changed: $path", identity.second, shaFile(file))
+        }
+    }
+
+    private fun replayProcessedEdits(original: String, edits: JSONArray): String {
+        val sourceCount = original.codePointCount(0, original.length)
+        assertTrue(sourceCount <= 32768 && edits.length() in 1..100000)
+        var cursor = 0
+        var utf16Cursor = 0
+        return buildString {
+            for (index in 0 until edits.length()) {
+                val edit = edits.getJSONObject(index); val first = edit.getInt("startScalar"); val past = edit.getInt("endScalar")
+                val replacement = edit.getString("text")
+                assertTrue(first >= cursor && past in first..sourceCount); assertFalse('\uFFFC' in replacement)
+                val firstUtf16 = original.offsetByCodePoints(utf16Cursor, first - cursor)
+                val pastUtf16 = original.offsetByCodePoints(firstUtf16, past - first)
+                append(original, utf16Cursor, firstUtf16)
+                append(replacement); cursor = past; utf16Cursor = pastUtf16
+            }
+            append(original, utf16Cursor, original.length)
         }
     }
 
@@ -428,9 +499,14 @@ class UiFreshMobiJourneyTest {
     private fun healthy(model: ReaderViewModel, revision: Long) { assertFalse("Original operation failed/pending", failed(model)); assertEquals(revision, model.state.value.importRevision) }
     private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
     private fun freshRecords(before: Set<String>) = (completedNames() - before).map { name ->
-        val file = File(current.filesDir, "Reader/Operations/Completed/$name")
-        assertTrue(file.length() in 1..8L * 1024 * 1024)
-        val raw = AtomicFile(file).openRead().use { it.readBytes() }; Triple(file, JSONObject(raw.toString(Charsets.UTF_8)), raw)
+        readCompletedRecord(File(current.filesDir, "Reader/Operations/Completed/$name"))
+    }
+    private fun readCompletedRecord(file: File): Triple<File, JSONObject, ByteArray> {
+        assertTrue(file.isFile && file.length() in 1..8L * 1024 * 1024)
+        assertFalse(File(file.parentFile, file.name + ".new").exists())
+        assertFalse(File(file.parentFile, file.name + ".bak").exists())
+        val raw = file.readBytes()
+        return Triple(file, JSONObject(raw.toString(Charsets.UTF_8)), raw)
     }
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
     private fun actualWebView(): WebView {
@@ -503,7 +579,7 @@ class UiFreshMobiJourneyTest {
         assertEquals(Lifecycle.State.DESTROYED, owned.state); owned.close(); marker("activity-destroyed")
     }
     private fun marker(step: String, details: Bundle = Bundle()) {
-        details.putString("readerStep", step); details.putString("readerMethod", METHOD)
+        details.putString("readerStep", step); details.putString("readerMethod", currentMethod)
         details.putInt("readerProcessPid", AndroidProcess.myPid()); details.putLong("readerProcessStartElapsedMs", AndroidProcess.getStartElapsedRealtime())
         details.putLong("readerElapsedMs", SystemClock.elapsedRealtime()); instrumentation.sendStatus(2, details)
     }
@@ -515,6 +591,7 @@ class UiFreshMobiJourneyTest {
     }
     companion object {
         private const val METHOD = "freshFuHanMobiImportsScrollsAndExitsWithOriginalReceipts"
+        private const val CONTINUATION_METHOD = "existingFreshFuHanMobiScrollsAndExitsWithOriginalReceipts"
         private const val SOURCE_SHA = "a25dcde710240f9c2c03d7b7b98aa09277d83392f3dc0da9779f6bc78e7c0cef"
         private const val SOURCE_BYTES = 8522384L
         private const val ORIGIN = "https://reader-ebook.invalid"
