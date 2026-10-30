@@ -141,8 +141,32 @@ class UiLocalReadingJourneyTest {
         marker("method-exit")
     }
 
+    /** Fresh Alice slice: bind the audited nonempty Core chapter instead of the TOC-only prelude rows. */
+    @Test
+    fun freshAliceDailyReadingScrollRecreateAndRestore() = withMethodCleanup {
+        marker("method-enter")
+        val args = InstrumentationRegistry.getArguments()
+        val hash = args.getString("expectedSHA") ?: throw AssertionError("expectedSHA required")
+        val expectedCount = args.getString("expectedChapterCount")?.toIntOrNull()
+            ?: throw AssertionError("expectedChapterCount required")
+        val targetIndex = args.getString("targetChapterIndex")?.toIntOrNull()
+            ?: throw AssertionError("targetChapterIndex required")
+        assertTrue(hash.matches(Regex("[a-f0-9]{64}")) && expectedCount > 1 && targetIndex >= 0)
+        val model = compose.activity.readerViewModel
+        marker("activity-owner-ready")
+        compose.waitUntil(20_000) { model.state.value.ready && !model.state.value.busy }
+        assertEquals(0L, model.state.value.importRevision)
+        assertTrue(model.state.value.pendingImports.isEmpty() && model.state.value.pendingPositions.isEmpty())
+        val book = model.state.value.books.singleOrNull { it.id == "local:$hash" }
+            ?: throw AssertionError("Fresh Alice book is absent")
+        assertEquals(expectedCount, book.chapterCount)
+        marker("fresh-book-admitted", Bundle().apply { putString("bookId", book.id); putInt("chapterCount", book.chapterCount); putInt("targetChapter", targetIndex) })
+        readReturnAndRecreateExisting(book, model, targetIndex)
+        marker("method-exit")
+    }
+
     /** Shared reading suffix; import and existing-book admission stay separate. */
-    private fun readReturnAndRecreateExisting(book: LibraryBook, model: ReaderViewModel) {
+    private fun readReturnAndRecreateExisting(book: LibraryBook, model: ReaderViewModel, targetIndex: Int = 1) {
         marker("reader-open-request")
         compose.onNodeWithTag("reader_book_${book.id}").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
@@ -152,7 +176,7 @@ class UiLocalReadingJourneyTest {
         marker("directory-open-request")
         compose.onNodeWithTag("reader_open_directory").performClick()
         compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Directory && !model.state.value.busy }
-        val targetChapter = model.state.value.chapters.getOrNull(1)
+        val targetChapter = model.state.value.chapters.getOrNull(targetIndex)
             ?: throw AssertionError("Real original's second catalog entry is absent")
         marker("directory-ready")
         compose.onNodeWithTag("reader_chapter_${targetChapter.index}").performClick()
