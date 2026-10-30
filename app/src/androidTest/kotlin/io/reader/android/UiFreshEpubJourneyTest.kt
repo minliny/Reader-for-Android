@@ -39,6 +39,7 @@ class UiFreshEpubJourneyTest {
         currentMethod = "freshZhongSongEpubImportsReadsAndExits"
         marker("rule-enter")
         try {
+            marker("method-enter")
             val args = InstrumentationRegistry.getArguments()
             val name = args.getString("displayName") ?: error("displayName required")
             val sha = args.getString("expectedSHA") ?: error("expectedSHA required")
@@ -62,6 +63,10 @@ class UiFreshEpubJourneyTest {
             compose.onNodeWithTag("reader_book_${book.id}").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
             assertEquals(ReaderLocalBookFormat.EPUB, model.state.value.reading?.format)
+            compose.onNodeWithTag("reader_ebook_body").performTouchInput { click(center) }
+            compose.waitUntil(5_000) {
+                model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_open_directory")).fetchSemanticsNodes().isNotEmpty()
+            }
             compose.onNodeWithTag("reader_open_directory").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Directory && !model.state.value.busy }
             val target = model.state.value.chapters.firstOrNull { it.index == 1 } ?: error("EPUB chapter 1 absent")
