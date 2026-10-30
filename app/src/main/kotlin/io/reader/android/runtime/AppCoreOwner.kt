@@ -39,7 +39,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
             this, root, operations.dataDirectory)
     }
     private val httpHost = ReaderHttpHost()
-    private val mangaResourceHost = ReaderMangaResourceHost(httpHost)
+    private val mangaResourceHost = ReaderMangaResourceHost(httpHost, ReaderMangaResourceStore(File(root, "Manga/Resources")))
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
             NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),

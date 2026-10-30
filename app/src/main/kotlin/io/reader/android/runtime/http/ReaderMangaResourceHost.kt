@@ -1,6 +1,8 @@
 package io.reader.android.runtime.http
 
 import io.reader.android.runtime.ReaderCoreEventActor
+import io.reader.android.runtime.ReaderMangaResourceStore
+import io.reader.android.runtime.ReaderMangaTransferIdentity
 import org.json.JSONObject
 import okio.ByteString.Companion.decodeBase64
 
@@ -9,7 +11,10 @@ import okio.ByteString.Companion.decodeBase64
  * HTTP owner and hands immutable chunks to the event actor; decode, metadata,
  * cache and UI remain separate capabilities.
  */
-internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
+internal class ReaderMangaResourceHost(
+    private val httpHost: ReaderHttpHost,
+    private val resourceStore: ReaderMangaResourceStore,
+) {
     suspend fun execute(envelope: ReaderCoreEventActor.HostEnvelope): ReaderCoreEventActor.HostReply {
         if (envelope.capability != CAPABILITY) return ReaderCoreEventActor.HostReply.Error(
             "UNKNOWN_METHOD", "Android manga resource transfer is not available for this capability", false,
@@ -17,7 +22,9 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
         val raw = try { JSONObject(envelope.parametersJson) } catch (_: org.json.JSONException) {
             return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_RESOURCE_INPUT_INVALID", false)
         }
-        if (raw.optString("stage", "") != STAGE_INPUT) return ReaderCoreEventActor.HostReply.Error(
+        val stage = raw.optString("stage", "")
+        if (stage == STAGE_INSPECT) return inspect(raw)
+        if (stage != STAGE_INPUT) return ReaderCoreEventActor.HostReply.Error(
             "UNKNOWN_METHOD", "manga resource output/decode is not implemented in this slice", false,
         )
         val input = try {
@@ -39,7 +46,41 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
             is ReaderCoreEventActor.HostReply.AssetConsume -> ReaderCoreEventActor.HostReply.Error(
                 "INTERNAL", "MANGA_HTTP_NESTED_ASSET_UNEXPECTED", false,
             )
-            is ReaderCoreEventActor.HostReply.Complete -> parseHttpResult(httpReply.resultJson, input.maxBytes)
+            is ReaderCoreEventActor.HostReply.Complete -> {
+                val transfer = parseHttpResult(httpReply.resultJson, input.maxBytes)
+                if (transfer !is ReaderCoreEventActor.HostReply.AssetTransfer) return transfer
+                val identity = try { ReaderMangaTransferIdentity.decode(input.transferId, input.resourceRef) }
+                catch (_: IllegalArgumentException) {
+                    return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_TRANSFER_IDENTITY", false)
+                }
+                val staged = try { resourceStore.stage(identity, transfer.chunks, transfer.contentType) }
+                catch (_: IllegalArgumentException) {
+                    return ReaderCoreEventActor.HostReply.Error("RESOURCE_EXHAUSTED", "MANGA_RESOURCE_STAGE", false)
+                }
+                transfer.copy(onCommitted = { resourceStore.commit(staged) })
+            }
+        }
+    }
+
+    private fun inspect(value: JSONObject): ReaderCoreEventActor.HostReply {
+        return try {
+            exactKeys(value, setOf("stage", "transferId", "sha256", "bytes", "maxBytes"))
+            val transferId = nonBlank(value.getString("transferId"), "transferId", 128)
+            val bytes = exactLong(value.get("bytes"), "bytes")
+            require(bytes in 1..MAX_BYTES) { "bytes must be in 1..16 MiB" }
+            val sha256 = nonBlank(value.getString("sha256"), "sha256", 64)
+            require(sha256.matches(Regex("[0-9a-f]{64}"))) { "sha256 must be lowercase hex" }
+            val resource = resourceStore.readByTransferId(transferId, sha256, bytes)
+            ReaderCoreEventActor.HostReply.AssetTransfer(
+                resource.encoded.asList().chunked(CHUNK_BYTES).map { it.toByteArray() },
+                contentType = resource.contentType,
+            )
+        } catch (error: IllegalArgumentException) {
+            ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", error.message ?: "MANGA_RESOURCE_INSPECT_INVALID", false)
+        } catch (error: IllegalStateException) {
+            ReaderCoreEventActor.HostReply.Error("INTERNAL", error.message ?: "MANGA_RESOURCE_INSPECT_READ", false)
+        } catch (_: java.io.IOException) {
+            ReaderCoreEventActor.HostReply.Error("INTERNAL", "MANGA_RESOURCE_INSPECT_READ", false)
         }
     }
 
@@ -124,6 +165,7 @@ internal class ReaderMangaResourceHost(private val httpHost: ReaderHttpHost) {
     companion object {
         internal const val CAPABILITY = "manga.resource.transfer"
         internal const val STAGE_INPUT = "input"
+        internal const val STAGE_INSPECT = "inspectInput"
         internal const val CHUNK_BYTES = 1024 * 1024
         internal const val MAX_BYTES = 16L * 1024 * 1024
     }

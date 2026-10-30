@@ -1,5 +1,7 @@
 package io.reader.android.runtime
 
+import java.security.MessageDigest
+
 /** Core-owned manga source identity; image bytes and rendering remain Host-owned. */
 data class ReaderMangaChapterRef(val sourceId: String, val bookId: String)
 
@@ -84,6 +86,32 @@ data class ReaderMangaResourcePrepareRequest(
     val sourceRuleVersion: String,
     val transferId: String,
 )
+
+/** Compact Core-safe identity for a Host-owned encoded resource transfer. */
+internal data class ReaderMangaTransferIdentity(val wireId: String, val resourceRef: String) {
+    init {
+        require(wireId.matches(Regex("rmt1:[0-9a-f]{64}"))) { "MANGA_TRANSFER_IDENTITY" }
+        require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
+    }
+
+    companion object {
+        fun forPrepare(request: ReaderMangaResourcePrepareRequest): ReaderMangaTransferIdentity {
+            val original = request.transferId.trim()
+            require(original.isNotEmpty()) { "MANGA_TRANSFER_ID" }
+            val canonical = listOf(
+                request.chapter.sourceId, request.chapter.bookId, request.chapter.chapterId,
+                request.manifestVersion, request.resourceRef, request.sourceRuleVersion, original,
+            ).joinToString("\u0000")
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(canonical.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            return ReaderMangaTransferIdentity("rmt1:$digest", request.resourceRef)
+        }
+
+        fun decode(wireId: String, resourceRef: String): ReaderMangaTransferIdentity =
+            ReaderMangaTransferIdentity(wireId, resourceRef)
+    }
+}
 
 data class ReaderMangaResourcePrepareResult(
     val prepared: Boolean,

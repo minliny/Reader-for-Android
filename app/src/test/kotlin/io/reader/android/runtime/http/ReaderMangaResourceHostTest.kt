@@ -1,6 +1,7 @@
 package io.reader.android.runtime.http
 
 import io.reader.android.runtime.ReaderCoreEventActor
+import io.reader.android.runtime.ReaderMangaResourceStore
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -9,7 +10,11 @@ import org.junit.Test
 import java.util.Base64
 
 class ReaderMangaResourceHostTest {
-    private val host = ReaderMangaResourceHost(ReaderHttpHost())
+    private val host = ReaderMangaResourceHost(ReaderHttpHost(), ReaderMangaResourceStore(tempDirectory()))
+
+    companion object {
+        private fun tempDirectory() = java.nio.file.Files.createTempDirectory("reader-manga-host-").toFile()
+    }
 
     @Test fun inputParserBindsTransferResourceRequestAndMaxBytes() {
         val parsed = host.parseInput(inputJson(8L * 1024 * 1024))
@@ -79,15 +84,15 @@ class ReaderMangaResourceHostTest {
         assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
     }
 
-    @Test fun inspectInputStageIsClosedUntilResourceStoreOwnsEncodedBytes() = runBlocking {
+    @Test fun inspectInputStageRequiresACommittedResource() = runBlocking {
         val reply = host.execute(ReaderCoreEventActor.HostEnvelope(
             runtimeSession = "runtime", requestId = 1, requestToken = "token", operationId = 2,
             capability = ReaderMangaResourceHost.CAPABILITY,
             parametersJson = JSONObject().put("stage", "inspectInput")
-                .put("transferId", "transfer-1").put("sha256", "a".repeat(64)).put("bytes", 128).toString(),
+                .put("transferId", "rmt1:${"a".repeat(64)}").put("sha256", "a".repeat(64)).put("bytes", 128).toString(),
         ))
-        assertError(reply, "manga resource output/decode is not implemented in this slice")
-        assertEquals("UNKNOWN_METHOD", (reply as ReaderCoreEventActor.HostReply.Error).code)
+        assertTrue(reply is ReaderCoreEventActor.HostReply.Error)
+        assertEquals("INTERNAL", (reply as ReaderCoreEventActor.HostReply.Error).code)
     }
 
     private fun assertError(reply: ReaderCoreEventActor.HostReply, message: String) {

@@ -1,0 +1,45 @@
+package io.reader.android.runtime
+
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.nio.file.Files
+
+class ReaderMangaResourceStoreTest {
+    @Test
+    fun stagedBytesAreInvisibleUntilCommitAndReadBindsDigestAndIdentity() {
+        val root = Files.createTempDirectory("reader-manga-store-").toFile()
+        val store = ReaderMangaResourceStore(root)
+        val identity = ReaderMangaTransferIdentity("rmt1:${"a".repeat(64)}", "manga:page-0")
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val staged = store.stage(identity, listOf(bytes.copyOfRange(0, 2), bytes.copyOfRange(2, 4)), "image/png")
+        assertTrue(staged.directory.exists())
+        val sha = staged.sha256
+        try {
+            store.read(identity, sha, bytes.size.toLong())
+            throw AssertionError("staged resource was visible before commit")
+        } catch (_: IllegalStateException) { }
+        store.commit(staged)
+        val resource = store.read(identity, sha, bytes.size.toLong())
+        assertArrayEquals(bytes, resource.encoded)
+        assertEquals("image/png", resource.contentType)
+        assertFalse(staged.directory.exists())
+        assertTrue(store.evict(identity, sha))
+    }
+
+    @Test
+    fun transferLookupRequiresExactShaAndBytes() {
+        val root = Files.createTempDirectory("reader-manga-store-").toFile()
+        val store = ReaderMangaResourceStore(root)
+        val identity = ReaderMangaTransferIdentity("rmt1:${"b".repeat(64)}", "manga:page-1")
+        val staged = store.stage(identity, listOf(byteArrayOf(9, 8, 7)), "image/jpeg")
+        store.commit(staged)
+        assertArrayEquals(byteArrayOf(9, 8, 7), store.readByTransferId(identity.wireId, staged.sha256, 3).encoded)
+        try {
+            store.readByTransferId(identity.wireId, staged.sha256, 2)
+            throw AssertionError("wrong byte count was admitted")
+        } catch (_: IllegalStateException) { }
+    }
+}

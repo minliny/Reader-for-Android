@@ -128,6 +128,8 @@ internal class ReaderCoreEventActor(
             val contentType: String? = null,
             val width: Int? = null,
             val height: Int? = null,
+            /** Called only after the Core asset commit is acknowledged. */
+            val onCommitted: (() -> Unit)? = null,
         ) : HostReply
         /** Core-owned asset bytes are read/released by the actor before Host consumption. */
         data class AssetConsume(
@@ -824,6 +826,7 @@ internal class ReaderCoreEventActor(
             check(port.assetCommit(envelope.requestId, envelope.operationId, assetId) == total) {
                 "MANGA_ASSET_COMMIT_RECEIPT"
             }
+            reply.onCommitted?.invoke()
             committed = true
             return JSONObject().put("assetId", assetId)
                 .put("operationId", envelope.operationId).put("bytes", total)

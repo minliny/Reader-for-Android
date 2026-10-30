@@ -55,11 +55,13 @@ internal class ReaderMangaService(private val transport: CoreTransport) {
         check(request.manifestVersion.isNotBlank() && request.resourceRef.isNotBlank() && request.sourceRuleVersion.isNotBlank()) {
             "MANGA_RESOURCE_PREPARE_SCOPE"
         }
+        val identity = ReaderMangaTransferIdentity.forPrepare(request)
+        val wireRequest = request.copy(transferId = identity.wireId)
         val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
             .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
             .put("manifestVersion", request.manifestVersion).put("resourceRef", request.resourceRef)
-            .put("sourceRuleVersion", request.sourceRuleVersion).put("transferId", request.transferId)
-        return ReaderMangaPolicy.resourcePrepare(transport.request("manga.resource.prepare", params), request)
+            .put("sourceRuleVersion", request.sourceRuleVersion).put("transferId", identity.wireId)
+        return ReaderMangaPolicy.resourcePrepare(transport.request("manga.resource.prepare", params), wireRequest)
     }
 
     fun resourceInspect(request: ReaderMangaResourceInspectRequest): ReaderMangaResourceInspectResult {

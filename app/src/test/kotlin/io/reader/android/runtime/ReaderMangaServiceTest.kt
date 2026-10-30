@@ -147,12 +147,13 @@ class ReaderMangaServiceTest {
     fun resourcePrepareInspectAndMaterializationContractsBindTransferAndManifestIdentity() {
         val calls = mutableListOf<String>()
         val identity = ReaderMangaChapterIdentity("source-a", "book-a", "chapter-7")
-        val service = ReaderMangaService(fakeTransport { method, _ ->
+        var wireTransferId = ""
+        val service = ReaderMangaService(fakeTransport { method, params ->
             calls += method
             when (method) {
                 "manga.resource.prepare" -> JSONObject().put("prepared", true).put("resourceRef", "manga:page-0")
-                    .put("transferId", "transfer-1").put("bytes", 1234)
-                "manga.resource.inspect" -> JSONObject().put("transferId", "transfer-1")
+                    .put("transferId", params.getString("transferId")).put("bytes", 1234).also { wireTransferId = params.getString("transferId") }
+                "manga.resource.inspect" -> JSONObject().put("transferId", wireTransferId)
                     .put("sha256", "a".repeat(64)).put("bytes", 1234).put("status", "present")
                     .put("orientation", 1).put("decodeProfile", JSONObject().put("format", "jpeg")
                         .put("encodedWidth", 1080).put("encodedHeight", 1920).put("allocationClass", "scanline"))
@@ -165,7 +166,7 @@ class ReaderMangaServiceTest {
         })
         val prepared = service.resourcePrepare(ReaderMangaResourcePrepareRequest(identity, "manifest-1", "manga:page-0", "rules-1", "transfer-1"))
         assertEquals(1234, prepared.bytes)
-        val inspected = service.resourceInspect(ReaderMangaResourceInspectRequest("transfer-1", "a".repeat(64), 1234))
+        val inspected = service.resourceInspect(ReaderMangaResourceInspectRequest(wireTransferId, "a".repeat(64), 1234))
         assertEquals(ReaderMangaResourceStatus.PRESENT, inspected.status)
         assertEquals(ReaderMangaImageFormat.JPEG, inspected.decodeProfile.format)
         val materialized = service.materializationPrepare(ReaderMangaMaterializationPrepareRequest(identity, "manifest-1", ReaderMangaMaterializationIntent.CACHE))
