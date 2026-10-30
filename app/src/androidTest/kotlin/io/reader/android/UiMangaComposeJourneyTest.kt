@@ -277,7 +277,7 @@ class UiMangaComposeJourneyTest {
         instrumentation.sendStatus(2, extras)
     }
 
-    private class Fixture : AutoCloseable {
+    internal class Fixture : AutoCloseable {
         private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
         private val workers = Executors.newFixedThreadPool(2)
         private val base = "http://127.0.0.1:${server.localPort}"
