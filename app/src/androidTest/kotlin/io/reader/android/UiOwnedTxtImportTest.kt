@@ -149,6 +149,81 @@ class UiOwnedTxtImportTest {
         marker("method-exit")
     }
 
+    /** SOURCE-ONLY one-owned-TXT SAF import from an explicitly empty App state. */
+    @Test
+    fun oneFreshOwnedTxtImportsFromEmptyState() = withMethodCleanup {
+        marker("method-enter")
+        val args = InstrumentationRegistry.getArguments()
+        val name = args.getString("displayName") ?: throw AssertionError("displayName required")
+        val hash = args.getString("expectedSHA") ?: throw AssertionError("expectedSHA required")
+        val bytes = args.getString("expectedBytes")?.toLongOrNull() ?: throw AssertionError("expectedBytes required")
+        assertTrue(name.endsWith(".txt") && '/' !in name && '\\' !in name)
+        assertTrue(hash.matches(Regex("[a-f0-9]{64}")) && bytes > 0)
+        val model = compose.activity.readerViewModel
+        compose.waitUntil(20_000) { model.state.value.ready && !model.state.value.busy }
+        val before = model.state.value
+        assertEquals(null, before.error)
+        assertEquals(null, before.protocolRecoveryReference)
+        assertTrue(before.pendingReady && before.pendingImports.isEmpty() && before.pendingPositions.isEmpty() && before.pendingBookmarks.isEmpty())
+        assertEquals(null, before.pendingSearchClose)
+        assertEquals(0L, before.importRevision)
+        assertTrue("Fresh App state must have no books", before.books.isEmpty())
+        marker("owned-input-admitted", Bundle().apply {
+            putString("displayName", name); putString("expectedSHA", hash); putLong("expectedBytes", bytes)
+            putBoolean("freshState", true)
+        })
+        compose.onNodeWithTag("reader_import").performClick()
+        selectRealDocument(name)
+        compose.waitUntil(120_000) {
+            val value = model.state.value
+            !value.busy && (value.importRevision > before.importRevision || value.error != null ||
+                value.protocolRecoveryReference != null || value.pendingImports.isNotEmpty())
+        }
+        val imported = model.state.value
+        assertEquals(null, imported.error)
+        assertEquals(null, imported.protocolRecoveryReference)
+        assertTrue(imported.pendingImports.isEmpty() && imported.pendingPositions.isEmpty() && imported.pendingBookmarks.isEmpty())
+        assertEquals(1L, imported.importRevision)
+        assertEquals("local:$hash", imported.lastImportedBookId)
+        val book = imported.books.single { it.id == "local:$hash" }
+        assertTrue(book.chapterCount > 0)
+        marker("owned-import-ACK", Bundle().apply {
+            putString("bookId", book.id); putInt("chapterCount", book.chapterCount); putLong("importRevision", imported.importRevision)
+        })
+        compose.onNodeWithTag("reader_book_${book.id}").performClick()
+        compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.route == ReaderRoute.Reading }
+        waitForNativeRestore()
+        showControlsAndAwaitDraw(model, "reader_open_directory")
+        compose.onNodeWithTag("reader_open_directory").performClick()
+        compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.route == ReaderRoute.Directory }
+        val toc = model.state.value.chapters
+        assertEquals(book.chapterCount, toc.size)
+        val selected = toc.firstOrNull { it.index > 0 } ?: toc.firstOrNull() ?: throw AssertionError("Real Core TOC is empty")
+        marker("owned-core-directory-ACK", Bundle().apply {
+            putString("bookId", book.id); putInt("chapterCount", toc.size); putInt("selectedChapter", selected.index)
+        })
+        compose.onNodeWithTag("reader_chapter_${selected.index}").performClick()
+        compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.route == ReaderRoute.Reading &&
+            model.state.value.reading?.chapter?.index == selected.index }
+        waitForNativeRestore()
+        val reading = model.state.value.reading ?: throw AssertionError("Actual reading owner absent")
+        assertTrue(reading.chapter.text.any { !it.isWhitespace() })
+        assertEquals(book.id, reading.chapter.bookId)
+        assertNativeAnchorVisible(reading.visibleScalarOffset)
+        marker("owned-nonempty-native-anchor-ACK", Bundle().apply {
+            putString("bookId", book.id); putInt("chapter", reading.chapter.index); putInt("scalarOffset", reading.visibleScalarOffset)
+            putInt("scalarCount", reading.chapter.scalarCount); putInt("utf16Count", reading.chapter.text.length)
+            putString("bodyVersion", reading.chapter.bodyVersion); putString("processingVersion", reading.chapter.processingVersion)
+        })
+        exitToBookshelfAndAwaitSave(model, book.id, reading.chapter.index, reading.visibleScalarOffset)
+        val saved = model.state.value.books.single { it.id == book.id }
+        marker("owned-final-saved-projection", Bundle().apply {
+            putString("bookId", saved.id); putInt("chapter", saved.progressChapter); putInt("scalarOffset", saved.progressOffset)
+        })
+        assertEquals(1L, model.state.value.importRevision)
+        marker("method-exit")
+    }
+
     private fun withMethodCleanup(body: () -> Unit) {
         var primaryFailure: Throwable? = null
         try {
