@@ -207,6 +207,7 @@ class UiOwnedTxtImportTest {
         marker("owned-core-directory-ACK", Bundle().apply {
             putString("bookId", book.id); putInt("chapterCount", toc.size); putInt("selectedChapter", selected.index)
         })
+        compose.onNodeWithTag("reader_directory").performScrollToNode(hasTestTag("reader_chapter_${selected.index}"))
         compose.onNodeWithTag("reader_chapter_${selected.index}").performClick()
         compose.waitUntil(20_000) { !model.state.value.busy && model.state.value.route == ReaderRoute.Reading &&
             model.state.value.reading?.chapter?.index == selected.index }
