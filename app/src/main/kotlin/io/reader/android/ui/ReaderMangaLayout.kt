@@ -100,9 +100,56 @@ internal class ReaderMangaScrollAdmission {
 
     fun canObserve(issued: ReaderMangaLayoutTicket) = ticket == issued && !restoring && !active && idleMovement
 
+    fun hasUnobservedMovement(issued: ReaderMangaLayoutTicket) = ticket == issued && (active || idleMovement)
+
     /** Keep the permit through stale/missing draw callbacks; consume only the admitted actual location. */
     fun accepted(issued: ReaderMangaLayoutTicket) {
         if (canObserve(issued)) idleMovement = false
+    }
+}
+
+internal data class ReaderMangaWindowRequest(val start: Int, val limit: Int, val lastVisibleOrdinal: Int)
+internal data class ReaderMangaWindowPlan(
+    val automatic: ReaderMangaWindowRequest? = null,
+    val previousOrdinal: Int? = null,
+    val continueOrdinal: Int? = null,
+)
+
+/** Bounded viewport demand, independent from whether a new durable position is authorized. */
+internal object ReaderMangaWindowPaging {
+    const val MAX_PAGES = 32
+    private const val STEP = 8
+
+    /** A withdrawn candidate does not retire its visible window; later measured demand may differ. */
+    fun shouldDispatch(previous: Pair<ReaderMangaWindowTicket, ReaderMangaWindowRequest>?,
+        window: ReaderMangaWindowTicket, request: ReaderMangaWindowRequest) = previous != (window to request)
+
+    fun plan(start: Int, count: Int, total: Int, anchorOrdinal: Int, lastVisibleOrdinal: Int,
+        canScrollBackward: Boolean, canScrollForward: Boolean, direction: Int,
+        automaticBlocked: Boolean = false, allowPassiveForward: Boolean = true): ReaderMangaWindowPlan {
+        if (start < 0 || count !in 1..MAX_PAGES || total <= 0 || start > total - count) return ReaderMangaWindowPlan()
+        val end = start + count - 1
+        if (anchorOrdinal !in start..end || lastVisibleOrdinal !in anchorOrdinal..end) return ReaderMangaWindowPlan()
+        val previous = if (start > 0 && anchorOrdinal == start && !canScrollBackward) (start - STEP).coerceAtLeast(0) else null
+        // Only advance beyond content that native actually shows at its end. Never skip an unseen loaded page.
+        val next = if (end < total - 1 && lastVisibleOrdinal == end && !canScrollForward) end + 1 else null
+        if (automaticBlocked) return ReaderMangaWindowPlan(previousOrdinal = previous, continueOrdinal = next)
+        val request = when {
+            direction < 0 && start > 0 && anchorOrdinal <= start + 1 -> {
+                val first = maxOf(0, anchorOrdinal - STEP, lastVisibleOrdinal - MAX_PAGES + 1)
+                val limit = maxOf(STEP, end - first + 1).coerceAtMost(minOf(MAX_PAGES, total - first))
+                if (first < start) ReaderMangaWindowRequest(first, limit, lastVisibleOrdinal) else null
+            }
+            (direction > 0 || (direction == 0 && allowPassiveForward)) && end < total - 1 && lastVisibleOrdinal >= end - 1 -> {
+                val desiredEnd = minOf(total - 1L, end.toLong() + STEP).toInt()
+                val limit = (desiredEnd - anchorOrdinal + 1).coerceAtMost(MAX_PAGES)
+                if (anchorOrdinal + limit - 1 > end)
+                    ReaderMangaWindowRequest(anchorOrdinal, limit, lastVisibleOrdinal)
+                else null
+            }
+            else -> null
+        }
+        return ReaderMangaWindowPlan(request, previous, next)
     }
 }
 

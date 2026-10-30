@@ -397,11 +397,11 @@ class UiMangaComposeJourneyTest {
         instrumentation.sendStatus(2, extras)
     }
 
-    internal class Fixture : AutoCloseable {
+    internal class Fixture(private val pageCount: Int = 2, private val pageHeight: Int = 512) : AutoCloseable {
         private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
         private val workers = Executors.newFixedThreadPool(2)
         private val base = "http://127.0.0.1:${server.localPort}"
-        private val images = listOf(page(Color.rgb(224, 35, 35)), page(Color.rgb(35, 55, 224)))
+        private val images = List(pageCount) { index -> page(if (index % 2 == 0) Color.rgb(224, 35, 35) else Color.rgb(35, 55, 224)) }
         private val acceptor = thread(start = true, name = "reader-manga-compose-fixture") {
             try {
                 while (!server.isClosed) {
@@ -426,9 +426,10 @@ class UiMangaComposeJourneyTest {
         }
 
         private fun page(color: Int): ByteArray {
-            // Each page exceeds this phone's reading viewport, so the final page can
-            // become the first visible item without adding unrelated filler content.
-            val bitmap = Bitmap.createBitmap(256, 512, Bitmap.Config.ARGB_8888)
+            // The default tall pages can become the first visible item; the explicit
+            // short-page variant exercises a complete window that fits in one viewport.
+            require(pageCount in 1..128 && pageHeight in 1..1024)
+            val bitmap = Bitmap.createBitmap(256, pageHeight, Bitmap.Config.ARGB_8888)
             try {
                 val canvas = Canvas(bitmap)
                 canvas.drawColor(color)
@@ -453,11 +454,10 @@ class UiMangaComposeJourneyTest {
                     "/search-rule.js" -> "[{name:'Comic',author:'Author',url:'$base/book'}]".toByteArray()
                     "/detail-rule.js" -> "({name:'Comic',author:'Author',intro:'Two colored pages',url:'$base/toc'})".toByteArray()
                     "/toc-rule.js" -> "[{name:'Chapter 1',url:'$base/chapter/1'}]".toByteArray()
-                    "/content-rule.js" -> "'<img src=\"$base/images/1.jpg\"><img src=\"$base/images/2.jpg\">'".toByteArray()
-                    "/images/1.jpg" -> images[0]
-                    "/images/2.jpg" -> images[1]
+                    "/content-rule.js" -> ("'" + (1..pageCount).joinToString("") { "<img src=\"$base/images/$it.jpg\">" } + "'").toByteArray()
                     "/search", "/book", "/toc", "/chapter/1" -> "fixture".toByteArray()
-                    else -> null
+                    else -> Regex("/images/([0-9]+)\\.jpg").matchEntire(path)?.groupValues?.get(1)
+                        ?.toIntOrNull()?.let { images.getOrNull(it - 1) }
                 }
                 val status = if (body == null) "404 Not Found" else "200 OK"
                 val payload = body ?: "missing".toByteArray()

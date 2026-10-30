@@ -26,6 +26,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.IdentityHashMap
 
 /** The narrow Library surface a Manga reading owner is allowed to use. */
 internal interface ReaderMangaLibrary {
@@ -68,7 +69,18 @@ internal data class ReaderMangaWindowTicket(
     val decodeRevision: String,
     val start: Int,
     val limit: Int,
+    val navigationTarget: ReaderMangaAnchor? = null,
+    val lastVisibleOrdinal: Int? = null,
 )
+
+/** Managed encoded handles only. This is not a Host raster, Bitmap/GPU or whole-process memory budget. */
+internal data class ReaderMangaEncodedPageBudget(
+    val steadyBytes: Long = 32L * 1024 * 1024,
+    val peakBytes: Long = 48L * 1024 * 1024,
+    val prepareHeadroomBytes: Long = 16L * 1024 * 1024,
+) {
+    init { require(steadyBytes > 0 && prepareHeadroomBytes > 0 && peakBytes >= steadyBytes + prepareHeadroomBytes) }
+}
 
 internal data class ReaderMangaReadingUiState(
     val generation: Long = 0,
@@ -105,6 +117,7 @@ internal data class ReaderMangaReadingUiState(
 internal class ReaderMangaReadingOwner(
     private val scope: CoroutineScope,
     private val onFailure: (Throwable) -> Unit = {},
+    private val encodedBudget: ReaderMangaEncodedPageBudget = ReaderMangaEncodedPageBudget(),
     private val library: () -> ReaderMangaLibrary,
 ) : AutoCloseable {
     private val mutable = MutableStateFlow(ReaderMangaReadingUiState())
@@ -116,6 +129,8 @@ internal class ReaderMangaReadingOwner(
     private var activeChapter: ReaderMangaChapterData? = null
     private var activePages: List<ReaderMangaReadingPage> = emptyList()
     private var inFlightWindow: ReaderMangaWindowTicket? = null
+    private val resourceMutex = Mutex()
+    private val managedReferences = IdentityHashMap<ReaderMangaDecodedResource, Int>()
     private val progressMutex = Mutex()
     private var activeOwner: ReaderMangaChapterRef? = null
     private var nextLayoutEpoch = 0L
@@ -124,6 +139,7 @@ internal class ReaderMangaReadingOwner(
     /** Kept separately from reflow baselines: a zoom/resize cannot invent or erase a genuine user position. */
     private var dirtyAnchor: ReaderMangaAnchor? = null
     private var restoreTarget: ReaderMangaAnchor? = null
+    private var navigationRestoreTarget: ReaderMangaAnchor? = null
     private var writeBlocked = false
     private var rejectionGeneration: Long? = null
 
@@ -139,7 +155,8 @@ internal class ReaderMangaReadingOwner(
         activeOwner = request.chapter
         activeChapter = null
         inFlightWindow = null
-        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false; rejectionGeneration = null
+        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; navigationRestoreTarget = null
+        writeBlocked = false; rejectionGeneration = null
         mutable.value = ReaderMangaReadingUiState(generation = generation, phase = ReaderMangaReadingPhase.LOADING)
         scope.launch {
             try {
@@ -188,22 +205,43 @@ internal class ReaderMangaReadingOwner(
         }
     }
 
-    fun loadWindow(start: Int, limit: Int = DEFAULT_WINDOW_LIMIT) {
+    fun loadWindow(start: Int, limit: Int = DEFAULT_WINDOW_LIMIT, lastVisibleOrdinal: Int? = null) {
         val generation = activeGeneration ?: return
         val chapter = activeChapter ?: return
         if (mutable.value.exitPending || mutable.value.restoreBlocked != null) return
-        loadWindow(generation, chapter, start, limit)
+        val anchor = mutable.value.visibleAnchor ?: return
+        val last = lastVisibleOrdinal ?: anchor.ordinal
+        if (last < anchor.ordinal || activePages.none { it.ordinal == last } || !covers(start, limit, anchor.ordinal, last)) return
+        val visible = mutable.value.visibleWindow
+        if (inFlightWindow == null && visible?.start == start && visible.limit == limit) return
+        loadWindow(generation, chapter, start, limit, lastVisibleOrdinal = last)
     }
 
-    private fun loadWindow(generation: Long, chapter: ReaderMangaChapterData, start: Int, limit: Int) {
+    /** Explicit user navigation is single-page first; only its exact later draw may become a new saved position. */
+    fun jumpToPage(ordinal: Int) {
+        val generation = activeGeneration ?: return
+        val chapter = activeChapter ?: return
+        if (mutable.value.exitPending || mutable.value.restoreBlocked != null) return
+        val page = chapter.manifest.pages.singleOrNull { it.ordinal == ordinal } ?: return
+        val target = ReaderMangaAnchor(page.pageId, page.ordinal, page.resourceRef, 0.0, 0.0)
+        loadWindow(generation, chapter, ordinal, 1, navigationTarget = target)
+    }
+
+    private fun covers(start: Int, limit: Int, first: Int, last: Int): Boolean = start >= 0 && limit in 1..32 &&
+        first >= start && last.toLong() < start.toLong() + limit
+
+    private fun loadWindow(generation: Long, chapter: ReaderMangaChapterData, start: Int, limit: Int,
+        navigationTarget: ReaderMangaAnchor? = null, lastVisibleOrdinal: Int? = null) {
         require(start >= 0 && limit in 1..32) { "MANGA_UI_WINDOW_RANGE" }
         if (!current(generation) || activeChapter !== chapter) return
         val manifest = chapter.manifest
         val pending = inFlightWindow
-        if (pending != null && current(pending) && pending.start == start && pending.limit == limit) return
+        if (pending != null && current(pending) && pending.start == start && pending.limit == limit &&
+            pending.navigationTarget == navigationTarget && pending.lastVisibleOrdinal == lastVisibleOrdinal) return
         check(nextWindowRevision < Long.MAX_VALUE) { "MANGA_UI_WINDOW_REVISION_EXHAUSTED" }
         val ticket = ReaderMangaWindowTicket(generation, ++nextWindowRevision, manifest.chapter,
-            manifest.manifestVersion, manifest.sourceRuleVersion, manifest.decodeRevision, start, limit)
+            manifest.manifestVersion, manifest.sourceRuleVersion, manifest.decodeRevision, start, limit,
+            navigationTarget, lastVisibleOrdinal)
         inFlightWindow = ticket
         mutable.value = mutable.value.copy(
             phase = if (activePages.isEmpty()) ReaderMangaReadingPhase.LOADING else ReaderMangaReadingPhase.READY,
@@ -233,31 +271,64 @@ internal class ReaderMangaReadingOwner(
                 for ((index, resource) in window.resources.withIndex()) {
                     if (!current(ticket)) return@launch
                     val ordinal = window.pageStart + index
-                    val request = ReaderMangaResourcePrepareRequest(
-                        chapter = ticket.chapter,
-                        manifestVersion = ticket.manifestVersion,
-                        resourceRef = resource.resourceRef,
-                        sourceRuleVersion = ticket.sourceRuleVersion,
-                        transferId = "android-manga-ui:${generation}:${ticket.revision}:${ordinal}:${resource.resourceRef}",
-                    )
-                    val decoded = library().decodedResource(request)
-                    val page = ReaderMangaReadingPage(ordinal, resource, decoded)
-                    acquired += page // Even a late/foreign handle belongs to this request's finally block.
+                    resourceMutex.withLock {
+                        if (!current(ticket)) return@withLock
+                        try {
+                            // activeChapter is immutable within a generation; its manifest/rules/decode identity
+                            // was checked against this ticket before borrowing any active handle.
+                            val reused = activePages.singleOrNull { it.ordinal == ordinal && it.resource == resource &&
+                                it.decoded.chapter == ticket.chapter && it.decoded.manifestVersion == ticket.manifestVersion &&
+                                it.decoded.resourceRef == resource.resourceRef }
+                            if (reused != null) {
+                                retainPage(reused); acquired += reused
+                            } else {
+                                // One preparation at a time, including superseded candidates. Account all live unique handles.
+                                check(managedBytes() + encodedBudget.prepareHeadroomBytes <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
+                                val request = ReaderMangaResourcePrepareRequest(
+                                    chapter = ticket.chapter, manifestVersion = ticket.manifestVersion,
+                                    resourceRef = resource.resourceRef, sourceRuleVersion = ticket.sourceRuleVersion,
+                                    transferId = "android-manga-ui:${generation}:${ticket.revision}:${ordinal}:${resource.resourceRef}",
+                                )
+                                val decoded = library().decodedResource(request)
+                                val page = ReaderMangaReadingPage(ordinal, resource, decoded)
+                                check(!managedReferences.containsKey(decoded)) { "MANGA_UI_DUPLICATE_DECODED_HANDLE" }
+                                managedReferences[decoded] = 1
+                                acquired += page // Every returned handle belongs to this candidate, even when late or foreign.
+                                check(decoded.bytes.size.toLong() <= encodedBudget.prepareHeadroomBytes &&
+                                    managedBytes() <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
+                                check(decoded.chapter == ticket.chapter && decoded.manifestVersion == ticket.manifestVersion &&
+                                    decoded.resourceRef == resource.resourceRef &&
+                                    decoded.transferId == ReaderMangaTransferIdentity.forPrepare(request).wireId) { "MANGA_UI_RESOURCE_SCOPE" }
+                            }
+                            check(acquired.sumOf { it.decoded.bytes.size.toLong() } <= encodedBudget.steadyBytes) { ENCODED_BUDGET_ERROR }
+                            if (!current(ticket)) { releasePages(acquired); acquired.clear() }
+                        } catch (error: Throwable) {
+                            // Release before unlocking: an awaiting newer candidate must not count a retired candidate's handles.
+                            releasePages(acquired); acquired.clear(); throw error
+                        }
+                    }
                     if (!current(ticket)) return@launch
-                    check(decoded.chapter == ticket.chapter &&
-                        decoded.manifestVersion == ticket.manifestVersion &&
-                        decoded.resourceRef == resource.resourceRef &&
-                        decoded.transferId == ReaderMangaTransferIdentity.forPrepare(request).wireId) { "MANGA_UI_RESOURCE_SCOPE" }
                 }
                 if (!current(ticket)) return@launch
+                if (ticket.navigationTarget == null && lastStableAnchor?.let { anchor ->
+                        acquired.none { it.ordinal == anchor.ordinal && it.resource.resourceRef == anchor.resourceRef }
+                    } == true) {
+                    // The reader moved outside this preserving candidate while it loaded. Leave the current window untouched.
+                    inFlightWindow = null
+                    mutable.value = mutable.value.copy(pendingWindow = null)
+                    return@launch
+                }
                 val pages = acquired.toList()
                 val previousPages = activePages
+                val navigation = ticket.navigationTarget ?: navigationRestoreTarget
+                val target = navigation ?: (lastStableAnchor ?: restoreTarget)?.takeIf { anchor ->
+                    pages.any { it.ordinal == anchor.ordinal && it.resource.resourceRef == anchor.resourceRef }
+                } ?: error("MANGA_UI_VISIBLE_ANCHOR_MISSING")
+                check(pages.any { it.ordinal == target.ordinal && it.resource.resourceRef == target.resourceRef }) { "MANGA_UI_TARGET_WINDOW_SCOPE" }
+                val restore = newRestore(target)
                 activePages = pages
                 inFlightWindow = null
-                val target = (lastStableAnchor ?: restoreTarget)?.takeIf { anchor -> pages.any { it.ordinal == anchor.ordinal && it.resource.resourceRef == anchor.resourceRef } }
-                    ?: window.manifest.pages.first { it.ordinal == pages.first().ordinal }.let {
-                        ReaderMangaAnchor(it.pageId, it.ordinal, it.resourceRef, 0.0, 0.0)
-                    }
+                navigationRestoreTarget = navigation
                 restoreTarget = target
                 mutable.value = mutable.value.copy(
                     phase = ReaderMangaReadingPhase.READY,
@@ -266,17 +337,17 @@ internal class ReaderMangaReadingOwner(
                     pages = pages,
                     visibleWindow = ticket,
                     pendingWindow = null, failedWindow = null,
-                    layoutTicket = null, visibleAnchor = null, restoreRequest = newRestore(target),
+                    layoutTicket = null, visibleAnchor = null, restoreRequest = restore,
                     windowError = null, error = null,
                 )
                 acquired.clear() // The published owner now holds these leases.
-                previousPages.forEach { it.decoded.close() }
+                releasePages(previousPages)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
                 failWindow(ticket, error)
             } finally {
-                acquired.forEach { it.decoded.close() }
+                releasePages(acquired)
             }
         }
     }
@@ -290,7 +361,7 @@ internal class ReaderMangaReadingOwner(
             it.viewportHeightPx == height && it.zoom == snapshot.zoom }?.let { return it }
         check(nextLayoutEpoch < Long.MAX_VALUE) { "MANGA_LAYOUT_EPOCH_EXHAUSTED" }
         val ticket = ReaderMangaLayoutTicket(window, ++nextLayoutEpoch, width, height, snapshot.zoom)
-        val target = lastStableAnchor?.takeIf(::loadedAnchor) ?: restoreTarget?.takeIf(::loadedAnchor)
+        val target = navigationRestoreTarget?.takeIf(::loadedAnchor) ?: lastStableAnchor?.takeIf(::loadedAnchor) ?: restoreTarget?.takeIf(::loadedAnchor)
             ?: return null
         restoreTarget = target
         mutable.value = snapshot.copy(layoutTicket = ticket, visibleAnchor = null, restoreRequest = newRestore(target))
@@ -302,7 +373,7 @@ internal class ReaderMangaReadingOwner(
         if (closed || snapshot.exitPending || !value.isFinite()) return
         val zoom = value.coerceIn(MIN_ZOOM, MAX_ZOOM)
         if (zoom == snapshot.zoom) return
-        restoreTarget = lastStableAnchor?.takeIf(::loadedAnchor) ?: restoreTarget
+        restoreTarget = navigationRestoreTarget ?: lastStableAnchor?.takeIf(::loadedAnchor) ?: restoreTarget
         mutable.value = snapshot.copy(zoom = zoom, layoutTicket = null, visibleAnchor = null,
             restoreRequest = restoreTarget?.let(::newRestore))
     }
@@ -320,7 +391,12 @@ internal class ReaderMangaReadingOwner(
             if (measured.restoredRequestId != restore.id || measured.restoredTargetPageId != restore.anchor.pageId ||
                 !loadedAnchor(restore.anchor)) return false
             // Native end clamping may put an earlier page at the top. The separately drawn target proves restoration.
-            // Restore establishes a measurement baseline only; a pre-layout genuine dirty snapshot stays intact.
+            // Resume/resize is a baseline. An explicit page navigation earns save eligibility only from this real draw.
+            navigationRestoreTarget?.let { target ->
+                if (restore.anchor != target) return false
+                dirtyAnchor = measured.anchor
+                navigationRestoreTarget = null
+            }
         } else {
             if (measured.restoredRequestId != null || measured.restoredTargetPageId != null) return false
             if (measured.anchor != lastStableAnchor) dirtyAnchor = measured.anchor
@@ -350,7 +426,25 @@ internal class ReaderMangaReadingOwner(
         if (!current(failed.generation) || mutable.value.exitPending || chapter.manifest.chapter != failed.chapter ||
             chapter.manifest.manifestVersion != failed.manifestVersion || chapter.manifest.sourceRuleVersion != failed.sourceRuleVersion ||
             chapter.manifest.decodeRevision != failed.decodeRevision) return
-        loadWindow(failed.generation, chapter, failed.start, failed.limit)
+        val anchor = mutable.value.visibleAnchor
+        if (failed.navigationTarget == null && anchor != null &&
+            !covers(failed.start, failed.limit, anchor.ordinal, maxOf(anchor.ordinal, failed.lastVisibleOrdinal ?: anchor.ordinal))) return
+        loadWindow(failed.generation, chapter, failed.start, failed.limit, failed.navigationTarget, failed.lastVisibleOrdinal)
+    }
+
+    /** Explicit recovery after an empty initial window exceeded its encoded budget; never automatic shrinking. */
+    fun retryWindowSinglePage() {
+        val failed = mutable.value.failedWindow ?: return
+        val chapter = activeChapter ?: return
+        val target = restoreTarget ?: return
+        if (activePages.isNotEmpty() || mutable.value.windowError != ENCODED_BUDGET_ERROR || mutable.value.exitPending ||
+            !current(failed.generation) || chapter.manifest.chapter != failed.chapter ||
+            chapter.manifest.manifestVersion != failed.manifestVersion || chapter.manifest.sourceRuleVersion != failed.sourceRuleVersion ||
+            chapter.manifest.decodeRevision != failed.decodeRevision || chapter.manifest.pages.none {
+                it.pageId == target.pageId && it.ordinal == target.ordinal && it.resourceRef == target.resourceRef
+            }) return
+        // Keep the saved target and its x/y. This is resume/reflow, not an explicit page-navigation write intent.
+        loadWindow(failed.generation, chapter, target.ordinal, 1)
     }
 
     /** Freeze synchronously before the caller queues its exit flush behind any current original. */
@@ -481,7 +575,8 @@ internal class ReaderMangaReadingOwner(
         activeOwner = null
         activeChapter = null
         inFlightWindow = null
-        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false; rejectionGeneration = null
+        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; navigationRestoreTarget = null
+        writeBlocked = false; rejectionGeneration = null
         retirePages()
         mutable.value = ReaderMangaReadingUiState(generation = nextGeneration)
     }
@@ -521,13 +616,29 @@ internal class ReaderMangaReadingOwner(
         mutable.value = mutable.value.copy(phase = ReaderMangaReadingPhase.ERROR, pages = emptyList(), error = error.message ?: error::class.java.simpleName)
     }
 
+    private fun managedBytes(): Long = managedReferences.keys.sumOf { it.bytes.size.toLong() }
+
+    private fun retainPage(page: ReaderMangaReadingPage) {
+        val count = checkNotNull(managedReferences[page.decoded]) { "MANGA_UI_HANDLE_NOT_OWNED" }
+        managedReferences[page.decoded] = count + 1
+    }
+
+    private fun releasePages(pages: List<ReaderMangaReadingPage>) {
+        pages.forEach { page ->
+            val count = checkNotNull(managedReferences[page.decoded]) { "MANGA_UI_HANDLE_NOT_OWNED" }
+            if (count == 1) { managedReferences.remove(page.decoded); page.decoded.close() }
+            else managedReferences[page.decoded] = count - 1
+        }
+    }
+
     private fun retirePages() {
-        activePages.forEach { it.decoded.close() }
+        releasePages(activePages)
         activePages = emptyList()
     }
 
     companion object {
         const val DEFAULT_WINDOW_LIMIT = 8
+        const val ENCODED_BUDGET_ERROR = "MANGA_UI_ENCODED_WINDOW_BUDGET"
         const val MIN_ZOOM = 1f
         const val MAX_ZOOM = 3f
     }

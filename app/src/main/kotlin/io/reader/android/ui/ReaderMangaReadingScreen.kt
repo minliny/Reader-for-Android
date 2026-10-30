@@ -45,7 +45,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -67,7 +66,8 @@ internal fun ReaderMangaReadingScreen(state: ReaderMangaReadingUiState, model: R
         when {
             state.restoreBlocked != null -> {
                 MangaHeading(state, model, moving = false)
-                ReaderPageState("阅读位置暂时无法恢复", state.restoreBlocked)
+                ReaderPageState("阅读位置暂时无法恢复", if (state.restoreBlocked == "MANGA_SAVED_POSITION_REQUIRES_EXACT_CHAPTER_MANIFEST")
+                    "目录或图片版本已变化，原阅读位置仍然保留。" else "暂时无法恢复原阅读位置，请稍后重试。")
             }
             state.phase == ReaderMangaReadingPhase.READY -> MangaViewport(state, model, Modifier.weight(1f))
             else -> {
@@ -76,7 +76,11 @@ internal fun ReaderMangaReadingScreen(state: ReaderMangaReadingUiState, model: R
                     ReaderMangaReadingPhase.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.testTag("reader_manga_loading"))
                     }
-                    ReaderMangaReadingPhase.ERROR -> ReaderPageState("漫画暂时不可用", state.error ?: "资源读取失败。", "重试", model::retryMangaReading)
+                    ReaderMangaReadingPhase.ERROR -> if (state.pages.isEmpty() && state.failedWindow != null &&
+                        state.windowError == "MANGA_UI_ENCODED_WINDOW_BUDGET") {
+                        ReaderPageState("图片暂时无法全部加载", "可先读取原阅读位置的一张图片。", "单页读取", model::retryMangaSinglePage)
+                    } else ReaderPageState("漫画暂时不可用", if (state.error == "MANGA_UI_EMPTY_MANIFEST")
+                        "本章暂时没有可阅读的图片。" else "本章图片暂时无法打开，请稍后重试。", "重试", model::retryMangaReading)
                     else -> Unit
                 }
             }
@@ -118,14 +122,16 @@ private fun MangaHeading(state: ReaderMangaReadingUiState, model: ReaderViewMode
             pending?.let { item -> { model.reconcileMangaProgress(item.operationId) } },
             actionTag = "reader_manga_reconcile_progress")
     }
-    if (state.windowError != null) {
-        ReaderRecoveryNotice(state.windowError, state.pendingWindow != null,
-            if (state.failedWindow != null) ({ model.retryMangaWindow() }) else null,
+    if (state.windowError != null && state.pages.isNotEmpty()) {
+        val budgetLimited = state.windowError == "MANGA_UI_ENCODED_WINDOW_BUDGET"
+        ReaderRecoveryNotice(if (budgetLimited) "本段图片仍可阅读，到末尾可继续下一段。" else "后续图片暂时不可用，已打开的图片仍可阅读。", state.pendingWindow != null,
+            if (!budgetLimited && state.failedWindow != null) ({ model.retryMangaWindow() }) else null,
             actionLabel = "重试加载", actionTag = "reader_manga_retry_window")
     }
 }
 
-private data class MangaBitmapPage(val page: ReaderMangaReadingPage, val pageId: String, val bitmap: ImageBitmap)
+private data class MangaImagePage(val page: ReaderMangaReadingPage, val pageId: String, val width: Int, val height: Int)
+private data class MangaWindowNavigation(val frame: MangaDrawFrame, val anchor: ReaderMangaAnchor, val plan: ReaderMangaWindowPlan)
 
 @Composable
 private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewModel, modifier: Modifier) {
@@ -135,17 +141,19 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
     val current by rememberUpdatedState(state)
     val observation = remember(state.generation) { MangaDrawObservation() }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    val bitmapPages = remember(state.visibleWindow, state.pages) {
+    var navigation by remember(state.generation) { mutableStateOf<MangaWindowNavigation?>(null) }
+    val imagePages = remember(state.pages) {
         state.pages.mapNotNull { page ->
             val identity = state.chapter?.manifest?.pages?.singleOrNull {
                 it.ordinal == page.ordinal && it.resourceRef == page.resource.resourceRef
             } ?: return@mapNotNull null
-            val bitmap = BitmapFactory.decodeByteArray(page.decoded.bytes, 0, page.decoded.bytes.size)?.asImageBitmap()
-                ?: return@mapNotNull null
-            MangaBitmapPage(page, identity.pageId, bitmap)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(page.decoded.bytes, 0, page.decoded.bytes.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@mapNotNull null
+            MangaImagePage(page, identity.pageId, bounds.outWidth, bounds.outHeight)
         }
     }
-    val latestPages by rememberUpdatedState(bitmapPages)
+    val latestPages by rememberUpdatedState(imagePages)
     val transform = rememberTransformableState { change, _, _ ->
         val now = current
         if (!now.exitPending && !list.isScrollInProgress && !horizontal.isScrollInProgress && change.isFinite() && change > 0f)
@@ -206,7 +214,7 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
     }
     LaunchedEffect(observation) {
         var lastAccepted: ReaderMangaAnchor? = null
-        var lastWindowRequest: Pair<ReaderMangaWindowTicket, Int>? = null
+        var lastWindowRequest: Pair<ReaderMangaWindowTicket, ReaderMangaWindowRequest>? = null
         for (frame in observation.frames) {
             val now = current
             val issued = now.layoutTicket ?: continue
@@ -234,33 +242,41 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
                     image.rect.intersects(frame.viewport) && ReaderMangaLayoutGeometry.accepts(issued, frame.viewport, image) }
             }
             if (restore != null && target == null) continue
-            if (restore == null && !observation.scrollAdmission.canObserve(issued)) continue
-            val measured = ReaderMangaMeasuredAnchor(issued, actual, restore?.id, target?.pageId)
-            if (!model.observeMangaVisible(measured)) continue
-            if (restore != null) observation.restoreConfirmed(issued, restore.id)
-            else observation.scrollAdmission.accepted(issued)
-            val previous = lastAccepted
-            lastAccepted = actual
-            // A restore establishes a new geometry baseline. Paging requires later real vertical movement,
-            // so an overlapping replacement cannot immediately request the preceding window again.
-            if (restore != null || previous == null || now.pendingWindow != null || now.windowError != null) continue
-            val direction = if (actual.ordinal != previous.ordinal) actual.ordinal.compareTo(previous.ordinal) else actual.y.compareTo(previous.y)
+            var direction = 0
+            val mayObserve = restore != null || observation.scrollAdmission.canObserve(issued)
+            if (mayObserve) {
+                val measured = ReaderMangaMeasuredAnchor(issued, actual, restore?.id, target?.pageId)
+                if (!model.observeMangaVisible(measured)) continue
+                if (restore != null) observation.restoreConfirmed(issued, restore.id)
+                else observation.scrollAdmission.accepted(issued)
+                val previous = lastAccepted
+                lastAccepted = actual
+                if (restore == null && previous != null)
+                    direction = if (actual.ordinal != previous.ordinal) actual.ordinal.compareTo(previous.ordinal) else actual.y.compareTo(previous.y)
+            } else if (now.visibleAnchor != actual) continue
+            // A verified idle viewport can need more images without authorizing a progress write.
+            // Require the native tail item to have an actual drawn rectangle too.
+            val lastVisible = nativeVisible.lastOrNull()?.key
+            val tail = visibleImages.singleOrNull { it.pageId == lastVisible } ?: continue
             val first = now.pages.firstOrNull()?.ordinal ?: continue
-            val last = now.pages.lastOrNull()?.ordinal ?: continue
             val total = now.window?.totalPages ?: continue
-            val start = when {
-                direction > 0 && actual.ordinal >= last - 1 && last + 1 < total -> (actual.ordinal - 1).coerceAtLeast(0)
-                direction < 0 && first > 0 && actual.ordinal <= first + 1 -> (actual.ordinal - 5).coerceAtLeast(0)
-                else -> continue
-            }
-            if (start == issued.window.start || lastWindowRequest == (issued.window to start)) continue
-            lastWindowRequest = issued.window to start
-            model.loadMangaWindow(start)
+            val fromBackwardRequest = lastWindowRequest?.let { (previousWindow, request) ->
+                request.start < previousWindow.start && issued.window.start == request.start && issued.window.limit == request.limit
+            } == true
+            val plan = ReaderMangaWindowPaging.plan(first, now.pages.size, total, actual.ordinal, tail.ordinal,
+                list.canScrollBackward, list.canScrollForward, direction,
+                automaticBlocked = now.windowError != null, allowPassiveForward = !fromBackwardRequest)
+            navigation = MangaWindowNavigation(frame, actual, plan)
+            if (now.pendingWindow != null) continue
+            val request = plan.automatic ?: continue
+            if (!ReaderMangaWindowPaging.shouldDispatch(lastWindowRequest, issued.window, request)) continue
+            lastWindowRequest = issued.window to request
+            model.loadMangaWindow(request.start, request.limit, request.lastVisibleOrdinal)
         }
     }
     Column(modifier) {
         MangaHeading(state, model, moving)
-        if (bitmapPages.size != state.pages.size || bitmapPages.isEmpty()) {
+        if (imagePages.size != state.pages.size || imagePages.isEmpty()) {
             ReaderPageState("漫画暂时无法显示", "图片读取未完成。", "重试", model::retryMangaReading)
         } else {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { coordinates ->
@@ -276,34 +292,65 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
                     LazyColumn(state = list,
                         userScrollEnabled = !state.exitPending && state.restoreRequest == null && !transform.isTransformInProgress,
                         modifier = Modifier.width(contentWidth).height(viewportHeight).testTag("reader_manga_pages")) {
-                        items(bitmapPages, key = { it.pageId }) { value ->
-                            key(ticket?.epoch) {
-                            DisposableEffect(ticket, value.page.decoded.transferId) {
-                                val issued = ticket
-                                onDispose { if (issued != null) observation.remove(issued, value.page.decoded.transferId) }
+                        items(imagePages, key = { it.pageId }) { value ->
+                            // Stable handle identity survives an overlapping window; zoom changes only layout nodes.
+                            val bitmap = remember(value.page.decoded) {
+                                BitmapFactory.decodeByteArray(value.page.decoded.bytes, 0, value.page.decoded.bytes.size)?.asImageBitmap()
                             }
-                            Image(value.bitmap, "第 ${value.page.ordinal + 1} 页", contentScale = ContentScale.FillWidth,
-                                modifier = Modifier.fillMaxWidth().aspectRatio(value.bitmap.width.toFloat() / value.bitmap.height)
-                                    .onGloballyPositioned { coordinates ->
-                                        val actualTicket = ticket ?: return@onGloballyPositioned
-                                        val position = coordinates.positionInRoot()
-                                        observation.image(actualTicket, value.geometry(ReaderMangaImageRect(position.x.toDouble(), position.y.toDouble(),
-                                            coordinates.size.width.toDouble(), coordinates.size.height.toDouble())))
-                                    }.drawWithContent {
-                                        drawContent()
-                                        ticket?.let { observation.drawn(it, value.page.decoded.transferId) }
-                                    }.testTag("reader_manga_page_${value.page.ordinal}"))
+                            key(ticket?.epoch) {
+                                DisposableEffect(ticket, value.page.decoded.transferId) {
+                                    val issued = ticket
+                                    onDispose { if (issued != null) observation.remove(issued, value.page.decoded.transferId) }
+                                }
+                                if (bitmap == null || bitmap.width != value.width || bitmap.height != value.height) {
+                                    ReaderPageState("这张图片暂时无法显示", "请稍后重试。")
+                                } else Image(bitmap, "第 ${value.page.ordinal + 1} 页", contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(value.width.toFloat() / value.height)
+                                        .onGloballyPositioned { coordinates ->
+                                            val actualTicket = ticket ?: return@onGloballyPositioned
+                                            val position = coordinates.positionInRoot()
+                                            observation.image(actualTicket, value.geometry(ReaderMangaImageRect(position.x.toDouble(), position.y.toDouble(),
+                                                coordinates.size.width.toDouble(), coordinates.size.height.toDouble())))
+                                        }.drawWithContent {
+                                            drawContent()
+                                            ticket?.let { observation.drawn(it, value.page.decoded.transferId) }
+                                        }.testTag("reader_manga_page_${value.page.ordinal}"))
                             }
                         }
                     }
                 }
             }
         }
+        // A fixed host avoids a show/hide feedback loop that changes the viewport used by the window plan.
+        Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            val displayed = navigation
+            val ready = displayed != null && displayed.frame.ticket == ticket && displayed.anchor == state.visibleAnchor &&
+                state.restoreRequest == null && state.pendingWindow == null && !state.exitPending && !moving &&
+                observation.isCurrent(displayed.frame) && !observation.scrollAdmission.hasUnobservedMovement(displayed.frame.ticket)
+            fun navigate(forward: Boolean) {
+                val captured = navigation ?: return
+                val now = current
+                if (now.layoutTicket != captured.frame.ticket || now.visibleAnchor != captured.anchor ||
+                    now.restoreRequest != null || now.pendingWindow != null || now.exitPending ||
+                    list.isScrollInProgress || horizontal.isScrollInProgress || transform.isTransformInProgress ||
+                    !observation.isCurrent(captured.frame) || observation.scrollAdmission.hasUnobservedMovement(captured.frame.ticket)) return
+                if (captured.plan.automatic != null || (if (forward) list.canScrollForward else list.canScrollBackward)) return
+                val ordinal = (if (forward) captured.plan.continueOrdinal else captured.plan.previousOrdinal) ?: return
+                model.jumpToMangaPage(ordinal)
+            }
+            Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton({ navigate(false) }, enabled = ready && displayed?.plan?.automatic == null && displayed?.plan?.previousOrdinal != null,
+                    modifier = Modifier.testTag("reader_manga_previous_segment")) { Text("前一段") }
+                TextButton({ navigate(true) }, enabled = ready && displayed?.plan?.automatic == null && displayed?.plan?.continueOrdinal != null,
+                    modifier = Modifier.testTag("reader_manga_continue")) { Text("继续阅读") }
+            }
+        }
     }
 }
 
-private fun MangaBitmapPage.geometry(rect: ReaderMangaImageRect) = ReaderMangaImageGeometry(
-    pageId, page.ordinal, page.resource.resourceRef, page.decoded.transferId, bitmap.width, bitmap.height, rect,
+private fun MangaImagePage.geometry(rect: ReaderMangaImageRect) = ReaderMangaImageGeometry(
+    pageId, page.ordinal, page.resource.resourceRef, page.decoded.transferId, width, height, rect,
 )
 
 private data class MangaDrawStamp(val ticket: ReaderMangaLayoutTicket, val revision: Long)

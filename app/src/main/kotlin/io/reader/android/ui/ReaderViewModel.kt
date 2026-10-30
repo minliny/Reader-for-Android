@@ -325,12 +325,23 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         if (owner.state.value.generation == ownerGeneration) owner.flushVisibleProgress()
     }
 
-    internal fun loadMangaWindow(start: Int) {
-        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.loadWindow(start)
+    internal fun loadMangaWindow(start: Int, limit: Int = ReaderMangaReadingOwner.DEFAULT_WINDOW_LIMIT,
+        lastVisibleOrdinal: Int? = null) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized())
+            mangaOwnerDelegate.value.loadWindow(start, limit, lastVisibleOrdinal)
+    }
+
+    internal fun jumpToMangaPage(ordinal: Int) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized())
+            mangaOwnerDelegate.value.jumpToPage(ordinal)
     }
 
     internal fun retryMangaWindow() {
         if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.retryWindow()
+    }
+
+    internal fun retryMangaSinglePage() {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized()) mangaOwnerDelegate.value.retryWindowSinglePage()
     }
 
     internal fun reconcileMangaProgress(operationId: String) {

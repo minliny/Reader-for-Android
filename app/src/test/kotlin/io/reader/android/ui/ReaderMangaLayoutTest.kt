@@ -135,4 +135,79 @@ class ReaderMangaLayoutTest {
         assertFalse(ReaderMangaLayoutGeometry.matchesNativePlacement(area, actual,
             nativeRelativeTopPx = -326, nativeHeightPx = 2700, horizontalScrollPx = 50))
     }
+
+    @Test fun shortInitialViewportFillsOnlyToThirtyTwoWithoutGrantingProgressMovement() {
+        val admission = ReaderMangaScrollAdmission().apply { bind(ticket); confirmRestore(ticket) }
+        for ((count, nextCount) in listOf(8 to 16, 16 to 24, 24 to 32)) {
+            val plan = ReaderMangaWindowPaging.plan(0, count, 40, 0, count - 1,
+                canScrollBackward = false, canScrollForward = false, direction = 0)
+            assertEquals(ReaderMangaWindowRequest(0, nextCount, count - 1), plan.automatic)
+            assertFalse(admission.canObserve(ticket))
+        }
+        val capped = ReaderMangaWindowPaging.plan(0, 32, 40, 0, 31,
+            canScrollBackward = false, canScrollForward = false, direction = 0)
+        assertNull(capped.automatic); assertEquals(32, capped.continueOrdinal); assertNull(capped.previousOrdinal)
+        assertFalse(admission.canObserve(ticket))
+    }
+
+    @Test fun actualVisibleTailExtendsWindowWhileRetainingAnEarlierFirstImage() {
+        // Six short images are on screen at the native end; first-visible is nowhere near the old final two.
+        val plan = ReaderMangaWindowPaging.plan(0, 8, 40, 2, 7,
+            canScrollBackward = true, canScrollForward = false, direction = 1)
+        val next = checkNotNull(plan.automatic)
+        assertEquals(2, next.start); assertEquals(14, next.limit); assertEquals(7, next.lastVisibleOrdinal)
+        assertTrue(2 in next.start until next.start + next.limit)
+        assertTrue(7 in next.start until next.start + next.limit)
+        assertTrue(next.start + next.limit > 8)
+    }
+
+    @Test fun fullVisibleSpanCannotBeSilentlyDroppedToMakeRoomForMorePages() {
+        val plan = ReaderMangaWindowPaging.plan(5, 32, 80, 5, 36,
+            canScrollBackward = false, canScrollForward = false, direction = 0)
+        assertNull(plan.automatic); assertEquals(37, plan.continueOrdinal); assertEquals(0, plan.previousOrdinal)
+        val notAtEnd = ReaderMangaWindowPaging.plan(5, 32, 80, 5, 35,
+            canScrollBackward = false, canScrollForward = true, direction = 1)
+        assertNull(notAtEnd.automatic); assertNull(notAtEnd.continueOrdinal)
+    }
+
+    @Test fun reverseWindowDemandPreservesTheMeasuredTailAndRestoreDoesNotBounceBack() {
+        val reverse = ReaderMangaWindowPaging.plan(16, 16, 80, 16, 20,
+            canScrollBackward = false, canScrollForward = true, direction = -1)
+        assertEquals(ReaderMangaWindowRequest(8, 24, 20), reverse.automatic)
+        val restored = ReaderMangaWindowPaging.plan(8, 24, 80, 16, 31,
+            canScrollBackward = true, canScrollForward = true, direction = 0, allowPassiveForward = false)
+        assertNull(restored.automatic) // Do not immediately drop the newly prepended pages before the user can reach them.
+        assertNull(restored.previousOrdinal)
+        val realForward = ReaderMangaWindowPaging.plan(8, 24, 80, 16, 31,
+            canScrollBackward = true, canScrollForward = true, direction = 1, allowPassiveForward = false)
+        assertNotNull(realForward.automatic)
+    }
+
+    @Test fun budgetStopKeepsExplicitContinuationButNeverSkipsAnUnseenLoadedPage() {
+        val cappedByBytes = ReaderMangaWindowPaging.plan(0, 8, 40, 0, 7,
+            canScrollBackward = false, canScrollForward = false, direction = 0, automaticBlocked = true)
+        assertNull(cappedByBytes.automatic); assertEquals(8, cappedByBytes.continueOrdinal)
+        val unseenTail = ReaderMangaWindowPaging.plan(0, 8, 40, 0, 6,
+            canScrollBackward = false, canScrollForward = false, direction = 0, automaticBlocked = true)
+        assertNull(unseenTail.continueOrdinal)
+        val lastChapterSegment = ReaderMangaWindowPaging.plan(32, 8, 40, 32, 39,
+            canScrollBackward = false, canScrollForward = false, direction = 0)
+        assertNull(lastChapterSegment.automatic); assertNull(lastChapterSegment.continueOrdinal)
+        assertEquals(24, lastChapterSegment.previousOrdinal)
+    }
+
+    @Test fun withdrawnCandidateAllowsDifferentMeasuredDemandOnTheSameVisibleWindow() {
+        val firstDemand = checkNotNull(ReaderMangaWindowPaging.plan(0, 8, 40, 5, 7,
+            canScrollBackward = true, canScrollForward = false, direction = 1).automatic)
+        val dispatched = window to firstDemand
+        assertFalse(ReaderMangaWindowPaging.shouldDispatch(dispatched, window, firstDemand))
+        // While acquisition was pending, the reader moved above candidate.start=5. Owner keeps the
+        // original visible window, then the newly measured range asks for a different preserving window.
+        val laterDemand = checkNotNull(ReaderMangaWindowPaging.plan(0, 8, 40, 2, 7,
+            canScrollBackward = true, canScrollForward = false, direction = 1).automatic)
+        assertEquals(5, firstDemand.start); assertEquals(2, laterDemand.start)
+        assertTrue(ReaderMangaWindowPaging.shouldDispatch(dispatched, window, laterDemand))
+        assertFalse(ReaderMangaWindowPaging.shouldDispatch(window to laterDemand, window, laterDemand))
+        assertTrue(ReaderMangaWindowPaging.shouldDispatch(dispatched, window.copy(revision = window.revision + 1), firstDemand))
+    }
 }

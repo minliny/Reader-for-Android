@@ -322,6 +322,47 @@ class ReaderMangaReadingProgressOwnerTest {
         } finally { fixture.close() }
     }
 
+    @Test fun explicitJumpRequiresRealDrawAndKeepsItsMeaningThroughZoomAndExpansion(): Unit = runBlocking {
+        val fixture = Fixture()
+        try {
+            fixture.open(); fixture.restore()
+            fixture.owner.jumpToPage(3); fixture.ready()
+            assertEquals(listOf(3), fixture.owner.state.value.pages.map { it.ordinal })
+            assertFalse(fixture.owner.state.value.progressDirty)
+            assertEquals(ReaderMangaFlushResult.NO_CHANGE, fixture.owner.flushVisibleProgress())
+            val published = fixture.owner.state.value.visibleWindow
+            fixture.owner.loadWindow(2, 2, 3) // No measured new actual position yet; must not erase the navigation intent.
+            assertEquals(published, fixture.owner.state.value.visibleWindow)
+            fixture.owner.requestZoom(2f)
+            fixture.restore(actual = fixture.anchor(3, 0.2))
+            assertTrue(fixture.owner.state.value.progressDirty)
+            fixture.owner.loadWindow(2, 2, 3); fixture.ready()
+            fixture.restore(actual = fixture.anchor(2, 0.4)) // Subsequent native end clamp is only reflow, not a second navigation.
+            assertEquals(ReaderMangaFlushResult.CONFIRMED, fixture.owner.flushVisibleProgress())
+            val saved = fixture.library.saves.single().location
+            assertEquals(3, saved.pageOrdinalFallback); assertEquals(0.2, saved.y, 0.0)
+            assertEquals(2, fixture.owner.state.value.currentOrdinal)
+        } finally { fixture.close() }
+    }
+
+    @Test fun explicitJumpDrawWhileOldSaveIsInflightRetainsNewPositionForNextCas(): Unit = runBlocking {
+        val fixture = Fixture()
+        try {
+            fixture.open(); fixture.restore(); fixture.measure(fixture.anchor(0, 0.3))
+            val release = CompletableDeferred<Unit>()
+            fixture.library.nextSaveGate = release
+            val oldSave = async(start = CoroutineStart.UNDISPATCHED) { fixture.owner.flushVisibleProgress() }
+            fixture.owner.jumpToPage(3); fixture.ready()
+            fixture.restore(actual = fixture.anchor(3, 0.5))
+            release.complete(Unit)
+            assertEquals(ReaderMangaFlushResult.CONFIRMED, oldSave.await())
+            assertTrue(fixture.owner.state.value.progressDirty)
+            assertEquals(ReaderMangaFlushResult.CONFIRMED, fixture.owner.flushVisibleProgress())
+            assertEquals(listOf(0, 3), fixture.library.saves.map { it.location.pageOrdinalFallback })
+            assertEquals(listOf(0L, 1L), fixture.library.saves.map { it.expected.revision })
+        } finally { fixture.close() }
+    }
+
     private class Fixture : AutoCloseable {
         val library = Library()
         val failures = mutableListOf<Throwable>()

@@ -112,8 +112,11 @@ Native anchor 的 Boolean 仅为当前完整 reading/token/key 范围内的显�
 | --- | --- | --- |
 | 首次章节/图片加载失败、保存位置的章节/manifest/page 无法匹配 | ReaderPageState；ReaderMangaReadingScreen | 当前 owner generation + 完整 chapter/manifest；重新打开须先无 dirty/在途原保存。失配不回落页首并覆盖原位置；没有 dirty/pending 时可以退出 |
 | 后续图片窗口失败，原图片仍有效 | ReaderRecoveryNotice；漫画图片区域上方 | 原失败窗口 generation/revision/chapter/manifest/sourceRule/decode/start/limit；明确重试仅请求同失败窗口，新窗口原子接管后退休旧提示，不清已有位置 |
+| 初次窗口超出受管图片字节预算且尚无可见图片 | ReaderPageState；漫画图片区域，明确“单页读取”动作 | 仅同 generation/chapter/准确 budget failedWindow 可用，读取原恢复目标的一页；该动作不创建翻页意图，不以限位后的显示位置覆盖原保存位置；失败继续保留原目标，不自动缩窗重试 |
 | 漫画原进度保存未知或尚未确认 | ReaderRecoveryNotice；当前漫画宿主，协议事实另走既有 ReaderProtocolRecoveryHost | 实际 mangaProgress operationId + sourceId/bookId + owner generation；只查询该原件。隐藏提示、get 当前位置或新布局均不能确认原写入；未确认不自动重派、不完成退出 |
 | 原进度被明确拒绝且已持久归档 | ReaderRecoveryNotice；漫画宿主，明确“不保存并返回”动作 | 仅 Service 签发的 ReaderMangaProgressRejected 原件与 owner 当前尝试相符时开放；点击先冻结测量，在 Mutex 内重新核同 generation/原件与 pending 为空，才舍弃本地未保存位置并退出；不删书，不改已确认 token/位置，不发 get/update，不自动重试。普通异常或 pending 为空不能提供该资格 |
 | 实际保存执行中 | 页面现有进度状态与退出禁用 | 原 measured anchor + layout ticket + CAS token；只原 ACK 更新 lastConfirmedProgress。后台与退出经同串行 owner，450ms 调度仅取消未派发 timer，不取消已准入原操作 |
 
 布局票据由 owner 单调签发；图片真实坐标和 draw/idle 观察只归当前 ticket/resource。首次恢复、尺寸变化、缩放和窗口替换建立显示基线，不制造保存；重排前真实 dirty 位置保留。旧 callback 不修改新页面；退出先冻结新测量，原保存确认或确实没有新写入后退休。此表登记接入与生命周期，不表示设备或用户验收。
+
+短图的“前一段／继续阅读”为固定宿主的正常导航控件，源于当前准确布局实际可见范围与有界窗口；自动补窗只保持当前显示范围，不创建进度。明确跳段意图绑定 owner generation/window/目标页和恢复票据，唯有该目标真实绘制后，实际可见位置才可保存。窗口预算拒绝保留旧图片和真实 dirty；受管 encoded bytes 的限额不代表 Host 解码、Bitmap/GPU 或整进程预算已验收。
