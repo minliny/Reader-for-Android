@@ -21,6 +21,7 @@ import okio.ByteString.Companion.decodeBase64
 internal class ReaderMangaResourceHost(
     private val httpHost: ReaderHttpHost,
     private val resourceStore: ReaderMangaResourceStore,
+    private val readImageBounds: (ByteArray) -> Pair<Int, Int> = ::platformImageBounds,
 ) {
     suspend fun execute(envelope: ReaderCoreEventActor.HostEnvelope): ReaderCoreEventActor.HostReply {
         if (envelope.capability != CAPABILITY) return ReaderCoreEventActor.HostReply.Error(
@@ -63,8 +64,9 @@ internal class ReaderMangaResourceHost(
                 }
                 val dimensions = if (input.inspectGraphics) {
                     try { imageDimensions(transfer.chunks) }
-                    catch (_: IllegalArgumentException) {
-                        return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_IMAGE_DIMENSIONS", false)
+                    catch (error: IllegalArgumentException) {
+                        return if (error.message == ReaderMangaBitmapPolicy.BUDGET_ERROR) outputArgumentFailure(error)
+                        else ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_IMAGE_DIMENSIONS", false)
                     }
                 } else null
                 val staged = try { resourceStore.stage(identity, transfer.chunks, transfer.contentType) }
@@ -82,10 +84,7 @@ internal class ReaderMangaResourceHost(
         val encoded = ByteArray(chunks.sumOf { it.size })
         var offset = 0
         chunks.forEach { chunk -> chunk.copyInto(encoded, offset); offset += chunk.size }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "MANGA_IMAGE_DIMENSIONS" }
-        return bounds.outWidth to bounds.outHeight
+        return readImageBounds(encoded).also { ReaderMangaBitmapPolicy.graphicsDimensions(it.first, it.second) }
     }
 
     private fun inspect(value: JSONObject): ReaderCoreEventActor.HostReply {
@@ -120,93 +119,154 @@ internal class ReaderMangaResourceHost(
             val operationId = exactLong(value.get("operationId"), "operationId")
             val bytes = exactLong(value.get("bytes"), "bytes")
             require(assetId > 0 && operationId > 0 && bytes in 1..MAX_BYTES) { "MANGA_OUTPUT_IDENTITY" }
-            val graphicsPlan = value.optJSONObject("graphicsPlan")
-            graphicsPlan?.let(::validateGraphicsPlanShape)
+            val graphicsPlan = if (!value.has("graphicsPlan") || value.isNull("graphicsPlan")) null
+                else validateGraphicsPlanShape(value.getJSONObject("graphicsPlan"))
+            graphicsPlan?.let { ReaderMangaBitmapPolicy.graphics(it.width, it.height, bytes, it.strips.maxOf { strip -> strip.height }) }
             ReaderCoreEventActor.HostReply.AssetConsume(assetId, operationId, bytes) { encoded ->
-                require(encoded.size.toLong() == bytes) { "MANGA_OUTPUT_BYTES" }
-                val bitmap = if (graphicsPlan == null) decodeOrdinary(encoded) else decodeGraphicsPlan(encoded, graphicsPlan)
+                // This callback executes after execute() returns. Keep typed budget errors on this boundary too.
                 try {
-                    val preparedBytes = if (graphicsPlan == null) bytes else {
-                        val compressed = ByteArrayOutputStream()
-                        check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, compressed)) { "MANGA_GRAPHICS_PLAN_COMPRESS" }
-                        resourceStore.putDecodedByTransferId(transferId, compressed.toByteArray())
-                        compressed.size().toLong()
-                    }.also { if (graphicsPlan == null) resourceStore.putDecodedByTransferId(transferId, encoded) }
-                    require(preparedBytes in 1..MAX_PREPARED_BYTES) { "MANGA_IMAGE_PIXEL_BUDGET" }
-                    ReaderCoreEventActor.HostReply.Complete(JSONObject()
-                        .put("consumed", true).put("assetId", assetId).put("bytes", bytes)
-                        .put("preparedBytes", preparedBytes).toString())
-                } finally {
-                    bitmap.recycle()
+                    require(encoded.size.toLong() == bytes) { "MANGA_OUTPUT_BYTES" }
+                    val bitmap = if (graphicsPlan == null) decodeOrdinary(encoded) else decodeGraphicsPlan(encoded, graphicsPlan)
+                    try {
+                        val preparedBytes = if (graphicsPlan == null) {
+                            resourceStore.putDecodedByTransferId(transferId, encoded)
+                            bytes
+                        } else {
+                            val reservation = ReaderMangaBitmapPolicy.graphics(graphicsPlan.width, graphicsPlan.height,
+                                bytes, graphicsPlan.strips.maxOf { it.height })
+                            val compressed = BoundedBitmapOutput(reservation.maximumOutputBytes)
+                            val written = try { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, compressed) }
+                                catch (error: RuntimeException) { compressed.requireWithinBudget(); throw error }
+                            compressed.requireWithinBudget()
+                            check(written) { "MANGA_GRAPHICS_PLAN_COMPRESS" }
+                            resourceStore.putDecodedByTransferId(transferId, compressed.toByteArray())
+                            compressed.size().toLong()
+                        }
+                        require(preparedBytes in 1..MAX_PREPARED_BYTES) { "MANGA_IMAGE_PIXEL_BUDGET" }
+                        ReaderCoreEventActor.HostReply.Complete(JSONObject()
+                            .put("consumed", true).put("assetId", assetId).put("bytes", bytes)
+                            .put("preparedBytes", preparedBytes).toString())
+                    } finally { bitmap.recycle() }
+                } catch (error: IllegalArgumentException) { outputArgumentFailure(error) }
+                catch (error: IllegalStateException) {
+                    ReaderCoreEventActor.HostReply.Error("INTERNAL", error.message ?: "MANGA_OUTPUT_DECODE", false)
                 }
             }
-        } catch (error: IllegalArgumentException) {
-            ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", error.message ?: "MANGA_OUTPUT_INVALID", false)
-        } catch (error: IllegalStateException) {
+        } catch (error: IllegalArgumentException) { outputArgumentFailure(error) }
+        catch (_: org.json.JSONException) {
+            ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_OUTPUT_INVALID", false)
+        }
+        catch (error: IllegalStateException) {
             ReaderCoreEventActor.HostReply.Error("INTERNAL", error.message ?: "MANGA_OUTPUT_DECODE", false)
         }
     }
 
+    private fun outputArgumentFailure(error: IllegalArgumentException) = ReaderCoreEventActor.HostReply.Error(
+        if (error.message == ReaderMangaBitmapPolicy.BUDGET_ERROR) "RESOURCE_EXHAUSTED" else "INVALID_PARAMS",
+        error.message ?: "MANGA_OUTPUT_INVALID", false,
+    )
+
     private fun decodeOrdinary(encoded: ByteArray): Bitmap {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "MANGA_IMAGE_DECODE" }
-        return BitmapFactory.decodeByteArray(encoded, 0, encoded.size,
-            BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 })
+        val (width, height) = readImageBounds(encoded)
+        ReaderMangaBitmapPolicy.ordinary(width, height, encoded.size.toLong())
+        val bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.size,
+            BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888; inScaled = false })
             ?: error("MANGA_IMAGE_DECODE")
+        try {
+            require(bitmap.width == width && bitmap.height == height) { "MANGA_IMAGE_DECODE_DIMENSIONS" }
+            ReaderMangaBitmapPolicy.ordinaryAllocation(width, height, encoded.size.toLong(), bitmap.allocationByteCount.toLong())
+            return bitmap
+        } catch (failure: Throwable) { bitmap.recycle(); throw failure }
     }
 
-    private fun decodeGraphicsPlan(encoded: ByteArray, plan: JSONObject): Bitmap {
-        validateGraphicsPlanShape(plan)
-        val width = plan.getInt("width"); val height = plan.getInt("height")
-        val target = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+    private data class GraphicsStrip(val sourceY: Int, val targetY: Int, val height: Int)
+    private data class GraphicsPlan(val width: Int, val height: Int, val strips: List<GraphicsStrip>)
+
+    private fun decodeGraphicsPlan(encoded: ByteArray, plan: GraphicsPlan): Bitmap {
+        val reservation = ReaderMangaBitmapPolicy.graphics(plan.width, plan.height, encoded.size.toLong(), plan.strips.maxOf { it.height })
+        val actual = readImageBounds(encoded)
+        require(actual.first == plan.width && actual.second == plan.height) { "MANGA_GRAPHICS_PLAN_DIMENSIONS" }
+        // No target exists if opening the native decoder fails. Any later failure releases both owners.
         val decoder = BitmapRegionDecoder.newInstance(encoded, 0, encoded.size, false)
+        var target: Bitmap? = null
         try {
-            require(decoder.width == width && decoder.height == height) { "MANGA_GRAPHICS_PLAN_DIMENSIONS" }
-            val canvas = Canvas(target); val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-            val sourceCoverage = BooleanArray(height); val targetCoverage = BooleanArray(height)
-            val strips = plan.getJSONArray("strips")
-            for (index in 0 until strips.length()) {
-                val strip = strips.getJSONObject(index)
-                val sourceY = strip.getInt("sourceY"); val targetY = strip.getInt("targetY"); val stripHeight = strip.getInt("height")
-                val piece = decoder.decodeRegion(Rect(0, sourceY, width, sourceY + stripHeight),
+            require(decoder.width == plan.width && decoder.height == plan.height) { "MANGA_GRAPHICS_PLAN_DIMENSIONS" }
+            val bitmap = Bitmap.createBitmap(plan.width, plan.height, Bitmap.Config.RGB_565)
+            target = bitmap
+            ReaderMangaBitmapPolicy.requireAllocation(bitmap.allocationByteCount.toLong(), reservation.targetBytes)
+            val canvas = Canvas(bitmap); val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+            for (strip in plan.strips) {
+                val piece = decoder.decodeRegion(Rect(0, strip.sourceY, plan.width, strip.sourceY + strip.height),
                     BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 })
                     ?: error("MANGA_GRAPHICS_PLAN_DECODE")
                 try {
-                    require(piece.width == width && piece.height == stripHeight) { "MANGA_GRAPHICS_PLAN_PIECE" }
-                    canvas.drawBitmap(piece, 0f, targetY.toFloat(), paint)
+                    require(piece.width == plan.width && piece.height == strip.height) { "MANGA_GRAPHICS_PLAN_PIECE" }
+                    ReaderMangaBitmapPolicy.requireAllocation(piece.allocationByteCount.toLong(), reservation.stripBytes)
+                    canvas.drawBitmap(piece, 0f, strip.targetY.toFloat(), paint)
                 } finally { piece.recycle() }
-                for (row in sourceY until sourceY + stripHeight) sourceCoverage[row] = true
-                for (row in targetY until targetY + stripHeight) targetCoverage[row] = true
             }
-            require(sourceCoverage.all { it } && targetCoverage.all { it }) { "MANGA_GRAPHICS_PLAN_GAP" }
-            return target
+            return bitmap
         } catch (failure: Throwable) {
-            target.recycle()
+            target?.recycle()
             throw failure
-        } finally {
-            decoder.recycle()
-        }
+        } finally { decoder.recycle() }
     }
 
-    private fun validateGraphicsPlanShape(plan: JSONObject) {
+    private fun validateGraphicsPlanShape(plan: JSONObject): GraphicsPlan {
         exactKeys(plan, setOf("__readerMangaGraphicsPlan", "toJSON", "width", "height", "format", "quality", "pixelFormat", "strips"))
-        require(plan.optBoolean("__readerMangaGraphicsPlan") && plan.isNull("toJSON")) { "MANGA_GRAPHICS_PLAN_MARKER" }
-        val width = plan.getInt("width"); val height = plan.getInt("height")
-        require(width > 0 && height > 0 && plan.getString("format") == "jpeg" &&
-            plan.getInt("quality") == 90 && plan.getString("pixelFormat") == "rgb565") { "MANGA_GRAPHICS_PLAN_FORMAT" }
-        val strips = plan.getJSONArray("strips")
-        require(strips.length() in 1..64) { "MANGA_GRAPHICS_PLAN_STRIPS" }
-        val sourceCoverage = BooleanArray(height); val targetCoverage = BooleanArray(height)
-        for (index in 0 until strips.length()) {
-            val strip = strips.getJSONObject(index)
+        require(plan.get("__readerMangaGraphicsPlan") == true && plan.isNull("toJSON")) { "MANGA_GRAPHICS_PLAN_MARKER" }
+        val width = boundedInteger(plan.get("width"), "width")
+        val height = boundedInteger(plan.get("height"), "height")
+        ReaderMangaBitmapPolicy.graphicsDimensions(width, height)
+        require(plan.getString("format") == "jpeg" && exactLong(plan.get("quality"), "quality") == 90L &&
+            plan.getString("pixelFormat") == "rgb565") { "MANGA_GRAPHICS_PLAN_FORMAT" }
+        val raw = plan.getJSONArray("strips")
+        require(raw.length() in 1..64) { "MANGA_GRAPHICS_PLAN_STRIPS" }
+        val strips = (0 until raw.length()).map { index ->
+            val strip = raw.getJSONObject(index)
             exactKeys(strip, setOf("sourceY", "targetY", "height"))
-            val sourceY = strip.getInt("sourceY"); val targetY = strip.getInt("targetY"); val stripHeight = strip.getInt("height")
-            require(sourceY >= 0 && targetY >= 0 && stripHeight > 0 && sourceY + stripHeight <= height && targetY + stripHeight <= height) { "MANGA_GRAPHICS_PLAN_BOUNDS" }
-            for (row in sourceY until sourceY + stripHeight) require(!sourceCoverage[row]) { "MANGA_GRAPHICS_PLAN_SOURCE_OVERLAP" }.also { sourceCoverage[row] = true }
-            for (row in targetY until targetY + stripHeight) require(!targetCoverage[row]) { "MANGA_GRAPHICS_PLAN_TARGET_OVERLAP" }.also { targetCoverage[row] = true }
+            val sourceY = boundedInteger(strip.get("sourceY"), "sourceY")
+            val targetY = boundedInteger(strip.get("targetY"), "targetY")
+            val stripHeight = boundedInteger(strip.get("height"), "height")
+            require(sourceY >= 0 && targetY >= 0 && stripHeight > 0 &&
+                sourceY.toLong() + stripHeight <= height.toLong() && targetY.toLong() + stripHeight <= height.toLong()) {
+                "MANGA_GRAPHICS_PLAN_BOUNDS"
+            }
+            GraphicsStrip(sourceY, targetY, stripHeight)
         }
-        require(sourceCoverage.all { it } && targetCoverage.all { it }) { "MANGA_GRAPHICS_PLAN_GAP" }
+        // At most 64 strips: validate exact coverage without arrays sized by an untrusted image height.
+        fun contiguous(ordered: List<GraphicsStrip>, start: (GraphicsStrip) -> Int): Boolean {
+            var end = 0L
+            for (strip in ordered) {
+                if (start(strip).toLong() != end) return false
+                end += strip.height.toLong()
+            }
+            return end == height.toLong()
+        }
+        require(contiguous(strips.sortedBy { it.sourceY }) { it.sourceY } &&
+            contiguous(strips.sortedBy { it.targetY }) { it.targetY }) { "MANGA_GRAPHICS_PLAN_GAP" }
+        return GraphicsPlan(width, height, strips)
+    }
+
+    private fun boundedInteger(value: Any, field: String): Int = exactLong(value, field).also {
+        require(it in 0..Int.MAX_VALUE.toLong()) { "$field is outside the integer range" }
+    }.toInt()
+
+    private class BoundedBitmapOutput(private val maximum: Int) : ByteArrayOutputStream() {
+        private var exceeded = false
+        fun requireWithinBudget() { require(!exceeded) { ReaderMangaBitmapPolicy.BUDGET_ERROR } }
+        private fun admit(length: Int) {
+            try { ReaderMangaBitmapPolicy.requireOutputSize(size(), length, maximum) }
+            catch (error: IllegalArgumentException) { exceeded = true; throw error }
+        }
+        override fun write(value: Int) {
+            admit(1)
+            super.write(value)
+        }
+        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+            admit(length)
+            super.write(bytes, offset, length)
+        }
     }
 
     internal data class ParsedHttpResult(val status: Int, val contentType: String, val bytes: ByteArray)
@@ -290,6 +350,12 @@ internal class ReaderMangaResourceHost(
     }
 
     companion object {
+        private fun platformImageBounds(encoded: ByteArray): Pair<Int, Int> {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
+            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "MANGA_IMAGE_DIMENSIONS" }
+            return bounds.outWidth to bounds.outHeight
+        }
         internal const val CAPABILITY = "manga.resource.transfer"
         internal const val STAGE_INPUT = "input"
         internal const val STAGE_INSPECT = "inspectInput"

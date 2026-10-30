@@ -1,5 +1,6 @@
 package io.reader.android.ui
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.view.ViewTreeObserver
 import androidx.activity.compose.BackHandler
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.reader.android.runtime.http.ReaderMangaBitmapPolicy
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -219,7 +221,11 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, directory: ReaderMan
                 it.ordinal == page.ordinal && it.resourceRef == page.resource.resourceRef
             } ?: return@mapNotNull null
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            try { BitmapFactory.decodeByteArray(page.decoded.bytes, 0, page.decoded.bytes.size, bounds) }
+            try {
+                BitmapFactory.decodeByteArray(page.decoded.bytes, 0, page.decoded.bytes.size, bounds)
+                // Cached resources may predate the Host gate. Admit geometry and full pixel decode together.
+                ReaderMangaBitmapPolicy.ordinary(bounds.outWidth, bounds.outHeight, page.decoded.bytes.size.toLong())
+            }
             catch (_: RuntimeException) { return@mapNotNull null }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@mapNotNull null
             MangaImagePage(page, identity.pageId, bounds.outWidth, bounds.outHeight)
@@ -401,7 +407,15 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, directory: ReaderMan
                         items(imagePages, key = { it.pageId }) { value ->
                             // Stable handle identity survives an overlapping window; zoom changes only layout nodes.
                             val bitmap = remember(value.page.decoded) {
-                                try { BitmapFactory.decodeByteArray(value.page.decoded.bytes, 0, value.page.decoded.bytes.size)?.asImageBitmap() }
+                                try { BitmapFactory.decodeByteArray(value.page.decoded.bytes, 0, value.page.decoded.bytes.size,
+                                    BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888; inScaled = false })?.let { pixels ->
+                                        try {
+                                            ReaderMangaBitmapPolicy.ordinaryAllocation(value.width, value.height,
+                                                value.page.decoded.bytes.size.toLong(), pixels.allocationByteCount.toLong())
+                                            require(pixels.width == value.width && pixels.height == value.height)
+                                            pixels.asImageBitmap()
+                                        } catch (error: RuntimeException) { pixels.recycle(); throw error }
+                                    } }
                                 catch (_: RuntimeException) { null }
                             }
                             key(ticket?.epoch) {
