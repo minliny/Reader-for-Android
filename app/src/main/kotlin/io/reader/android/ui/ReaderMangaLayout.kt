@@ -51,6 +51,61 @@ internal data class ReaderMangaImageGeometry(
 
 internal data class ReaderMangaNativeRestore(val itemIndex: Int, val scrollOffsetPx: Int, val horizontalOffsetPx: Int)
 
+/** A draw or a layout-induced coordinate change is not evidence of a new user scroll. */
+internal class ReaderMangaScrollAdmission {
+    private var ticket: ReaderMangaLayoutTicket? = null
+    private var restoring = true
+    private var active = false
+    private var idleMovement = false
+
+    fun bind(value: ReaderMangaLayoutTicket?) {
+        if (ticket == value) return
+        ticket = value
+        restoring = true
+        active = false
+        idleMovement = false
+    }
+
+    fun beginRestore(issued: ReaderMangaLayoutTicket) {
+        if (ticket != issued) return
+        restoring = true
+        active = false
+        idleMovement = false
+    }
+
+    fun confirmRestore(issued: ReaderMangaLayoutTicket) {
+        if (ticket != issued) return
+        restoring = false
+        active = false
+        idleMovement = false
+    }
+
+    /** Compose's native scroll states include the drag and its fling, not just pointer-up. */
+    fun nativeMotion(issued: ReaderMangaLayoutTicket?, scrolling: Boolean, transforming: Boolean,
+        restorationPending: Boolean = false) {
+        if (ticket == null || ticket != issued) return
+        // A queued native scrollToItem activity from the restore cannot arm a later ordinary observation.
+        if (restorationPending) return
+        if (restoring || transforming) {
+            active = false
+            idleMovement = false
+        } else if (scrolling) {
+            active = true
+            idleMovement = false
+        } else if (active) {
+            active = false
+            idleMovement = true
+        }
+    }
+
+    fun canObserve(issued: ReaderMangaLayoutTicket) = ticket == issued && !restoring && !active && idleMovement
+
+    /** Keep the permit through stale/missing draw callbacks; consume only the admitted actual location. */
+    fun accepted(issued: ReaderMangaLayoutTicket) {
+        if (canObserve(issued)) idleMovement = false
+    }
+}
+
 /** Reader coordinate adaptation only. Compose owns gestures, scrolling, clamping and item layout. */
 internal object ReaderMangaLayoutGeometry {
     fun accepts(ticket: ReaderMangaLayoutTicket, viewport: ReaderMangaImageRect, image: ReaderMangaImageGeometry): Boolean {
@@ -61,6 +116,14 @@ internal object ReaderMangaLayoutGeometry {
         return abs(viewport.width - ticket.viewportWidthPx) <= 1.0 && abs(viewport.height - ticket.viewportHeightPx) <= 1.0 &&
             abs(image.rect.width - expectedWidth) <= 1.0 && abs(image.rect.height - expectedHeight) <= 1.0
     }
+
+    /** A post-position callback can lag native scrollToItem, even with the correct window and image size. */
+    fun matchesNativePlacement(viewport: ReaderMangaImageRect, image: ReaderMangaImageGeometry,
+        nativeRelativeTopPx: Int, nativeHeightPx: Int, horizontalScrollPx: Int): Boolean =
+        viewport.valid && image.rect.valid && nativeHeightPx > 0 && horizontalScrollPx >= 0 &&
+            abs(image.rect.top - (viewport.top + nativeRelativeTopPx)) <= 1.0 &&
+            abs(image.rect.height - nativeHeightPx) <= 1.0 &&
+            abs(image.rect.left - (viewport.left - horizontalScrollPx)) <= 1.0
 
     fun visibleAnchor(ticket: ReaderMangaLayoutTicket, viewport: ReaderMangaImageRect, images: List<ReaderMangaImageGeometry>): ReaderMangaAnchor? {
         val image = images.filter { accepts(ticket, viewport, it) && it.rect.intersects(viewport) }

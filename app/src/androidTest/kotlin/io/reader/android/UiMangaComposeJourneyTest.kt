@@ -192,10 +192,12 @@ class UiMangaComposeJourneyTest {
             compose.onNodeWithTag("reader_manga_zoom_in").assertIsDisplayed().assertIsEnabled().performClick()
             compose.waitUntil(3_000) { model.mangaReadingState.value.zoom == 1.25f }
             compose.waitUntil(5_000) { model.mangaReadingState.value.restoreRequest == null }
+            mangaStateMarker("manga-zoom-in-restored-state", model)
             compose.onNodeWithText("125%").assertIsDisplayed()
             compose.onNodeWithTag("reader_manga_zoom_out").assertIsDisplayed().assertIsEnabled().performClick()
             compose.waitUntil(3_000) { model.mangaReadingState.value.zoom == 1f }
             compose.waitUntil(5_000) { model.mangaReadingState.value.restoreRequest == null }
+            mangaStateMarker("manga-zoom-out-restored-state", model)
             compose.onNodeWithText("100%").assertIsDisplayed()
             assertEquals(1, model.mangaReadingState.value.currentOrdinal)
             assertFalse(model.mangaReadingState.value.progressDirty)
@@ -263,6 +265,7 @@ class UiMangaComposeJourneyTest {
             complete = true
         } catch (error: Throwable) {
             failure = error
+            observedModel?.let { mangaStateMarker("manga-failure-owner-state", it) }
             marker("method-failure", Bundle().apply {
                 putString("phase", phase); putString("failureClass", error.javaClass.name)
                 putString("message", error.message?.take(512))
@@ -305,6 +308,17 @@ class UiMangaComposeJourneyTest {
         assertNull(state.error); assertNull(state.protocolRecoveryReference)
         assertTrue(state.pendingImports.isEmpty() && state.pendingPositions.isEmpty() && state.pendingBookmarks.isEmpty())
         assertNull(state.pendingSearchClose)
+    }
+
+    private fun mangaStateMarker(step: String, model: ReaderViewModel) {
+        val state = model.mangaReadingState.value
+        marker(step, Bundle().apply {
+            putFloat("zoom", state.zoom); putBoolean("dirty", state.progressDirty); putBoolean("busy", state.progressBusy)
+            putLong("layoutEpoch", state.layoutTicket?.epoch ?: -1); putLong("restoreId", state.restoreRequest?.id ?: -1)
+            putString("visiblePageId", state.visibleAnchor?.pageId); state.visibleAnchor?.let { putDouble("visibleX", it.x); putDouble("visibleY", it.y) }
+            state.lastConfirmedProgress?.let { putDouble("ackX", it.x); putDouble("ackY", it.y); putLong("ackRevision", it.progressRevision) }
+            putString("progressError", state.progressError)
+        })
     }
 
     private fun originalProgress(sourceId: String, location: ReaderMangaLocation): JSONObject {

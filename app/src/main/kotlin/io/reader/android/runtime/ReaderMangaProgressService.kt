@@ -114,7 +114,8 @@ internal class ReaderMangaProgressService(
             })
             return confirmed ?: throw ReaderMangaProgressUnconfirmed(id)
         } catch (error: Exception) {
-            if (error.coreProtocolPending() != null || error is CoreCommandException || error is ReaderMangaProgressUnconfirmed) throw error
+            if (error.coreProtocolPending() != null || error is CoreCommandException || error is ReaderMangaProgressUnconfirmed ||
+                error is ReaderMangaProgressRejected) throw error
             throw ReaderMangaProgressUnconfirmed(id, error)
         }
     }
@@ -165,7 +166,15 @@ internal class ReaderMangaProgressService(
         }
         warm.remove(id)
         protocolFailures.remove(id)
-        if (result == null) CoreTerminal.result(ReaderMangaProgressPolicy.METHOD, event)
+        if (result == null) {
+            // A generic CoreCommandException alone carries no evidence of durable original completion.
+            val parameters = JSONObject(record.getString("parametersJson"))
+            throw ReaderMangaProgressRejected(id, ReaderMangaProgressPolicy.owner(record),
+                ReaderMangaProgressPolicy.location(parameters.getJSONObject("location")),
+                ReaderMangaProgressToken(ReaderMangaProgressPolicy.integer(parameters, "expectedEpoch"),
+                    ReaderMangaProgressPolicy.integer(parameters, "expectedRevision")),
+                event.getJSONObject("error").getString("code"))
+        }
         return checkNotNull(result)
     }
 

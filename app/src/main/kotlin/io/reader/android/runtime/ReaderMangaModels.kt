@@ -51,6 +51,15 @@ data class ReaderMangaProgressPending(val operationId: String, val chapter: Read
 class ReaderMangaProgressUnconfirmed(val operationId: String, cause: Throwable? = null) :
     Exception("MANGA_PROGRESS_ORIGINAL_UNCONFIRMED: $operationId", cause)
 
+/** Emitted only after an exact definite original rejection passes the protocol gate and durable completion. */
+class ReaderMangaProgressRejected internal constructor(
+    val operationId: String,
+    val chapter: ReaderMangaChapterRef,
+    val location: ReaderMangaLocation,
+    val expected: ReaderMangaProgressToken,
+    val code: String,
+) : Exception("MANGA_PROGRESS_ORIGINAL_REJECTED: $operationId/$code")
+
 enum class ReaderMangaReadPolicy(val wire: String) {
     CACHE_ONLY("cacheOnly"), CACHE_FIRST("cacheFirst"), REFRESH("refresh"),
 }

@@ -217,6 +217,111 @@ class ReaderMangaReadingProgressOwnerTest {
         } finally { fixture.close() }
     }
 
+    @Test fun exactRejectedOriginalAllowsOnlyExplicitFrozenDiscardWithoutClaimingASave(): Unit = runBlocking {
+        val fixture = Fixture()
+        try {
+            fixture.open(); fixture.restore(); fixture.measure(fixture.anchor(0, 0.2))
+            assertEquals(ReaderMangaFlushResult.CONFIRMED, fixture.owner.flushVisibleProgress())
+            val confirmed = fixture.owner.state.value.lastConfirmedProgress
+            val token = fixture.owner.state.value.progressToken
+            val rejectedAnchor = fixture.anchor(1, 0.4)
+            fixture.measure(rejectedAnchor)
+            val rejection = fixture.library.rejection(rejectedAnchor, 1)
+            fixture.library.failSave = rejection
+            assertEquals(ReaderMangaFlushResult.BLOCKED, fixture.owner.flushVisibleProgress())
+            assertSame(rejection, fixture.owner.state.value.knownRejection)
+            assertTrue(fixture.owner.state.value.progressPending.isEmpty())
+            fixture.measure(fixture.anchor(2, 0.7)) // The explicit action discards this current unsaved position too.
+            assertEquals(ReaderMangaFlushResult.BLOCKED, fixture.owner.flushVisibleProgress())
+            assertFalse(fixture.owner.discardRejectedProgress(rejection.operationId)) // Must freeze exit first.
+            assertNotNull(fixture.owner.beginExit())
+            assertFalse(fixture.owner.discardRejectedProgress("foreign-original"))
+            assertTrue(fixture.owner.discardRejectedProgress(rejection.operationId))
+            assertFalse(fixture.owner.state.value.progressDirty)
+            assertNull(fixture.owner.state.value.knownRejection)
+            assertEquals(confirmed, fixture.owner.state.value.lastConfirmedProgress)
+            assertEquals(token, fixture.owner.state.value.progressToken)
+            assertEquals(ReaderMangaReadingPhase.READY, fixture.owner.state.value.phase) // Root owns navigation.
+            assertEquals(2, fixture.library.saves.size); assertEquals(1, fixture.library.getCount)
+        } finally { fixture.close() }
+    }
+
+    @Test fun genericErrorsEmptyPendingAndForeignRejectedBindingsNeverAuthorizeDiscard(): Unit = runBlocking {
+        for (kind in 0..4) {
+            val fixture = Fixture()
+            try {
+                fixture.open(); fixture.restore()
+                val anchor = fixture.anchor(1, 0.4)
+                fixture.measure(anchor)
+                fixture.library.createPendingOnFailure = false
+                fixture.library.failSave = when (kind) {
+                    0 -> CoreCommandException("reading.progress.update", org.json.JSONObject().put("code", "INVALID_PARAMS"))
+                    1 -> fixture.library.unknown
+                    2 -> fixture.library.rejection(anchor.copy(y = 0.9), 0)
+                    3 -> fixture.library.rejection(anchor, 8)
+                    else -> ReaderMangaProgressRejected("original-progress", ReaderMangaChapterRef("foreign", "book"),
+                        fixture.library.location(anchor, 1), ReaderMangaProgressToken(5, 0), "INVALID_PARAMS")
+                }
+                assertEquals(ReaderMangaFlushResult.BLOCKED, fixture.owner.flushVisibleProgress())
+                assertTrue(fixture.owner.state.value.progressPending.isEmpty())
+                assertNull(fixture.owner.state.value.knownRejection)
+                assertNotNull(fixture.owner.beginExit())
+                assertFalse(fixture.owner.discardRejectedProgress("original-progress"))
+                assertTrue(fixture.owner.state.value.progressDirty)
+                assertEquals(1, fixture.library.saves.size)
+            } finally { fixture.close() }
+        }
+    }
+
+    @Test fun rejectedDiscardRechecksPendingAndRejectsRetiredGeneration(): Unit = runBlocking {
+        val fixture = Fixture()
+        try {
+            fixture.open(); fixture.restore()
+            val anchor = fixture.anchor(1, 0.4)
+            fixture.measure(anchor)
+            val rejection = fixture.library.rejection(anchor, 0)
+            fixture.library.failSave = rejection
+            assertEquals(ReaderMangaFlushResult.BLOCKED, fixture.owner.flushVisibleProgress())
+            val generation = checkNotNull(fixture.owner.beginExit())
+            fixture.library.pending = listOf(ReaderMangaProgressPending("new-unknown", fixture.library.ref, false, false))
+            assertFalse(fixture.owner.discardRejectedProgress(rejection.operationId))
+            assertTrue(fixture.owner.state.value.progressDirty)
+            assertEquals("new-unknown", fixture.owner.state.value.progressPending.single().operationId)
+            fixture.library.pending = emptyList()
+            fixture.library.failPending = IllegalStateException("JOURNAL_QUERY_FAILED")
+            assertFalse(fixture.owner.discardRejectedProgress(rejection.operationId))
+            assertSame(rejection, fixture.owner.state.value.knownRejection)
+            assertTrue(fixture.owner.state.value.progressDirty)
+            fixture.owner.cancelExit(generation)
+            fixture.library.failPending = null
+            fixture.owner.retire(); fixture.open(); fixture.restore(); fixture.measure(fixture.anchor(2, 0.5))
+            assertNotNull(fixture.owner.beginExit())
+            assertFalse(fixture.owner.discardRejectedProgress(rejection.operationId))
+            assertTrue(fixture.owner.state.value.progressDirty)
+            assertEquals(1, fixture.library.saves.size)
+        } finally { fixture.close() }
+    }
+
+    @Test fun exactReconcileMayReportDefiniteRejectionWithoutInventingSuccessfulProgress(): Unit = runBlocking {
+        val fixture = Fixture()
+        try {
+            fixture.open(); fixture.restore()
+            val anchor = fixture.anchor(1, 0.4)
+            fixture.measure(anchor); fixture.library.failSave = fixture.library.unknown
+            assertEquals(ReaderMangaFlushResult.BLOCKED, fixture.owner.flushVisibleProgress())
+            val rejection = fixture.library.rejection(anchor, 0)
+            fixture.library.canReconcile = true; fixture.library.reconcileFailure = rejection
+            assertFalse(fixture.owner.reconcileProgress(rejection.operationId))
+            assertSame(rejection, fixture.owner.state.value.knownRejection)
+            assertTrue(fixture.owner.state.value.progressPending.isEmpty())
+            assertNull(fixture.owner.state.value.lastConfirmedProgress)
+            assertEquals(ReaderMangaProgressToken(5, 0), fixture.owner.state.value.progressToken)
+            assertNotNull(fixture.owner.beginExit())
+            assertTrue(fixture.owner.discardRejectedProgress(rejection.operationId))
+            assertEquals(1, fixture.library.saves.size); assertEquals(1, fixture.library.getCount)
+        } finally { fixture.close() }
+    }
+
     private class Fixture : AutoCloseable {
         val library = Library()
         val failures = mutableListOf<Throwable>()
@@ -258,14 +363,18 @@ class ReaderMangaReadingProgressOwnerTest {
         var pending: List<ReaderMangaProgressPending> = emptyList()
         var nextSaveGate: CompletableDeferred<Unit>? = null
         var failSave: Throwable? = null
+        var createPendingOnFailure = true
         var failPending: Throwable? = null
         var canReconcile = false
+        var reconcileFailure: ReaderMangaProgressRejected? = null
         var activeSaves = 0
         var maxActiveSaves = 0
         var changeAck: (ReaderMangaProgressState) -> ReaderMangaProgressState = { it }
         val unknown = CoreProtocolPending(CoreProtocolReference("runtime", "original", 41L, "token"), CoreProtocolStage.ORIGINAL_UNCERTAIN)
         fun location(anchor: ReaderMangaAnchor, revision: Long) = ReaderMangaLocation(identity, manifest.manifestVersion,
             anchor.pageId, anchor.ordinal, anchor.x, anchor.y, revision)
+        fun rejection(anchor: ReaderMangaAnchor, expectedRevision: Long) = ReaderMangaProgressRejected("original-progress", ref,
+            location(anchor, expectedRevision + 1), ReaderMangaProgressToken(5, expectedRevision), "INVALID_PARAMS")
         fun saved(ordinal: Int, y: Double, revision: Long): ReaderMangaProgressState {
             val page = manifest.pages.single { it.ordinal == ordinal }
             return ReaderMangaProgressState(ReaderMangaProgressToken(5, revision),
@@ -283,7 +392,9 @@ class ReaderMangaReadingProgressOwnerTest {
             try {
                 val gate = nextSaveGate; nextSaveGate = null; gate?.await()
                 failSave?.let {
-                    pending = listOf(ReaderMangaProgressPending("original-progress", ref, false, false)); throw it
+                    if (createPendingOnFailure && it !is ReaderMangaProgressRejected)
+                        pending = listOf(ReaderMangaProgressPending("original-progress", ref, false, false))
+                    throw it
                 }
                 return changeAck(ReaderMangaProgressState(ReaderMangaProgressToken(request.expected.epoch,
                     request.location.progressRevision), request.location))
@@ -293,6 +404,7 @@ class ReaderMangaReadingProgressOwnerTest {
             assertEquals(ref, owner); assertEquals("original-progress", operationId)
             reconciled += operationId; if (!canReconcile) throw unknown
             pending = emptyList()
+            reconcileFailure?.let { throw it }
             val request = saves.single()
             return ReaderMangaProgressState(ReaderMangaProgressToken(request.expected.epoch, request.location.progressRevision), request.location)
         }

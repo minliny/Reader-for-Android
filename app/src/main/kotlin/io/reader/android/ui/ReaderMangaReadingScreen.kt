@@ -108,7 +108,12 @@ private fun MangaHeading(state: ReaderMangaReadingUiState, model: ReaderViewMode
         }
     }
     val pending = state.progressPending.firstOrNull()
-    if (pending != null || state.progressError != null) {
+    val rejected = state.knownRejection
+    if (rejected != null && pending == null) {
+        ReaderRecoveryNotice("本次阅读位置未保存。", state.progressBusy || state.exitPending,
+            { model.discardRejectedMangaProgress(rejected.operationId) },
+            actionLabel = "不保存并返回", actionTag = "reader_manga_discard_rejected_progress")
+    } else if (pending != null || state.progressError != null) {
         ReaderRecoveryNotice("阅读进度尚未确认。", state.progressBusy,
             pending?.let { item -> { model.reconcileMangaProgress(item.operationId) } },
             actionTag = "reader_manga_reconcile_progress")
@@ -169,13 +174,18 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
         onDispose { if (tree.isAlive) tree.removeOnDrawListener(listener); observation.close() }
     }
     LaunchedEffect(observation, list, horizontal, transform) {
-        snapshotFlow { list.isScrollInProgress || horizontal.isScrollInProgress || transform.isTransformInProgress }
-            .collect { active -> if (!active) view.invalidate() }
+        snapshotFlow { MangaScrollActivity(current.layoutTicket, current.restoreRequest != null,
+            list.isScrollInProgress || horizontal.isScrollInProgress, transform.isTransformInProgress) }
+            .collect { activity ->
+                observation.scrollAdmission.nativeMotion(activity.ticket, activity.scrolling,
+                    activity.transforming, activity.restorationPending)
+                if (!activity.scrolling && !activity.transforming) view.invalidate()
+            }
     }
     LaunchedEffect(ticket, state.restoreRequest?.id) {
         val issued = ticket ?: return@LaunchedEffect
         val request = current.restoreRequest ?: return@LaunchedEffect
-        observation.restoring()
+        observation.restoring(issued)
         // A previous window can have the same count and dimensions. Its layoutInfo alone is insufficient.
         observation.layoutDrawn.first { it == issued }
         // Now native has drawn an image measured against this exact window/width ticket.
@@ -200,14 +210,19 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
         for (frame in observation.frames) {
             val now = current
             val issued = now.layoutTicket ?: continue
-            if (frame.ticket != issued || issued.window != now.visibleWindow || now.exitPending ||
+            if (!observation.isCurrent(frame) || frame.ticket != issued || issued.window != now.visibleWindow || now.exitPending ||
                 list.isScrollInProgress || horizontal.isScrollInProgress || transform.isTransformInProgress) continue
             val nativeLayout = list.layoutInfo
             val nativeVisible = nativeLayout.visibleItemsInfo.filter {
                 it.offset + it.size > nativeLayout.viewportStartOffset && it.offset < nativeLayout.viewportEndOffset
             }
             val nativeKeys = nativeVisible.mapTo(mutableSetOf()) { it.key }
-            val visibleImages = frame.images.filter { it.pageId in nativeKeys }
+            val visibleImages = frame.images.filter { image ->
+                image.pageId in nativeKeys && nativeVisible.singleOrNull { it.key == image.pageId }?.let { item ->
+                    ReaderMangaLayoutGeometry.matchesNativePlacement(frame.viewport, image,
+                        item.offset - nativeLayout.viewportStartOffset, item.size, horizontal.value)
+                } == true
+            }
             val actual = ReaderMangaLayoutGeometry.visibleAnchor(issued, frame.viewport, visibleImages) ?: continue
             val firstNativeKey = nativeVisible.firstOrNull()?.key
             if (firstNativeKey != actual.pageId) continue // A later measured row cannot stand in for an unmeasured first row.
@@ -219,8 +234,11 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, model: ReaderViewMod
                     image.rect.intersects(frame.viewport) && ReaderMangaLayoutGeometry.accepts(issued, frame.viewport, image) }
             }
             if (restore != null && target == null) continue
+            if (restore == null && !observation.scrollAdmission.canObserve(issued)) continue
             val measured = ReaderMangaMeasuredAnchor(issued, actual, restore?.id, target?.pageId)
             if (!model.observeMangaVisible(measured)) continue
+            if (restore != null) observation.restoreConfirmed(issued, restore.id)
+            else observation.scrollAdmission.accepted(issued)
             val previous = lastAccepted
             lastAccepted = actual
             // A restore establishes a new geometry baseline. Paging requires later real vertical movement,
@@ -289,13 +307,16 @@ private fun MangaBitmapPage.geometry(rect: ReaderMangaImageRect) = ReaderMangaIm
 )
 
 private data class MangaDrawStamp(val ticket: ReaderMangaLayoutTicket, val revision: Long)
-private data class MangaDrawFrame(val ticket: ReaderMangaLayoutTicket, val viewport: ReaderMangaImageRect,
+private data class MangaScrollActivity(val ticket: ReaderMangaLayoutTicket?, val restorationPending: Boolean,
+    val scrolling: Boolean, val transforming: Boolean)
+private data class MangaDrawFrame(val ticket: ReaderMangaLayoutTicket, val revision: Long, val viewport: ReaderMangaImageRect,
     val images: List<ReaderMangaImageGeometry>, val appliedRestoreId: Long?)
 
 /** UI-thread observations only. No owner identity, scroll physics or durable progress is created here. */
 private class MangaDrawObservation {
     val frames = Channel<MangaDrawFrame>(Channel.CONFLATED)
     val layoutDrawn = MutableStateFlow<ReaderMangaLayoutTicket?>(null)
+    val scrollAdmission = ReaderMangaScrollAdmission()
     private var ticket: ReaderMangaLayoutTicket? = null
     private var viewport: ReaderMangaImageRect? = null
     private val images = mutableMapOf<String, ReaderMangaImageGeometry>()
@@ -305,6 +326,7 @@ private class MangaDrawObservation {
     fun bind(value: ReaderMangaLayoutTicket?) {
         if (ticket == value) return
         ticket = value; images.clear(); drawn.clear(); appliedRestoreId = null; layoutDrawn.value = null; revision++
+        scrollAdmission.bind(value)
     }
     fun viewport(value: ReaderMangaImageRect) { if (viewport != value) { viewport = value; revision++ } }
     fun image(issued: ReaderMangaLayoutTicket, value: ReaderMangaImageGeometry) {
@@ -317,8 +339,16 @@ private class MangaDrawObservation {
         if (images.remove(transferId) != null) revision++
         drawn.remove(transferId)
     }
-    fun restoring() { appliedRestoreId = null; revision++ }
+    fun restoring(issued: ReaderMangaLayoutTicket) {
+        if (ticket != issued) return
+        appliedRestoreId = null; revision++
+        scrollAdmission.beginRestore(issued)
+    }
     fun restoreApplied(id: Long) { appliedRestoreId = id; revision++ }
+    fun restoreConfirmed(issued: ReaderMangaLayoutTicket, id: Long) {
+        if (ticket == issued && appliedRestoreId == id) scrollAdmission.confirmRestore(issued)
+    }
+    fun isCurrent(frame: MangaDrawFrame) = frame.ticket == ticket && frame.revision == revision
     fun beforeDraw(): MangaDrawStamp? = ticket?.let { MangaDrawStamp(it, revision) }
     /** A layout change during native draw requests another real draw, never a synthetic acknowledgment. */
     fun afterDraw(stamp: MangaDrawStamp?): Boolean {
@@ -328,7 +358,7 @@ private class MangaDrawObservation {
         val visible = images.values.filter { it.transferId in drawn }
         if (visible.any { it.rect.intersects(area) && ReaderMangaLayoutGeometry.accepts(stamp.ticket, area, it) })
             layoutDrawn.value = stamp.ticket
-        frames.trySend(MangaDrawFrame(stamp.ticket, area, visible, appliedRestoreId))
+        frames.trySend(MangaDrawFrame(stamp.ticket, stamp.revision, area, visible, appliedRestoreId))
         return true
     }
     fun close() { frames.close() }

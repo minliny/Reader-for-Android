@@ -4,6 +4,7 @@ import io.reader.android.runtime.ReaderLibrary
 import io.reader.android.runtime.ReaderMangaChapterRef
 import io.reader.android.runtime.ReaderMangaLocation
 import io.reader.android.runtime.ReaderMangaProgressPending
+import io.reader.android.runtime.ReaderMangaProgressRejected
 import io.reader.android.runtime.ReaderMangaProgressSaveRequest
 import io.reader.android.runtime.ReaderMangaProgressState
 import io.reader.android.runtime.ReaderMangaProgressToken
@@ -92,6 +93,7 @@ internal data class ReaderMangaReadingUiState(
     val progressBusy: Boolean = false,
     val progressPending: List<ReaderMangaProgressPending> = emptyList(),
     val progressError: String? = null,
+    val knownRejection: ReaderMangaProgressRejected? = null,
     val restoreBlocked: String? = null,
     val exitPending: Boolean = false,
     val error: String? = null,
@@ -123,6 +125,7 @@ internal class ReaderMangaReadingOwner(
     private var dirtyAnchor: ReaderMangaAnchor? = null
     private var restoreTarget: ReaderMangaAnchor? = null
     private var writeBlocked = false
+    private var rejectionGeneration: Long? = null
 
     fun open(request: ReaderMangaChapterRequest) {
         if (closed) return
@@ -136,7 +139,7 @@ internal class ReaderMangaReadingOwner(
         activeOwner = request.chapter
         activeChapter = null
         inFlightWindow = null
-        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false
+        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false; rejectionGeneration = null
         mutable.value = ReaderMangaReadingUiState(generation = generation, phase = ReaderMangaReadingPhase.LOADING)
         scope.launch {
             try {
@@ -373,10 +376,11 @@ internal class ReaderMangaReadingOwner(
         val token = snapshot.progressToken ?: return@withLock ReaderMangaFlushResult.BLOCKED
         val location = ReaderMangaLocation(chapter.manifest.chapter, chapter.manifest.manifestVersion,
             anchor.pageId, anchor.ordinal, anchor.x, anchor.y, token.revision + 1)
+        val request = ReaderMangaProgressSaveRequest(chapter.manifest, location, token)
         mutable.value = snapshot.copy(progressBusy = true, progressError = null)
         withContext(NonCancellable) {
             try {
-                val result = library().saveProgress(ReaderMangaProgressSaveRequest(chapter.manifest, location, token))
+                val result = library().saveProgress(request)
                 check(result.location == location && result.token.epoch == token.epoch && result.token.revision == location.progressRevision) {
                     "MANGA_UI_PROGRESS_ACK_SCOPE"
                 }
@@ -386,7 +390,7 @@ internal class ReaderMangaReadingOwner(
                     lastConfirmedProgress = result.location, progressDirty = dirtyAnchor != null, progressError = null)
                 ReaderMangaFlushResult.CONFIRMED
             } catch (error: Throwable) {
-                if (current(generation)) retainProgressFailure(error, generation)
+                if (current(generation)) retainProgressFailure(error, generation, request = request)
                 ReaderMangaFlushResult.BLOCKED
             }
         }
@@ -412,24 +416,61 @@ internal class ReaderMangaReadingOwner(
                     it.x == location.x && it.y == location.y && activeChapter?.manifest?.chapter == location.chapter &&
                     activeChapter?.manifest?.manifestVersion == location.manifestVersion) dirtyAnchor = null }
                 writeBlocked = pending.isNotEmpty()
+                rejectionGeneration = null
                 mutable.value = mutable.value.copy(progressBusy = false, progressPending = pending, progressToken = result.token,
-                    lastConfirmedProgress = location, progressDirty = dirtyAnchor != null, progressError = null)
+                    lastConfirmedProgress = location, progressDirty = dirtyAnchor != null, progressError = null, knownRejection = null)
                 true
             } catch (error: Throwable) {
-                if (current(generation)) retainProgressFailure(error, generation)
+                if (current(generation)) retainProgressFailure(error, generation, original = original)
                 false
             }
         }
     }
 
-    private suspend fun retainProgressFailure(error: Throwable, generation: Long) {
+    private suspend fun retainProgressFailure(error: Throwable, generation: Long,
+        request: ReaderMangaProgressSaveRequest? = null, original: ReaderMangaProgressPending? = null) {
         writeBlocked = true // Even a failing journal query cannot authorize an automatic new write.
+        val rejection = (error as? ReaderMangaProgressRejected)?.takeIf { rejected ->
+            rejected.chapter == activeOwner && when {
+                request != null -> rejected.location == request.location && rejected.expected == request.expected
+                original != null -> rejected.operationId == original.operationId && rejected.chapter == original.chapter
+                else -> false
+            }
+        }
         onFailure(error)
         var pending = mutable.value.progressPending
         try { pending = library().pendingProgress() }
         catch (queryFailure: Throwable) { onFailure(queryFailure) }
-        if (current(generation)) mutable.value = mutable.value.copy(progressBusy = false, progressPending = pending,
-            progressError = error.message ?: error::class.java.simpleName, progressDirty = dirtyAnchor != null)
+        if (current(generation)) {
+            rejectionGeneration = generation.takeIf { rejection != null }
+            mutable.value = mutable.value.copy(progressBusy = false, progressPending = pending, knownRejection = rejection,
+                progressError = error.message ?: error::class.java.simpleName, progressDirty = dirtyAnchor != null)
+        }
+    }
+
+    /** Explicit "do not save and return" only. This drops local unsaved intent, never Core data or an unknown original. */
+    suspend fun discardRejectedProgress(operationId: String): Boolean = progressMutex.withLock {
+        val generation = activeGeneration ?: return@withLock false
+        val rejected = mutable.value.knownRejection ?: return@withLock false
+        if (!mutable.value.exitPending || mutable.value.progressBusy || rejectionGeneration != generation ||
+            rejected.operationId != operationId || rejected.chapter != activeOwner) return@withLock false
+        mutable.value = mutable.value.copy(progressBusy = true)
+        val pending = try { library().pendingProgress() }
+        catch (error: Throwable) {
+            onFailure(error)
+            if (current(generation)) mutable.value = mutable.value.copy(progressBusy = false,
+                progressError = error.message ?: error::class.java.simpleName)
+            return@withLock false
+        }
+        if (!current(generation) || mutable.value.knownRejection !== rejected || !mutable.value.exitPending) return@withLock false
+        if (pending.isNotEmpty()) {
+            mutable.value = mutable.value.copy(progressBusy = false, progressPending = pending)
+            return@withLock false
+        }
+        dirtyAnchor = null; writeBlocked = false; rejectionGeneration = null
+        mutable.value = mutable.value.copy(progressBusy = false, progressDirty = false, progressPending = emptyList(),
+            progressError = null, knownRejection = null)
+        true // No get, update, token advance, successful-save claim, or navigation.
     }
 
     /** Retire the visible chapter while keeping this ViewModel-owned owner reusable. */
@@ -440,7 +481,7 @@ internal class ReaderMangaReadingOwner(
         activeOwner = null
         activeChapter = null
         inFlightWindow = null
-        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false
+        lastStableAnchor = null; dirtyAnchor = null; restoreTarget = null; writeBlocked = false; rejectionGeneration = null
         retirePages()
         mutable.value = ReaderMangaReadingUiState(generation = nextGeneration)
     }

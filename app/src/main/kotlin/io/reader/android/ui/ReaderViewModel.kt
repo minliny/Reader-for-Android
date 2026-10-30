@@ -364,13 +364,33 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 if (result == ReaderMangaFlushResult.BLOCKED) {
                     owner.cancelExit(ownerGeneration)
                 } else {
-                    owner.retire()
-                    mangaState.value = owner.state.value
-                    mangaRequest = null
-                    mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
+                    retireMangaReading(owner)
                 }
             }
         }
+    }
+
+    internal fun discardRejectedMangaProgress(operationId: String) {
+        if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return
+        val owner = mangaOwnerDelegate.value
+        if (owner.state.value.knownRejection?.operationId != operationId || owner.state.value.progressPending.isNotEmpty()) return
+        val ownerGeneration = owner.beginExit() ?: return
+        mangaSaveDelay?.cancel(); mangaSaveDelay = null
+        viewModelScope.launch {
+            gate.withLock {
+                if (state.value.route != ReaderRoute.MangaReading || owner.state.value.generation != ownerGeneration) return@withLock
+                val discarded = owner.discardRejectedProgress(operationId)
+                if (state.value.route != ReaderRoute.MangaReading || owner.state.value.generation != ownerGeneration) return@withLock
+                if (discarded) retireMangaReading(owner) else owner.cancelExit(ownerGeneration)
+            }
+        }
+    }
+
+    private fun retireMangaReading(owner: ReaderMangaReadingOwner) {
+        owner.retire()
+        mangaState.value = owner.state.value
+        mangaRequest = null
+        mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
     }
 
     private var managementBusyGeneration: Long? = null

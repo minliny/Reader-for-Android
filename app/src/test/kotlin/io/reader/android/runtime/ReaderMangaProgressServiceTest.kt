@@ -43,6 +43,7 @@ class ReaderMangaProgressServiceTest {
         var beforeWriteCalls = 0
         var sharedWriterBlocked = false
         var mode = "result"
+        var failAck = false
         var transform: (JSONObject) -> Unit = {}
         var reads = JSONObject().put("token", JSONObject().put("epoch", 3).put("revision", 0)).put("location", JSONObject.NULL)
         var drainEvent: JSONObject? = null
@@ -69,9 +70,10 @@ class ReaderMangaProgressServiceTest {
                 val event = if (mode == "rejected" || mode == "indeterminate") JSONObject().put("protocolVersion", 1)
                     .put("requestId", 41).put("type", "error").put("error", JSONObject()
                         .put("code", if (mode == "rejected") "INVALID_PARAMS" else "INTERNAL").put("message", "probe"))
-                else event(params).also(transform)
+                else event(params)
+                transform(event)
                 deliver(event)
-                if (mode == "ack-failed") {
+                if (mode == "ack-failed" || failAck) {
                     drainRequiresProtocolRecovery = true
                     throw unknown
                 }
@@ -270,13 +272,42 @@ class ReaderMangaProgressServiceTest {
 
     @Test fun definiteOriginalRejectionCompletesButInternalErrorAndExistingWriterDoNot() {
         val rejected = Fixture().apply { mode = "rejected" }
-        assertThrows(CoreCommandException::class.java) { rejected.service.save(request) }
+        val proof = assertThrows(ReaderMangaProgressRejected::class.java) { rejected.service.save(request) }
+        assertEquals(rejected.id(), proof.operationId); assertEquals(owner, proof.chapter)
+        assertEquals(request.location, proof.location); assertEquals(request.expected, proof.expected)
+        assertEquals("INVALID_PARAMS", proof.code)
         assertTrue(rejected.record().getBoolean("completed")); assertTrue(rejected.service.pending().isEmpty())
+        val reread = assertThrows(ReaderMangaProgressRejected::class.java) { rejected.service.reconcile(owner, rejected.id()) }
+        assertEquals(proof.operationId, reread.operationId); assertEquals(1, rejected.requests.size)
         val unknown = Fixture().apply { mode = "indeterminate" }
         assertThrows(ReaderMangaProgressUnconfirmed::class.java) { unknown.service.save(request) }
         assertFalse(unknown.record().getBoolean("completed")); assertTrue(unknown.service.pending().isNotEmpty())
         val blocked = Fixture().apply { sharedWriterBlocked = true }
         assertThrows(IllegalStateException::class.java) { blocked.service.save(request) }
         assertTrue(blocked.requests.isEmpty()); assertTrue(blocked.journal.records.isEmpty())
+    }
+
+    @Test fun rejectedReceiptRequiresExactProtocolAndDurableCompletionBeforeItIsExposed() {
+        val disk = Fixture().apply { mode = "rejected"; journal.failCompletion = true }
+        assertThrows(ReaderMangaProgressUnconfirmed::class.java) { disk.service.save(request) }
+        assertFalse(disk.record().getBoolean("completed")); assertTrue(disk.service.pending().isNotEmpty())
+        disk.journal.failCompletion = false; disk.client = "replacement-client"
+        assertThrows(ReaderMangaProgressRejected::class.java) { disk.service.reconcile(owner, disk.id()) }
+        assertTrue(disk.record().getBoolean("completed")); assertEquals(1, disk.requests.size)
+        for (sinkFails in listOf(false, true)) {
+            val protocol = Fixture().apply { mode = "rejected"; failAck = !sinkFails; journal.failTerminal = sinkFails }
+            assertSame(protocol.unknown, assertThrows(CoreProtocolPending::class.java) { protocol.service.save(request) })
+            protocol.client = "replacement-client"
+            assertSame(protocol.unknown, assertThrows(CoreProtocolPending::class.java) {
+                protocol.service.reconcile(owner, protocol.id())
+            })
+            assertFalse(protocol.record().getBoolean("completed")); assertTrue(protocol.service.pending().isNotEmpty())
+        }
+        val markedUnknown = Fixture().apply {
+            mode = "rejected"
+            transform = { it.getJSONObject("error").put("details", JSONObject().put("originalPending", true)) }
+        }
+        assertThrows(ReaderMangaProgressUnconfirmed::class.java) { markedUnknown.service.save(request) }
+        assertFalse(markedUnknown.record().getBoolean("completed")); assertTrue(markedUnknown.service.pending().isNotEmpty())
     }
 }

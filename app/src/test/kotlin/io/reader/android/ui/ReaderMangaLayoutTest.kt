@@ -58,4 +58,81 @@ class ReaderMangaLayoutTest {
         val actual = ReaderMangaLayoutGeometry.visibleAnchor(newTicket, newViewport, listOf(actuallyClamped))!!
         assertEquals(0.0, actual.x, 0.0); assertEquals(.25, actual.y, 0.0)
     }
+
+    @Test fun zoomRestoreRoundingCannotBecomeAnOrdinaryProgressObservation() {
+        val saved = 261.0 / 2160
+        val restored = 326.0 / 2700
+        assertNotEquals(saved, restored, 0.0) // Exact physical rounding from the failed device original, not a tolerance.
+        val admission = ReaderMangaScrollAdmission()
+        admission.bind(ticket)
+        admission.beginRestore(ticket)
+        admission.nativeMotion(ticket, scrolling = true, transforming = false) // scrollToItem is native motion too.
+        admission.nativeMotion(ticket, scrolling = false, transforming = false)
+        admission.confirmRestore(ticket)
+        assertFalse(admission.canObserve(ticket))
+        // Late notifications retain their restore provenance even if the owner already cleared its request.
+        admission.nativeMotion(ticket, scrolling = true, transforming = false, restorationPending = true)
+        admission.nativeMotion(ticket, scrolling = false, transforming = false, restorationPending = true)
+        assertFalse(admission.canObserve(ticket))
+        admission.nativeMotion(ticket, scrolling = false, transforming = false) // More idle draws after restore.
+        assertFalse(admission.canObserve(ticket))
+
+        val zoomOut = ticket.copy(epoch = ticket.epoch + 1, zoom = 1f)
+        admission.bind(zoomOut)
+        admission.beginRestore(zoomOut)
+        admission.nativeMotion(zoomOut, scrolling = true, transforming = false)
+        admission.nativeMotion(zoomOut, scrolling = false, transforming = false)
+        admission.confirmRestore(zoomOut)
+        assertFalse(admission.canObserve(zoomOut))
+    }
+
+    @Test fun genuineScrollPermitWaitsForTheCurrentDrawAndIsConsumedOnce() {
+        val admission = ReaderMangaScrollAdmission()
+        admission.bind(ticket); admission.confirmRestore(ticket)
+        admission.nativeMotion(ticket, scrolling = true, transforming = false)
+        assertFalse(admission.canObserve(ticket))
+        admission.nativeMotion(ticket, scrolling = false, transforming = false)
+        assertTrue(admission.canObserve(ticket))
+        // A rejected old/missing frame must not consume the new real scroll's pending observation.
+        admission.accepted(ticket.copy(epoch = ticket.epoch - 1))
+        assertTrue(admission.canObserve(ticket))
+        assertTrue(admission.canObserve(ticket))
+        admission.accepted(ticket)
+        assertFalse(admission.canObserve(ticket))
+        admission.nativeMotion(ticket, scrolling = true, transforming = false)
+        admission.nativeMotion(ticket, scrolling = false, transforming = false)
+        assertTrue(admission.canObserve(ticket)) // A later genuine scroll is not suppressed.
+    }
+
+    @Test fun restoringTransformingOrRetiredMotionCannotAuthorizeANewWindow() {
+        val admission = ReaderMangaScrollAdmission()
+        admission.bind(ticket); admission.confirmRestore(ticket)
+        admission.nativeMotion(ticket, scrolling = true, transforming = false)
+        admission.nativeMotion(ticket, scrolling = false, transforming = true)
+        assertFalse(admission.canObserve(ticket))
+        val next = ticket.copy(epoch = ticket.epoch + 1)
+        admission.bind(next); admission.confirmRestore(next)
+        admission.nativeMotion(ticket, scrolling = true, transforming = false)
+        admission.nativeMotion(ticket, scrolling = false, transforming = false)
+        assertFalse(admission.canObserve(next))
+        admission.nativeMotion(next, scrolling = true, transforming = false)
+        admission.nativeMotion(next, scrolling = false, transforming = false)
+        assertTrue(admission.canObserve(next))
+        admission.beginRestore(next)
+        assertFalse(admission.canObserve(next))
+    }
+
+    @Test fun currentTicketAndSizeCannotAdmitThePreRestoreNativeOffset() {
+        val area = ReaderMangaImageRect(0.0, 100.0, 1080.0, 1899.0)
+        val oldRect = image(left = 0.0, top = 100.0 - 261, width = 1350.0, height = 2700.0)
+        assertTrue(ReaderMangaLayoutGeometry.accepts(ticket.copy(viewportWidthPx = 1080,
+            viewportHeightPx = 1899, zoom = 1.25f), area, oldRect))
+        assertFalse(ReaderMangaLayoutGeometry.matchesNativePlacement(area, oldRect,
+            nativeRelativeTopPx = -326, nativeHeightPx = 2700, horizontalScrollPx = 0))
+        val actual = oldRect.copy(rect = oldRect.rect.copy(top = 100.0 - 326))
+        assertTrue(ReaderMangaLayoutGeometry.matchesNativePlacement(area, actual,
+            nativeRelativeTopPx = -326, nativeHeightPx = 2700, horizontalScrollPx = 0))
+        assertFalse(ReaderMangaLayoutGeometry.matchesNativePlacement(area, actual,
+            nativeRelativeTopPx = -326, nativeHeightPx = 2700, horizontalScrollPx = 50))
+    }
 }
