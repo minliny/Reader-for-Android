@@ -54,4 +54,21 @@ class ReaderMangaResourceStoreTest {
         assertEquals(64, decodedSha.length)
         assertArrayEquals(byteArrayOf(9, 8, 7, 6), store.readDecodedByTransferId(identity.wireId))
     }
+
+    @Test
+    fun evictionRefusesActiveLeaseAndMaterializedProtection() {
+        val root = Files.createTempDirectory("reader-manga-store-").toFile()
+        val store = ReaderMangaResourceStore(root)
+        val identity = ReaderMangaTransferIdentity("rmt1:${"e".repeat(64)}", "manga:page-evict")
+        val staged = store.stage(identity, listOf(byteArrayOf(1, 2, 3)), "image/jpeg")
+        store.commit(staged)
+        store.putDecodedByTransferId(identity.wireId, byteArrayOf(4, 5, 6))
+        val lease = store.acquireDecodedLease(identity.wireId)
+        assertFalse(store.evictDecodedByTransferId(identity.wireId))
+        lease.close()
+        store.protectResourceRef(identity.resourceRef)
+        assertFalse(store.evictDecodedByTransferId(identity.wireId))
+        store.unprotectResourceRef(identity.resourceRef)
+        assertTrue(store.evictDecodedByTransferId(identity.wireId))
+    }
 }

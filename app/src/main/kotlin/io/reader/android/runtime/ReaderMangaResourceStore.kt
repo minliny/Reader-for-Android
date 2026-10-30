@@ -11,6 +11,11 @@ import java.util.UUID
  * committed resource; the directory rename is the commit boundary.
  */
 internal class ReaderMangaResourceStore(private val root: File) {
+    class DecodedLease internal constructor(private val releaseAction: () -> Unit) : AutoCloseable {
+        private var released = false
+        override fun close() { if (!released) { released = true; releaseAction() } }
+    }
+
     data class Staged internal constructor(
         val identity: ReaderMangaTransferIdentity,
         val directory: File,
@@ -178,6 +183,37 @@ internal class ReaderMangaResourceStore(private val root: File) {
         .digest(bytes).joinToString("") { "%02x".format(it) }
 
     private data class Meta(val first: String, val second: String, val third: Long, val fourth: String, val fifth: String)
+    private val decodedLeases = mutableMapOf<String, Int>()
+    private val protectedRefs = mutableSetOf<String>()
+
+    @Synchronized
+    fun acquireDecodedLease(wireId: String): DecodedLease {
+        readDecodedByTransferId(wireId)
+        decodedLeases[wireId] = (decodedLeases[wireId] ?: 0) + 1
+        return DecodedLease { releaseDecodedLease(wireId) }
+    }
+
+    @Synchronized
+    fun protectResourceRef(resourceRef: String) { protectedRefs += resourceRef }
+
+    @Synchronized
+    fun unprotectResourceRef(resourceRef: String) { protectedRefs -= resourceRef }
+
+    @Synchronized
+    fun evictDecodedByTransferId(wireId: String): Boolean {
+        if ((decodedLeases[wireId] ?: 0) > 0) return false
+        val directory = findDirectory(wireId) { true }
+        val meta = readMeta(directory)
+        if (meta.second in protectedRefs) return false
+        val decoded = File(directory, DECODED)
+        return !decoded.exists() || decoded.delete()
+    }
+
+    @Synchronized
+    private fun releaseDecodedLease(wireId: String) {
+        val count = decodedLeases[wireId] ?: return
+        if (count <= 1) decodedLeases.remove(wireId) else decodedLeases[wireId] = count - 1
+    }
 
     companion object {
         private const val ENCODED = "encoded.bin"
