@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -394,11 +395,21 @@ private fun MangaViewport(state: ReaderMangaReadingUiState, directory: ReaderMan
                     coordinates.size.width.toDouble(), coordinates.size.height.toDouble()))
             }.testTag("reader_manga_viewport")) {
                 val contentWidth = maxWidth * state.zoom
+                val contentWidthPx = with(LocalDensity.current) { contentWidth.roundToPx() }
+                val layoutReady = imagePages.all {
+                    ReaderMangaImageLayoutAdmission.accepts(it.width, it.height, contentWidthPx)
+                }
+                LaunchedEffect(ticket, layoutReady, state.chapterTransition?.id) {
+                    val issued = ticket ?: return@LaunchedEffect
+                    if (boundsReady && !layoutReady && current.chapterTransition?.phase == ReaderMangaChapterTransitionPhase.PRESENTING)
+                        model.failMangaChapterPresentation(issued, "MANGA_UI_IMAGE_LAYOUT_LIMIT")
+                }
                 val viewportHeight = maxHeight
                 val interactionEnabled = !state.exitPending && state.chapterTransition == null && !directory.visible && !directory.busy
-                if (!boundsReady) ReaderPageState("漫画暂时无法显示", "图片读取未完成。",
-                    if (state.chapterTransition == null) "重试" else null,
-                    if (state.chapterTransition == null) model::retryMangaReading else null)
+                if (!boundsReady || !layoutReady) ReaderPageState("漫画暂时无法显示",
+                    if (boundsReady) "图片尺寸超出当前显示范围。" else "图片读取未完成。",
+                    if (!boundsReady && state.chapterTransition == null) "重试" else null,
+                    if (!boundsReady && state.chapterTransition == null) model::retryMangaReading else null)
                 else Box(Modifier.fillMaxSize().horizontalScroll(horizontal, enabled = interactionEnabled && state.restoreRequest == null)
                     .transformable(transform, canPan = { false }, enabled = interactionEnabled)) {
                     LazyColumn(state = list,
