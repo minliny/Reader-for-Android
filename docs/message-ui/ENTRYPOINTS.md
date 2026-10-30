@@ -120,3 +120,15 @@ Native anchor 的 Boolean 仅为当前完整 reading/token/key 范围内的显�
 布局票据由 owner 单调签发；图片真实坐标和 draw/idle 观察只归当前 ticket/resource。首次恢复、尺寸变化、缩放和窗口替换建立显示基线，不制造保存；重排前真实 dirty 位置保留。旧 callback 不修改新页面；退出先冻结新测量，原保存确认或确实没有新写入后退休。此表登记接入与生命周期，不表示设备或用户验收。
 
 短图的“前一段／继续阅读”为固定宿主的正常导航控件，源于当前准确布局实际可见范围与有界窗口；自动补窗只保持当前显示范围，不创建进度。明确跳段意图绑定 owner generation/window/目标页和恢复票据，唯有该目标真实绘制后，实际可见位置才可保存。窗口预算拒绝保留旧图片和真实 dirty；受管 encoded bytes 的限额不代表 Host 解码、Bitmap/GPU 或整进程预算已验收。
+
+### A6 漫画目录与相邻章节（源码候选）
+
+| 事实 | 公共组件及宿主 | 身份、动作与失效 |
+| --- | --- | --- |
+| 目录读取/定位失败，原目录资格需重新取得 | ReaderRecoveryNotice；漫画底部目录面板 | 当前 VM 目录代次与实际 issued directory；“重新读取目录”只交给 VM 的显式读取入口。error 时旧节点及“更多目录”均不可派发；新目录到达后旧对象失效。关闭面板仅隐藏展示，不取消已准入读取或保存 |
+| 当前目录没有可展示条目 | ReaderPageState；同目录面板 | 仅当前 issued nodes 为空且不在读取、没有错误时展示；分组/disabled 行不能作为选章目标，更多分页只使用当前 nextOffset |
+| 已确认没有前一章或后一章 | ReaderTransientFeedback；现有图片视口顶部覆盖消息列 | VM 签发的 notice id 与业务文案；到时只退休相同 id，不重读目录、不推算 index、不形成切章事务 |
+| 保存、准备及真实呈现新章节 | 现有标题行进度与“取消”控件 | 同 chapterTransition id/originGeneration/issued node/targetIndex/landing；禁止新的选章、缩放、原生滚动与退出，取消只转交当前事务 owner。SAVING/PREPARING 不提交图位置，PRESENTING 保留真实 layout/draw/restore 路径 |
+| 章节切换或候选图片真实呈现失败，原章节已保留/回退 | ReaderRecoveryNotice；图片视口顶部覆盖消息列；无自动重试 | chapterError 由 owner 发布；图片 bounds/bitmap 失败只回传原候选的 exact layoutTicket，超时由 owner 持有。消息不自行确认、保存或回退；旧票不能操作新章节 |
+
+目录复用现有阅读 controls 的底部 Surface 面板规则，作为图片宿主的覆盖兄弟节点；目录开关不卸载图片、清理资源或改变阅读视口高度。上一章、目录、下一章及取消沿用现有标题行；已有 48.dp 图片段落 footer 保持。所有导航按钮与系统返回在原生 idle 且实际移动已被当前布局接纳后才准入，目录选章转交精确 issued node 对象，前后章由 VM 解析真实目录顺序。临时隐藏面板不取消业务；只有明确选章产生切章意图。此登记仅为源码接入与生命周期合同，构建、真实设备交互及用户验收另记。

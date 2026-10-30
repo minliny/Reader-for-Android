@@ -77,6 +77,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     /** Uses the App owner’s single store instance so Host leases and materialization protection agree. */
     private val mangaService by lazy { ReaderMangaService(transport, client.mangaMaterializationStore) }
     private val mangaProgressService get() = client.mangaProgress
+    private val mangaDirectoryDelegate = lazy {
+        ReaderMangaDirectoryOwner(transport, onlineCatalog, { id -> sourceRulesService.list(id, true) },
+            { client.currentTurn(); Unit }, { client.assertCurrentAdmission() })
+    }
+    private val mangaDirectory get() = mangaDirectoryDelegate.value
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
@@ -239,6 +244,20 @@ class ReaderLibrary(context: Context) : AutoCloseable {
             val saved = mangaProgressService.get(ReaderMangaChapterRef(preview.key.sourceId, preview.key.bookId))
             onlineCatalog.mangaToc(client.lease, preview, saved.location?.chapter?.chapterId)
         }
+    internal suspend fun prepareMangaOpening(preview: ReaderOnlineDetailPreview): ReaderMangaOpening =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            val saved = mangaProgressService.get(ReaderMangaChapterRef(preview.key.sourceId, preview.key.bookId))
+            val request = onlineCatalog.mangaToc(client.lease, preview, saved.location?.chapter?.chapterId)
+            ReaderMangaOpening(request, mangaDirectory.open(client.lease, request, preview.sourceVersion))
+        }
+    suspend fun nextMangaDirectoryPage(directory: ReaderMangaDirectory, offset: Int): ReaderMangaDirectoryPage =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaDirectory.next(client.lease, directory, offset) }
+    suspend fun reopenMangaDirectory(directory: ReaderMangaDirectory, currentChapterIndex: Int): ReaderMangaDirectoryPage =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaDirectory.reopen(client.lease, directory, currentChapterIndex) }
+    suspend fun resolveMangaDirectoryTarget(node: ReaderMangaDirectoryNode): ReaderMangaChapterRequest =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaDirectory.resolve(client.lease, node) }
+    suspend fun closeMangaDirectory(directory: ReaderMangaDirectory): Unit =
+        onIO(WholeTurnMode.OBSERVER_READ) { mangaDirectory.close(directory) }
     suspend fun closeOnlineSearch(session: ReaderOnlineSearchSession): Unit =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) {
             onlineCatalog.close(session)
@@ -307,7 +326,7 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     suspend fun mangaChapter(request: ReaderMangaChapterRequest): ReaderMangaChapterData =
         // Chapter acquisition can execute source rules and wait for Host HTTP/image metadata;
         // it is not a pure observer turn even though the returned manifest is read-only.
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.chapter(request) }
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaDirectory.requireTarget(client.lease, request); mangaService.chapter(request) }
 
     /** Observes Core state only; it cannot resolve any original write. */
     suspend fun mangaProgress(chapter: ReaderMangaChapterRef): ReaderMangaProgressState =
@@ -1112,7 +1131,11 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) { positionIntent.set(null); retirePreparedEbook(); client.retire() }
+        if (closed.compareAndSet(false, true)) {
+            positionIntent.set(null); retirePreparedEbook()
+            if (mangaDirectoryDelegate.isInitialized()) mangaDirectoryDelegate.value.retireAll()
+            client.retire()
+        }
         // Existing ViewModel.onCleared() still calls this, but no native destroy,
         // detached close thread, current-cursor close, or old-session map clearing.
     }

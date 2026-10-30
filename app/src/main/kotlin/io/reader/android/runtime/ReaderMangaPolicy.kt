@@ -4,6 +4,18 @@ import org.json.JSONObject
 
 /** Strict admission for Core manga page descriptors; no download or decode occurs here. */
 internal object ReaderMangaPolicy {
+    fun directoryTargetProof(request: ReaderMangaChapterRequest): JSONObject? {
+        val target = request.directoryTarget ?: return null
+        val directory = target.directory
+        check(request.chapter == directory.chapter && request.chapterIndex == target.chapterIndex &&
+            target.sourceRuleVersion == directory.sourceVersion && target.url.isNotBlank()) { "MANGA_DIRECTORY_REQUEST_SCOPE" }
+        return JSONObject(target.proofJson).also { proof ->
+            check(proof.getString("sourceId") == request.chapter.sourceId && proof.getString("bookId") == request.chapter.bookId &&
+                proof.getString("catalogRevision") == directory.catalogRevision && proof.getString("structureRevision") == directory.structureRevision &&
+                proof.getString("nodeId") == target.nodeId && ReaderMangaProgressPolicy.integer(proof, "chapterIndex") == request.chapterIndex.toLong() &&
+                proof.getString("url") == target.url) { "MANGA_DIRECTORY_NATIVE_PROOF_SCOPE" }
+        }
+    }
     fun pagesExtract(value: JSONObject, expected: ReaderMangaChapterRef): ReaderMangaPagesExtract {
         val sourceId = value.getString("sourceId").also { check(it == expected.sourceId && it.isNotBlank()) { "MANGA_SOURCE_SCOPE" } }
         val bookId = value.getString("bookId").also { check(it == expected.bookId && it.isNotBlank()) { "MANGA_BOOK_SCOPE" } }
@@ -42,6 +54,12 @@ internal object ReaderMangaPolicy {
     fun chapterData(value: JSONObject, expected: ReaderMangaChapterRequest): ReaderMangaChapterData {
         val chapterIndex = value.getInt("chapterIndex").also { check(it == expected.chapterIndex && it >= 0) { "MANGA_CHAPTER_INDEX" } }
         val manifest = manifest(value.getJSONObject("manifest"), expected.chapter.sourceId, expected.chapter.bookId)
+        expected.directoryTarget?.let { target ->
+            directoryTargetProof(expected)
+            check(manifest.chapter.chapterId == target.url && manifest.sourceRuleVersion == target.sourceRuleVersion) {
+                "MANGA_DIRECTORY_RETURNED_CHAPTER_SCOPE"
+            }
+        }
         check(manifest.manifestVersion == expected.expectedManifestVersion || expected.expectedManifestVersion == null) {
             "MANGA_MANIFEST_VERSION"
         }

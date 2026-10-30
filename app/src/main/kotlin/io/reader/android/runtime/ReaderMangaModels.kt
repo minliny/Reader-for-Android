@@ -70,7 +70,10 @@ data class ReaderMangaChapterRequest(
     val policy: ReaderMangaReadPolicy = ReaderMangaReadPolicy.CACHE_FIRST,
     val expectedManifestVersion: String? = null,
     val preparationRevision: Long? = null,
+    val directoryTarget: ReaderMangaDirectoryTarget? = null,
 )
+
+data class ReaderMangaOpening(val request: ReaderMangaChapterRequest, val directoryPage: ReaderMangaDirectoryPage)
 
 data class ReaderMangaManifestPage(val pageId: String, val ordinal: Int, val resourceRef: String)
 

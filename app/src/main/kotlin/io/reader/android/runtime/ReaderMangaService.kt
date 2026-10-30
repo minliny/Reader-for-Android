@@ -34,6 +34,7 @@ internal class ReaderMangaService(
             .put("policy", request.policy.wire)
         request.expectedManifestVersion?.let { params.put("expectedManifestVersion", it) }
         request.preparationRevision?.let { params.put("preparationRevision", it) }
+        ReaderMangaPolicy.directoryTargetProof(request)?.let { params.put("directoryTargetProof", it) }
         return ReaderMangaPolicy.chapterData(transport.request("manga.chapter.get", params), request)
     }
 

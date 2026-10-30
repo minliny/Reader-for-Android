@@ -397,11 +397,18 @@ class UiMangaComposeJourneyTest {
         instrumentation.sendStatus(2, extras)
     }
 
-    internal class Fixture(private val pageCount: Int = 2, private val pageHeight: Int = 512) : AutoCloseable {
+    internal class Fixture(private val pageCount: Int = 2, private val pageHeight: Int = 512,
+        private val chapterCount: Int = 1) : AutoCloseable {
         private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
         private val workers = Executors.newFixedThreadPool(2)
         private val base = "http://127.0.0.1:${server.localPort}"
         private val images = List(pageCount) { index -> page(if (index % 2 == 0) Color.rgb(224, 35, 35) else Color.rgb(35, 55, 224)) }
+        private val chapterImages = if (chapterCount > 1) {
+            require(chapterCount in 2..3)
+            val colors = listOf(Color.rgb(224, 35, 35), Color.rgb(35, 55, 224),
+                Color.rgb(35, 175, 55), Color.rgb(230, 135, 25), Color.rgb(140, 45, 195), Color.rgb(25, 165, 195))
+            (1..chapterCount).associateWith { chapter -> List(pageCount) { index -> page(colors[(chapter - 1) * 2 + index % 2]) } }
+        } else emptyMap()
         private val acceptor = thread(start = true, name = "reader-manga-compose-fixture") {
             try {
                 while (!server.isClosed) {
@@ -422,7 +429,7 @@ class UiMangaComposeJourneyTest {
                 .put("ruleBookInfo", JSONObject().put("init", js("detail-rule")).put("name", "name")
                     .put("author", "author").put("intro", "intro").put("tocUrl", "url"))
                 .put("ruleToc", JSONObject().put("chapterList", js("toc-rule")).put("chapterName", "name").put("chapterUrl", "url"))
-                .put("ruleContent", JSONObject().put("content", js("content-rule"))).toString()
+                .put("ruleContent", JSONObject().put("content", if (chapterCount == 1) js("content-rule") else "tag.img@src")).toString()
         }
 
         private fun page(color: Int): ByteArray {
@@ -453,10 +460,11 @@ class UiMangaComposeJourneyTest {
                     "/search-url.js" -> "'$base/search'".toByteArray()
                     "/search-rule.js" -> "[{name:'Comic',author:'Author',url:'$base/book'}]".toByteArray()
                     "/detail-rule.js" -> "({name:'Comic',author:'Author',intro:'Two colored pages',url:'$base/toc'})".toByteArray()
-                    "/toc-rule.js" -> "[{name:'Chapter 1',url:'$base/chapter/1'}]".toByteArray()
+                    "/toc-rule.js" -> ("[" + (1..chapterCount).joinToString(",") {
+                        "{name:'Chapter $it',url:'$base/chapter/$it'}" } + "]").toByteArray()
                     "/content-rule.js" -> ("'" + (1..pageCount).joinToString("") { "<img src=\"$base/images/$it.jpg\">" } + "'").toByteArray()
-                    "/search", "/book", "/toc", "/chapter/1" -> "fixture".toByteArray()
-                    else -> Regex("/images/([0-9]+)\\.jpg").matchEntire(path)?.groupValues?.get(1)
+                    "/search", "/book", "/toc" -> "fixture".toByteArray()
+                    else -> chapterBody(path) ?: chapterImage(path) ?: Regex("/images/([0-9]+)\\.jpg").matchEntire(path)?.groupValues?.get(1)
                         ?.toIntOrNull()?.let { images.getOrNull(it - 1) }
                 }
                 val status = if (body == null) "404 Not Found" else "200 OK"
@@ -465,6 +473,21 @@ class UiMangaComposeJourneyTest {
                 val header = "HTTP/1.1 $status\r\nContent-Type: $type\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n"
                 it.getOutputStream().apply { write(header.toByteArray(StandardCharsets.ISO_8859_1)); write(payload); flush() }
             }
+        }
+
+        private fun chapterBody(path: String): ByteArray? {
+            val chapter = Regex("/chapter/([0-9]+)").matchEntire(path)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+            if (chapter !in 1..chapterCount) return null
+            if (chapterCount == 1) return "fixture".toByteArray()
+            return ("<html><body>" + (1..pageCount).joinToString("") {
+                "<img src=\"$base/chapters/$chapter/images/$it.jpg\">" } + "</body></html>").toByteArray()
+        }
+
+        private fun chapterImage(path: String): ByteArray? {
+            val match = Regex("/chapters/([0-9]+)/images/([0-9]+)\\.jpg").matchEntire(path) ?: return null
+            val chapter = match.groupValues[1].toIntOrNull() ?: return null
+            val page = match.groupValues[2].toIntOrNull() ?: return null
+            return chapterImages[chapter]?.getOrNull(page - 1)
         }
 
         override fun close() {

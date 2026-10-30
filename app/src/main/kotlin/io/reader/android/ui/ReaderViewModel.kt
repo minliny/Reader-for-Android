@@ -61,6 +61,9 @@ import io.reader.android.runtime.ReaderContentSearchHit
 import io.reader.android.runtime.BookmarkTargetStaleException
 import io.reader.android.runtime.ContentSearchPendingException
 import io.reader.android.runtime.ReaderMangaChapterRequest
+import io.reader.android.runtime.ReaderMangaDirectoryNode
+import io.reader.android.runtime.ReaderMangaDirectoryPage
+import io.reader.android.runtime.ReaderMangaDirectoryUnavailable
 import java.io.FileNotFoundException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -184,12 +187,24 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     private val libraryDelegate = lazy { ReaderLibrary(application) }
     private val library by libraryDelegate
     private val mangaOwnerDelegate = lazy {
-        ReaderMangaReadingOwner(viewModelScope, onFailure = { retainProtocolPending(it) }) { ReaderMangaLibraryAdapter(library) }
+        ReaderMangaReadingOwner(viewModelScope, onFailure = ::retainMangaFailure) { ReaderMangaLibraryAdapter(library) }
     }
     private val mangaState = MutableStateFlow(ReaderMangaReadingUiState())
     internal val mangaReadingState = mangaState.asStateFlow()
     private var mangaStateJob: Job? = null
     private var mangaSaveDelay: Job? = null
+    private val mangaDirectory = MutableStateFlow(ReaderMangaDirectoryUiState())
+    internal val mangaDirectoryState = mangaDirectory.asStateFlow()
+    private var mangaDirectoryGeneration = 0L
+    private var mangaNoticeSequence = 0L
+
+    private fun retainMangaFailure(error: Throwable) {
+        retainProtocolPending(error)
+        if (error is ReaderMangaDirectoryUnavailable && state.value.route == ReaderRoute.MangaReading &&
+            mangaDirectory.value.directory === error.directory) {
+            mangaDirectory.update { it.copy(error = "目录暂时不可用，已打开的章节仍可阅读。") }
+        }
+    }
 
     private fun mangaOwner(): ReaderMangaReadingOwner {
         val owner = mangaOwnerDelegate.value
@@ -267,12 +282,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             gate.withLock {
                 try {
-                    val request = library.prepareMangaChapter(detail)
-                    if (requestGeneration != generation || state.value.route != ReaderRoute.Online) return@withLock
+                    val opening = library.prepareMangaOpening(detail)
+                    if (requestGeneration != generation || state.value.route != ReaderRoute.Online) {
+                        library.closeMangaDirectory(opening.directoryPage.directory)
+                        return@withLock
+                    }
                     onlineSources.leave() // Retire the issued search/detail session after its TOC original is complete.
-                    mangaRequest = request
+                    ++mangaDirectoryGeneration
+                    mangaDirectory.value = ReaderMangaDirectoryUiState(directory = opening.directoryPage.directory,
+                        nodes = opening.directoryPage.nodes, nextOffset = opening.directoryPage.nextOffset)
+                    mangaRequest = opening.request
                     mutableState.update { it.copy(route = ReaderRoute.MangaReading, busy = false, error = null, onlineError = null) }
-                    mangaOwner().open(request)
+                    mangaOwner().open(opening.request)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -286,6 +307,186 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private var mangaRequest: ReaderMangaChapterRequest? = null
+
+    internal fun showMangaDirectory() {
+        if (state.value.route != ReaderRoute.MangaReading || mangaDirectory.value.directory == null ||
+            mangaOwnerDelegate.value.state.value.let { it.chapterTransition != null || it.exitPending }) return
+        mangaDirectory.update { it.copy(visible = true, notice = null) }
+    }
+
+    internal fun dismissMangaDirectory() { mangaDirectory.update { it.copy(visible = false) } }
+
+    internal fun retireMangaDirectoryNotice(id: Long) {
+        mangaDirectory.update { if (it.notice?.id == id) it.copy(notice = null) else it }
+    }
+
+    private fun mangaDirectoryNotice(message: String) {
+        mangaDirectory.update { it.copy(notice = ReaderMangaDirectoryNotice(++mangaNoticeSequence, message)) }
+    }
+
+    private fun appendMangaDirectoryPage(page: ReaderMangaDirectoryPage) {
+        val prior = mangaDirectory.value
+        check(page.directory === prior.directory && prior.nodes.size <= 50_000 - page.nodes.size) { "MANGA_DIRECTORY_PAGE_SCOPE" }
+        val ids = prior.nodes.mapTo(mutableSetOf()) { it.nodeId }
+        check(page.nodes.all { it.directory === prior.directory && ids.add(it.nodeId) }) { "MANGA_DIRECTORY_PAGE_REPEATED" }
+        mangaDirectory.value = prior.copy(nodes = prior.nodes + page.nodes, nextOffset = page.nextOffset)
+    }
+
+    internal fun loadMoreMangaDirectory() {
+        val snapshot = mangaDirectory.value
+        val directory = snapshot.directory ?: return
+        val offset = snapshot.nextOffset ?: return
+        if (state.value.route != ReaderRoute.MangaReading || snapshot.busy || snapshot.error != null ||
+            mangaOwnerDelegate.value.state.value.let { it.chapterTransition != null || it.exitPending }) return
+        val identity = mangaDirectoryGeneration
+        mangaDirectory.value = snapshot.copy(busy = true, error = null, notice = null)
+        viewModelScope.launch {
+            gate.withLock {
+                try {
+                    if (!currentMangaDirectory(identity)) return@withLock
+                    val page = library.nextMangaDirectoryPage(directory, offset)
+                    // A cancelled navigation does not discard an already returned page from its
+                    // still-live view, otherwise the native next offset would outrun the UI.
+                    if (state.value.route == ReaderRoute.MangaReading && mangaDirectory.value.directory === directory)
+                        appendMangaDirectoryPage(page)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    retainProtocolPending(error)
+                    if (state.value.route == ReaderRoute.MangaReading && mangaDirectory.value.directory === directory)
+                        mangaDirectory.update { it.copy(error = "目录暂时无法继续加载，请重新读取目录。") }
+                } finally {
+                    if (mangaDirectory.value.directory === directory) mangaDirectory.update { it.copy(busy = false) }
+                }
+            }
+        }
+    }
+
+    internal fun retryMangaDirectory() {
+        val snapshot = mangaDirectory.value
+        val directory = snapshot.directory ?: return
+        val reading = mangaOwnerDelegate.value.state.value
+        val chapter = reading.chapter ?: return
+        if (state.value.route != ReaderRoute.MangaReading || snapshot.busy || reading.exitPending || reading.chapterTransition != null) return
+        ++mangaDirectoryGeneration
+        mangaDirectory.value = snapshot.copy(busy = true, visible = true, error = null, notice = null)
+        viewModelScope.launch {
+            gate.withLock {
+                try {
+                    if (state.value.route != ReaderRoute.MangaReading || mangaDirectory.value.directory !== directory) return@withLock
+                    val page = library.reopenMangaDirectory(directory, chapter.chapterIndex)
+                    if (state.value.route == ReaderRoute.MangaReading && mangaDirectory.value.directory === directory) {
+                        val visible = mangaDirectory.value.visible
+                        mangaDirectory.value = ReaderMangaDirectoryUiState(page.directory, page.nodes, page.nextOffset, visible = visible)
+                    } else library.closeMangaDirectory(page.directory)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    retainProtocolPending(error)
+                    if (mangaDirectory.value.directory === directory)
+                        mangaDirectory.update { it.copy(error = "目录暂时不可用，已打开的章节仍可阅读。") }
+                } finally {
+                    if (mangaDirectory.value.directory === directory) mangaDirectory.update { it.copy(busy = false) }
+                }
+            }
+        }
+    }
+
+    private fun currentMangaDirectory(identity: Long): Boolean =
+        identity == mangaDirectoryGeneration && state.value.route == ReaderRoute.MangaReading
+
+    internal fun selectMangaChapter(node: ReaderMangaDirectoryNode) {
+        val directory = mangaDirectory.value
+        if (state.value.route != ReaderRoute.MangaReading || directory.busy || directory.error != null || node.directory !== directory.directory ||
+            directory.nodes.none { it === node } || node.kind != "target" || node.chapterIndex == null) return
+        val owner = mangaOwnerDelegate.value
+        if (node.chapterIndex == owner.state.value.chapter?.chapterIndex) { dismissMangaDirectory(); return }
+        if (owner.navigateChapter(node, ReaderMangaChapterLanding.FIRST)) {
+            mangaSaveDelay?.cancel(); mangaSaveDelay = null
+            mangaDirectory.update { it.copy(visible = false, error = null, notice = null) }
+        }
+    }
+
+    internal fun navigateAdjacentMangaChapter(forward: Boolean) {
+        val directory = mangaDirectory.value
+        val view = directory.directory ?: return
+        if (state.value.route != ReaderRoute.MangaReading || directory.busy) return
+        if (directory.error != null) { mangaDirectory.update { it.copy(visible = true) }; return }
+        val owner = mangaOwnerDelegate.value
+        val original = owner.state.value
+        val chapter = original.chapter ?: return
+        if (original.phase != ReaderMangaReadingPhase.READY || original.chapterTransition != null ||
+            original.exitPending || original.restoreRequest != null || original.visibleAnchor == null) return
+        val identity = mangaDirectoryGeneration
+        fun stillCurrent() = currentMangaDirectory(identity) && owner.state.value.generation == original.generation &&
+            owner.state.value.chapter === chapter && !owner.state.value.exitPending && owner.state.value.chapterTransition == null
+        mangaDirectory.value = directory.copy(busy = true, error = null, notice = null)
+        viewModelScope.launch {
+            gate.withLock {
+                var cursor: Int? = null
+                try {
+                    // Native directory pages are a bounded cached projection. Read each page at most once;
+                    // sparse source indexes and group rows never become fabricated chapterIndex +/- 1.
+                    while (stillCurrent()) {
+                        val current = mangaDirectory.value
+                        if (cursor == null) {
+                            val matches = current.nodes.withIndex().filter { it.value.kind == "target" && it.value.chapterIndex == chapter.chapterIndex }
+                            check(matches.size <= 1) { "MANGA_DIRECTORY_CURRENT_AMBIGUOUS" }
+                            if (matches.isNotEmpty()) {
+                                val selected = matches.single()
+                                val currentTarget = library.resolveMangaDirectoryTarget(selected.value)
+                                if (!stillCurrent()) return@withLock
+                                ReaderMangaDirectoryNavigation.requireCurrent(currentTarget, chapter)
+                                cursor = selected.index + if (forward) 1 else -1
+                            }
+                        }
+                        val position = cursor
+                        if (position != null && position in current.nodes.indices) {
+                            val node = current.nodes[position]
+                            cursor = position + if (forward) 1 else -1
+                            if (node.kind != "target" || node.chapterIndex == null) continue
+                            // Resolve is an original read, not acquisition or progress acknowledgement.
+                            // Duplicate source URLs may occupy different native directory indexes.
+                            val target = library.resolveMangaDirectoryTarget(node)
+                            if (!stillCurrent()) return@withLock
+                            if (target.directoryTarget?.url == chapter.manifest.chapter.chapterId) continue
+                            val landing = if (forward) ReaderMangaChapterLanding.FIRST else ReaderMangaChapterLanding.LAST
+                            if (owner.navigateChapter(node, landing, target)) {
+                                mangaSaveDelay?.cancel(); mangaSaveDelay = null
+                                mangaDirectory.update { it.copy(visible = false) }
+                            }
+                            return@withLock
+                        }
+                        if ((position == null || forward) && current.nextOffset != null) {
+                            val page = library.nextMangaDirectoryPage(view, current.nextOffset)
+                            if (state.value.route == ReaderRoute.MangaReading && mangaDirectory.value.directory === view)
+                                appendMangaDirectoryPage(page)
+                            if (!stillCurrent()) return@withLock
+                            continue
+                        }
+                        check(position != null) { "MANGA_DIRECTORY_CURRENT_MISSING" }
+                        mangaDirectoryNotice(if (forward) "已是最后一章" else "已是第一章")
+                        return@withLock
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    retainProtocolPending(error)
+                    if (state.value.route == ReaderRoute.MangaReading && mangaDirectory.value.directory === view)
+                        mangaDirectory.update { it.copy(visible = true, error = "暂时无法定位相邻章节，请重新读取目录。") }
+                } finally {
+                    if (mangaDirectory.value.directory === view) mangaDirectory.update { it.copy(busy = false) }
+                }
+            }
+        }
+    }
+
+    internal fun cancelMangaChapterTransition() {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized())
+            mangaOwnerDelegate.value.cancelChapterTransition()
+    }
+
+    internal fun failMangaChapterPresentation(ticket: ReaderMangaLayoutTicket, reason: String) {
+        if (state.value.route == ReaderRoute.MangaReading && mangaOwnerDelegate.isInitialized())
+            mangaOwnerDelegate.value.failChapterPresentation(ticket, reason)
+    }
 
     internal fun retryMangaReading() {
         if (state.value.route != ReaderRoute.MangaReading || state.value.busy) return
@@ -304,7 +505,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     internal fun observeMangaVisible(measured: ReaderMangaMeasuredAnchor): Boolean {
         if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return false
         val owner = mangaOwnerDelegate.value
+        val transition = owner.state.value.chapterTransition
         val accepted = owner.observeVisible(measured)
+        if (accepted && transition != null && owner.state.value.chapterTransition == null) {
+            owner.state.value.chapter?.let { chapter ->
+                mangaRequest = ReaderMangaChapterRequest(
+                    io.reader.android.runtime.ReaderMangaChapterRef(chapter.manifest.chapter.sourceId, chapter.manifest.chapter.bookId),
+                    chapter.chapterIndex, expectedManifestVersion = chapter.manifest.manifestVersion)
+            }
+        }
         if (accepted && owner.state.value.progressDirty) scheduleMangaSave(owner.state.value.generation)
         return accepted
     }
@@ -364,6 +573,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     internal fun closeMangaReading() {
         if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return
+        ++mangaDirectoryGeneration // In-flight read results can no longer start a transition.
+        mangaDirectory.update { it.copy(visible = false, notice = null) }
         val owner = mangaOwnerDelegate.value
         val ownerGeneration = owner.beginExit() ?: return
         mangaSaveDelay?.cancel(); mangaSaveDelay = null
@@ -385,6 +596,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         if (state.value.route != ReaderRoute.MangaReading || !mangaOwnerDelegate.isInitialized()) return
         val owner = mangaOwnerDelegate.value
         if (owner.state.value.knownRejection?.operationId != operationId || owner.state.value.progressPending.isNotEmpty()) return
+        ++mangaDirectoryGeneration
+        mangaDirectory.update { it.copy(visible = false, notice = null) }
         val ownerGeneration = owner.beginExit() ?: return
         mangaSaveDelay?.cancel(); mangaSaveDelay = null
         viewModelScope.launch {
@@ -397,10 +610,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun retireMangaReading(owner: ReaderMangaReadingOwner) {
+    private suspend fun retireMangaReading(owner: ReaderMangaReadingOwner) {
+        mangaDirectory.value.directory?.let { library.closeMangaDirectory(it) }
         owner.retire()
         mangaState.value = owner.state.value
         mangaRequest = null
+        ++mangaDirectoryGeneration
+        mangaDirectory.value = ReaderMangaDirectoryUiState()
         mutableState.update { it.copy(route = ReaderRoute.Bookshelf, error = null) }
     }
 
@@ -1303,7 +1519,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             ReaderRoute.Directory -> mutableState.update { it.copy(route = directoryReturn, error = null) }
             ReaderRoute.OnlineReading -> exitOnlineReading()
             ReaderRoute.OnlineDirectory -> backOnlineDirectory()
-            ReaderRoute.MangaReading -> closeMangaReading()
+            ReaderRoute.MangaReading -> if (mangaDirectory.value.visible) dismissMangaDirectory() else closeMangaReading()
             ReaderRoute.Online -> if (!onlineSources.back()) showBookshelf()
             ReaderRoute.Settings, ReaderRoute.Management -> showBookshelf()
             ReaderRoute.Bookshelf -> Unit
@@ -1312,8 +1528,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onBackground() {
         if (state.value.route == ReaderRoute.MangaReading) {
+            ++mangaDirectoryGeneration
             mangaSaveDelay?.cancel(); mangaSaveDelay = null
             if (mangaOwnerDelegate.isInitialized()) {
+                mangaOwnerDelegate.value.cancelChapterTransition()
                 val ownerGeneration = mangaOwnerDelegate.value.state.value.generation
                 viewModelScope.launch { flushMangaIfCurrent(ownerGeneration) }
             }

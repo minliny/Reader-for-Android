@@ -12,6 +12,7 @@ import io.reader.android.runtime.ReaderMangaChapterData
 import io.reader.android.runtime.ReaderMangaChapterIdentity
 import io.reader.android.runtime.ReaderMangaChapterRequest
 import io.reader.android.runtime.ReaderMangaDecodedResource
+import io.reader.android.runtime.ReaderMangaDirectoryNode
 import io.reader.android.runtime.ReaderMangaPageWindow
 import io.reader.android.runtime.ReaderMangaPageWindowRequest
 import io.reader.android.runtime.ReaderMangaResource
@@ -19,6 +20,8 @@ import io.reader.android.runtime.ReaderMangaResourcePrepareRequest
 import io.reader.android.runtime.ReaderMangaTransferIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -37,6 +40,7 @@ internal interface ReaderMangaLibrary {
     suspend fun chapter(request: ReaderMangaChapterRequest): ReaderMangaChapterData
     suspend fun pagesWindow(request: ReaderMangaPageWindowRequest): ReaderMangaPageWindow
     suspend fun decodedResource(request: ReaderMangaResourcePrepareRequest): ReaderMangaDecodedResource
+    suspend fun resolveChapter(node: ReaderMangaDirectoryNode): ReaderMangaChapterRequest = error("MANGA_DIRECTORY_UNAVAILABLE")
 }
 
 internal class ReaderMangaLibraryAdapter(private val library: ReaderLibrary) : ReaderMangaLibrary {
@@ -47,11 +51,23 @@ internal class ReaderMangaLibraryAdapter(private val library: ReaderLibrary) : R
     override suspend fun chapter(request: ReaderMangaChapterRequest) = library.mangaChapter(request)
     override suspend fun pagesWindow(request: ReaderMangaPageWindowRequest) = library.mangaPagesWindow(request)
     override suspend fun decodedResource(request: ReaderMangaResourcePrepareRequest) = library.mangaDecodedResource(request)
+    override suspend fun resolveChapter(node: ReaderMangaDirectoryNode) = library.resolveMangaDirectoryTarget(node)
 }
 
 internal enum class ReaderMangaFlushResult { NO_CHANGE, CONFIRMED, BLOCKED }
 
 internal enum class ReaderMangaReadingPhase { IDLE, LOADING, READY, ERROR, CLOSED }
+
+internal enum class ReaderMangaChapterLanding { FIRST, LAST }
+internal enum class ReaderMangaChapterTransitionPhase { SAVING, PREPARING, PRESENTING }
+internal data class ReaderMangaChapterTransition(
+    val id: Long,
+    val originGeneration: Long,
+    val nodeId: String,
+    val targetIndex: Int,
+    val landing: ReaderMangaChapterLanding,
+    val phase: ReaderMangaChapterTransitionPhase,
+)
 
 internal data class ReaderMangaReadingPage(
     val ordinal: Int,
@@ -108,6 +124,8 @@ internal data class ReaderMangaReadingUiState(
     val knownRejection: ReaderMangaProgressRejected? = null,
     val restoreBlocked: String? = null,
     val exitPending: Boolean = false,
+    val chapterTransition: ReaderMangaChapterTransition? = null,
+    val chapterError: String? = null,
     val error: String? = null,
 )
 
@@ -118,6 +136,7 @@ internal class ReaderMangaReadingOwner(
     private val scope: CoroutineScope,
     private val onFailure: (Throwable) -> Unit = {},
     private val encodedBudget: ReaderMangaEncodedPageBudget = ReaderMangaEncodedPageBudget(),
+    private val chapterPresentationTimeoutMillis: Long = 15_000,
     private val library: () -> ReaderMangaLibrary,
 ) : AutoCloseable {
     private val mutable = MutableStateFlow(ReaderMangaReadingUiState())
@@ -142,9 +161,20 @@ internal class ReaderMangaReadingOwner(
     private var navigationRestoreTarget: ReaderMangaAnchor? = null
     private var writeBlocked = false
     private var rejectionGeneration: Long? = null
+    private var nextChapterTransition = 0L
+    private class ChapterAttempt(val identity: ReaderMangaChapterTransition, val origin: ReaderMangaChapterData) {
+        var rollback: ChapterRollback? = null
+        var publishedGeneration: Long? = null
+        var timeout: Job? = null
+    }
+    private data class ChapterRollback(val state: ReaderMangaReadingUiState, val stable: ReaderMangaAnchor,
+        val restore: ReaderMangaAnchor, val navigation: ReaderMangaAnchor?)
+    private var chapterAttempt: ChapterAttempt? = null
+    init { require(chapterPresentationTimeoutMillis > 0) }
 
     fun open(request: ReaderMangaChapterRequest) {
         if (closed) return
+        if (chapterAttempt != null) return
         if (mutable.value.progressBusy || dirtyAnchor != null) {
             mutable.value = mutable.value.copy(progressError = "MANGA_PROGRESS_EXIT_REQUIRED")
             return
@@ -208,7 +238,7 @@ internal class ReaderMangaReadingOwner(
     fun loadWindow(start: Int, limit: Int = DEFAULT_WINDOW_LIMIT, lastVisibleOrdinal: Int? = null) {
         val generation = activeGeneration ?: return
         val chapter = activeChapter ?: return
-        if (mutable.value.exitPending || mutable.value.restoreBlocked != null) return
+        if (mutable.value.exitPending || mutable.value.restoreBlocked != null || chapterAttempt != null) return
         val anchor = mutable.value.visibleAnchor ?: return
         val last = lastVisibleOrdinal ?: anchor.ordinal
         if (last < anchor.ordinal || activePages.none { it.ordinal == last } || !covers(start, limit, anchor.ordinal, last)) return
@@ -221,7 +251,7 @@ internal class ReaderMangaReadingOwner(
     fun jumpToPage(ordinal: Int) {
         val generation = activeGeneration ?: return
         val chapter = activeChapter ?: return
-        if (mutable.value.exitPending || mutable.value.restoreBlocked != null) return
+        if (mutable.value.exitPending || mutable.value.restoreBlocked != null || chapterAttempt != null) return
         val page = chapter.manifest.pages.singleOrNull { it.ordinal == ordinal } ?: return
         val target = ReaderMangaAnchor(page.pageId, page.ordinal, page.resourceRef, 0.0, 0.0)
         loadWindow(generation, chapter, ordinal, 1, navigationTarget = target)
@@ -229,6 +259,153 @@ internal class ReaderMangaReadingOwner(
 
     private fun covers(start: Int, limit: Int, first: Int, last: Int): Boolean = start >= 0 && limit in 1..32 &&
         first >= start && last.toLong() < start.toLong() + limit
+
+    /** One explicit directory intent. The currently displayed chapter survives acquisition and presentation failure. */
+    fun navigateChapter(node: ReaderMangaDirectoryNode, landing: ReaderMangaChapterLanding,
+        resolvedRequest: ReaderMangaChapterRequest? = null): Boolean {
+        val snapshot = mutable.value
+        val origin = activeChapter ?: return false
+        val generation = activeGeneration ?: return false
+        val index = node.chapterIndex ?: return false
+        if (closed || chapterAttempt != null || snapshot.exitPending || snapshot.phase != ReaderMangaReadingPhase.READY ||
+            snapshot.restoreBlocked != null || snapshot.restoreRequest != null || snapshot.visibleAnchor == null ||
+            node.kind != "target" || index == origin.chapterIndex || node.directory.chapter != activeOwner) return false
+        if (resolvedRequest != null) {
+            val target = resolvedRequest.directoryTarget ?: return false
+            if (resolvedRequest.chapter != activeOwner || resolvedRequest.chapterIndex != index ||
+                target.directory !== node.directory || target.nodeId != node.nodeId || target.chapterIndex != index ||
+                target.url == origin.manifest.chapter.chapterId || target.sourceRuleVersion != origin.manifest.sourceRuleVersion) return false
+        }
+        check(nextChapterTransition < Long.MAX_VALUE) { "MANGA_CHAPTER_TRANSITION_EXHAUSTED" }
+        val identity = ReaderMangaChapterTransition(++nextChapterTransition, generation, node.nodeId, index, landing,
+            ReaderMangaChapterTransitionPhase.SAVING)
+        val attempt = ChapterAttempt(identity, origin)
+        chapterAttempt = attempt
+        inFlightWindow = null // A late preserving-window candidate must not replace this frozen origin.
+        mutable.value = snapshot.copy(chapterTransition = identity, chapterError = null, pendingWindow = null)
+        scope.launch {
+            val acquired = ArrayList<ReaderMangaReadingPage>()
+            try {
+                progressMutex.withLock {
+                    if (!current(attempt)) return@withLock
+                    if (flushProgressLocked() == ReaderMangaFlushResult.BLOCKED) {
+                        if (current(attempt)) rollbackChapter(attempt, "MANGA_CHAPTER_PROGRESS_NOT_CONFIRMED")
+                        return@withLock
+                    }
+                    if (!current(attempt)) return@withLock
+                    val pending = library().pendingProgress()
+                    if (!current(attempt)) return@withLock
+                    mutable.value = mutable.value.copy(progressPending = pending)
+                    check(pending.isEmpty()) { "MANGA_PROGRESS_ORIGINAL_PENDING" }
+                    mutable.value = mutable.value.copy(chapterTransition = identity.copy(phase = ReaderMangaChapterTransitionPhase.PREPARING))
+                    val request = resolvedRequest ?: library().resolveChapter(node)
+                    if (!current(attempt)) return@withLock
+                    val target = checkNotNull(request.directoryTarget) { "MANGA_CHAPTER_TARGET_REQUIRED" }
+                    check(request.chapter == activeOwner && request.chapterIndex == index && target.directory === node.directory &&
+                        target.nodeId == node.nodeId && target.chapterIndex == index && target.url != origin.manifest.chapter.chapterId &&
+                        target.sourceRuleVersion == origin.manifest.sourceRuleVersion) { "MANGA_CHAPTER_TARGET_SCOPE" }
+                    val chapter = library().chapter(request)
+                    if (!current(attempt)) return@withLock
+                    val manifest = chapter.manifest
+                    check(manifest.chapter.sourceId == origin.manifest.chapter.sourceId &&
+                        manifest.chapter.bookId == origin.manifest.chapter.bookId && manifest.chapter.chapterId == target.url &&
+                        chapter.chapterIndex == index && manifest.sourceRuleVersion == origin.manifest.sourceRuleVersion &&
+                        manifest.decodeRevision == origin.manifest.decodeRevision &&
+                        (request.expectedManifestVersion == null || request.expectedManifestVersion == manifest.manifestVersion)) {
+                        "MANGA_CHAPTER_TARGET_SCOPE"
+                    }
+                    val page = (if (landing == ReaderMangaChapterLanding.FIRST) manifest.pages.firstOrNull() else manifest.pages.lastOrNull())
+                        ?: error("MANGA_UI_EMPTY_MANIFEST")
+                    val anchor = ReaderMangaAnchor(page.pageId, page.ordinal, page.resourceRef, 0.0,
+                        if (landing == ReaderMangaChapterLanding.LAST) 1.0 else 0.0)
+                    check(nextGeneration < Long.MAX_VALUE && nextWindowRevision < Long.MAX_VALUE) { "MANGA_CHAPTER_ID_EXHAUSTED" }
+                    val candidateGeneration = ++nextGeneration
+                    val ticket = ReaderMangaWindowTicket(candidateGeneration, ++nextWindowRevision, manifest.chapter,
+                        manifest.manifestVersion, manifest.sourceRuleVersion, manifest.decodeRevision, page.ordinal, 1,
+                        navigationTarget = anchor)
+                    val window = acquireWindow(ticket, acquired) { current(attempt) } ?: return@withLock
+                    if (!current(attempt)) return@withLock
+                    check(acquired.size == 1 && acquired.single().ordinal == anchor.ordinal &&
+                        acquired.single().resource.resourceRef == anchor.resourceRef) { "MANGA_UI_TARGET_WINDOW_SCOPE" }
+                    // All original writes have finished. This is only a current CAS observation, never a save receipt.
+                    val observed = library().progress(request.chapter)
+                    if (!current(attempt)) return@withLock
+                    val previousToken = checkNotNull(mutable.value.progressToken) { "MANGA_CHAPTER_PROGRESS_TOKEN_MISSING" }
+                    val location = observed.location
+                    check(observed.token.epoch > 0 && observed.token.revision == previousToken.revision &&
+                        (location == null && observed.token.revision == 0L || location != null &&
+                            location.chapter.sourceId == request.chapter.sourceId && location.chapter.bookId == request.chapter.bookId &&
+                            location.progressRevision == observed.token.revision) &&
+                        mutable.value.lastConfirmedProgress?.takeIf { it.progressRevision == previousToken.revision }
+                            ?.let { it == location } != false) { "MANGA_CHAPTER_PROGRESS_CHANGED" }
+                    val old = mutable.value.copy(progressToken = observed.token)
+                    val stable = checkNotNull(lastStableAnchor) { "MANGA_UI_VISIBLE_ANCHOR_MISSING" }
+                    val restore = newRestore(anchor)
+                    attempt.rollback = ChapterRollback(old, stable, restoreTarget ?: stable, navigationRestoreTarget)
+                    attempt.publishedGeneration = candidateGeneration
+                    activeGeneration = candidateGeneration
+                    activeChapter = chapter
+                    activePages = acquired.toList()
+                    lastStableAnchor = null; dirtyAnchor = null
+                    restoreTarget = anchor; navigationRestoreTarget = anchor
+                    mutable.value = old.copy(generation = candidateGeneration, chapter = chapter, window = window,
+                        pages = activePages, visibleWindow = ticket, pendingWindow = null, failedWindow = null,
+                        windowError = null, layoutTicket = null, visibleAnchor = null, restoreRequest = restore,
+                        progressDirty = false, chapterTransition = identity.copy(phase = ReaderMangaChapterTransitionPhase.PRESENTING),
+                        chapterError = null, error = null)
+                    acquired.clear() // Active candidate owns these references; the rollback bundle still owns the origin.
+                    attempt.timeout = scope.launch {
+                        delay(chapterPresentationTimeoutMillis)
+                        if (current(attempt)) rollbackChapter(attempt, "MANGA_CHAPTER_PRESENTATION_TIMEOUT")
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                if (current(attempt)) rollbackChapter(attempt, null)
+                throw cancelled
+            } catch (error: Throwable) {
+                if (current(attempt)) { onFailure(error); rollbackChapter(attempt, error.message ?: error::class.java.simpleName) }
+            } finally { releasePages(acquired) }
+        }
+        return true
+    }
+
+    fun cancelChapterTransition() { chapterAttempt?.let { rollbackChapter(it, null) } }
+
+    /** Native decode/layout failure is scoped to the currently published candidate, never an old Image callback. */
+    fun failChapterPresentation(ticket: ReaderMangaLayoutTicket, reason: String) {
+        val attempt = chapterAttempt ?: return
+        if (attempt.publishedGeneration == ticket.window.generation && mutable.value.layoutTicket == ticket && current(attempt))
+            rollbackChapter(attempt, reason)
+    }
+
+    private fun current(attempt: ChapterAttempt): Boolean = chapterAttempt === attempt &&
+        current(attempt.publishedGeneration ?: attempt.identity.originGeneration) &&
+        (attempt.publishedGeneration != null || activeChapter === attempt.origin)
+
+    private fun rollbackChapter(attempt: ChapterAttempt, reason: String?) {
+        if (!current(attempt)) return
+        val rollback = attempt.rollback
+        chapterAttempt = null
+        attempt.timeout?.cancel(); attempt.timeout = null
+        if (rollback == null) {
+            mutable.value = mutable.value.copy(chapterTransition = null, chapterError = reason)
+            return
+        }
+        val candidatePages = activePages
+        val currentProgress = mutable.value
+        val generation = ++nextGeneration
+        val previousWindow = checkNotNull(rollback.state.visibleWindow)
+        val window = previousWindow.copy(generation = generation, revision = ++nextWindowRevision)
+        activeGeneration = generation; activeChapter = attempt.origin; activePages = rollback.state.pages
+        inFlightWindow = null; lastStableAnchor = rollback.stable; dirtyAnchor = null
+        restoreTarget = rollback.restore; navigationRestoreTarget = rollback.navigation
+        mutable.value = rollback.state.copy(generation = generation, visibleWindow = window, pendingWindow = null,
+            layoutTicket = null, visibleAnchor = null, restoreRequest = newRestore(rollback.restore), progressDirty = false,
+            progressToken = currentProgress.progressToken, lastConfirmedProgress = currentProgress.lastConfirmedProgress,
+            chapterTransition = null, chapterError = reason)
+        attempt.rollback = null
+        releasePages(candidatePages)
+    }
 
     private fun loadWindow(generation: Long, chapter: ReaderMangaChapterData, start: Int, limit: Int,
         navigationTarget: ReaderMangaAnchor? = null, lastVisibleOrdinal: Int? = null) {
@@ -251,65 +428,7 @@ internal class ReaderMangaReadingOwner(
             val acquired = ArrayList<ReaderMangaReadingPage>()
             try {
                 if (!current(ticket)) return@launch
-                val window = library().pagesWindow(ReaderMangaPageWindowRequest(
-                    chapter = ticket.chapter,
-                    manifestVersion = ticket.manifestVersion,
-                    start = start,
-                    limit = limit,
-                ))
-                if (!current(ticket)) return@launch
-                check(window.manifest.chapter == ticket.chapter &&
-                    window.manifest.manifestVersion == ticket.manifestVersion &&
-                    window.manifest.sourceRuleVersion == ticket.sourceRuleVersion &&
-                    window.manifest.decodeRevision == ticket.decodeRevision &&
-                    window.pageStart == start && window.resources.size <= limit && window.resources.isNotEmpty() &&
-                    window.resources.withIndex().all { (index, resource) ->
-                        window.manifest.pages.singleOrNull { it.ordinal == start + index }?.resourceRef == resource.resourceRef
-                    }) {
-                    "MANGA_UI_WINDOW_SCOPE"
-                }
-                for ((index, resource) in window.resources.withIndex()) {
-                    if (!current(ticket)) return@launch
-                    val ordinal = window.pageStart + index
-                    resourceMutex.withLock {
-                        if (!current(ticket)) return@withLock
-                        try {
-                            // activeChapter is immutable within a generation; its manifest/rules/decode identity
-                            // was checked against this ticket before borrowing any active handle.
-                            val reused = activePages.singleOrNull { it.ordinal == ordinal && it.resource == resource &&
-                                it.decoded.chapter == ticket.chapter && it.decoded.manifestVersion == ticket.manifestVersion &&
-                                it.decoded.resourceRef == resource.resourceRef }
-                            if (reused != null) {
-                                retainPage(reused); acquired += reused
-                            } else {
-                                // One preparation at a time, including superseded candidates. Account all live unique handles.
-                                check(managedBytes() + encodedBudget.prepareHeadroomBytes <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
-                                val request = ReaderMangaResourcePrepareRequest(
-                                    chapter = ticket.chapter, manifestVersion = ticket.manifestVersion,
-                                    resourceRef = resource.resourceRef, sourceRuleVersion = ticket.sourceRuleVersion,
-                                    transferId = "android-manga-ui:${generation}:${ticket.revision}:${ordinal}:${resource.resourceRef}",
-                                )
-                                val decoded = library().decodedResource(request)
-                                val page = ReaderMangaReadingPage(ordinal, resource, decoded)
-                                check(!managedReferences.containsKey(decoded)) { "MANGA_UI_DUPLICATE_DECODED_HANDLE" }
-                                managedReferences[decoded] = 1
-                                acquired += page // Every returned handle belongs to this candidate, even when late or foreign.
-                                check(decoded.bytes.size.toLong() <= encodedBudget.prepareHeadroomBytes &&
-                                    managedBytes() <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
-                                check(decoded.chapter == ticket.chapter && decoded.manifestVersion == ticket.manifestVersion &&
-                                    decoded.resourceRef == resource.resourceRef &&
-                                    decoded.transferId == ReaderMangaTransferIdentity.forPrepare(request).wireId) { "MANGA_UI_RESOURCE_SCOPE" }
-                            }
-                            check(acquired.sumOf { it.decoded.bytes.size.toLong() } <= encodedBudget.steadyBytes) { ENCODED_BUDGET_ERROR }
-                            if (!current(ticket)) { releasePages(acquired); acquired.clear() }
-                        } catch (error: Throwable) {
-                            // Release before unlocking: an awaiting newer candidate must not count a retired candidate's handles.
-                            releasePages(acquired); acquired.clear(); throw error
-                        }
-                    }
-                    if (!current(ticket)) return@launch
-                }
-                if (!current(ticket)) return@launch
+                val window = acquireWindow(ticket, acquired) { current(ticket) } ?: return@launch
                 if (ticket.navigationTarget == null && lastStableAnchor?.let { anchor ->
                         acquired.none { it.ordinal == anchor.ordinal && it.resource.resourceRef == anchor.resourceRef }
                     } == true) {
@@ -352,6 +471,71 @@ internal class ReaderMangaReadingOwner(
         }
     }
 
+    /** Shared staging path: each caller owns acquired until publication or finally releases it. */
+    private suspend fun acquireWindow(ticket: ReaderMangaWindowTicket, acquired: ArrayList<ReaderMangaReadingPage>,
+        isCurrent: () -> Boolean): ReaderMangaPageWindow? {
+        val window = library().pagesWindow(ReaderMangaPageWindowRequest(
+            chapter = ticket.chapter,
+            manifestVersion = ticket.manifestVersion,
+            start = ticket.start,
+            limit = ticket.limit,
+        ))
+        if (!isCurrent()) return null
+        check(window.manifest.chapter == ticket.chapter &&
+            window.manifest.manifestVersion == ticket.manifestVersion &&
+            window.manifest.sourceRuleVersion == ticket.sourceRuleVersion &&
+            window.manifest.decodeRevision == ticket.decodeRevision &&
+            window.pageStart == ticket.start && window.resources.size <= ticket.limit && window.resources.isNotEmpty() &&
+            window.resources.withIndex().all { (index, resource) ->
+                window.manifest.pages.singleOrNull { it.ordinal == ticket.start + index }?.resourceRef == resource.resourceRef
+            }) {
+            "MANGA_UI_WINDOW_SCOPE"
+        }
+        for ((index, resource) in window.resources.withIndex()) {
+            if (!isCurrent()) return null
+            val ordinal = window.pageStart + index
+            resourceMutex.withLock {
+                if (!isCurrent()) return@withLock
+                try {
+                    // Borrow only within the complete immutable identity, including during chapter preparation.
+                    val reused = activePages.singleOrNull { activeChapter?.manifest?.sourceRuleVersion == ticket.sourceRuleVersion &&
+                        activeChapter?.manifest?.decodeRevision == ticket.decodeRevision && it.ordinal == ordinal && it.resource == resource &&
+                        it.decoded.chapter == ticket.chapter && it.decoded.manifestVersion == ticket.manifestVersion &&
+                        it.decoded.resourceRef == resource.resourceRef }
+                    if (reused != null) {
+                        retainPage(reused); acquired += reused
+                    } else {
+                        // One preparation at a time, including superseded candidates. Account all live unique handles.
+                        check(managedBytes() + encodedBudget.prepareHeadroomBytes <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
+                        val request = ReaderMangaResourcePrepareRequest(
+                            chapter = ticket.chapter, manifestVersion = ticket.manifestVersion,
+                            resourceRef = resource.resourceRef, sourceRuleVersion = ticket.sourceRuleVersion,
+                            transferId = "android-manga-ui:${ticket.generation}:${ticket.revision}:${ordinal}:${resource.resourceRef}",
+                        )
+                        val decoded = library().decodedResource(request)
+                        val page = ReaderMangaReadingPage(ordinal, resource, decoded)
+                        check(!managedReferences.containsKey(decoded)) { "MANGA_UI_DUPLICATE_DECODED_HANDLE" }
+                        managedReferences[decoded] = 1
+                        acquired += page // Every returned handle belongs to this candidate, even when late or foreign.
+                        check(decoded.bytes.size.toLong() <= encodedBudget.prepareHeadroomBytes &&
+                            managedBytes() <= encodedBudget.peakBytes) { ENCODED_BUDGET_ERROR }
+                        check(decoded.chapter == ticket.chapter && decoded.manifestVersion == ticket.manifestVersion &&
+                            decoded.resourceRef == resource.resourceRef &&
+                            decoded.transferId == ReaderMangaTransferIdentity.forPrepare(request).wireId) { "MANGA_UI_RESOURCE_SCOPE" }
+                    }
+                    check(acquired.sumOf { it.decoded.bytes.size.toLong() } <= encodedBudget.steadyBytes) { ENCODED_BUDGET_ERROR }
+                    if (!isCurrent()) { releasePages(acquired); acquired.clear() }
+                } catch (error: Throwable) {
+                    // Release before unlocking: an awaiting newer candidate must not count a retired candidate's handles.
+                    releasePages(acquired); acquired.clear(); throw error
+                }
+            }
+            if (!isCurrent()) return null
+        }
+        if (!isCurrent()) return null
+        return window
+    }
+
     /** The owner alone issues layout epochs; remounting Compose cannot reuse an old ticket. */
     fun viewportChanged(window: ReaderMangaWindowTicket, width: Int, height: Int): ReaderMangaLayoutTicket? {
         val snapshot = mutable.value
@@ -370,7 +554,7 @@ internal class ReaderMangaReadingOwner(
 
     fun requestZoom(value: Float) {
         val snapshot = mutable.value
-        if (closed || snapshot.exitPending || !value.isFinite()) return
+        if (closed || snapshot.exitPending || chapterAttempt != null || !value.isFinite()) return
         val zoom = value.coerceIn(MIN_ZOOM, MAX_ZOOM)
         if (zoom == snapshot.zoom) return
         restoreTarget = navigationRestoreTarget ?: lastStableAnchor?.takeIf(::loadedAnchor) ?: restoreTarget
@@ -383,10 +567,13 @@ internal class ReaderMangaReadingOwner(
     /** Screen supplies this only after exact-ticket draw and native scrolling/transform controls are idle. */
     fun observeVisible(measured: ReaderMangaMeasuredAnchor): Boolean {
         val snapshot = mutable.value
+        val transition = chapterAttempt
+        if (transition != null && (transition.publishedGeneration == null || !current(transition))) return false
         if (closed || snapshot.exitPending || snapshot.phase != ReaderMangaReadingPhase.READY ||
             snapshot.layoutTicket != measured.ticket || snapshot.visibleWindow != measured.ticket.window ||
             !loadedAnchor(measured.anchor)) return false
         val restore = snapshot.restoreRequest
+        if (transition != null && restore == null) return false
         if (restore != null) {
             if (measured.restoredRequestId != restore.id || measured.restoredTargetPageId != restore.anchor.pageId ||
                 !loadedAnchor(restore.anchor)) return false
@@ -403,8 +590,14 @@ internal class ReaderMangaReadingOwner(
         }
         lastStableAnchor = measured.anchor
         restoreTarget = measured.anchor
+        val previousPages = transition?.rollback?.state?.pages
+        if (transition != null) {
+            transition.timeout?.cancel(); transition.timeout = null
+            transition.rollback = null; chapterAttempt = null
+        }
         mutable.value = snapshot.copy(visibleAnchor = measured.anchor, currentOrdinal = measured.anchor.ordinal,
-            restoreRequest = null, progressDirty = dirtyAnchor != null)
+            restoreRequest = null, progressDirty = dirtyAnchor != null, chapterTransition = null)
+        previousPages?.let(::releasePages) // The real drawn target, not a prepared handle, transfers ownership.
         return true
     }
 
@@ -421,6 +614,7 @@ internal class ReaderMangaReadingOwner(
     }
 
     fun retryWindow() {
+        if (chapterAttempt != null) return
         val failed = mutable.value.failedWindow ?: return
         val chapter = activeChapter ?: return
         if (!current(failed.generation) || mutable.value.exitPending || chapter.manifest.chapter != failed.chapter ||
@@ -434,6 +628,7 @@ internal class ReaderMangaReadingOwner(
 
     /** Explicit recovery after an empty initial window exceeded its encoded budget; never automatic shrinking. */
     fun retryWindowSinglePage() {
+        if (chapterAttempt != null) return
         val failed = mutable.value.failedWindow ?: return
         val chapter = activeChapter ?: return
         val target = restoreTarget ?: return
@@ -449,8 +644,9 @@ internal class ReaderMangaReadingOwner(
 
     /** Freeze synchronously before the caller queues its exit flush behind any current original. */
     fun beginExit(): Long? {
-        val generation = activeGeneration ?: return null
         if (closed || mutable.value.exitPending) return null
+        cancelChapterTransition()
+        val generation = activeGeneration ?: return null
         mutable.value = mutable.value.copy(exitPending = true)
         return generation
     }
@@ -461,18 +657,23 @@ internal class ReaderMangaReadingOwner(
 
     /** One latest genuine measurement per admission. NO_CHANGE is not an acknowledgement. */
     suspend fun flushVisibleProgress(): ReaderMangaFlushResult = progressMutex.withLock {
-        val generation = activeGeneration ?: return@withLock ReaderMangaFlushResult.NO_CHANGE
+        if (chapterAttempt != null) return@withLock ReaderMangaFlushResult.BLOCKED
+        flushProgressLocked()
+    }
+
+    private suspend fun flushProgressLocked(): ReaderMangaFlushResult {
+        val generation = activeGeneration ?: return ReaderMangaFlushResult.NO_CHANGE
         val snapshot = mutable.value
-        if (writeBlocked || snapshot.progressPending.isNotEmpty()) return@withLock ReaderMangaFlushResult.BLOCKED
-        val anchor = dirtyAnchor ?: return@withLock ReaderMangaFlushResult.NO_CHANGE
-        if (snapshot.restoreBlocked != null) return@withLock ReaderMangaFlushResult.BLOCKED
-        val chapter = activeChapter ?: return@withLock ReaderMangaFlushResult.BLOCKED
-        val token = snapshot.progressToken ?: return@withLock ReaderMangaFlushResult.BLOCKED
+        if (writeBlocked || snapshot.progressPending.isNotEmpty()) return ReaderMangaFlushResult.BLOCKED
+        val anchor = dirtyAnchor ?: return ReaderMangaFlushResult.NO_CHANGE
+        if (snapshot.restoreBlocked != null) return ReaderMangaFlushResult.BLOCKED
+        val chapter = activeChapter ?: return ReaderMangaFlushResult.BLOCKED
+        val token = snapshot.progressToken ?: return ReaderMangaFlushResult.BLOCKED
         val location = ReaderMangaLocation(chapter.manifest.chapter, chapter.manifest.manifestVersion,
             anchor.pageId, anchor.ordinal, anchor.x, anchor.y, token.revision + 1)
         val request = ReaderMangaProgressSaveRequest(chapter.manifest, location, token)
         mutable.value = snapshot.copy(progressBusy = true, progressError = null)
-        withContext(NonCancellable) {
+        return withContext(NonCancellable) {
             try {
                 val result = library().saveProgress(request)
                 check(result.location == location && result.token.epoch == token.epoch && result.token.revision == location.progressRevision) {
@@ -492,6 +693,7 @@ internal class ReaderMangaReadingOwner(
 
     /** Explicitly consume the selected original. Never reads current progress to infer an ACK or replays an update. */
     suspend fun reconcileProgress(operationId: String): Boolean = progressMutex.withLock {
+        if (chapterAttempt != null) return@withLock false
         val generation = activeGeneration ?: return@withLock false
         val owner = activeOwner ?: return@withLock false
         val original = mutable.value.progressPending.singleOrNull { it.operationId == operationId && it.chapter == owner }
@@ -570,6 +772,10 @@ internal class ReaderMangaReadingOwner(
     /** Retire the visible chapter while keeping this ViewModel-owned owner reusable. */
     fun retire() {
         if (closed) return
+        chapterAttempt?.timeout?.cancel()
+        chapterAttempt?.rollback?.state?.pages?.let(::releasePages)
+        chapterAttempt?.rollback = null
+        chapterAttempt = null
         ++nextGeneration
         activeGeneration = null
         activeOwner = null

@@ -130,6 +130,17 @@ internal class ReaderOnlineCatalog(
         configureCapabilities()
         return originals.request(method, key.sourceId, params)
     }
+    /** Native manga directory projection over the same original-call owner, without a text/shelf entry. */
+    fun readMangaDirectory(method: String, chapter: ReaderMangaChapterRef, params: JSONObject): JSONObject {
+        checkLane()
+        require(chapter.sourceId.isNotBlank() && chapter.sourceId != "local" && chapter.bookId.isNotBlank())
+        check(method in setOf("reading.directory.view.open.v2", "reading.directory.view.page.v2", "reading.directory.target.resolve.v2")) {
+            "MANGA_DIRECTORY_METHOD_NOT_ADMITTED"
+        }
+        check(params.getString("sourceId") == chapter.sourceId && params.getString("bookId") == chapter.bookId) { "MANGA_DIRECTORY_SCOPE" }
+        configureCapabilities()
+        return originals.request(method, chapter.sourceId, params)
+    }
     fun pending(): List<ReaderOnlineOriginalObservation> { assertHeld(); return originals.pending() }
     fun observeOriginal(id: String): ReaderOnlineOriginalObservation { assertHeld(); return originals.observe(id) }
 
