@@ -61,13 +61,29 @@ internal class ReaderMangaResourceHost(
                 catch (_: IllegalArgumentException) {
                     return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_TRANSFER_IDENTITY", false)
                 }
+                val dimensions = try { imageDimensions(transfer.chunks) }
+                catch (_: IllegalArgumentException) {
+                    return ReaderCoreEventActor.HostReply.Error("INVALID_PARAMS", "MANGA_IMAGE_DIMENSIONS", false)
+                }
                 val staged = try { resourceStore.stage(identity, transfer.chunks, transfer.contentType) }
                 catch (_: IllegalArgumentException) {
                     return ReaderCoreEventActor.HostReply.Error("RESOURCE_EXHAUSTED", "MANGA_RESOURCE_STAGE", false)
                 }
-                transfer.copy(onCommitted = { resourceStore.commit(staged) })
+                transfer.copy(width = dimensions.first, height = dimensions.second,
+                    onCommitted = { resourceStore.commit(staged) })
             }
         }
+    }
+
+    /** Bounds only: Core needs dimensions before its graphicsPlan continuation; pixels stay Host-owned. */
+    private fun imageDimensions(chunks: List<ByteArray>): Pair<Int, Int> {
+        val encoded = ByteArray(chunks.sumOf { it.size })
+        var offset = 0
+        chunks.forEach { chunk -> chunk.copyInto(encoded, offset); offset += chunk.size }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "MANGA_IMAGE_DIMENSIONS" }
+        return bounds.outWidth to bounds.outHeight
     }
 
     private fun inspect(value: JSONObject): ReaderCoreEventActor.HostReply {
