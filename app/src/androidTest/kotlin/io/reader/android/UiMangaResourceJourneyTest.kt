@@ -180,7 +180,7 @@ class UiMangaResourceJourneyTest {
         fun js(path: String) = "<js>eval(String(Reload('$base/$path.js')))</js>"
         return JSONObject().put("bookSourceUrl", base).put("bookSourceName", "Android manga probe")
             .put("bookSourceType", 2).put("enabled", true).put("enabledCookieJar", false)
-            .put("jsLib", JSONObject().put("fixture", "$base/library.js").toString())
+            .put("jsLib", JSONObject().put("fixture", "$base/library.js"))
             .put("searchUrl", js("search-url"))
             .put("ruleSearch", JSONObject().put("bookList", js("search-rule")).put("name", "<js>Label(result.name)</js>")
                 .put("author", "<js>Label(result.author)</js>").put("bookUrl", "url"))
