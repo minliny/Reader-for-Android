@@ -63,7 +63,7 @@ class UiFreshEpubJourneyTest {
             compose.onNodeWithTag("reader_book_${book.id}").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Reading && !model.state.value.busy }
             assertEquals(ReaderLocalBookFormat.EPUB, model.state.value.reading?.format)
-            compose.onNodeWithTag("reader_ebook_body").performTouchInput { click(center) }
+            compose.onNodeWithTag("reader_ebook_viewport").performTouchInput { click(center) }
             compose.waitUntil(5_000) {
                 model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_open_directory")).fetchSemanticsNodes().isNotEmpty()
             }
@@ -78,7 +78,7 @@ class UiFreshEpubJourneyTest {
             assertEquals(ReaderLocalBookFormat.EPUB, reading.format)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
             marker("fresh-epub-reading-ready", Bundle().apply { putString("bookId", book.id); putInt("chapter", reading.chapter.index); putInt("scalarCount", reading.chapter.scalarCount) })
-            compose.onNodeWithTag("reader_ebook_body").performTouchInput { click(center) }
+            compose.onNodeWithTag("reader_ebook_viewport").performTouchInput { click(center) }
             compose.waitUntil(5_000) { model.state.value.controlsVisible && compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("reader_exit").performClick()
             compose.waitUntil(20_000) { model.state.value.route == ReaderRoute.Bookshelf && !model.state.value.busy }
