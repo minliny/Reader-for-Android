@@ -2,12 +2,14 @@ package io.reader.android.ui
 
 import io.reader.android.runtime.ReaderLibrary
 import io.reader.android.runtime.ReaderMangaChapterData
+import io.reader.android.runtime.ReaderMangaChapterIdentity
 import io.reader.android.runtime.ReaderMangaChapterRequest
 import io.reader.android.runtime.ReaderMangaDecodedResource
 import io.reader.android.runtime.ReaderMangaPageWindow
 import io.reader.android.runtime.ReaderMangaPageWindowRequest
 import io.reader.android.runtime.ReaderMangaResource
 import io.reader.android.runtime.ReaderMangaResourcePrepareRequest
+import io.reader.android.runtime.ReaderMangaTransferIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,12 +37,28 @@ internal data class ReaderMangaReadingPage(
     val decoded: ReaderMangaDecodedResource,
 )
 
+/** Identity of one window acquisition; layout callbacks can bind to the published ticket. */
+internal data class ReaderMangaWindowTicket(
+    val generation: Long,
+    val revision: Long,
+    val chapter: ReaderMangaChapterIdentity,
+    val manifestVersion: String,
+    val sourceRuleVersion: String,
+    val decodeRevision: String,
+    val start: Int,
+    val limit: Int,
+)
+
 internal data class ReaderMangaReadingUiState(
     val generation: Long = 0,
     val phase: ReaderMangaReadingPhase = ReaderMangaReadingPhase.IDLE,
     val chapter: ReaderMangaChapterData? = null,
     val window: ReaderMangaPageWindow? = null,
     val pages: List<ReaderMangaReadingPage> = emptyList(),
+    /** Remains attached to the visible pages until a new window is atomically published. */
+    val visibleWindow: ReaderMangaWindowTicket? = null,
+    val pendingWindow: ReaderMangaWindowTicket? = null,
+    val windowError: String? = null,
     val currentOrdinal: Int = 0,
     val zoom: Float = 1f,
     val scrollFraction: Float = 0f,
@@ -59,10 +77,12 @@ internal class ReaderMangaReadingOwner(
     private val mutable = MutableStateFlow(ReaderMangaReadingUiState())
     val state = mutable.asStateFlow()
     private var nextGeneration = 0L
+    private var nextWindowRevision = 0L
     private var closed = false
     private var activeGeneration: Long? = null
     private var activeChapter: ReaderMangaChapterData? = null
     private var activePages: List<ReaderMangaReadingPage> = emptyList()
+    private var inFlightWindow: ReaderMangaWindowTicket? = null
 
     fun open(request: ReaderMangaChapterRequest) {
         if (closed) return
@@ -70,6 +90,7 @@ internal class ReaderMangaReadingOwner(
         retirePages()
         activeGeneration = generation
         activeChapter = null
+        inFlightWindow = null
         mutable.value = ReaderMangaReadingUiState(generation = generation, phase = ReaderMangaReadingPhase.LOADING)
         scope.launch {
             try {
@@ -94,63 +115,79 @@ internal class ReaderMangaReadingOwner(
 
     private fun loadWindow(generation: Long, chapter: ReaderMangaChapterData, start: Int, limit: Int) {
         require(start >= 0 && limit in 1..32) { "MANGA_UI_WINDOW_RANGE" }
+        if (!current(generation) || activeChapter !== chapter) return
+        val manifest = chapter.manifest
+        val pending = inFlightWindow
+        if (pending != null && current(pending) && pending.start == start && pending.limit == limit) return
+        check(nextWindowRevision < Long.MAX_VALUE) { "MANGA_UI_WINDOW_REVISION_EXHAUSTED" }
+        val ticket = ReaderMangaWindowTicket(generation, ++nextWindowRevision, manifest.chapter,
+            manifest.manifestVersion, manifest.sourceRuleVersion, manifest.decodeRevision, start, limit)
+        inFlightWindow = ticket
+        mutable.value = mutable.value.copy(
+            phase = if (activePages.isEmpty()) ReaderMangaReadingPhase.LOADING else ReaderMangaReadingPhase.READY,
+            pendingWindow = ticket, windowError = null, error = null,
+        )
         scope.launch {
-            var acquired = emptyList<ReaderMangaReadingPage>()
+            val acquired = ArrayList<ReaderMangaReadingPage>()
             try {
-                if (!current(generation)) return@launch
-                mutable.value = mutable.value.copy(phase = ReaderMangaReadingPhase.LOADING, error = null)
+                if (!current(ticket)) return@launch
                 val window = library().pagesWindow(ReaderMangaPageWindowRequest(
-                    chapter = chapter.manifest.chapter,
-                    manifestVersion = chapter.manifest.manifestVersion,
+                    chapter = ticket.chapter,
+                    manifestVersion = ticket.manifestVersion,
                     start = start,
                     limit = limit,
                 ))
-                check(window.manifest.chapter == chapter.manifest.chapter &&
-                    window.manifest.manifestVersion == chapter.manifest.manifestVersion &&
-                    window.manifest.sourceRuleVersion == chapter.manifest.sourceRuleVersion) {
+                if (!current(ticket)) return@launch
+                check(window.manifest.chapter == ticket.chapter &&
+                    window.manifest.manifestVersion == ticket.manifestVersion &&
+                    window.manifest.sourceRuleVersion == ticket.sourceRuleVersion &&
+                    window.manifest.decodeRevision == ticket.decodeRevision &&
+                    window.pageStart == start && window.resources.size <= limit) {
                     "MANGA_UI_WINDOW_SCOPE"
                 }
-                val pages = ArrayList<ReaderMangaReadingPage>(window.resources.size)
-                window.resources.forEachIndexed { index, resource ->
+                for ((index, resource) in window.resources.withIndex()) {
+                    if (!current(ticket)) return@launch
                     val ordinal = window.pageStart + index
                     val request = ReaderMangaResourcePrepareRequest(
-                        chapter = window.manifest.chapter,
-                        manifestVersion = window.manifest.manifestVersion,
+                        chapter = ticket.chapter,
+                        manifestVersion = ticket.manifestVersion,
                         resourceRef = resource.resourceRef,
-                        sourceRuleVersion = window.manifest.sourceRuleVersion,
-                        transferId = "android-manga-ui:${generation}:${ordinal}:${resource.resourceRef}",
+                        sourceRuleVersion = ticket.sourceRuleVersion,
+                        transferId = "android-manga-ui:${generation}:${ticket.revision}:${ordinal}:${resource.resourceRef}",
                     )
                     val decoded = library().decodedResource(request)
                     val page = ReaderMangaReadingPage(ordinal, resource, decoded)
-                    pages += page
-                    acquired = pages.toList()
-                    check(decoded.chapter == window.manifest.chapter &&
-                        decoded.manifestVersion == window.manifest.manifestVersion &&
-                        decoded.resourceRef == resource.resourceRef) { "MANGA_UI_RESOURCE_SCOPE" }
+                    acquired += page // Even a late/foreign handle belongs to this request's finally block.
+                    if (!current(ticket)) return@launch
+                    check(decoded.chapter == ticket.chapter &&
+                        decoded.manifestVersion == ticket.manifestVersion &&
+                        decoded.resourceRef == resource.resourceRef &&
+                        decoded.transferId == ReaderMangaTransferIdentity.forPrepare(request).wireId) { "MANGA_UI_RESOURCE_SCOPE" }
                 }
-                if (!current(generation)) {
-                    pages.forEach { it.decoded.close() }
-                    return@launch
-                }
-                acquired = pages
-                if (!current(generation)) return@launch
-                retirePages()
+                if (!current(ticket)) return@launch
+                val pages = acquired.toList()
+                val previousPages = activePages
                 activePages = pages
+                inFlightWindow = null
                 mutable.value = mutable.value.copy(
                     phase = ReaderMangaReadingPhase.READY,
                     chapter = chapter,
                     window = window,
                     pages = pages,
-                    currentOrdinal = pages.firstOrNull()?.ordinal ?: start,
-                    error = null,
+                    visibleWindow = ticket,
+                    pendingWindow = null,
+                    currentOrdinal = state.value.currentOrdinal.takeIf { ordinal -> pages.any { it.ordinal == ordinal } }
+                        ?: pages.firstOrNull()?.ordinal ?: start,
+                    windowError = null, error = null,
                 )
-                acquired = emptyList()
+                acquired.clear() // The published owner now holds these leases.
+                previousPages.forEach { it.decoded.close() }
             } catch (cancelled: CancellationException) {
-                acquired.forEach { it.decoded.close() }
                 throw cancelled
             } catch (error: Throwable) {
+                failWindow(ticket, error)
+            } finally {
                 acquired.forEach { it.decoded.close() }
-                fail(generation, error)
             }
         }
     }
@@ -176,6 +213,7 @@ internal class ReaderMangaReadingOwner(
         ++nextGeneration
         activeGeneration = null
         activeChapter = null
+        inFlightWindow = null
         retirePages()
         mutable.value = ReaderMangaReadingUiState(generation = nextGeneration)
     }
@@ -189,6 +227,24 @@ internal class ReaderMangaReadingOwner(
     }
 
     private fun current(generation: Long): Boolean = !closed && activeGeneration == generation
+
+    private fun current(ticket: ReaderMangaWindowTicket): Boolean {
+        val manifest = activeChapter?.manifest ?: return false
+        return current(ticket.generation) && inFlightWindow == ticket &&
+            manifest.chapter == ticket.chapter && manifest.manifestVersion == ticket.manifestVersion &&
+            manifest.sourceRuleVersion == ticket.sourceRuleVersion && manifest.decodeRevision == ticket.decodeRevision
+    }
+
+    private fun failWindow(ticket: ReaderMangaWindowTicket, error: Throwable) {
+        if (!current(ticket)) return
+        inFlightWindow = null
+        val message = error.message ?: error::class.java.simpleName
+        val hasVisiblePages = activePages.isNotEmpty()
+        mutable.value = mutable.value.copy(
+            phase = if (hasVisiblePages) ReaderMangaReadingPhase.READY else ReaderMangaReadingPhase.ERROR,
+            pendingWindow = null, windowError = message, error = if (hasVisiblePages) null else message,
+        )
+    }
 
     private fun fail(generation: Long, error: Throwable) {
         if (!current(generation)) return
