@@ -232,6 +232,9 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.page(client.lease, session, page) }
     suspend fun previewOnlineBook(session: ReaderOnlineSearchSession, selected: ReaderOnlineBook): ReaderOnlineDetailPreview =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.preview(client.lease, session, selected) }
+    /** Manga chapter acquisition needs the issued detail session to admit its source TOC first. */
+    internal suspend fun prepareMangaChapter(preview: ReaderOnlineDetailPreview): ReaderMangaChapterRequest =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineCatalog.mangaToc(client.lease, preview) }
     suspend fun closeOnlineSearch(session: ReaderOnlineSearchSession): Unit =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) {
             onlineCatalog.close(session)
@@ -298,10 +301,13 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract(request) }
 
     suspend fun mangaChapter(request: ReaderMangaChapterRequest): ReaderMangaChapterData =
-        onIO(WholeTurnMode.OBSERVER_READ) { mangaService.chapter(request) }
+        // Chapter acquisition can execute source rules and wait for Host HTTP/image metadata;
+        // it is not a pure observer turn even though the returned manifest is read-only.
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.chapter(request) }
 
     suspend fun mangaPagesWindow(request: ReaderMangaPageWindowRequest): ReaderMangaPageWindow =
-        onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesWindow(request) }
+        // Fixed Core reads the stored window; this RPC is not admitted by the Host observer allowlist.
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.pagesWindow(request) }
 
     /** Resource preparation/inspection retain the original because Core waits on Host continuations. */
     suspend fun mangaResourcePrepare(request: ReaderMangaResourcePrepareRequest): ReaderMangaResourcePrepareResult =

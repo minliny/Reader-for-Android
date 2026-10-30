@@ -77,6 +77,8 @@ class ReaderMangaServiceTest {
         ).first { it.isFile }.readText()
         assertTrue("ReaderLibrary must expose the A6 Core adapter" , "mangaPagesExtract" in source)
         assertTrue("A6 extraction must use observer-read lane", "onIO(WholeTurnMode.OBSERVER_READ) { mangaService.pagesExtract" in source)
+        assertTrue("manga chapter acquisition may issue Host HTTP and must retain its original",
+            "onIO(WholeTurnMode.RETAIN_ORIGINAL) { mangaService.chapter" in source)
     }
 
     @Test

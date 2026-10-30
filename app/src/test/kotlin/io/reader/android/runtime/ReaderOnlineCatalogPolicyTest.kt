@@ -57,7 +57,7 @@ class ReaderOnlineCatalogPolicyTest {
                 methods.add(method); params.add(parameters.toString()); val id = ++nextId; beforeSend(id)
                 if (rejectSearch && method == "book.search") throw CoreProtocolPending(
                     CoreProtocolReference(session, "protocol-original", id, "protocol-token"), CoreProtocolStage.ORIGINAL_UNCERTAIN)
-                val data = if (method == "runtime.setHostCapabilities") JSONObject().put("applied", true).put("capabilities", 1).put("lanes", 0)
+                val data = if (method == "runtime.setHostCapabilities") JSONObject().put("applied", true).put("capabilities", 2).put("lanes", 0)
                     else page(selectedSource, JSONArray())
                 terminal?.invoke(JSONObject().put("protocolVersion", 1).put("type", "result").put("requestId", id).put("data", data))
                 return data
@@ -91,7 +91,7 @@ class ReaderOnlineCatalogPolicyTest {
                 terminal: ((JSONObject) -> Unit)?): JSONObject {
                 methods += method
                 val id = methods.size.toLong(); beforeSend(id)
-                val data = if (method == "runtime.setHostCapabilities") JSONObject().put("applied", true).put("capabilities", 1).put("lanes", 0)
+                val data = if (method == "runtime.setHostCapabilities") JSONObject().put("applied", true).put("capabilities", 2).put("lanes", 0)
                     else page(source(), JSONArray())
                 terminal?.invoke(JSONObject().put("protocolVersion", 1).put("requestId", id).put("type", "result").put("data", data))
                 return data
@@ -107,5 +107,104 @@ class ReaderOnlineCatalogPolicyTest {
         sharedWriterPending = true
         assertThrows(IllegalStateException::class.java) { service.start(lease, selection, "blocked") }
         assertEquals(before, methods)
+    }
+
+    @Test fun mangaTocCarriesDetailVariablesAndSelectsFirstReadableChapter() {
+        val fixture = MangaFixture()
+        val request = fixture.catalog.mangaToc(lease, fixture.preview)
+        assertEquals(ReaderMangaChapterRef(source().sourceId, "manga-book"), request.chapter)
+        assertEquals(7, request.chapterIndex) // Index 0 is a group; readable indexes are sparse.
+        assertEquals(ReaderMangaReadPolicy.CACHE_FIRST, request.policy)
+        val parameters = fixture.requests.single { it.first == "book.toc" }.second
+        assertEquals(source().sourceId, parameters.getString("sourceId"))
+        assertEquals("manga-book", parameters.getString("bookId"))
+        assertEquals("https://example.invalid/manga/toc", parameters.getString("tocUrl"))
+        assertEquals("original-token", parameters.getJSONObject("variables").getString("token"))
+        assertEquals("{\"cursor\":2}", parameters.getJSONObject("variables").getString("continuation"))
+        assertEquals(listOf("runtime.setHostCapabilities", "book.search", "book.detail", "book.toc"),
+            fixture.requests.map { it.first })
+    }
+
+    @Test fun mangaTocRejectsForeignIdentityVersionDeferredAndUnreadableCatalogs() {
+        val invalidTocs = listOf<(JSONObject) -> Unit>(
+            { it.put("sourceId", "foreign-source") },
+            { it.put("bookId", "foreign-book") },
+            { it.put("sourceVersion", "changed-version") },
+            { it.put("catalogDeferredReason", "classificationRequired") },
+            { it.put("readableChapterIndexes", JSONArray()) },
+            { it.put("readableChapterIndexes", JSONArray().put(99)) },
+            { it.getJSONArray("toc").put(JSONObject().put("index", 7).put("title", "duplicate").put("url", "/duplicate")) },
+        )
+        invalidTocs.forEach { change ->
+            val fixture = MangaFixture(change)
+            assertThrows(IllegalStateException::class.java) { fixture.catalog.mangaToc(lease, fixture.preview) }
+            assertEquals(1, fixture.requests.count { it.first == "book.toc" })
+            assertFalse(fixture.requests.any { it.first.startsWith("manga.") })
+        }
+    }
+
+    @Test fun mangaPreparationSurvivesSearchCloseWithoutReusingRetiredPreview() {
+        val fixture = MangaFixture()
+        val request = fixture.catalog.mangaToc(lease, fixture.preview)
+        val sent = fixture.requests.map { it.first }
+        fixture.catalog.close(fixture.search)
+        assertEquals(sent, fixture.requests.map { it.first }) // Closing presentation has no Core RPC.
+        assertEquals(7, request.chapterIndex)
+        assertEquals(ReaderMangaReadPolicy.CACHE_FIRST, request.policy)
+        assertThrows(IllegalStateException::class.java) { fixture.catalog.mangaToc(lease, fixture.preview) }
+        assertEquals(sent, fixture.requests.map { it.first })
+    }
+
+    @Test fun catalogAdvertisesOnlyHttpAndMangaTransferAndRejectsWrongAcknowledgementCount() {
+        val fixture = MangaFixture()
+        val params = fixture.requests.single { it.first == "runtime.setHostCapabilities" }.second
+        val names = params.getJSONArray("capabilities")
+        assertEquals(listOf("http.execute", "manga.resource.transfer"), (0 until names.length()).map { names.getString(it) })
+        assertEquals(0, params.getJSONArray("extensions").length())
+        assertEquals(0, params.getJSONArray("lanes").length())
+        assertEquals("android", params.getString("platform"))
+        listOf(0, 1, 3).forEach { count ->
+            val error = assertThrows(IllegalStateException::class.java) { MangaFixture(capabilityAckCount = count) }
+            assertEquals("ONLINE_HOST_MANIFEST_UNCONFIRMED", error.message)
+        }
+    }
+
+    /** Reuses the catalog protocol-port fixture; it never executes source rules or Native. */
+    private inner class MangaFixture(changeToc: (JSONObject) -> Unit = {}, capabilityAckCount: Int = 2) {
+        val requests = mutableListOf<Pair<String, JSONObject>>()
+        private val book = JSONObject().put("bookId", "manga-book").put("title", "Comic").put("author", "Author")
+        private val toc = JSONObject().put("sourceId", source().sourceId).put("bookId", "manga-book")
+            .put("sourceVersion", source().sourceVersion).put("contentKind", "manga")
+            .put("toc", JSONArray()
+                .put(JSONObject().put("index", 0).put("title", "Volume").put("url", ""))
+                .put(JSONObject().put("index", 7).put("title", "First readable").put("url", "/chapter/7"))
+                .put(JSONObject().put("index", 12).put("title", "Next readable").put("url", "/chapter/12")))
+            .put("readableChapterIndexes", JSONArray().put(7).put(12)).also(changeToc)
+        private val port = object : CoreTransport {
+            override val session = "runtime-a"
+            override fun request(method: String, parameters: JSONObject, timeoutMs: Long, beforeSend: (Long) -> Unit,
+                terminal: ((JSONObject) -> Unit)?): JSONObject {
+                requests += method to JSONObject(parameters.toString())
+                val id = requests.size.toLong(); beforeSend(id)
+                val data = when (method) {
+                    "runtime.setHostCapabilities" -> JSONObject().put("applied", true).put("capabilities", capabilityAckCount).put("lanes", 0)
+                    "book.search" -> page(source(), JSONArray().put(book)).put("contentKind", "manga")
+                    "book.detail" -> JSONObject().put("sourceId", source().sourceId).put("sourceVersion", source().sourceVersion)
+                        .put("contentKind", "manga").put("book", book).put("tocUrl", "https://example.invalid/manga/toc")
+                        .put("variables", JSONObject().put("token", "original-token").put("continuation", "{\"cursor\":2}"))
+                    "book.toc" -> toc
+                    else -> error("UNEXPECTED_MANGA_PREPARATION_METHOD:$method")
+                }
+                terminal?.invoke(JSONObject().put("protocolVersion", 1).put("requestId", id).put("type", "result").put("data", data))
+                return data
+            }
+            override fun drainOriginalTerminal(requestId: Long, timeoutMs: Long) = error("NO_NEW_DRAIN")
+            override fun close() = error("NO_NATIVE_CLOSE")
+        }
+        val catalog = ReaderOnlineCatalog(port,
+            { id -> listOf(ReaderSourceEntry(id, "source", "", true, false, source().sourceVersion, null)) }, {})
+        private val selection = catalog.select(lease, source().sourceId)
+        val search = catalog.start(lease, selection, "Comic")
+        val preview = catalog.preview(lease, search, catalog.page(lease, search, 1).books.single())
     }
 }

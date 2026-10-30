@@ -1,5 +1,6 @@
 package io.reader.android.runtime
 
+import io.reader.android.runtime.http.ReaderMangaResourceHost
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Collections
@@ -72,6 +73,30 @@ internal class ReaderOnlineCatalog(
             return ReaderOnlineCatalogPolicy.detail(session.source, selected, value).also { addPreview = it to session }
         } catch (error: Exception) { search.failed = true; throw error }
     }
+
+    /** Prepare a manga chapter's source catalog while the issued search/detail session is alive. */
+    fun mangaToc(lease: ReaderOperationOwner.ClientLease, preview: ReaderOnlineDetailPreview): ReaderMangaChapterRequest {
+        checkLane()
+        val issued = checkNotNull(addPreview) { "ONLINE_MANGA_PREVIEW_NOT_ISSUED" }
+        active(lease, issued.second)
+        check(issued.first === preview && preview.contentKind == ReaderOnlineContentKind.MANGA) {
+            "ONLINE_MANGA_PREVIEW_RETIRED"
+        }
+        val params = JSONObject().put("sourceId", preview.key.sourceId)
+            .put("bookId", preview.key.bookId).put("variables", JSONObject(preview.variables))
+        preview.tocUrl?.let { params.put("tocUrl", it) }
+        val toc = originals.request("book.toc", preview.key.sourceId, params)
+        ReaderOnlineAddPolicy.scope(toc, preview.key)
+        ReaderOnlineAddPolicy.sourceVersion(toc, preview.sourceVersion)
+        check(toc.optString("catalogDeferredReason").isEmpty()) { "ONLINE_MANGA_CATALOG_NOT_ADMITTED" }
+        val firstIndex = ReaderOnlineAddPolicy.readableChapterIndexes(toc).first()
+        val chapters = toc.getJSONArray("toc")
+        check((0 until chapters.length()).count { chapters.getJSONObject(it).getInt("index") == firstIndex } == 1) {
+            "ONLINE_MANGA_CHAPTER_IDENTITY"
+        }
+        return ReaderMangaChapterRequest(ReaderMangaChapterRef(preview.key.sourceId, preview.key.bookId),
+            firstIndex, ReaderMangaReadPolicy.CACHE_FIRST)
+    }
     fun close(session: ReaderOnlineSearchSession) {
         checkLane()
         val search = searches[session.id] ?: return
@@ -114,10 +139,11 @@ internal class ReaderOnlineCatalog(
     }
     private fun configureCapabilities() {
         if (capabilitiesConfigured) return
-        val data = originals.request("runtime.setHostCapabilities", "", JSONObject().put("capabilities", JSONArray().put("http.execute"))
+        val data = originals.request("runtime.setHostCapabilities", "", JSONObject().put("capabilities",
+            JSONArray().put("http.execute").put(ReaderMangaResourceHost.CAPABILITY))
             .put("extensions", JSONArray()).put("lanes", JSONArray()).put("platform", "android"))
-        check(data.get("applied") == true && data.getInt("capabilities") == 1 && data.getInt("lanes") == 0) { "ONLINE_HTTP_MANIFEST_UNCONFIRMED" }
-        capabilitiesConfigured = true // No cookie/login/asset/WebView capability claimed.
+        check(data.get("applied") == true && data.getInt("capabilities") == 2 && data.getInt("lanes") == 0) { "ONLINE_HOST_MANIFEST_UNCONFIRMED" }
+        capabilitiesConfigured = true // Matches AppCoreOwner's HTTP and manga transfer handlers; no other capabilities claimed.
     }
     private fun selection(lease: ReaderOperationOwner.ClientLease, selected: ReaderOnlineSourceSelection) {
         checkLane()

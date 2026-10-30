@@ -61,8 +61,6 @@ import io.reader.android.runtime.ReaderContentSearchHit
 import io.reader.android.runtime.BookmarkTargetStaleException
 import io.reader.android.runtime.ContentSearchPendingException
 import io.reader.android.runtime.ReaderMangaChapterRequest
-import io.reader.android.runtime.ReaderMangaChapterRef
-import io.reader.android.runtime.ReaderMangaReadPolicy
 import java.io.FileNotFoundException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -260,15 +258,27 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     internal fun openManga(detail: io.reader.android.runtime.ReaderOnlineDetailPreview) {
         if (state.value.busy || state.value.route != ReaderRoute.Online || detail.contentKind != io.reader.android.runtime.ReaderOnlineContentKind.MANGA) return
-        onlineSources.leave() // Retire the search session before opening the independent Manga owner.
-        ++generation; shelfRead?.cancel(); delayedSave?.cancel()
-        val request = ReaderMangaChapterRequest(
-            ReaderMangaChapterRef(detail.key.sourceId, detail.key.bookId), chapterIndex = 0,
-            policy = ReaderMangaReadPolicy.CACHE_FIRST,
-        )
-        mangaRequest = request
-        mutableState.update { it.copy(route = ReaderRoute.MangaReading, busy = false, error = null, onlineError = null) }
-        mangaOwner().open(request)
+        val requestGeneration = ++generation
+        shelfRead?.cancel(); delayedSave?.cancel()
+        mutableState.update { it.copy(busy = true, onlineError = null) }
+        viewModelScope.launch {
+            gate.withLock {
+                try {
+                    val request = library.prepareMangaChapter(detail)
+                    if (requestGeneration != generation || state.value.route != ReaderRoute.Online) return@withLock
+                    onlineSources.leave() // Retire the issued search/detail session after its TOC original is complete.
+                    mangaRequest = request
+                    mutableState.update { it.copy(route = ReaderRoute.MangaReading, busy = false, error = null, onlineError = null) }
+                    mangaOwner().open(request)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (requestGeneration == generation) mutableState.update {
+                        it.copy(busy = false, onlineError = error.userMessage())
+                    }
+                }
+            }
+        }
     }
 
     private var mangaRequest: ReaderMangaChapterRequest? = null
