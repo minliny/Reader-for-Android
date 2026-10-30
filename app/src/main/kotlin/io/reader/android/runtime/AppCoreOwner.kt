@@ -39,7 +39,10 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
             this, root, operations.dataDirectory)
     }
     private val httpHost = ReaderHttpHost()
-    private val mangaResourceHost = ReaderMangaResourceHost(httpHost, ReaderMangaResourceStore(File(root, "Manga/Resources")))
+    /** One process-owned store instance; Host leases and materialization protection share its identity. */
+    private val mangaResourceStore by lazy { ReaderMangaResourceStore(File(root, "Manga/Resources")) }
+    private val mangaMaterializationStore by lazy { ReaderMangaMaterializationStore(mangaResourceStore, File(root, "Manga/Materializations")) }
+    private val mangaResourceHost = ReaderMangaResourceHost(httpHost, mangaResourceStore)
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
             NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),
@@ -160,6 +163,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
         val onlineCatalog: ReaderOnlineCatalog get() { owner.requireLane(lease); return owner.onlineCatalogService }
         val onlineAdds: ReaderOnlineAdd get() { owner.requireLane(lease); return owner.onlineAddService }
         val tts: ReaderTtsService get() { owner.requireLane(lease); return owner.ttsService }
+        internal val mangaMaterializationStore: ReaderMangaMaterializationStore
+            get() { owner.requireLane(lease); return owner.mangaMaterializationStore }
         // Constructing a Library/client/status observer does not create Native.
         val transport: CoreTransport = object : CoreTransport {
             private fun bound(): CoreTransport {

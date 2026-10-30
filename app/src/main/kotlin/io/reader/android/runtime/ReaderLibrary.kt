@@ -74,9 +74,8 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     private val onlineAdds get() = client.onlineAdds
     private val onlineReading get() = client.onlineReading
     private val tts get() = client.tts
-    private val mangaResourceStore by lazy { ReaderMangaResourceStore(File(root, "Manga/Resources")) }
-    private val mangaMaterializationStore by lazy { ReaderMangaMaterializationStore(mangaResourceStore, File(root, "Manga/Materializations")) }
-    private val mangaService by lazy { ReaderMangaService(transport, mangaMaterializationStore) }
+    /** Uses the App owner’s single store instance so Host leases and materialization protection agree. */
+    private val mangaService by lazy { ReaderMangaService(transport, client.mangaMaterializationStore) }
     private val searchServiceDelegate = lazy { ReaderContentSearch(transport) }
     private val searchService by searchServiceDelegate
     private val registeredSearchCleanups = mutableSetOf<String>()
