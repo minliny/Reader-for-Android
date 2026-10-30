@@ -4,7 +4,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Source-only Core manga adapter. Host image transfer, decode, cache and zoom are separate. */
-internal class ReaderMangaService(private val transport: CoreTransport) {
+internal class ReaderMangaService(
+    private val transport: CoreTransport,
+    private val materializationStore: ReaderMangaMaterializationStore? = null,
+) {
     fun pagesExtract(request: ReaderMangaExtractRequest): ReaderMangaPagesExtract {
         check(request.chapter.sourceId.isNotBlank()) { "MANGA_SOURCE_ID" }
         check(request.chapter.bookId.isNotBlank()) { "MANGA_BOOK_ID" }
@@ -76,7 +79,9 @@ internal class ReaderMangaService(private val transport: CoreTransport) {
         val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
             .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
             .put("manifestVersion", request.manifestVersion).put("intent", request.intent.wire)
-        return ReaderMangaPolicy.materializationPrepare(transport.request("manga.cache.materialization.prepare", params), request)
+        return ReaderMangaPolicy.materializationPrepare(transport.request("manga.cache.materialization.prepare", params), request).also {
+            materializationStore?.prepare(it)
+        }
     }
 
     fun materializationComplete(request: ReaderMangaMaterializationCompleteRequest): ReaderMangaMaterializationCompleteResult {
@@ -84,11 +89,16 @@ internal class ReaderMangaService(private val transport: CoreTransport) {
         val params = JSONObject().put("chapter", JSONObject().put("sourceId", request.chapter.sourceId)
             .put("bookId", request.chapter.bookId).put("chapterId", request.chapter.chapterId))
             .put("manifestVersion", request.manifestVersion).put("token", request.token).put("resourceRefs", refs)
-        return ReaderMangaPolicy.materializationComplete(transport.request("manga.cache.materialization.complete", params), request)
+        materializationStore?.requireResources(request.token, request.chapter, request.manifestVersion, request.resourceRefs)
+        return ReaderMangaPolicy.materializationComplete(transport.request("manga.cache.materialization.complete", params), request).also {
+            materializationStore?.complete(it, request.token)
+        }
     }
 
     fun materializationAbort(token: String): ReaderMangaMaterializationAbortResult {
         check(token.isNotBlank()) { "MANGA_MATERIALIZATION_TOKEN" }
-        return ReaderMangaPolicy.materializationAbort(transport.request("manga.cache.materialization.abort", JSONObject().put("token", token)))
+        return ReaderMangaPolicy.materializationAbort(transport.request("manga.cache.materialization.abort", JSONObject().put("token", token))).also {
+            materializationStore?.abort(token)
+        }
     }
 }

@@ -123,6 +123,19 @@ internal class ReaderMangaResourceStore(private val root: File) {
     }
 
     @Synchronized
+    fun readDecodedByResourceRef(resourceRef: String): ByteArray {
+        require(resourceRef.isNotBlank()) { "MANGA_RESOURCE_REF" }
+        val directory = root.listFiles().orEmpty().firstOrNull { candidate ->
+            !candidate.name.startsWith(".") && candidate.isDirectory && runCatching {
+                readMeta(candidate).second == resourceRef && File(candidate, DECODED).isFile
+            }.getOrDefault(false)
+        } ?: error("MANGA_DECODED_ABSENT")
+        val decoded = File(directory, DECODED)
+        check(decoded.length() in 1..MAX_PREPARED_BYTES) { "MANGA_DECODED_ABSENT" }
+        return decoded.readBytes()
+    }
+
+    @Synchronized
     fun evict(identity: ReaderMangaTransferIdentity, sha256: String): Boolean {
         val directory = File(root, key(identity, sha256))
         return !directory.exists() || directory.deleteRecursively()
