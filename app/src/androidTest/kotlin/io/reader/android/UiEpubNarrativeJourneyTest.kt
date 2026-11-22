@@ -9,8 +9,6 @@ import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import android.util.AtomicFile
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.webkit.WebView
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
@@ -119,7 +117,7 @@ class UiEpubNarrativeJourneyTest {
             assertEquals(BASELINE_REVISION, ProgressReceiptPolicy.revision(baselineRecord, baselineWire))
             assertEquals(1, baselineRecord.getJSONObject("parameters").getInt("chapterIndex"))
             assertEquals(0, baselineRecord.getJSONObject("parameters").getInt("chapterOffset"))
-            val beforeAuto = completedNames()
+            val beforeAuto = EbookJourneyProbe.completedOperationNames(current)
             compose.waitUntil(5_000) { compose.runOnUiThread { current.window.decorView.hasWindowFocus() } }
             assertTrue("Physical screen must already be on", UiDevice.getInstance(instrumentation).isScreenOn)
             assertFalse("Physical screen must already be unlocked", checkNotNull(current.getSystemService(KeyguardManager::class.java)).isKeyguardLocked)
@@ -170,26 +168,26 @@ class UiEpubNarrativeJourneyTest {
             assertEquals(bookId, reading.chapter.bookId); assertEquals(selected.index, reading.chapter.index)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
             assertEquals(0, reading.visibleScalarOffset); assertFalse(model.state.value.controlsVisible)
-            assertEquals(beforeAuto, completedNames())
+            assertEquals(beforeAuto, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "actual-webview-ready-draw-dom"
-            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
+            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { EbookJourneyProbe.readyMount(current, SHELL) != null } }
             healthy(model, 0)
             // Native Ready is synchronous; Compose must commit removal of its covering Surface too.
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
-            val mount = compose.runOnUiThread { checkNotNull(readyMount()) }
+            val mount = compose.runOnUiThread { checkNotNull(EbookJourneyProbe.readyMount(current, SHELL)) }
             val readyAtDraw = compose.runOnUiThread { checkNotNull(mount.ready) }
-            val web = compose.runOnUiThread { actualWebView() }
-            attachedDraw(current.window.decorView)
-            attachedDraw(web)
+            val web = compose.runOnUiThread { EbookJourneyProbe.webView(current, SHELL) }
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView)
+            EbookJourneyProbe.awaitDraw(compose, web)
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
             compose.runOnUiThread {
-                assertSame(mount, readyMount()); assertSame(web, actualWebView())
+                assertSame(mount, EbookJourneyProbe.readyMount(current, SHELL)); assertSame(web, EbookJourneyProbe.webView(current, SHELL))
                 assertEquals(readyAtDraw, mount.ready)
             }
-            val probe = domProbe(web)
+            val probe = EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY)
             assertFalse(probe.has("probeError"))
             assertEquals(ORIGIN, probe.getString("origin")); assertEquals(SHELL, probe.getString("shellUrl"))
             val prepared = checkNotNull(mount.preparation)
@@ -211,7 +209,7 @@ class UiEpubNarrativeJourneyTest {
             val ready = checkNotNull(mount.ready)
             assertEquals(reading.visibleScalarOffset, ready.scalar)
             assertEquals(lease, ready.lease)
-            glyphTapCoordinates(web, probe) // Initial real glyph/viewport observation; not clicked.
+            EbookJourneyProbe.glyphTapCoordinates(compose, web, probe) // Initial real glyph/viewport observation; not clicked.
             assertTrue(Build.VERSION.SDK_INT >= 26)
             val provider = WebView.getCurrentWebViewPackage() ?: throw AssertionError("Actual WebView provider absent")
             marker("epub-real-webview-ready-draw-observed-dom", Bundle().apply {
@@ -230,14 +228,14 @@ class UiEpubNarrativeJourneyTest {
                 putString("probeMetrics", JSONObject(probe.toString()).apply { remove("domText") }.toString())
                 putString("textClaim", "LIVE_DOM_TEXT_SAMPLE_OBSERVATION_ONLY_CANONICAL_AUTHENTICATION_IS_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
             })
-            assertEquals(beforeAuto, completedNames())
+            assertEquals(beforeAuto, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "one-real-narrative-swipe-and-auto-save"
             val swipe = swipeProbe(web)
             assertFalse(swipe.has("probeError")); assertTrue(swipe.getBoolean("selectionCollapsed"))
             assertTrue(swipe.getBoolean("nonLinkStart")); assertEquals(probe.getString("entryUrl"), swipe.getString("entryUrl"))
             val points = compose.runOnUiThread {
-                prepared.requireCurrent(); assertSame(mount, field(model, "ebookMount")); assertSame(web, actualWebView())
+                prepared.requireCurrent(); assertSame(mount, field(model, "ebookMount")); assertSame(web, EbookJourneyProbe.webView(current, SHELL))
                 val location = IntArray(2).also(web::getLocationOnScreen); val visible = Rect()
                 assertTrue(web.getGlobalVisibleRect(visible)); val density = web.resources.displayMetrics.density.toDouble()
                 assertTrue(abs(swipe.getDouble("width") * density - web.width) <= 1.1 * density)
@@ -253,7 +251,7 @@ class UiEpubNarrativeJourneyTest {
             healthy(model, 0)
             compose.waitUntil(15_000) {
                 if (failed(model)) true else {
-                    val names = completedNames() - beforeAuto
+                    val names = EbookJourneyProbe.completedOperationNames(current) - beforeAuto
                     assertTrue("One swipe must not create multiple original autosaves", names.size <= 1)
                     names.size == 1 && compose.runOnUiThread { (field(model, "delayedSave") as? Job)?.isCompleted == true } &&
                         !File(current.filesDir, "Reader/Operations/${names.single()}").exists() &&
@@ -298,26 +296,26 @@ class UiEpubNarrativeJourneyTest {
                 putString("originalRecordSha256", sha(auto.third)); putString("originalWire", autoWire.toString())
                 putBoolean("autoObserverCompleted", true); putBoolean("autoActiveAbsent", autoActiveAbsent); putBoolean("autoCandidateAbsent", autoCandidateAbsent)
             })
-            val beforeExit = completedNames() // Auto original is completely archived before the only exit can cancel its observer.
+            val beforeExit = EbookJourneyProbe.completedOperationNames(current) // Auto original is completely archived before the only exit can cancel its observer.
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
-            attachedDraw(current.window.decorView); attachedDraw(web)
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView); EbookJourneyProbe.awaitDraw(compose, web)
             compose.runOnUiThread { assertEquals(scrolled.visibleScalarOffset, checkNotNull(capturedVisibleAnchor(mount, web, ready))) }
-            val scrolledProbe = domProbe(web)
+            val scrolledProbe = EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY)
             assertFalse(scrolledProbe.has("probeError")); assertEquals(probe.getString("entryUrl"), scrolledProbe.getString("entryUrl"))
             assertTrue(scrolledProbe.getBoolean("selectionCollapsed"))
-            val metrics = glyphTapCoordinates(web, scrolledProbe)
+            val metrics = EbookJourneyProbe.glyphTapCoordinates(compose, web, scrolledProbe)
             val screen = File(current.cacheDir, "reader-a3-epub-story-${lease.renderId}-draw.png")
             try { marker("epub-screenshot", Bundle().apply { putBoolean("saved", UiDevice.getInstance(instrumentation).takeScreenshot(screen)); putString("cacheFile", screen.name) }) }
             catch (failure: Exception) { marker("epub-screenshot", Bundle().apply { putBoolean("saved", false); putString("error", failure.javaClass.name) }) }
-            assertEquals(beforeExit, completedNames())
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "trusted-body-tap-and-one-normal-exit"
             assertTrue("Actual DOM-derived non-link visible content tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
             compose.waitUntil(5_000) { model.state.value.reading?.identity == reading.identity && model.state.value.controlsVisible && enabledExit() }
-            attachedDraw(current.window.decorView)
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView)
             assertTrue(enabledExit()); healthy(model, 0)
-            assertEquals(scrolled.visibleScalarOffset, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, completedNames())
+            assertEquals(scrolled.visibleScalarOffset, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
             marker("epub-trusted-body-tap-controls-draw", Bundle().apply { putLong("readingOwner", reading.identity) })
             compose.onNodeWithTag("reader_exit").assertIsEnabled().performClick()
             compose.waitUntil(15_000) { !model.state.value.busy && (model.state.value.reading == null || failed(model)) }
@@ -357,34 +355,6 @@ class UiEpubNarrativeJourneyTest {
         marker("method-exit")
     }
 
-    private fun glyphTapCoordinates(web: WebView, probe: JSONObject): IntArray = compose.runOnUiThread {
-        val location = IntArray(2).also(web::getLocationOnScreen); val visible = Rect()
-        assertTrue(web.getGlobalVisibleRect(visible))
-        assertEquals(Rect(location[0], location[1], location[0] + web.width, location[1] + web.height), visible)
-        val density = web.resources.displayMetrics.density.toDouble()
-        assertTrue(abs(probe.getDouble("width") * density - web.width) <= 1.1 * density)
-        assertTrue(abs(probe.getDouble("height") * density - web.height) <= 1.1 * density)
-        val tap = probe.getJSONObject("tap") // Actual Range/image rectangle, not an assumed screen coordinate.
-        val frameLeft = probe.getDouble("frameLeft"); val frameTop = probe.getDouble("frameTop")
-        val left = maxOf(tap.getDouble("left"), 0.0, (visible.left - location[0]) / density - frameLeft)
-        val right = minOf(tap.getDouble("right"), probe.getDouble("width"), (visible.right - location[0]) / density - frameLeft)
-        val top = maxOf(tap.getDouble("top"), 32.0, (visible.top - location[1]) / density - frameTop)
-        val bottom = minOf(tap.getDouble("bottom"), probe.getDouble("height") - 52, (visible.bottom - location[1]) / density - frameTop)
-        assertTrue("Actual content has no usable child/native viewport intersection", right > left && bottom > top)
-        val raw = JSONObject().put("left", tap.getDouble("left")).put("right", tap.getDouble("right"))
-            .put("top", tap.getDouble("top")).put("bottom", tap.getDouble("bottom"))
-        val clipped = JSONObject().put("left", left).put("right", right).put("top", top).put("bottom", bottom)
-        val cssX = frameLeft + (left + right) * .5
-        val cssY = frameTop + (top + bottom) * .5
-        val x = location[0] + (cssX * density).toInt()
-        val y = location[1] + (cssY * density).toInt()
-        assertTrue(visible.contains(x, y))
-        tap.put("raw", raw).put("clipped", clipped).put("screenX", x).put("screenY", y)
-            .put("nativeVisible", JSONObject().put("left", visible.left).put("right", visible.right)
-                .put("top", visible.top).put("bottom", visible.bottom))
-        intArrayOf(x, y)
-    }
-
     private fun capturedVisibleAnchor(mount: ReaderEbookUiMount, web: WebView, initialReady: ReaderEbookReady): Int? {
         val model = current.readerViewModel; val state = model.state.value; val reading = state.reading ?: return null
         if (field(model, "ebookMount") !== mount || state.route != ReaderRoute.Reading || state.busy || state.controlsVisible ||
@@ -394,7 +364,7 @@ class UiEpubNarrativeJourneyTest {
         val prepared = mount.preparation ?: return null
         if (prepared.view !== mount.view || prepared.publication.lease != initialReady.lease || initialReady.lease.renderId != mount.view.physicalViewId) return null
         prepared.requireCurrent()
-        if (actualWebView() !== web) return null
+        if (EbookJourneyProbe.webView(current, SHELL) !== web) return null
         val owner = field(web.parent, "owner") ?: return null; val layout = field(owner, "layout") ?: return null
         if (field(owner, "view") !== web || field(owner, "lease") != initialReady.lease || field(owner, "phase").toString() != "Ready" ||
             field(owner, "forceLayout") != false || field(owner, "awaitingDraw") != null || field(owner, "drawnEpoch") != initialReady.layoutEpoch ||
@@ -405,7 +375,7 @@ class UiEpubNarrativeJourneyTest {
     }
     private fun swipeProbe(web: WebView): JSONObject {
         val latch = CountDownLatch(1); var result: String? = null
-        compose.runOnUiThread { web.evaluateJavascript(SWIPE_READ_ONLY) { result = it; latch.countDown() } }
+        compose.runOnUiThread { web.evaluateJavascript(EbookJourneyProbe.SWIPE_READ_ONLY) { result = it; latch.countDown() } }
         assertTrue("Read-only swipe hit callback missing", latch.await(5, TimeUnit.SECONDS))
         return JSONObject(result ?: throw AssertionError("Swipe callback returned null"))
     }
@@ -415,59 +385,14 @@ class UiEpubNarrativeJourneyTest {
             it.pendingBookmarks.isNotEmpty() || it.pendingSearchClose != null || (it.ebookFailureOwner != null && it.ebookFailureOwner == it.reading?.identity)
     }
     private fun healthy(model: ReaderViewModel, revision: Long) { assertFalse("Original operation failed/pending", failed(model)); assertEquals(revision, model.state.value.importRevision) }
-    private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
-    private fun freshRecords(before: Set<String>) = (completedNames() - before).map { name ->
+    private fun freshRecords(before: Set<String>) = (EbookJourneyProbe.completedOperationNames(current) - before).map { name ->
         val file = File(current.filesDir, "Reader/Operations/Completed/$name")
         assertTrue(file.length() in 1..8L * 1024 * 1024)
         val raw = AtomicFile(file).openRead().use { it.readBytes() }; Triple(file, JSONObject(raw.toString(Charsets.UTF_8)), raw)
     }
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
-    private fun actualWebView(): WebView {
-        fun descendants(view: View): List<WebView> = (if (view is WebView) listOf(view) else emptyList()) +
-            (if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList())
-        return descendants(current.window.decorView).filter { it.isAttachedToWindow && it.url == SHELL }.single()
-    }
-    private fun readyMount(): ReaderEbookUiMount? {
-        val model = current.readerViewModel; val reading = model.state.value.reading ?: return null
-        val mount = field(model, "ebookMount") as? ReaderEbookUiMount ?: return null
-        val prepared = mount.preparation ?: return null; val ready = mount.ready ?: return null
-        if (reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
-            reading.chapter.bookId != mount.chapter.bookId || reading.chapter.index != mount.chapter.index ||
-            reading.chapter.bodyVersion != mount.chapter.bodyVersion || reading.chapter.processingVersion != mount.chapter.processingVersion ||
-            prepared.view !== mount.view || prepared.publication.lease != ready.lease || ready.scalar != reading.visibleScalarOffset) return null
-        prepared.requireCurrent()
-        val web = try { actualWebView() } catch (_: IllegalArgumentException) { return null } catch (_: NoSuchElementException) { return null }
-        val owner = field(web.parent, "owner") ?: return null
-        val layout = field(owner, "layout") ?: return null
-        val visible = Rect()
-        return mount.takeIf { field(owner, "view") === web && field(owner, "lease") == prepared.publication.lease &&
-            field(owner, "phase").toString() == "Ready" && field(layout, "anchor") == ready.scalar &&
-            web.width == ready.widthPx && web.height == ready.heightPx && field(owner, "forceLayout") == false && field(owner, "drawnEpoch") == ready.layoutEpoch && field(owner, "awaitingDraw") == null &&
-            field(layout, "epoch") == ready.layoutEpoch && field(layout, "token") == ready.layoutToken &&
-            web.isLaidOut && !web.isLayoutRequested && web.isShown && web.getGlobalVisibleRect(visible) &&
-            visible.width() == web.width && visible.height() == web.height }
-    }
     private fun enabledExit(): Boolean = compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().let {
         it.size == 1 && SemanticsProperties.Disabled !in it.single().config && it.single().boundsInRoot.width > 0 && it.single().boundsInRoot.height > 0
-    }
-    private fun attachedDraw(view: View) {
-        val latch = CountDownLatch(1); var tree: ViewTreeObserver? = null
-        val listener = ViewTreeObserver.OnDrawListener { if (view.isAttachedToWindow && view.isShown) view.post { latch.countDown() } }
-        var primary: Throwable? = null
-        try {
-            compose.runOnUiThread { assertTrue(view.isAttachedToWindow && view.isShown); tree = view.viewTreeObserver; tree!!.addOnDrawListener(listener); view.invalidate() }
-            assertTrue("Attached native draw did not complete", latch.await(5, TimeUnit.SECONDS))
-        } catch (failure: Throwable) { primary = failure; throw failure }
-        finally {
-            try { compose.runOnUiThread { tree?.takeIf { it.isAlive }?.removeOnDrawListener(listener) } }
-            catch (cleanup: Throwable) { if (primary == null) throw cleanup else primary.addSuppressed(cleanup) }
-        }
-    }
-    private fun domProbe(web: WebView): JSONObject {
-        val latch = CountDownLatch(1); var result: String? = null
-        compose.runOnUiThread { web.evaluateJavascript(DOM_READ_ONLY) { result = it; latch.countDown() } }
-        assertTrue("Read-only DOM callback missing", latch.await(5, TimeUnit.SECONDS))
-        return JSONObject(result ?: throw AssertionError("DOM callback returned null"))
     }
     private fun finishOnlyBookshelf() {
         val owned = scenario ?: return // No destroyed claim if launch never returned.
@@ -512,48 +437,5 @@ class UiEpubNarrativeJourneyTest {
         private const val PROTECTED_SHA = "aac01dbeb5e10710ee802466f077889f5b83d27db70a69e68a33af9ac51658a5"
         private const val ORIGIN = "https://reader-ebook.invalid"
         private const val SHELL = "$ORIGIN/__reader/shell.html"
-        private val SWIPE_READ_ONLY = """
-            (()=>{try{
-              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
-              if(!d?.body||!w||w.getSelection()?.isCollapsed===false)return {probeError:'NO_CURRENT_COLLAPSED_DOCUMENT'};
-              const x=w.innerWidth*.5,startY=Math.min(w.innerHeight-60,w.innerHeight*.78),endY=Math.max(40,w.innerHeight*.28);
-              const hit=d.elementFromPoint(x,startY);
-              if(!hit||hit.closest('a[href],button,input,textarea,select,[contenteditable]'))return {probeError:'NO_NON_LINK_SWIPE_START'};
-              const r=f.getBoundingClientRect();return {entryUrl:w.location.href,frameLeft:r.left,frameTop:r.top,
-                width:w.innerWidth,height:w.innerHeight,x,startY,endY,nonLinkStart:true,selectionCollapsed:true,hitTag:hit.localName};
-            }catch(e){return {probeError:String(e)}}})()
-        """.trimIndent()
-        private val DOM_READ_ONLY = """
-            (()=>{try{
-              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
-              if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
-              const rect=q=>({left:q.left,right:q.right,top:q.top,bottom:q.bottom});
-              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
-              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
-              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
-              while(n=walker.nextNode()){
-                const e=n.parentElement;if(!eligible(e))continue;
-                const i=n.data.search(/\S/u);if(i<0)continue;
-                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
-                const q=r.getBoundingClientRect();if(usable(q)){tap={...rect(q),kind:'text-range'};break;}
-              }
-              if(!tap)for(const image of d.querySelectorAll('img,image')){
-                if(!eligible(image))continue;
-                const q=image.getBoundingClientRect();if(!usable(q))continue;
-                const tag=image.localName.toLowerCase();let loaded=false;
-                if(tag==='img')loaded=image.complete&&image.naturalWidth>0;
-                else{const src=image.getAttribute('href')||image.getAttributeNS('http://www.w3.org/1999/xlink','href');
-                  if(src){const url=new URL(src,d.baseURI).href;loaded=w.performance.getEntriesByName(url).some(e=>e.responseEnd>0&&e.decodedBodySize>0);}}
-                if(loaded){tap={...rect(q),kind:tag==='img'?'loaded-img':'resource-complete-svg-image'};break;}
-              }
-              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT_OR_LOADED_IMAGE'};
-              const raw=d.body.textContent||'',text=raw.slice(0,1000000),fr=f.getBoundingClientRect();
-              return {origin:location.origin,shellUrl:location.href,entryUrl:w.location.href,documentComplete:d.readyState==='complete',
-                framePointerEvents:getComputedStyle(f).pointerEvents,documentOverflowY:w.getComputedStyle(d.documentElement).overflowY,
-                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,
-                styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,domTextTotalUtf16:raw.length,
-                domTextSampleUtf16:text.length,domTextTruncated:raw.length>text.length,width:w.innerWidth,height:w.innerHeight,tap};
-            }catch(e){return {probeError:String(e)}}})()
-        """.trimIndent()
     }
 }

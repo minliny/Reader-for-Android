@@ -9,8 +9,6 @@ import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import android.util.AtomicFile
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.webkit.WebView
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
@@ -82,7 +80,7 @@ class UiEpubOriginalJourneyTest {
             assertEquals(1, protected.progressChapter); assertEquals(210, protected.progressOffset)
             assertTrue(initial.books.none { it.id == bookId })
             assertFalse(File(current.filesDir, "Reader/Originals/$SOURCE_SHA.source").exists())
-            val before = completedNames()
+            val before = EbookJourneyProbe.completedOperationNames(current)
             compose.waitUntil(5_000) { compose.runOnUiThread { current.window.decorView.hasWindowFocus() } }
             assertTrue("Physical screen must already be on", UiDevice.getInstance(instrumentation).isScreenOn)
             assertFalse("Physical screen must already be unlocked", checkNotNull(current.getSystemService(KeyguardManager::class.java)).isKeyguardLocked)
@@ -123,7 +121,7 @@ class UiEpubOriginalJourneyTest {
                 putString("format", binding.getString("format")); putString("authorityEpoch", binding.getString("authorityEpoch"))
                 putLong("sequence", binding.getLong("sequence")); putLong("sourceBytes", original.length()); putString("sourceSHA", SOURCE_SHA)
             })
-            val beforeExit = completedNames()
+            val beforeExit = EbookJourneyProbe.completedOperationNames(current)
 
             phase = "shelf-core-directory-once"
             // Directory while no Reading exists admits no old-session progress save.
@@ -147,15 +145,15 @@ class UiEpubOriginalJourneyTest {
             assertEquals(bookId, reading.chapter.bookId); assertEquals(selected.index, reading.chapter.index)
             assertTrue(reading.chapter.text.any { !it.isWhitespace() })
             assertEquals(0, reading.visibleScalarOffset); assertFalse(model.state.value.controlsVisible)
-            assertEquals(beforeExit, completedNames())
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "actual-webview-ready-draw-dom"
-            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
+            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { EbookJourneyProbe.readyMount(current, SHELL) != null } }
             healthy(model, 1)
-            val mount = compose.runOnUiThread { checkNotNull(readyMount()) }
-            val web = compose.runOnUiThread { actualWebView() }
-            attachedDraw(web)
-            val probe = domProbe(web)
+            val mount = compose.runOnUiThread { checkNotNull(EbookJourneyProbe.readyMount(current, SHELL)) }
+            val web = compose.runOnUiThread { EbookJourneyProbe.webView(current, SHELL) }
+            EbookJourneyProbe.awaitDraw(compose, web)
+            val probe = EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY)
             assertFalse(probe.has("probeError"))
             assertEquals(ORIGIN, probe.getString("origin")); assertEquals(SHELL, probe.getString("shellUrl"))
             val prepared = checkNotNull(mount.preparation)
@@ -224,14 +222,14 @@ class UiEpubOriginalJourneyTest {
             val screen = File(current.cacheDir, "reader-a3-epub-original-draw.png")
             try { marker("epub-screenshot", Bundle().apply { putBoolean("saved", UiDevice.getInstance(instrumentation).takeScreenshot(screen)); putString("cacheFile", screen.name) }) }
             catch (failure: Exception) { marker("epub-screenshot", Bundle().apply { putBoolean("saved", false); putString("error", failure.javaClass.name) }) }
-            assertEquals(beforeExit, completedNames())
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "trusted-body-tap-and-one-normal-exit"
             assertTrue("Actual DOM-derived non-link visible content tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
             compose.waitUntil(5_000) { model.state.value.reading?.identity == reading.identity && model.state.value.controlsVisible && enabledExit() }
-            attachedDraw(current.window.decorView)
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView)
             assertTrue(enabledExit()); healthy(model, 1)
-            assertEquals(reading.visibleScalarOffset, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, completedNames())
+            assertEquals(reading.visibleScalarOffset, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
             marker("epub-trusted-body-tap-controls-draw", Bundle().apply { putLong("readingOwner", reading.identity) })
             compose.onNodeWithTag("reader_exit").assertIsEnabled().performClick()
             compose.waitUntil(15_000) { !model.state.value.busy && (model.state.value.reading == null || failed(model)) }
@@ -267,59 +265,14 @@ class UiEpubOriginalJourneyTest {
             it.pendingBookmarks.isNotEmpty() || it.pendingSearchClose != null || (it.ebookFailureOwner != null && it.ebookFailureOwner == it.reading?.identity)
     }
     private fun healthy(model: ReaderViewModel, revision: Long) { assertFalse("Original operation failed/pending", failed(model)); assertEquals(revision, model.state.value.importRevision) }
-    private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
-    private fun freshRecords(before: Set<String>) = (completedNames() - before).map { name ->
+    private fun freshRecords(before: Set<String>) = (EbookJourneyProbe.completedOperationNames(current) - before).map { name ->
         val file = File(current.filesDir, "Reader/Operations/Completed/$name")
         assertTrue(file.length() in 1..8L * 1024 * 1024)
         val raw = AtomicFile(file).openRead().use { it.readBytes() }; Triple(file, JSONObject(raw.toString(Charsets.UTF_8)), raw)
     }
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
-    private fun actualWebView(): WebView {
-        fun descendants(view: View): List<WebView> = (if (view is WebView) listOf(view) else emptyList()) +
-            (if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList())
-        return descendants(current.window.decorView).filter { it.isAttachedToWindow && it.url == SHELL }.single()
-    }
-    private fun readyMount(): ReaderEbookUiMount? {
-        val model = current.readerViewModel; val reading = model.state.value.reading ?: return null
-        val mount = field(model, "ebookMount") as? ReaderEbookUiMount ?: return null
-        val prepared = mount.preparation ?: return null; val ready = mount.ready ?: return null
-        if (reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
-            reading.chapter.bookId != mount.chapter.bookId || reading.chapter.index != mount.chapter.index ||
-            reading.chapter.bodyVersion != mount.chapter.bodyVersion || reading.chapter.processingVersion != mount.chapter.processingVersion ||
-            prepared.view !== mount.view || prepared.publication.lease != ready.lease || ready.scalar != reading.visibleScalarOffset) return null
-        prepared.requireCurrent()
-        val web = try { actualWebView() } catch (_: IllegalArgumentException) { return null } catch (_: NoSuchElementException) { return null }
-        val owner = field(web.parent, "owner") ?: return null
-        val layout = field(owner, "layout") ?: return null
-        val visible = Rect()
-        return mount.takeIf { field(owner, "view") === web && field(owner, "lease") == prepared.publication.lease &&
-            field(owner, "phase").toString() == "Ready" && field(layout, "anchor") == ready.scalar &&
-            web.width == ready.widthPx && web.height == ready.heightPx && field(owner, "forceLayout") == false && field(owner, "drawnEpoch") == ready.layoutEpoch && field(owner, "awaitingDraw") == null &&
-            field(layout, "epoch") == ready.layoutEpoch && field(layout, "token") == ready.layoutToken &&
-            web.isLaidOut && !web.isLayoutRequested && web.isShown && web.getGlobalVisibleRect(visible) &&
-            visible.width() == web.width && visible.height() == web.height }
-    }
     private fun enabledExit(): Boolean = compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().let {
         it.size == 1 && SemanticsProperties.Disabled !in it.single().config && it.single().boundsInRoot.width > 0 && it.single().boundsInRoot.height > 0
-    }
-    private fun attachedDraw(view: View) {
-        val latch = CountDownLatch(1); var tree: ViewTreeObserver? = null
-        val listener = ViewTreeObserver.OnDrawListener { if (view.isAttachedToWindow && view.isShown) view.post { latch.countDown() } }
-        var primary: Throwable? = null
-        try {
-            compose.runOnUiThread { assertTrue(view.isAttachedToWindow && view.isShown); tree = view.viewTreeObserver; tree!!.addOnDrawListener(listener); view.invalidate() }
-            assertTrue("Attached native draw did not complete", latch.await(5, TimeUnit.SECONDS))
-        } catch (failure: Throwable) { primary = failure; throw failure }
-        finally {
-            try { compose.runOnUiThread { tree?.takeIf { it.isAlive }?.removeOnDrawListener(listener) } }
-            catch (cleanup: Throwable) { if (primary == null) throw cleanup else primary.addSuppressed(cleanup) }
-        }
-    }
-    private fun domProbe(web: WebView): JSONObject {
-        val latch = CountDownLatch(1); var result: String? = null
-        compose.runOnUiThread { web.evaluateJavascript(DOM_READ_ONLY) { result = it; latch.countDown() } }
-        assertTrue("Read-only DOM callback missing", latch.await(5, TimeUnit.SECONDS))
-        return JSONObject(result ?: throw AssertionError("DOM callback returned null"))
     }
     private fun finishOnlyBookshelf() {
         val owned = scenario ?: return // No destroyed claim if launch never returned.
@@ -361,38 +314,6 @@ class UiEpubOriginalJourneyTest {
         private const val PROTECTED_SHA = "aac01dbeb5e10710ee802466f077889f5b83d27db70a69e68a33af9ac51658a5"
         private const val ORIGIN = "https://reader-ebook.invalid"
         private const val SHELL = "$ORIGIN/__reader/shell.html"
-        private val DOM_READ_ONLY = """
-            (()=>{try{
-              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
-              if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
-              const rect=q=>({left:q.left,right:q.right,top:q.top,bottom:q.bottom});
-              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
-              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
-              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
-              while(n=walker.nextNode()){
-                const e=n.parentElement;if(!eligible(e))continue;
-                const i=n.data.search(/\S/u);if(i<0)continue;
-                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
-                const q=r.getBoundingClientRect();if(usable(q)){tap={...rect(q),kind:'text-range'};break;}
-              }
-              if(!tap)for(const image of d.querySelectorAll('img,image')){
-                if(!eligible(image))continue;
-                const q=image.getBoundingClientRect();if(!usable(q))continue;
-                const tag=image.localName.toLowerCase();let loaded=false;
-                if(tag==='img')loaded=image.complete&&image.naturalWidth>0;
-                else{const src=image.getAttribute('href')||image.getAttributeNS('http://www.w3.org/1999/xlink','href');
-                  if(src){const url=new URL(src,d.baseURI).href;loaded=w.performance.getEntriesByName(url).some(e=>e.responseEnd>0&&e.decodedBodySize>0);}}
-                if(loaded){tap={...rect(q),kind:tag==='img'?'loaded-img':'resource-complete-svg-image'};break;}
-              }
-              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT_OR_LOADED_IMAGE'};
-              const raw=d.body.textContent||'',text=raw.slice(0,1000000),fr=f.getBoundingClientRect();
-              return {origin:location.origin,shellUrl:location.href,entryUrl:w.location.href,documentComplete:d.readyState==='complete',
-                framePointerEvents:getComputedStyle(f).pointerEvents,documentOverflowY:w.getComputedStyle(d.documentElement).overflowY,
-                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,
-                styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,domTextTotalUtf16:raw.length,
-                domTextSampleUtf16:text.length,domTextTruncated:raw.length>text.length,width:w.innerWidth,height:w.innerHeight,tap};
-            }catch(e){return {probeError:String(e)}}})()
-        """.trimIndent()
     }
 
     // SAF helpers below are byte-for-byte from the frozen OwnedTxt source.

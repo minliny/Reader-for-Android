@@ -1,15 +1,12 @@
 package io.reader.android
 
 import android.app.KeyguardManager
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.webkit.WebView
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -45,7 +42,6 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
 
 /** Fresh run f9105a05 only: cold shelf continuation, actual draw/DOM restore, then one ACK-bound normal exit for safe teardown. No import, directory, swipe, reset or recovery. */
 @RunWith(AndroidJUnit4::class)
@@ -140,7 +136,7 @@ class UiFreshAzw3ColdRestoreTest {
             val sourceCanonicalSha = locator.getString("chapterContentSha256")
             assertEquals(0, sourceStart); assertEquals(11274, sourceEnd)
             assertEquals("a3e8955d4a568c60f85a781870ac9bc7aa250b9a5d0431655588a0e66dd19bcb", sourceCanonicalSha)
-            val completed = completedNames(); assertNoRestoreWrite(completed)
+            val completed = EbookJourneyProbe.completedOperationNames(current); assertNoRestoreWrite(completed)
             compose.waitUntil(5_000) { compose.runOnUiThread { current.window.decorView.hasWindowFocus() } }
             assertTrue(UiDevice.getInstance(instrumentation).isScreenOn)
             assertFalse(checkNotNull(current.getSystemService(KeyguardManager::class.java)).isKeyguardLocked)
@@ -184,23 +180,23 @@ class UiFreshAzw3ColdRestoreTest {
                 putBoolean("grantActionDispatched", false); putBoolean("directoryActionDispatched", false)
             })
             phase = "actual-webview-ready-draw-dom"
-            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
+            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { EbookJourneyProbe.readyMount(current, SHELL) != null } }
             healthy(model, 0)
             // Native Ready is synchronous; Compose must commit removal of its covering Surface too.
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
-            val mount = compose.runOnUiThread { checkNotNull(readyMount()) }
+            val mount = compose.runOnUiThread { checkNotNull(EbookJourneyProbe.readyMount(current, SHELL)) }
             val readyAtDraw = compose.runOnUiThread { checkNotNull(mount.ready) }
-            val web = compose.runOnUiThread { actualWebView() }
-            attachedDraw(current.window.decorView)
-            attachedDraw(web)
+            val web = compose.runOnUiThread { EbookJourneyProbe.webView(current, SHELL) }
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView)
+            EbookJourneyProbe.awaitDraw(compose, web)
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
             compose.runOnUiThread {
-                assertSame(mount, readyMount()); assertSame(web, actualWebView())
+                assertSame(mount, EbookJourneyProbe.readyMount(current, SHELL)); assertSame(web, EbookJourneyProbe.webView(current, SHELL))
                 assertEquals(readyAtDraw, mount.ready)
             }
-            val probe = domProbe(web)
+            val probe = EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY)
             assertFalse(probe.has("probeError"))
             assertEquals(ORIGIN, probe.getString("origin")); assertEquals(SHELL, probe.getString("shellUrl"))
             val prepared = checkNotNull(mount.preparation)
@@ -233,7 +229,7 @@ class UiFreshAzw3ColdRestoreTest {
             val ready = checkNotNull(mount.ready)
             assertEquals(reading.visibleScalarOffset, ready.scalar)
             assertEquals(lease, ready.lease)
-            glyphTapCoordinates(web, probe) // Initial real glyph/viewport observation; not clicked.
+            EbookJourneyProbe.glyphTapCoordinates(compose, web, probe) // Initial real glyph/viewport observation; not clicked.
             assertTrue(Build.VERSION.SDK_INT >= 26)
             val provider = WebView.getCurrentWebViewPackage() ?: throw AssertionError("Actual WebView provider absent")
             assertEquals(expectedScalar, ready.scalar); assertNotEquals(priorRuntime, lease.runtimeSession)
@@ -273,7 +269,7 @@ class UiFreshAzw3ColdRestoreTest {
                 putString("restorationClaim", "PRODUCTION_ANCHOR_MEASUREMENT_DOM_PAINT_NATIVE_DRAW_READY_PLUS_READ_ONLY_CURRENT_DOM_NOT_INDEPENDENT_SCALAR_RECT_EXPORT")
                 putString("textClaim", "DOM_SAMPLE_ONLY_ORIGINAL_CANONICAL_AND_CORE_PROCESSED_EDITS_AUTHENTICATED_BY_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
             })
-            assertEquals(completed, completedNames())
+            assertEquals(completed, EbookJourneyProbe.completedOperationNames(current))
 
             assertNoRestoreWrite(completed)
             assertEquals(baselineSha, shaFile(baselineFile))
@@ -287,10 +283,10 @@ class UiFreshAzw3ColdRestoreTest {
             // Restoration is already answered. This one exit is lifecycle cleanup, not an additional reading scenario.
             // Simply destroying a live reader can issue an ON_STOP save without an observed original ACK.
             phase = "one-normal-exit-for-acknowledged-teardown"
-            val tap = glyphTapCoordinates(web, domProbe(web))
+            val tap = EbookJourneyProbe.glyphTapCoordinates(compose, web, EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY))
             assertTrue(UiDevice.getInstance(instrumentation).click(tap[0], tap[1]))
             compose.waitUntil(5_000) { model.state.value.controlsVisible && enabledExit() }
-            attachedDraw(current.window.decorView); healthy(model, 0)
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView); healthy(model, 0)
             assertNoRestoreWrite(completed)
             assertEquals(expectedScalar, checkNotNull(model.state.value.reading).visibleScalarOffset)
             compose.onNodeWithTag("reader_exit").assertIsEnabled().performClick()
@@ -310,7 +306,7 @@ class UiFreshAzw3ColdRestoreTest {
             assertEquals(otherRemoteBooks, model.state.value.remoteBooks)
             assertEquals(baselineSha, shaFile(baselineFile)); assertRetainedFiles(checkNotNull(retainedFiles))
             assertNoPendingFiles()
-            settledCompleted = completedNames()
+            settledCompleted = EbookJourneyProbe.completedOperationNames(current)
             marker("azw3-cold-cleanup-exit-original-save-ACK", Bundle().apply {
                 putString("bookId", bookId); putString("originalId", record.getString("id")); putLong("requestId", record.getLong("requestId"))
                 putString("runtimeSession", record.getString("runtimeSession")); putInt("chapter", 4); putInt("scalarOffset", expectedScalar)
@@ -328,7 +324,7 @@ class UiFreshAzw3ColdRestoreTest {
             if (primary == null) {
                 try {
                     finishOnlyBookshelf()
-                    assertEquals(checkNotNull(settledCompleted), completedNames()); assertNoPendingFiles()
+                    assertEquals(checkNotNull(settledCompleted), EbookJourneyProbe.completedOperationNames(current)); assertNoPendingFiles()
                     assertRetainedFiles(checkNotNull(retainedFiles))
                     assertEquals(checkNotNull(priorSha), shaFile(checkNotNull(priorFile)))
                 } catch (cleanup: Throwable) { throw cleanup }
@@ -344,7 +340,7 @@ class UiFreshAzw3ColdRestoreTest {
     }
     /** No restore-caused write before the separately scoped normal exit. */
     private fun assertNoRestoreWrite(before: Set<String>) {
-        assertEquals(before, completedNames()); assertNoPendingFiles()
+        assertEquals(before, EbookJourneyProbe.completedOperationNames(current)); assertNoPendingFiles()
         val model = current.readerViewModel
         assertNull(model.state.value.lastPositionSaveAttempt)
         model.state.value.reading?.let { assertNull(it.newPositionIntent); assertFalse(it.newPositionIntentPresented) }
@@ -414,41 +410,12 @@ class UiFreshAzw3ColdRestoreTest {
         }
     }
 
-    private fun glyphTapCoordinates(web: WebView, probe: JSONObject): IntArray = compose.runOnUiThread {
-        val location = IntArray(2).also(web::getLocationOnScreen); val visible = Rect()
-        assertTrue(web.getGlobalVisibleRect(visible))
-        assertEquals(Rect(location[0], location[1], location[0] + web.width, location[1] + web.height), visible)
-        val density = web.resources.displayMetrics.density.toDouble()
-        assertTrue(abs(probe.getDouble("width") * density - web.width) <= 1.1 * density)
-        assertTrue(abs(probe.getDouble("height") * density - web.height) <= 1.1 * density)
-        val tap = probe.getJSONObject("tap") // Actual Range/image rectangle, not an assumed screen coordinate.
-        val frameLeft = probe.getDouble("frameLeft"); val frameTop = probe.getDouble("frameTop")
-        val left = maxOf(tap.getDouble("left"), 0.0, (visible.left - location[0]) / density - frameLeft)
-        val right = minOf(tap.getDouble("right"), probe.getDouble("width"), (visible.right - location[0]) / density - frameLeft)
-        val top = maxOf(tap.getDouble("top"), 32.0, (visible.top - location[1]) / density - frameTop)
-        val bottom = minOf(tap.getDouble("bottom"), probe.getDouble("height") - 52, (visible.bottom - location[1]) / density - frameTop)
-        assertTrue("Actual content has no usable child/native viewport intersection", right > left && bottom > top)
-        val raw = JSONObject().put("left", tap.getDouble("left")).put("right", tap.getDouble("right"))
-            .put("top", tap.getDouble("top")).put("bottom", tap.getDouble("bottom"))
-        val clipped = JSONObject().put("left", left).put("right", right).put("top", top).put("bottom", bottom)
-        val cssX = frameLeft + (left + right) * .5
-        val cssY = frameTop + (top + bottom) * .5
-        val x = location[0] + (cssX * density).toInt()
-        val y = location[1] + (cssY * density).toInt()
-        assertTrue(visible.contains(x, y))
-        tap.put("raw", raw).put("clipped", clipped).put("screenX", x).put("screenY", y)
-            .put("nativeVisible", JSONObject().put("left", visible.left).put("right", visible.right)
-                .put("top", visible.top).put("bottom", visible.bottom))
-        intArrayOf(x, y)
-    }
-
     private fun failed(model: ReaderViewModel): Boolean = model.state.value.let {
         it.error != null || it.protocolRecoveryReference != null || it.pendingImports.isNotEmpty() || it.pendingPositions.isNotEmpty() ||
             it.pendingBookmarks.isNotEmpty() || it.pendingSearchClose != null || (it.ebookFailureOwner != null && it.ebookFailureOwner == it.reading?.identity)
     }
     private fun healthy(model: ReaderViewModel, revision: Long) { assertTrue(model.state.value.pendingReady); assertFalse("Original operation failed/pending", failed(model)); assertEquals(revision, model.state.value.importRevision) }
-    private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
-    private fun freshRecords(before: Set<String>) = (completedNames() - before).map { name ->
+    private fun freshRecords(before: Set<String>) = (EbookJourneyProbe.completedOperationNames(current) - before).map { name ->
         safeReadCompleted(File(current.filesDir, "Reader/Operations/Completed/$name"))
     }
     private fun safeReadCompleted(file: File): Triple<File, JSONObject, ByteArray> {
@@ -460,57 +427,9 @@ class UiFreshAzw3ColdRestoreTest {
     }
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
 
-    private fun actualWebView(): WebView {
-        fun descendants(view: View): List<WebView> = (if (view is WebView) listOf(view) else emptyList()) +
-            (if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList())
-        return descendants(current.window.decorView).filter { it.isAttachedToWindow && it.url == SHELL }.single()
-    }
-
-    private fun readyMount(): ReaderEbookUiMount? {
-        val model = current.readerViewModel; val reading = model.state.value.reading ?: return null
-        val mount = field(model, "ebookMount") as? ReaderEbookUiMount ?: return null
-        val prepared = mount.preparation ?: return null; val ready = mount.ready ?: return null
-        if (reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
-            reading.chapter.bookId != mount.chapter.bookId || reading.chapter.index != mount.chapter.index ||
-            reading.chapter.bodyVersion != mount.chapter.bodyVersion || reading.chapter.processingVersion != mount.chapter.processingVersion ||
-            prepared.view !== mount.view || prepared.publication.lease != ready.lease || ready.scalar != reading.visibleScalarOffset) return null
-        prepared.requireCurrent()
-        val web = try { actualWebView() } catch (_: IllegalArgumentException) { return null } catch (_: NoSuchElementException) { return null }
-        val owner = field(web.parent, "owner") ?: return null
-        val layout = field(owner, "layout") ?: return null
-        val visible = Rect()
-        return mount.takeIf { field(owner, "view") === web && field(owner, "lease") == prepared.publication.lease &&
-            field(owner, "phase").toString() == "Ready" && field(layout, "anchor") == ready.scalar &&
-            web.width == ready.widthPx && web.height == ready.heightPx && field(owner, "forceLayout") == false && field(owner, "drawnEpoch") == ready.layoutEpoch && field(owner, "awaitingDraw") == null &&
-            field(layout, "epoch") == ready.layoutEpoch && field(layout, "token") == ready.layoutToken &&
-            web.isLaidOut && !web.isLayoutRequested && web.isShown && web.getGlobalVisibleRect(visible) &&
-            visible.width() == web.width && visible.height() == web.height }
-    }
-
     private fun enabledExit(): Boolean = compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().let {
         it.size == 1 && SemanticsProperties.Disabled !in it.single().config && it.single().boundsInRoot.width > 0 && it.single().boundsInRoot.height > 0
     }
-    private fun attachedDraw(view: View) {
-        val latch = CountDownLatch(1); var tree: ViewTreeObserver? = null
-        val listener = ViewTreeObserver.OnDrawListener { if (view.isAttachedToWindow && view.isShown) view.post { latch.countDown() } }
-        var primary: Throwable? = null
-        try {
-            compose.runOnUiThread { assertTrue(view.isAttachedToWindow && view.isShown); tree = view.viewTreeObserver; tree!!.addOnDrawListener(listener); view.invalidate() }
-            assertTrue("Attached native draw did not complete", latch.await(5, TimeUnit.SECONDS))
-        } catch (failure: Throwable) { primary = failure; throw failure }
-        finally {
-            try { compose.runOnUiThread { tree?.takeIf { it.isAlive }?.removeOnDrawListener(listener) } }
-            catch (cleanup: Throwable) { if (primary == null) throw cleanup else primary.addSuppressed(cleanup) }
-        }
-    }
-
-    private fun domProbe(web: WebView): JSONObject {
-        val latch = CountDownLatch(1); var result: String? = null
-        compose.runOnUiThread { web.evaluateJavascript(DOM_READ_ONLY) { result = it; latch.countDown() } }
-        assertTrue("Read-only DOM callback missing", latch.await(5, TimeUnit.SECONDS))
-        return JSONObject(result ?: throw AssertionError("DOM callback returned null"))
-    }
-
     private fun marker(step: String, details: Bundle = Bundle()) {
         details.putString("readerStep", step); details.putString("readerMethod", METHOD)
         details.putInt("readerProcessPid", AndroidProcess.myPid()); details.putLong("readerProcessStartElapsedMs", AndroidProcess.getStartElapsedRealtime())
@@ -527,7 +446,7 @@ class UiFreshAzw3ColdRestoreTest {
 
     private fun restoredOwnerFacts(mount: ReaderEbookUiMount, web: WebView, ready: ReaderEbookReady): JSONObject = compose.runOnUiThread {
         val model = current.readerViewModel; val reading = checkNotNull(model.state.value.reading)
-        assertSame(mount, readyMount()); assertSame(web, actualWebView()); assertSame(mount, field(model, "ebookMount"))
+        assertSame(mount, EbookJourneyProbe.readyMount(current, SHELL)); assertSame(web, EbookJourneyProbe.webView(current, SHELL)); assertSame(mount, field(model, "ebookMount"))
         val prepared = checkNotNull(mount.preparation); prepared.requireCurrent(); assertEquals(ready.lease, prepared.publication.lease)
         assertEquals(expectedScalar, reading.visibleScalarOffset); assertEquals(expectedScalar, ready.scalar)
         assertEquals(reading.identity, mount.readingOwner); assertEquals(reading.chapter.sessionToken, mount.chapter.sessionToken)
@@ -574,38 +493,6 @@ class UiFreshAzw3ColdRestoreTest {
         private const val SOURCE_BYTES = 1031552L
         private const val ORIGIN = "https://reader-ebook.invalid"
         private const val SHELL = "$ORIGIN/__reader/shell.html"
-        private val DOM_READ_ONLY = """
-            (()=>{try{
-              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
-              if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
-              const rect=q=>({left:q.left,right:q.right,top:q.top,bottom:q.bottom});
-              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
-              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
-              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
-              while(n=walker.nextNode()){
-                const e=n.parentElement;if(!eligible(e))continue;
-                const i=n.data.search(/\S/u);if(i<0)continue;
-                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
-                const q=r.getBoundingClientRect();if(usable(q)){tap={...rect(q),kind:'text-range'};break;}
-              }
-              if(!tap)for(const image of d.querySelectorAll('img,image')){
-                if(!eligible(image))continue;
-                const q=image.getBoundingClientRect();if(!usable(q))continue;
-                const tag=image.localName.toLowerCase();let loaded=false;
-                if(tag==='img')loaded=image.complete&&image.naturalWidth>0;
-                else{const src=image.getAttribute('href')||image.getAttributeNS('http://www.w3.org/1999/xlink','href');
-                  if(src){const url=new URL(src,d.baseURI).href;loaded=w.performance.getEntriesByName(url).some(e=>e.responseEnd>0&&e.decodedBodySize>0);}}
-                if(loaded){tap={...rect(q),kind:tag==='img'?'loaded-img':'resource-complete-svg-image'};break;}
-              }
-              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT_OR_LOADED_IMAGE'};
-              const raw=d.body.textContent||'',text=raw.slice(0,1000000),fr=f.getBoundingClientRect();
-              return {origin:location.origin,shellUrl:location.href,entryUrl:w.location.href,documentComplete:d.readyState==='complete',
-                framePointerEvents:getComputedStyle(f).pointerEvents,documentOverflowY:w.getComputedStyle(d.documentElement).overflowY,
-                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,
-                styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,domTextTotalUtf16:raw.length,
-                domTextSampleUtf16:text.length,domTextTruncated:raw.length>text.length,width:w.innerWidth,height:w.innerHeight,tap};
-            }catch(e){return {probeError:String(e)}}})()
-        """.trimIndent()
     }
 
 }

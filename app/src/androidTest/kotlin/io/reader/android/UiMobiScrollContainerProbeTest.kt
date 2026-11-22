@@ -8,8 +8,6 @@ import android.os.Bundle
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.webkit.WebView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -75,7 +73,7 @@ class UiMobiScrollContainerProbeTest {
             val book = model.state.value.books.single { it.id == bookId }
             assertEquals(560, book.chapterCount); assertEquals(3, book.progressChapter); assertEquals(0, book.progressOffset)
             val unknownRaw = assertUnknownUnchanged(); val unknown = JSONObject(unknownRaw.toString(Charsets.UTF_8))
-            originalCompleted = completedNames(); assertNoRestoreWrite(originalCompleted)
+            originalCompleted = EbookJourneyProbe.completedOperationNames(current); assertNoRestoreWrite(originalCompleted)
             marker("mobi-scroll-pending-original-bound", Bundle().apply {
                 putString("bookId", bookId); putString("originalId", UNKNOWN_ID); putString("originalRecordSha256", sha(unknownRaw))
                 putLong("originalRecordBytes", unknownRaw.size.toLong()); putLong("requestId", unknown.getLong("requestId"))
@@ -85,17 +83,17 @@ class UiMobiScrollContainerProbeTest {
             phase = "one-bookshelf-continue-to-real-ready"
             compose.onNodeWithTag("reader_bookshelf").performScrollToNode(hasTestTag("reader_book_$bookId"))
             compose.onNodeWithTag("reader_book_$bookId").assertIsDisplayed().performClick()
-            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
+            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { EbookJourneyProbe.readyMount(current, SHELL) != null } }
             healthy(model, 0); compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
-            val mount = compose.runOnUiThread { checkNotNull(readyMount()) }; val ready = checkNotNull(mount.ready)
-            val web = compose.runOnUiThread { actualWebView() }; val reading = checkNotNull(model.state.value.reading)
+            val mount = compose.runOnUiThread { checkNotNull(EbookJourneyProbe.readyMount(current, SHELL)) }; val ready = checkNotNull(mount.ready)
+            val web = compose.runOnUiThread { EbookJourneyProbe.webView(current, SHELL) }; val reading = checkNotNull(model.state.value.reading)
             assertEquals(ReaderLocalBookFormat.MOBI, reading.format); assertEquals(3, reading.chapter.index); assertEquals(0, reading.visibleScalarOffset)
             assertEquals(UNKNOWN_ID, model.state.value.positionSaveBarrier?.id); assertNull(reading.newPositionIntent)
             assertFalse(reading.newPositionIntentPresented); assertFalse(model.state.value.controlsVisible)
-            attachedDraw(current.window.decorView); attachedDraw(web)
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView); EbookJourneyProbe.awaitDraw(compose, web)
             compose.waitForIdle()
-            compose.runOnUiThread { assertSame(mount, readyMount()); assertSame(web, actualWebView()); assertEquals(ready, mount.ready) }
+            compose.runOnUiThread { assertSame(mount, EbookJourneyProbe.readyMount(current, SHELL)); assertSame(web, EbookJourneyProbe.webView(current, SHELL)); assertEquals(ready, mount.ready) }
             val before = scrollMetrics(web); assertFalse(before.has("probeError"))
             val gesture = before.getJSONObject("gesture")
             assertTrue(gesture.getBoolean("nonLinkStart")); assertTrue(before.getBoolean("selectionCollapsed"))
@@ -104,7 +102,7 @@ class UiMobiScrollContainerProbeTest {
             metricMarker("mobi-scroll-before-metrics", mount, ready, before, nativeState(mount, web))
             phase = "one-real-ui-swipe"
             val points = compose.runOnUiThread {
-                checkNotNull(mount.preparation).requireCurrent(); assertSame(mount, field(model, "ebookMount")); assertSame(web, actualWebView())
+                checkNotNull(mount.preparation).requireCurrent(); assertSame(mount, field(model, "ebookMount")); assertSame(web, EbookJourneyProbe.webView(current, SHELL))
                 val location = IntArray(2).also(web::getLocationOnScreen); val visible = Rect(); assertTrue(web.getGlobalVisibleRect(visible))
                 val density = web.resources.displayMetrics.density.toDouble(); val win = before.getJSONObject("window"); val frame = before.getJSONObject("frame")
                 assertTrue(abs(win.getDouble("innerWidth") * density - web.width) <= 1.1 * density)
@@ -150,7 +148,7 @@ class UiMobiScrollContainerProbeTest {
         compose.runOnUiThread { web.postVisualStateCallback(SystemClock.uptimeMillis(), object : WebView.VisualStateCallback() {
             override fun onComplete(requestId: Long) { latch.countDown() }
         }) }
-        assertTrue("Post-swipe visual callback absent", latch.await(5, TimeUnit.SECONDS)); attachedDraw(web)
+        assertTrue("Post-swipe visual callback absent", latch.await(5, TimeUnit.SECONDS)); EbookJourneyProbe.awaitDraw(compose, web)
     }
     private fun nativeState(mount: ReaderEbookUiMount, web: WebView): JSONObject = compose.runOnUiThread {
         val model = current.readerViewModel; val state = model.state.value; val owner = field(web.parent, "owner")
@@ -205,50 +203,7 @@ class UiMobiScrollContainerProbeTest {
         assertEquals(revision, model.state.value.importRevision)
     }
 
-    private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
-
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
-
-    private fun actualWebView(): WebView {
-        fun descendants(view: View): List<WebView> = (if (view is WebView) listOf(view) else emptyList()) +
-            (if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList())
-        return descendants(current.window.decorView).filter { it.isAttachedToWindow && it.url == SHELL }.single()
-    }
-
-    private fun readyMount(): ReaderEbookUiMount? {
-        val model = current.readerViewModel; val reading = model.state.value.reading ?: return null
-        val mount = field(model, "ebookMount") as? ReaderEbookUiMount ?: return null
-        val prepared = mount.preparation ?: return null; val ready = mount.ready ?: return null
-        if (reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
-            reading.chapter.bookId != mount.chapter.bookId || reading.chapter.index != mount.chapter.index ||
-            reading.chapter.bodyVersion != mount.chapter.bodyVersion || reading.chapter.processingVersion != mount.chapter.processingVersion ||
-            prepared.view !== mount.view || prepared.publication.lease != ready.lease || ready.scalar != reading.visibleScalarOffset) return null
-        prepared.requireCurrent()
-        val web = try { actualWebView() } catch (_: IllegalArgumentException) { return null } catch (_: NoSuchElementException) { return null }
-        val owner = field(web.parent, "owner") ?: return null
-        val layout = field(owner, "layout") ?: return null
-        val visible = Rect()
-        return mount.takeIf { field(owner, "view") === web && field(owner, "lease") == prepared.publication.lease &&
-            field(owner, "phase").toString() == "Ready" && field(layout, "anchor") == ready.scalar &&
-            web.width == ready.widthPx && web.height == ready.heightPx && field(owner, "forceLayout") == false && field(owner, "drawnEpoch") == ready.layoutEpoch && field(owner, "awaitingDraw") == null &&
-            field(layout, "epoch") == ready.layoutEpoch && field(layout, "token") == ready.layoutToken &&
-            web.isLaidOut && !web.isLayoutRequested && web.isShown && web.getGlobalVisibleRect(visible) &&
-            visible.width() == web.width && visible.height() == web.height }
-    }
-
-    private fun attachedDraw(view: View) {
-        val latch = CountDownLatch(1); var tree: ViewTreeObserver? = null
-        val listener = ViewTreeObserver.OnDrawListener { if (view.isAttachedToWindow && view.isShown) view.post { latch.countDown() } }
-        var primary: Throwable? = null
-        try {
-            compose.runOnUiThread { assertTrue(view.isAttachedToWindow && view.isShown); tree = view.viewTreeObserver; tree!!.addOnDrawListener(listener); view.invalidate() }
-            assertTrue("Attached native draw did not complete", latch.await(5, TimeUnit.SECONDS))
-        } catch (failure: Throwable) { primary = failure; throw failure }
-        finally {
-            try { compose.runOnUiThread { tree?.takeIf { it.isAlive }?.removeOnDrawListener(listener) } }
-            catch (cleanup: Throwable) { if (primary == null) throw cleanup else primary.addSuppressed(cleanup) }
-        }
-    }
 
     private fun marker(step: String, details: Bundle = Bundle()) {
         details.putString("readerStep", step); details.putString("readerMethod", METHOD)
@@ -259,7 +214,7 @@ class UiMobiScrollContainerProbeTest {
     private fun sha(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun assertNoRestoreWrite(before: Set<String>) {
-        assertEquals(before, completedNames()); assertUnknownUnchanged()
+        assertEquals(before, EbookJourneyProbe.completedOperationNames(current)); assertUnknownUnchanged()
         assertEquals(setOf("$UNKNOWN_ID.json"), File(current.filesDir, "Reader/Operations").listFiles().orEmpty().filter { it.isFile }.mapTo(linkedSetOf()) { it.name })
         assertTrue(File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().none { it.name.endsWith(".new") || it.name.endsWith(".bak") })
         val model = current.readerViewModel

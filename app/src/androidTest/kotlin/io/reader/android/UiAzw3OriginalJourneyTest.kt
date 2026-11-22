@@ -1,15 +1,12 @@
 package io.reader.android
 
 import android.app.KeyguardManager
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Process as AndroidProcess
 import android.os.SystemClock
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.webkit.WebView
 import android.webkit.MimeTypeMap
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -53,7 +50,6 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.abs
 
 /** One real AZW3 import, direct shelf directory story read and sole normal exit receipt. No second Library/client, parser or retry. */
 @RunWith(AndroidJUnit4::class)
@@ -99,7 +95,7 @@ class UiAzw3OriginalJourneyTest {
             assertEquals(3, protectedMobi.progressChapter); assertEquals(protectedMobiScalar, protectedMobi.progressOffset)
             assertUnknownUnchanged()
             assertTrue(initial.books.none { it.id == bookId }); assertFalse(File(current.filesDir, "Reader/Originals/$SOURCE_SHA.source").exists())
-            val beforeImport = completedNames()
+            val beforeImport = EbookJourneyProbe.completedOperationNames(current)
             compose.waitUntil(5_000) { compose.runOnUiThread { current.window.decorView.hasWindowFocus() } }
             assertTrue("Physical screen must already be on", UiDevice.getInstance(instrumentation).isScreenOn)
             assertFalse("Physical screen must already be unlocked", checkNotNull(current.getSystemService(KeyguardManager::class.java)).isKeyguardLocked)
@@ -147,7 +143,7 @@ class UiAzw3OriginalJourneyTest {
                 putLong("sequence", binding.getLong("sequence")); putLong("sourceBytes", original.length()); putString("sourceSHA", SOURCE_SHA)
                 putLong("importRevision", model.state.value.importRevision)
             })
-            val beforeExit = completedNames()
+            val beforeExit = EbookJourneyProbe.completedOperationNames(current)
 
             phase = "one-real-core-azw3-directory"
             compose.onNodeWithTag("reader_bookshelf").performScrollToNode(hasTestTag("reader_book_directory_$bookId"))
@@ -173,26 +169,26 @@ class UiAzw3OriginalJourneyTest {
             assertEquals(0, reading.visibleScalarOffset); assertFalse(model.state.value.controlsVisible)
             assertNull(reading.newPositionIntent); assertFalse(reading.newPositionIntentPresented)
             assertNull(model.state.value.positionSaveBarrier); assertUnknownUnchanged()
-            assertEquals(beforeExit, completedNames())
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
 
             phase = "actual-webview-ready-draw-dom"
-            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { readyMount() != null } }
+            compose.waitUntil(30_000) { failed(model) || compose.runOnUiThread { EbookJourneyProbe.readyMount(current, SHELL) != null } }
             healthy(model, 1)
             // Native Ready is synchronous; Compose must commit removal of its covering Surface too.
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
-            val mount = compose.runOnUiThread { checkNotNull(readyMount()) }
+            val mount = compose.runOnUiThread { checkNotNull(EbookJourneyProbe.readyMount(current, SHELL)) }
             val readyAtDraw = compose.runOnUiThread { checkNotNull(mount.ready) }
-            val web = compose.runOnUiThread { actualWebView() }
-            attachedDraw(current.window.decorView)
-            attachedDraw(web)
+            val web = compose.runOnUiThread { EbookJourneyProbe.webView(current, SHELL) }
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView)
+            EbookJourneyProbe.awaitDraw(compose, web)
             compose.waitForIdle()
             compose.onNodeWithTag("reader_ebook_restore_loading", useUnmergedTree = true).assertDoesNotExist()
             compose.runOnUiThread {
-                assertSame(mount, readyMount()); assertSame(web, actualWebView())
+                assertSame(mount, EbookJourneyProbe.readyMount(current, SHELL)); assertSame(web, EbookJourneyProbe.webView(current, SHELL))
                 assertEquals(readyAtDraw, mount.ready)
             }
-            val probe = domProbe(web)
+            val probe = EbookJourneyProbe.dom(compose, web, EbookJourneyProbe.DOM_READ_ONLY)
             assertFalse(probe.has("probeError"))
             assertEquals(ORIGIN, probe.getString("origin")); assertEquals(SHELL, probe.getString("shellUrl"))
             val prepared = checkNotNull(mount.preparation)
@@ -226,7 +222,7 @@ class UiAzw3OriginalJourneyTest {
             val ready = checkNotNull(mount.ready)
             assertEquals(reading.visibleScalarOffset, ready.scalar)
             assertEquals(lease, ready.lease)
-            glyphTapCoordinates(web, probe) // Initial real glyph/viewport observation; not clicked.
+            EbookJourneyProbe.glyphTapCoordinates(compose, web, probe) // Initial real glyph/viewport observation; not clicked.
             assertTrue(Build.VERSION.SDK_INT >= 26)
             val provider = WebView.getCurrentWebViewPackage() ?: throw AssertionError("Actual WebView provider absent")
             marker("azw3-real-webview-ready-draw-observed-dom", Bundle().apply {
@@ -250,18 +246,18 @@ class UiAzw3OriginalJourneyTest {
                 putString("probeMetrics", JSONObject(probe.toString()).apply { remove("domText") }.toString())
                 putString("textClaim", "DOM_SAMPLE_ONLY_ORIGINAL_CANONICAL_AND_CORE_PROCESSED_EDITS_AUTHENTICATED_BY_PRODUCTION_ADMIT_NATIVE_VISUAL_DRAW_READY")
             })
-            assertEquals(beforeExit, completedNames()); assertUnknownUnchanged()
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current)); assertUnknownUnchanged()
 
             phase = "one-real-glyph-and-normal-exit"
             val screen = File(current.cacheDir, "reader-a3-azw3-story-${lease.renderId}-draw.png")
             try { marker("azw3-screenshot", Bundle().apply { putBoolean("saved", UiDevice.getInstance(instrumentation).takeScreenshot(screen)); putString("cacheFile", screen.name) }) }
             catch (failure: Exception) { marker("azw3-screenshot", Bundle().apply { putBoolean("saved", false); putString("error", failure.javaClass.name) }) }
-            val metrics = glyphTapCoordinates(web, probe)
-            assertEquals(beforeExit, completedNames())
+            val metrics = EbookJourneyProbe.glyphTapCoordinates(compose, web, probe)
+            assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
             assertTrue("Actual DOM-derived non-link glyph tap not dispatched", UiDevice.getInstance(instrumentation).click(metrics[0], metrics[1]))
             compose.waitUntil(5_000) { model.state.value.reading?.identity == reading.identity && model.state.value.controlsVisible && enabledExit() }
-            attachedDraw(current.window.decorView); assertTrue(enabledExit()); healthy(model, 1)
-            assertEquals(0, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, completedNames())
+            EbookJourneyProbe.awaitDraw(compose, current.window.decorView); assertTrue(enabledExit()); healthy(model, 1)
+            assertEquals(0, model.state.value.reading!!.visibleScalarOffset); assertEquals(beforeExit, EbookJourneyProbe.completedOperationNames(current))
             marker("azw3-trusted-body-tap-controls-draw", Bundle().apply { putLong("readingOwner", reading.identity) })
             compose.onNodeWithTag("reader_exit").assertIsEnabled().performClick()
             compose.waitUntil(15_000) { !model.state.value.busy && (model.state.value.reading == null || failed(model)) }
@@ -289,7 +285,7 @@ class UiAzw3OriginalJourneyTest {
             assertEquals(protectedEpub, model.state.value.books.single { it.id == protectedEpub.id })
             assertEquals(protectedMobi, model.state.value.books.single { it.id == protectedMobi.id })
             assertEquals(sha(importRaw), shaFile(importFile)); assertEquals(1L, model.state.value.importRevision)
-            assertEquals(beforeExit + saved.first.name, completedNames())
+            assertEquals(beforeExit + saved.first.name, EbookJourneyProbe.completedOperationNames(current))
             compose.onNodeWithTag("reader_shelf_query").assertIsDisplayed()
         } catch (failure: Throwable) {
             primary = failure
@@ -354,34 +350,6 @@ class UiAzw3OriginalJourneyTest {
         }
     }
 
-    private fun glyphTapCoordinates(web: WebView, probe: JSONObject): IntArray = compose.runOnUiThread {
-        val location = IntArray(2).also(web::getLocationOnScreen); val visible = Rect()
-        assertTrue(web.getGlobalVisibleRect(visible))
-        assertEquals(Rect(location[0], location[1], location[0] + web.width, location[1] + web.height), visible)
-        val density = web.resources.displayMetrics.density.toDouble()
-        assertTrue(abs(probe.getDouble("width") * density - web.width) <= 1.1 * density)
-        assertTrue(abs(probe.getDouble("height") * density - web.height) <= 1.1 * density)
-        val tap = probe.getJSONObject("tap") // Actual Range/image rectangle, not an assumed screen coordinate.
-        val frameLeft = probe.getDouble("frameLeft"); val frameTop = probe.getDouble("frameTop")
-        val left = maxOf(tap.getDouble("left"), 0.0, (visible.left - location[0]) / density - frameLeft)
-        val right = minOf(tap.getDouble("right"), probe.getDouble("width"), (visible.right - location[0]) / density - frameLeft)
-        val top = maxOf(tap.getDouble("top"), 32.0, (visible.top - location[1]) / density - frameTop)
-        val bottom = minOf(tap.getDouble("bottom"), probe.getDouble("height") - 52, (visible.bottom - location[1]) / density - frameTop)
-        assertTrue("Actual content has no usable child/native viewport intersection", right > left && bottom > top)
-        val raw = JSONObject().put("left", tap.getDouble("left")).put("right", tap.getDouble("right"))
-            .put("top", tap.getDouble("top")).put("bottom", tap.getDouble("bottom"))
-        val clipped = JSONObject().put("left", left).put("right", right).put("top", top).put("bottom", bottom)
-        val cssX = frameLeft + (left + right) * .5
-        val cssY = frameTop + (top + bottom) * .5
-        val x = location[0] + (cssX * density).toInt()
-        val y = location[1] + (cssY * density).toInt()
-        assertTrue(visible.contains(x, y))
-        tap.put("raw", raw).put("clipped", clipped).put("screenX", x).put("screenY", y)
-            .put("nativeVisible", JSONObject().put("left", visible.left).put("right", visible.right)
-                .put("top", visible.top).put("bottom", visible.bottom))
-        intArrayOf(x, y)
-    }
-
     private fun failed(model: ReaderViewModel): Boolean = model.state.value.let {
         it.error != null || it.protocolRecoveryReference != null || it.pendingImports.isNotEmpty() || (it.pendingReady && (it.pendingPositions.map { pending -> pending.id } != listOf(UNKNOWN_ID) || it.pendingPositions.singleOrNull()?.bookId != "local:$PROTECTED_MOBI_SHA")) ||
             it.pendingBookmarks.isNotEmpty() || it.pendingSearchClose != null || (it.ebookFailureOwner != null && it.ebookFailureOwner == it.reading?.identity)
@@ -393,9 +361,7 @@ class UiAzw3OriginalJourneyTest {
         assertEquals(revision, model.state.value.importRevision)
     }
 
-    private fun completedNames() = File(current.filesDir, "Reader/Operations/Completed").listFiles().orEmpty().filter { it.name.endsWith(".json") }.mapTo(linkedSetOf()) { it.name }
-
-    private fun freshRecords(before: Set<String>) = (completedNames() - before).map { name ->
+    private fun freshRecords(before: Set<String>) = (EbookJourneyProbe.completedOperationNames(current) - before).map { name ->
         val file = File(current.filesDir, "Reader/Operations/Completed/$name")
         assertTrue(file.length() in 1..8L * 1024 * 1024)
         assertFalse(File(file.parentFile, file.name + ".new").exists())
@@ -405,56 +371,8 @@ class UiAzw3OriginalJourneyTest {
 
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner)
 
-    private fun actualWebView(): WebView {
-        fun descendants(view: View): List<WebView> = (if (view is WebView) listOf(view) else emptyList()) +
-            (if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList())
-        return descendants(current.window.decorView).filter { it.isAttachedToWindow && it.url == SHELL }.single()
-    }
-
-    private fun readyMount(): ReaderEbookUiMount? {
-        val model = current.readerViewModel; val reading = model.state.value.reading ?: return null
-        val mount = field(model, "ebookMount") as? ReaderEbookUiMount ?: return null
-        val prepared = mount.preparation ?: return null; val ready = mount.ready ?: return null
-        if (reading.identity != mount.readingOwner || reading.chapter.sessionToken != mount.chapter.sessionToken ||
-            reading.chapter.bookId != mount.chapter.bookId || reading.chapter.index != mount.chapter.index ||
-            reading.chapter.bodyVersion != mount.chapter.bodyVersion || reading.chapter.processingVersion != mount.chapter.processingVersion ||
-            prepared.view !== mount.view || prepared.publication.lease != ready.lease || ready.scalar != reading.visibleScalarOffset) return null
-        prepared.requireCurrent()
-        val web = try { actualWebView() } catch (_: IllegalArgumentException) { return null } catch (_: NoSuchElementException) { return null }
-        val owner = field(web.parent, "owner") ?: return null
-        val layout = field(owner, "layout") ?: return null
-        val visible = Rect()
-        return mount.takeIf { field(owner, "view") === web && field(owner, "lease") == prepared.publication.lease &&
-            field(owner, "phase").toString() == "Ready" && field(layout, "anchor") == ready.scalar &&
-            web.width == ready.widthPx && web.height == ready.heightPx && field(owner, "forceLayout") == false && field(owner, "drawnEpoch") == ready.layoutEpoch && field(owner, "awaitingDraw") == null &&
-            field(layout, "epoch") == ready.layoutEpoch && field(layout, "token") == ready.layoutToken &&
-            web.isLaidOut && !web.isLayoutRequested && web.isShown && web.getGlobalVisibleRect(visible) &&
-            visible.width() == web.width && visible.height() == web.height }
-    }
-
     private fun enabledExit(): Boolean = compose.onAllNodes(hasTestTag("reader_exit")).fetchSemanticsNodes().let {
         it.size == 1 && SemanticsProperties.Disabled !in it.single().config && it.single().boundsInRoot.width > 0 && it.single().boundsInRoot.height > 0
-    }
-
-    private fun attachedDraw(view: View) {
-        val latch = CountDownLatch(1); var tree: ViewTreeObserver? = null
-        val listener = ViewTreeObserver.OnDrawListener { if (view.isAttachedToWindow && view.isShown) view.post { latch.countDown() } }
-        var primary: Throwable? = null
-        try {
-            compose.runOnUiThread { assertTrue(view.isAttachedToWindow && view.isShown); tree = view.viewTreeObserver; tree!!.addOnDrawListener(listener); view.invalidate() }
-            assertTrue("Attached native draw did not complete", latch.await(5, TimeUnit.SECONDS))
-        } catch (failure: Throwable) { primary = failure; throw failure }
-        finally {
-            try { compose.runOnUiThread { tree?.takeIf { it.isAlive }?.removeOnDrawListener(listener) } }
-            catch (cleanup: Throwable) { if (primary == null) throw cleanup else primary.addSuppressed(cleanup) }
-        }
-    }
-
-    private fun domProbe(web: WebView): JSONObject {
-        val latch = CountDownLatch(1); var result: String? = null
-        compose.runOnUiThread { web.evaluateJavascript(DOM_READ_ONLY) { result = it; latch.countDown() } }
-        assertTrue("Read-only DOM callback missing", latch.await(5, TimeUnit.SECONDS))
-        return JSONObject(result ?: throw AssertionError("DOM callback returned null"))
     }
 
     private fun finishOnlyBookshelf() {
@@ -647,38 +565,6 @@ class UiAzw3OriginalJourneyTest {
         private const val PROTECTED_MOBI_SHA = "a25dcde710240f9c2c03d7b7b98aa09277d83392f3dc0da9779f6bc78e7c0cef"
         private const val ORIGIN = "https://reader-ebook.invalid"
         private const val SHELL = "$ORIGIN/__reader/shell.html"
-        private val DOM_READ_ONLY = """
-            (()=>{try{
-              const f=document.getElementById('publication'),d=f?.contentDocument,w=f?.contentWindow;
-              if(!d?.body||!w)return {probeError:'NO_CURRENT_DOCUMENT'};
-              const rect=q=>({left:q.left,right:q.right,top:q.top,bottom:q.bottom});
-              const usable=q=>q.width>0&&q.height>0&&q.bottom>32&&q.top<w.innerHeight-52&&q.right>0&&q.left<w.innerWidth;
-              const eligible=e=>e&&!e.closest('a[href],script,style,noscript,template')&&w.getComputedStyle(e).visibility!=='hidden';
-              const walker=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let n,tap=null;
-              while(n=walker.nextNode()){
-                const e=n.parentElement;if(!eligible(e))continue;
-                const i=n.data.search(/\S/u);if(i<0)continue;
-                const r=d.createRange();r.setStart(n,i);r.setEnd(n,i+(n.data.codePointAt(i)>65535?2:1));
-                const q=r.getBoundingClientRect();if(usable(q)){tap={...rect(q),kind:'text-range'};break;}
-              }
-              if(!tap)for(const image of d.querySelectorAll('img,image')){
-                if(!eligible(image))continue;
-                const q=image.getBoundingClientRect();if(!usable(q))continue;
-                const tag=image.localName.toLowerCase();let loaded=false;
-                if(tag==='img')loaded=image.complete&&image.naturalWidth>0;
-                else{const src=image.getAttribute('href')||image.getAttributeNS('http://www.w3.org/1999/xlink','href');
-                  if(src){const url=new URL(src,d.baseURI).href;loaded=w.performance.getEntriesByName(url).some(e=>e.responseEnd>0&&e.decodedBodySize>0);}}
-                if(loaded){tap={...rect(q),kind:tag==='img'?'loaded-img':'resource-complete-svg-image'};break;}
-              }
-              if(!tap)return {probeError:'NO_VISIBLE_NON_LINK_TEXT_OR_LOADED_IMAGE'};
-              const raw=d.body.textContent||'',text=raw.slice(0,1000000),fr=f.getBoundingClientRect();
-              return {origin:location.origin,shellUrl:location.href,entryUrl:w.location.href,documentComplete:d.readyState==='complete',
-                framePointerEvents:getComputedStyle(f).pointerEvents,documentOverflowY:w.getComputedStyle(d.documentElement).overflowY,
-                frameLeft:fr.left,frameTop:fr.top,selectionCollapsed:w.getSelection()?.isCollapsed!==false,imageCount:d.images.length,
-                styleSheetCount:d.styleSheets.length,fontStatus:d.fonts?.status,domText:text,domTextTotalUtf16:raw.length,
-                domTextSampleUtf16:text.length,domTextTruncated:raw.length>text.length,width:w.innerWidth,height:w.innerHeight,tap};
-            }catch(e){return {probeError:String(e)}}})()
-        """.trimIndent()
     }
 
 }
