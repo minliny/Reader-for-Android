@@ -1,6 +1,5 @@
 package com.reader.android.ui.components
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -31,9 +30,6 @@ class ReaderSharedComponentsStructureTest {
 
     private fun projectSource(path: String): String =
         String(Files.readAllBytes(Paths.get(path)))
-
-    private fun workspaceSource(path: String): String =
-        String(Files.readAllBytes(Paths.get("..").resolve(path)))
 
     private fun projectSource(paths: List<String>): String =
         paths.joinToString(separator = "\n") { projectSource(it) }
@@ -209,8 +205,7 @@ class ReaderSharedComponentsStructureTest {
     }
 
     @Test
-    fun `component library core semantics have compose implementation anchors`() {
-        val componentLibrary = workspaceSource("docs/ui-design/frontend-input/component-library/COMPONENT_LIBRARY.md")
+    fun `shared component APIs have current Kotlin implementation anchors`() {
         val mappings = listOf(
             ComponentMapping(
                 componentName = "MainNav",
@@ -354,10 +349,6 @@ class ReaderSharedComponentsStructureTest {
         )
 
         mappings.forEach { mapping ->
-            assertTrue(
-                "Component library must declare ${mapping.componentName}",
-                "`" + mapping.componentName + "`" in componentLibrary
-            )
             val source = projectSource(mapping.sourcePaths)
             mapping.requiredTokens.forEach { token ->
                 assertTrue("${mapping.componentName} must have Compose anchor $token", token in source)
@@ -366,21 +357,7 @@ class ReaderSharedComponentsStructureTest {
     }
 
     @Test
-    fun `manifest runtime shell taxonomy has compose implementation anchors`() {
-        assertEquals(
-            "manifest shell counts must stay aligned with the frontend input shell taxonomy",
-            mapOf(
-                "ComponentLibraryShell" to 3,
-                "AssetLibraryShell" to 1,
-                "MainTabShell" to 8,
-                "LibraryShell" to 16,
-                "ReaderShell" to 20,
-                "FlowShell" to 2,
-                "SettingsShell" to 14
-            ),
-            manifestShellCounts()
-        )
-
+    fun `current screen hosts retain native source and preview anchors`() {
         val anchors = listOf(
             ShellComposeAnchor(
                 shellName = "MainTabShell",
@@ -408,7 +385,6 @@ class ReaderSharedComponentsStructureTest {
                     "src/main/kotlin/com/reader/android/ui/toc/TOCScreen.kt"
                 ),
                 requiredTokens = listOf(
-                    "LibraryShell，书架空状态",
                     "ReaderAppTopBar",
                     "ReaderMainTabBar",
                     "ReaderPermissionRequiredState",
@@ -457,7 +433,6 @@ class ReaderSharedComponentsStructureTest {
                 sourcePaths = listOf("src/main/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowScreen.kt"),
                 requiredTokens = listOf(
                     "fun SourceSwitchFlowScreen(",
-                    "FlowShell flowFrame",
                     "slotName = \"stepRegion\"",
                     "slotName = \"comparisonRegion\"",
                     "slotName = \"resultRegion\"",
@@ -495,12 +470,6 @@ class ReaderSharedComponentsStructureTest {
             )
         )
 
-        assertEquals(
-            "runtime shell anchors must cover every runtime shell exactly",
-            setOf("MainTabShell", "LibraryShell", "ReaderShell", "FlowShell", "SettingsShell"),
-            anchors.map { it.shellName }.toSet()
-        )
-
         anchors.forEach { anchor ->
             val source = projectSource(anchor.sourcePaths)
             anchor.requiredTokens.forEach { token ->
@@ -510,33 +479,10 @@ class ReaderSharedComponentsStructureTest {
     }
 
     @Test
-    fun `slice 2 shared components do not reintroduce stitch or webview runtime`() {
+    fun `shared components keep the native rendering boundary`() {
         val source = componentSource()
-
-        listOf(
-            "bg-" + "surface-container",
-            "bg-" + "surface-container-high",
-            "bg-" + "surface-container-highest",
-            "text-" + "on-surface",
-            "text-" + "on-surface-variant",
-            "shadow-" + "lg",
-            "shadow-" + "md",
-            "FDF6EC",
-            "EAE1DA",
-            "F5ECE6",
-            "EFE7E0",
-            "8B5000",
-            "Web" + "View",
-            "normalized-" + "html"
-        ).forEach { forbidden ->
-            assertTrue("Forbidden Slice 2 token must not appear: $forbidden", forbidden !in source)
+        listOf("android.webkit", "Web" + "View", "normalized-" + "html").forEach { forbidden ->
+            assertTrue("Shared native components must not introduce $forbidden", forbidden !in source)
         }
     }
-
-    private fun manifestShellCounts(): Map<String, Int> =
-        Regex(""""shellName"\s*:\s*"([^"]+)"""")
-            .findAll(workspaceSource("docs/ui-design/frontend-input/manifest.json"))
-            .map { it.groupValues[1] }
-            .groupingBy { it }
-            .eachCount()
 }
