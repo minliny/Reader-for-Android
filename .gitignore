@@ -51,3 +51,12 @@ SKILL.md
 **/.github/instructions/
 **/.github/copilot-instructions.md
 /branch-archives/
+
+# Local Android build inputs, native artifacts and private device evidence
+.build/
+.artifacts/
+app/src/core/jniLibs/
+**/__pycache__/
+*.pyc
+*.jks
+*.keystore

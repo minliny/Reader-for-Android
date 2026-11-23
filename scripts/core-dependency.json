@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/minliny/Reader-Core",
+  "commit": "c3109d570dd62a636eff1ffb88f4e242ede0bf3a",
+  "license": "MIT OR Apache-2.0",
+  "minimumAndroidApi": 24,
+  "abis": [
+    "arm64-v8a"
+  ],
+  "rustTarget": "aarch64-linux-android",
+  "ndkVersion": "26.3.11579264",
+  "cmakeVersion": "3.22.1",
+  "files": [
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java",
+      "destination": "app/src/core/java/com/reader/core/NativeCoreBridge.java",
+      "sha256": "a333b1214bafc274e08ad5fd661adcd448b670f2aaaa8c73cd856d4bc61d8878"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreAssetException.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreAssetException.java",
+      "sha256": "25b215e26790b5bb68ebadf39818393d673a625ba525483f029fa5df0b42cb44"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreException.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreException.java",
+      "sha256": "e60b4abb853212292cc4b79052c79efa79e2b76ad046bc28d18d8b53408136d1"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreLastError.java",
+      "sha256": "427a2988d5d2fff74f5d81b39136c83daac5e3c1581dab95b083d8f0cbc0e894"
+    },
+    {
+      "source": "bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java",
+      "destination": "app/src/core/java/com/reader/core/ReaderCoreRuntime.java",
+      "sha256": "57635145fd994a14791572e50acdd75d983d2d4494506f0529e44a2ff952a6cb"
+    }
+  ],
+  "compatibility": {
+    "cAbi": 1,
+    "protocol": 1,
+    "runtimeConfig": 1,
+    "storage": "Base SQLite user_version38 plus physical local-import extension schema2; portable snapshot16. Local authority and Host snapshot-only persistence are mutually exclusive. No migration or existing Android data acceptance is claimed.",
+    "nativePageSize": "Explicit max-page-size=16384/common-page-size=16384 final-link options and ELF LOAD alignment inspection. Runtime 16KB device validation remains NOT_RUN."
+  },
+  "canonicalBuild": "build-android-jni.sh",
+  "nestedCompilations": [
+    "Java wrapper and Java sample compile when javac is available",
+    "Kotlin sample compile when kotlinc is available",
+    "reader-ffi release staticlib via cargo rustc",
+    "JNI shared library via CMake"
+  ],
+  "businessTests": "NOT_RUN",
+  "previousCommit": "1fe86c34e426e0288523850e3b87600f1efcaf3d",
+  "buildPatch": {
+    "baseCommit": "f3227e30d1022d6d0984fbfadcb1e3cf5679c6a7",
+    "changedFiles": [
+      "build-android-jni.sh"
+    ],
+    "reason": "The canonical Android cargo rustc command explicitly enables the already-existing reader-ffi bindgen feature. rquickjs 0.8.1 has no shipped Android bindings.",
+    "featurePath": [
+      "reader-ffi/bindgen",
+      "reader-js/bindgen",
+      "rquickjs/bindgen",
+      "rquickjs-sys/bindgen"
+    ],
+    "defaultOtherPlatformBehavior": "UNCHANGED",
+    "businessAbiSchemaProductVersion": "UNCHANGED",
+    "cargoLock": "UNCHANGED; bindgen 0.69.5 already locked and available in offline cache",
+    "hostTool": "LIBCLANG_PATH must select a real host libclang; NDK target/sysroot arguments remain canonical"
+  },
+  "androidBindingPatch": {
+    "baseCommit": "1fe86c34e426e0288523850e3b87600f1efcaf3d",
+    "changedFiles": [
+      "bindings/android/README.md",
+      "bindings/android/jni/reader_jni.cpp",
+      "bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreAssetException.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreException.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java",
+      "bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java"
+    ],
+    "reason": "Add the existing Core-owned response-asset begin/write/commit/read/release C APIs to the same Java/JNI RuntimeState alongside the existing ebook and delivery-ack bindings; preserve ownership, chunk/total bounds, allocation release, and same-thread diagnostics.",
+    "sameGitObjects": {
+      "crates": true,
+      "Cargo.toml": true,
+      "Cargo.lock": true,
+      "rust-toolchain.toml": true
+    },
+    "rustBusinessCargoCAbiSchemaProductVersion": "UNCHANGED",
+    "nativeBuildAndDevice": "SEPARATE_EVIDENCE_REQUIRED"
+  }
+}

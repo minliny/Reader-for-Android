@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "io.reader.minliny",
+  "buildToolsVersion": "36.1.0",
+  "minimumSdk": 24,
+  "targetSdk": 36,
+  "abis": [
+    "arm64-v8a"
+  ],
+  "variant": "debug",
+  "gradleTask": ":app:assembleDebug",
+  "apkOutput": "app/build/outputs/apk/debug/app-debug.apk",
+  "launchActivity": "io.reader.android.MainActivity",
+  "productVersion": "UNDECLARED",
+  "businessTests": "NOT_RUN"
+}
