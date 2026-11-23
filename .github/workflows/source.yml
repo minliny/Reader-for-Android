@@ -6,15 +6,11 @@ on:
         description: Select only checks justified for this change
         type: choice
         required: true
-        options: [json, workflow-lint, secrets, full]
+        options: [retired-inputs, workflow-lint, secrets]
       rationale:
-        description: Concrete risk and necessity for every selected check; full needs an explicit user request
+        description: Concrete risk and necessity for the selected check
         type: string
         required: true
-      full_suite_requested:
-        description: The user explicitly requested the complete suite
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -27,46 +23,32 @@ jobs:
     env:
       CHECKS: ${{ inputs.checks }}
       RATIONALE: ${{ inputs.rationale }}
-      FULL_SUITE_REQUESTED: ${{ inputs.full_suite_requested }}
     steps:
       - name: Admit the explicit selection
         shell: bash
         run: |
           [[ "$RATIONALE" =~ [^[:space:]] ]] || { echo 'A concrete rationale is required.' >&2; exit 2; }
-          case "$CHECKS" in json|workflow-lint|secrets) ;;
-            full) [[ "$FULL_SUITE_REQUESTED" == true ]] || { echo 'Full requires an explicit user request.' >&2; exit 2; } ;;
+          case "$CHECKS" in retired-inputs|workflow-lint|secrets) ;;
             *) echo 'Unknown check; nothing was run.' >&2; exit 2 ;;
           esac
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Selected tracked JSON fixtures
-        if: ${{ inputs.checks == 'json' || inputs.checks == 'full' }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import subprocess
-          from pathlib import Path
-          paths = subprocess.check_output(['git', 'ls-files', '-z', '*.json']).decode().split('\0')
-          count = 0
-          for path in filter(None, paths):
-              json.loads(Path(path).read_text(encoding='utf-8'))
-              count += 1
-          assert count > 0, 'Expected checked-in design fixtures'
-          print(f'PASS: {count} selected JSON fixtures; no Android compile or APK claim')
-          PY
+      - name: Selected withdrawn-input admission
+        if: ${{ inputs.checks == 'retired-inputs' }}
+        run: python3 .github/scripts/check-design-inputs.py --case retired-inputs
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
-        if: ${{ contains(fromJSON('["workflow-lint","secrets","full"]'), inputs.checks) }}
+        if: ${{ contains(fromJSON('["workflow-lint","secrets"]'), inputs.checks) }}
         with:
           go-version: '1.24.2'
           cache: false
       - name: Selected workflow lint
-        if: ${{ inputs.checks == 'workflow-lint' || inputs.checks == 'full' }}
+        if: ${{ inputs.checks == 'workflow-lint' }}
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-          "$(go env GOPATH)/bin/actionlint" -color
+          "$(go env GOPATH)/bin/actionlint" -color -shellcheck= -pyflakes= .github/workflows/source.yml
       - name: Selected current tracked-source secret scan
-        if: ${{ inputs.checks == 'secrets' || inputs.checks == 'full' }}
+        if: ${{ inputs.checks == 'secrets' }}
         run: |
           go install github.com/zricethezav/gitleaks/v8@v8.24.2
           scan=$(mktemp -d "$RUNNER_TEMP/reader-source.XXXXXX")

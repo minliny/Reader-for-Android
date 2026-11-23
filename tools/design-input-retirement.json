@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "decisionDate": "2026-10-21",
+  "scope": "Android source-input migration only. This registry is a tombstone and audit, not an executable Android test inventory or proof of product acceptance.",
+  "withdrawnRoots": [
+    "docs/ui-design"
+  ],
+  "withdrawnExecutableTokens": [
+    "ui-design",
+    "Selected tracked JSON fixtures",
+    "full_suite_requested"
+  ],
+  "retiredCiSelections": {
+    "json": "No runtime JSON input remains; the old selector only parsed 30 withdrawn design fixture files. Use retired-inputs for retirement admission.",
+    "full": "Aggregate shortcuts are retired. Each source responsibility must be selected separately."
+  },
+  "originalTests": [
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
+      "originalSha256": "4c56f8eb1e99da73182bbd02aebd619623c1e1d508d3af8c9d718398d5340c27",
+      "retiredFile": false,
+      "methods": [
+        {
+          "name": "main tabs use semantic icon tokens",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
+          "currentMethod": "main tabs use semantic icon tokens",
+          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+        },
+        {
+          "name": "all declared icon tokens resolve to image vectors",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
+          "currentMethod": "all declared icon tokens resolve to image vectors",
+          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+        },
+        {
+          "name": "local asset library exposes current icon token inventory",
+          "outcome": "RETIRE",
+          "reason": "Withdrawn JS asset registry inventory/mapping only. Actual appScreens semantic tokens, exhaustive enum to ImageVector resolution and settings tokens are retained."
+        },
+        {
+          "name": "compose semantic icon tokens trace to local asset tokens",
+          "outcome": "RETIRE",
+          "reason": "Withdrawn JS asset registry inventory/mapping only. Actual appScreens semantic tokens, exhaustive enum to ImageVector resolution and settings tokens are retained."
+        },
+        {
+          "name": "settings secondary semantic icons are available",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
+          "currentMethod": "settings secondary semantic icons are available",
+          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+      "originalSha256": "78f4c0c655ad2faf7499b008ad53a3a2f70b8ed8f7b8327c8bdb089fde4282c8",
+      "retiredFile": false,
+      "methods": [
+        {
+          "name": "slice 2 shared component package exposes required components",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "slice 2 shared component package exposes required components",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "slice 2 shared components use reader theme tokens",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "slice 2 shared components use reader theme tokens",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "slice 2 shared components expose base semantics",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "slice 2 shared components expose base semantics",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "shared top bar uses icon token for back action",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "shared top bar uses icon token for back action",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "shared icon tokens cover main navigation and common actions",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "shared icon tokens cover main navigation and common actions",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "shared component files use icon tokens instead of page local material icons",
+          "outcome": "RETAIN",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "shared component files use icon tokens instead of page local material icons",
+          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+        },
+        {
+          "name": "component library core semantics have compose implementation anchors",
+          "outcome": "MIGRATE",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "shared component APIs have current Kotlin implementation anchors",
+          "reason": "Retains every current Kotlin component API source anchor, including missing BookComponents.kt. Removes only the withdrawn Markdown declaration premise."
+        },
+        {
+          "name": "manifest runtime shell taxonomy has compose implementation anchors",
+          "outcome": "MIGRATE",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "current screen hosts retain native source and preview anchors",
+          "reason": "Retains actual native component/route/preview source anchors. Removes only HTML shell counts/taxonomy self-comparisons and comment labels; existing preview/route tests remain. No flow comparison/detection behavior is accepted."
+        },
+        {
+          "name": "slice 2 shared components do not reintroduce stitch or webview runtime",
+          "outcome": "MIGRATE",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
+          "currentMethod": "shared components keep the native rendering boundary",
+          "reason": "Retains native rendering boundary. Retires unapproved historical CSS token names and five fixed color bans; they are not current product requirements."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputAssetLibraryInventoryTest.kt",
+      "originalSha256": "1735463cbb12de1cb25a2f8536f21c234751117c8ebd70ae19d0563658ebb039",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "asset library fixture tracks every UI design screen and cover asset",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+        },
+        {
+          "name": "asset library icon registry stays aligned with fixture groups and docs",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+        },
+        {
+          "name": "asset library manifest target and validation report stay aligned",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComponentLibraryInventoryTest.kt",
+      "originalSha256": "f6ddb91e84e99a4a72a7329608b6e07af0809f36352e059fd6abe9bcb717527b",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "component library renderer inventory stays aligned with shared input contract",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+        },
+        {
+          "name": "component library fixture icons come from the shared asset registry",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+        },
+        {
+          "name": "component library docs manifest and validation report stay aligned",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputComposeCoverageTest.kt",
+      "originalSha256": "dccc81343b57374b4d0abac00ce3d8802f08efceeb649c7c87033d0bc8616427",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "formal frontend input pages have compose state mapping coverage",
+          "outcome": "MIGRATE",
+          "currentPath": "app/src/test/kotlin/com/reader/android/ui/preview/AndroidComposeSourceCoverageTest.kt",
+          "currentMethod": "current Kotlin mapper and preview anchors remain present",
+          "reason": "Preserves every existing sourcePaths/sourceTokens/previewPath/previewTokens assertion. Removes withdrawn spec, HTML and manifest premises; static anchors only, not state execution."
+        },
+        {
+          "name": "formal frontend input pages have global data state event contracts",
+          "outcome": "RETIRE",
+          "reason": "Removed premise compares withdrawn spec/types/HTML card counts with each other. Actual Kotlin state/mapper assertions are retained in existing per-feature mapping tests; no replacement event schema or quantity is invented."
+        },
+        {
+          "name": "frontend event contracts have documented compose callback mapping",
+          "outcome": "RETIRE",
+          "reason": "Only compares withdrawn TypeScript event spellings with Markdown-derived onCamelCase names. It never checks production callback invocation. Existing route/source checks remain, while Compose click/once/stale owner behavior is OPEN."
+        },
+        {
+          "name": "ui design screens have formal frontend input packages",
+          "outcome": "RETIRE",
+          "reason": "Only guards withdrawn formal HTML package inventory, manifest target/shell metadata or stored report success; no independent production assertion."
+        },
+        {
+          "name": "manifest target set only contains formal frontend input pages and library previews",
+          "outcome": "RETIRE",
+          "reason": "Only guards withdrawn formal HTML package inventory, manifest target/shell metadata or stored report success; no independent production assertion."
+        },
+        {
+          "name": "manifest shell metadata matches formal shell taxonomy",
+          "outcome": "RETIRE",
+          "reason": "Only guards withdrawn formal HTML package inventory, manifest target/shell metadata or stored report success; no independent production assertion."
+        },
+        {
+          "name": "frontend input validation report matches manifest and component references",
+          "outcome": "RETIRE",
+          "reason": "Only guards withdrawn formal HTML package inventory, manifest target/shell metadata or stored report success; no independent production assertion."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputFlowShellInventoryTest.kt",
+      "originalSha256": "ef55b0763ac37818f342f35a12cae9bb0eb14d8b62cbdeed7268494b1389c8a8",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "source switch package keeps the FlowShell frontend input file set",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+        },
+        {
+          "name": "source switch renderer uses centralized FlowShell and non empty state host",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+        },
+        {
+          "name": "source switch fixture keeps the landscape flow and state matrix data",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+        },
+        {
+          "name": "source switch manifest validation report docs and compose anchors stay aligned",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputHtmlInventoryTest.kt",
+      "originalSha256": "2caa6f5d3f9fed323031b5a3a6af19ff2a3801033aaffcdf82fa7699627fb0d3",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "local html inventory stays classified by frontend input role",
+          "outcome": "RETIRE",
+          "reason": "Only counts and classifies the withdrawn HTML previews, matrices, historical reproductions and manifest exclusions; no Android runtime consumer."
+        }
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/reader/android/ui/preview/FrontendInputPhaseCompletionGuardTest.kt",
+      "originalSha256": "3e0a81fd99a15533789815fb7b63edf04cfd9ac8738dfb37d875999328cd0512",
+      "retiredFile": true,
+      "methods": [
+        {
+          "name": "phase completion summary stays backed by current manifest and validation report",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn phase prose, command lists, design inventory totals and stored report success text; it does not execute an Android test or prove current completion."
+        },
+        {
+          "name": "phase guard command lists every frontend input protection layer",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn phase prose, command lists, design inventory totals and stored report success text; it does not execute an Android test or prove current completion."
+        },
+        {
+          "name": "event callback mapping stays listed as a protected handoff input",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn phase prose, command lists, design inventory totals and stored report success text; it does not execute an Android test or prove current completion."
+        },
+        {
+          "name": "mapping guide keeps completion boundary separate from next phase implementation",
+          "outcome": "RETIRE",
+          "reason": "Only checks withdrawn phase prose, command lists, design inventory totals and stored report success text; it does not execute an Android test or prove current completion."
+        }
+      ]
+    }
+  ],
+  "adoptedExistingCoverage": {
+    "stateMapperAssertions": "Existing *UiStateMappingTest / *DesignUiStateMappingTest files retain actual current Kotlin state/context/owner assertions; do not compare them with the removed TypeScript design model.",
+    "nativeShellAndPreviewAnchors": [
+      "app/src/test/kotlin/com/reader/android/ui/preview/MainTabStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/preview/LibraryFlowStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/preview/ReaderShellStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/preview/ReaderControlStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/preview/SettingsSecondaryStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/preview/SourceManagementStateMatrixPreviewTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowStructureTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/ReaderRouteHostSmokeTest.kt",
+      "app/src/test/kotlin/com/reader/android/ui/ReaderRouteReachabilityTest.kt"
+    ],
+    "iconBoundary": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt"
+  },
+  "openProductEvidence": [
+    "No tracked Gradle settings/build/wrapper or AndroidManifest exists; Kotlin/JUnit/Compose/APK/device tests are NOT_RUN in this migration.",
+    "Missing ReaderTheme, BookComponents.kt, SearchAdapterShell.kt, BookDetailAdapterShell.kt and booksource/SourceManagementUiState.kt are retained source prerequisites, not retired assertions.",
+    "Real Compose callback invocation, once/stale owner handling and Core source-switch/progress preservation remain OPEN. ReaderRouteHost onSwitchSource currently only pops back.",
+    "Reader-UI protocol event inventory is not a replacement for the removed 30 page UI models."
+  ]
+}
