@@ -4,8 +4,10 @@ import android.content.Context
 import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Parcelable
+import android.text.Spannable
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.style.BackgroundColorSpan
 import android.text.style.LineHeightSpan
 import android.util.TypedValue
 import android.util.SparseArray
@@ -19,6 +21,7 @@ import android.widget.TextView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
 import io.reader.android.R
 import io.reader.android.runtime.ReaderTextCoordinates
+import io.reader.android.runtime.ReaderTtsHighlight
 import kotlin.math.roundToInt
 
 private enum class NativeLayoutPhase { Restoring, Ready, Failed }
@@ -46,12 +50,13 @@ private enum class NativeLayoutPhase { Restoring, Ready, Failed }
 /** Presentation input only; never a local format/Original or an online business session. */
 private data class ReaderNativeTextOwner(val identity: Long, val chapter: ReaderChapter, val visibleScalarOffset: Int, val requiresVisibleAdmission: Boolean = false)
 
-/** Existing local entry retains its signature, rendering and Unit callback semantics. */
+/** Local text displays the current speech sentence independently of visible-position reporting. */
 @Composable
 internal fun ReaderNativeChapterBody(reading: ReadingSession, fontSize: Int, paper: ReaderPaper,
-    userScrollEnabled: Boolean, onVisibleAnchor: (Int) -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
+    userScrollEnabled: Boolean, onVisibleAnchor: (Int) -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier,
+    speechHighlight: ReaderTtsHighlight? = null) {
     ReaderNativeTextPresentationBody(ReaderNativeTextOwner(reading.identity, reading.chapter, reading.visibleScalarOffset),
-        fontSize, paper, userScrollEnabled, { onVisibleAnchor(it); true }, onTap, modifier)
+        fontSize, paper, userScrollEnabled, { onVisibleAnchor(it); true }, onTap, modifier, speechHighlight = speechHighlight)
 }
 
 /** Stored-source text uses the SAME native body; accepted means display admission, never Core ACK. */
@@ -78,6 +83,7 @@ private fun ReaderNativeTextPresentationBody(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
     onReady: (() -> Unit)? = null,
+    speechHighlight: ReaderTtsHighlight? = null,
 ) {
     var phase by remember { mutableStateOf(NativeLayoutPhase.Restoring) }
     val readyCallback by rememberUpdatedState(onReady)
@@ -86,6 +92,7 @@ private fun ReaderNativeTextPresentationBody(
         if (phase == NativeLayoutPhase.Ready) readyCallback?.invoke()
     }
     val native = remember { arrayOfNulls<ReaderNativeScrollView>(1) }
+    val speechColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f).toArgb()
     Box(modifier.testTag("reader_body")) {
         AndroidView(
             factory = { context -> ReaderNativeScrollView(context, reading).also { native[0] = it } },
@@ -94,6 +101,7 @@ private fun ReaderNativeTextPresentationBody(
             onRelease = { view -> view.release(); if (native[0] === view) native[0] = null },
             update = { view ->
                 view.bind(reading, fontSize, paper, userScrollEnabled, onVisibleAnchor, onTap) { phase = it }
+                view.highlightSpeech(speechHighlight, speechColor)
             },
         )
         if (phase != NativeLayoutPhase.Ready) Surface(color = paper.background(),
@@ -140,6 +148,8 @@ private class ReaderNativeScrollView(context: Context, private val owner: Reader
     }
     private val rawText = owner.chapter.text
     private var font = -1
+    private var speechSpan: BackgroundColorSpan? = null
+    private var speechRange: ReaderTtsHighlight? = null
     private var released = false
     private var scrollingAllowed = true
     private var logicalScalar = owner.visibleScalarOffset
@@ -282,12 +292,28 @@ private class ReaderNativeScrollView(context: Context, private val owner: Reader
             bodyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize.toFloat())
             val lineHeight = bodyView.textSize * 1.8f
             bodyView.setLineSpacing(lineHeight - bodyView.paint.fontSpacing, 1f)
-            bodyView.text = SpannableString(rawText).apply {
+            val decorated = SpannableString(rawText).apply {
                 rawText.forEachIndexed { index, char -> if (char == '\n')
                     setSpan(NativeParagraphGap(dp(12)), index, index + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
             }
+            bodyView.setText(decorated, TextView.BufferType.SPANNABLE)
+            speechSpan = null
+            speechRange = null
             restoreLogicalAnchor()
         }
+    }
+
+    fun highlightSpeech(range: ReaderTtsHighlight?, color: Int) {
+        if (released || (range == speechRange && (range == null || speechSpan?.backgroundColor == color))) return
+        val text = bodyView.text as? Spannable ?: return
+        speechSpan?.let(text::removeSpan)
+        speechRange = range
+        speechSpan = range?.let {
+            val start = ReaderTextCoordinates.utf16Offset(rawText, it.scalarStart)
+            val end = ReaderTextCoordinates.utf16Offset(rawText, it.scalarEnd)
+            BackgroundColorSpan(color).also { span -> text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+        }
+        bodyView.invalidate()
     }
 
     fun restoreLogicalAnchor() {

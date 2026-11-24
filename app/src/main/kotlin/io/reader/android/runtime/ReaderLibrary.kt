@@ -290,14 +290,28 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.OBSERVER_READ) { tts.chapterPlan(chapter, next, drainBehavior) }
 
     /** Core queue controls are serialized as one retained host turn; no Android speech is started here. */
-    suspend fun ttsQueuePlay(plan: ReaderTtsSlicePlan, startSliceIndex: Int = 0): ReaderTtsQueueSnapshot =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queuePlay(plan, startSliceIndex) }
-    suspend fun ttsQueuePause(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queuePause(chapter) }
-    suspend fun ttsQueueResume(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueResume(chapter) }
-    suspend fun ttsQueueStop(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueStop(chapter) }
+    suspend fun ttsQueuePlay(plan: ReaderTtsSlicePlan, startSliceIndex: Int = 0, playback: UUID? = null): ReaderTtsQueueSnapshot =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            tts.queuePlay(plan, startSliceIndex).also { if (playback != null) client.registerTtsQueue(plan.chapter, playback) }
+        }
+    suspend fun ttsQueuePause(chapter: ReaderTtsChapterRef, playback: UUID? = null): ReaderTtsQueueSnapshot =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            if (playback != null) client.requireTtsQueue(chapter, playback)
+            tts.queuePause(chapter)
+        }
+    suspend fun ttsQueueResume(chapter: ReaderTtsChapterRef, playback: UUID? = null): ReaderTtsQueueSnapshot =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            if (playback != null) client.requireTtsQueue(chapter, playback)
+            tts.queueResume(chapter)
+        }
+    suspend fun ttsQueueStop(chapter: ReaderTtsChapterRef, playback: UUID? = null): ReaderTtsQueueSnapshot =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            if (playback != null) client.requireTtsQueue(chapter, playback)
+            tts.queueStop(chapter).also {
+                check(it.state == ReaderTtsQueueState.STOPPED) { "TTS_STOP_RESULT" }
+                if (playback != null) client.finishTtsQueue(chapter, playback)
+            }
+        }
     suspend fun ttsQueueNext(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueNext(chapter) }
     suspend fun ttsQueuePrev(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
@@ -306,17 +320,25 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueSeek(chapter, sliceIndex) }
     suspend fun ttsQueueSkip(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueSkip(chapter) }
-    suspend fun ttsQueueSetRate(chapter: ReaderTtsChapterRef, rate: Int): ReaderTtsQueueSetRateResult =
-        onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueSetRate(chapter, rate) }
+    suspend fun ttsQueueSetRate(chapter: ReaderTtsChapterRef, rate: Int, playback: UUID? = null): ReaderTtsQueueSetRateResult =
+        onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+            if (playback != null) client.requireTtsQueue(chapter, playback)
+            tts.queueSetRate(chapter, rate)
+        }
     suspend fun ttsQueueReportStatus(chapter: ReaderTtsChapterRef, sliceIndex: Int,
         status: ReaderTtsSliceStatus): ReaderTtsQueueSnapshot =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { tts.queueReportStatus(chapter, sliceIndex, status) }
     suspend fun ttsQueueReportCallback(chapter: ReaderTtsChapterRef, sliceIndex: Int,
         status: ReaderTtsSliceStatus, callbackId: String,
         failurePolicy: ReaderTtsFailurePolicy = ReaderTtsFailurePolicy.STOP,
-        failureLimit: Int = 3): ReaderTtsQueueCallbackResult =
+        failureLimit: Int = 3, playback: UUID? = null): ReaderTtsQueueCallbackResult =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) {
-            tts.queueReportCallback(chapter, sliceIndex, status, callbackId, failurePolicy, failureLimit)
+            if (playback != null) client.requireTtsQueue(chapter, playback)
+            tts.queueReportCallback(chapter, sliceIndex, status, callbackId, failurePolicy, failureLimit).also {
+                if (playback != null && it.callbackDisposition == ReaderTtsCallbackDisposition.APPLIED &&
+                    (it.snapshot.state == ReaderTtsQueueState.COMPLETED || it.snapshot.state == ReaderTtsQueueState.STOPPED))
+                    client.finishTtsQueue(chapter, playback)
+            }
         }
 
     /** Core extracts ordered image descriptors; Android does not download or decode them here. */

@@ -19,6 +19,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     @Volatile override var ready: Boolean = false
         private set
     @Volatile private var listener: ReaderTtsPlaybackEngine.Listener? = null
+    @Volatile private var retired = false
     private var initializationGeneration = 0L
     private var initializedGeneration = 0L
 
@@ -27,7 +28,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     override fun initialize() {
         Log.i("ReaderTts", "TextToSpeech initialize requested main=${Looper.myLooper() == Looper.getMainLooper()}")
         main.post {
-            if (speaker != null) return@post
+            if (retired || speaker != null) return@post
             val generation = ++initializationGeneration
             val enginePackage = applicationContext.packageManager
                 .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), PackageManager.MATCH_ALL)
@@ -72,7 +73,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
         Log.i("ReaderTts", "TextToSpeech onInit callback status=$status main=${Looper.myLooper() == Looper.getMainLooper()}")
         main.post {
             val generation = initializationGeneration
-            if (generation == 0L || initializedGeneration == generation) return@post
+            if (retired || generation == 0L || initializedGeneration == generation) return@post
             initializedGeneration = generation
             ready = status == TextToSpeech.SUCCESS && speaker?.setLanguage(Locale.getDefault()) !in
                 setOf(TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED)
@@ -83,6 +84,7 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
 
     override fun speak(utteranceId: String, text: String) {
         main.post {
+            if (retired) return@post
             val value = speaker
             if (value == null || !ready) { listener?.onError(utteranceId); return@post }
             val params = Bundle().apply { putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId) }
@@ -99,10 +101,12 @@ internal class AndroidTextToSpeechEngine(context: Context) : ReaderTtsPlaybackEn
     override fun stop() { main.post { speaker?.stop() } }
 
     override fun shutdown() {
+        retired = true
         main.post {
             ready = false
             speaker?.shutdown()
             speaker = null
+            listener = null
         }
     }
 }

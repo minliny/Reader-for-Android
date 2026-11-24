@@ -72,7 +72,8 @@ internal fun ReaderReadingScreen(
             val bodyModifier = Modifier.align(Alignment.Center).widthIn(max = 760.dp).fillMaxSize()
             when (reading.format) {
                 ReaderLocalBookFormat.TXT -> ReaderNativeChapterBody(reading, state.fontSize, state.paper, !state.controlsVisible && !state.busy,
-                    onVisibleAnchor = { model.visibleAnchor(reading.identity, it) }, onTap = model::toggleControls, modifier = bodyModifier)
+                    onVisibleAnchor = { model.visibleAnchor(reading.identity, it) }, onTap = model::toggleControls, modifier = bodyModifier,
+                    speechHighlight = state.ttsPlayback.highlight)
                 ReaderLocalBookFormat.EPUB, ReaderLocalBookFormat.MOBI, ReaderLocalBookFormat.AZW -> {
                     var footerHeightPx by remember(reading.identity, reading.chapter.sessionToken) { mutableIntStateOf(0) }
                     // The footer owns real viewport space even while controls cover it. Its measured
@@ -151,7 +152,8 @@ internal fun ReaderReadingScreen(
                             TextButton(onClick = model::showContentSearch, enabled = !state.busy,
                                 modifier = Modifier.testTag("reader_open_content_search")) { Text("正文搜索") }
                         }
-                        if (reading.chapter.presentationKind == ReaderTextPresentationKind.LOCAL_DOCUMENT) {
+                        if (reading.format == ReaderLocalBookFormat.TXT &&
+                            reading.chapter.presentationKind == ReaderTextPresentationKind.LOCAL_DOCUMENT) {
                             val ttsStatus = state.ttsPlayback.status
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text("朗读：${when (ttsStatus) {

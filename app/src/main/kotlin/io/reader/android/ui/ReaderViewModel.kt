@@ -30,6 +30,7 @@ import io.reader.android.runtime.ReaderTtsQueueCallbackResult
 import io.reader.android.runtime.ReaderTtsQueueSetRateResult
 import io.reader.android.runtime.ReaderTtsQueueSnapshot
 import io.reader.android.runtime.ReaderTtsSliceStatus
+import io.reader.android.runtime.ReaderTtsSlicingStrategy
 import io.reader.android.runtime.AndroidTextToSpeechEngine
 import io.reader.android.runtime.ReaderEbookViewLease
 import io.reader.android.runtime.ReaderEbookViewPreparation
@@ -65,6 +66,7 @@ import io.reader.android.runtime.ReaderMangaDirectoryNode
 import io.reader.android.runtime.ReaderMangaDirectoryPage
 import io.reader.android.runtime.ReaderMangaDirectoryUnavailable
 import java.io.FileNotFoundException
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -222,10 +224,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     private var onlineWindowScheduleReadingIdentity: String? = null
     private var ebookMount: ReaderEbookUiMount? = null
     private var ttsCoordinator: ReaderTtsPlaybackCoordinator? = null
-    private var ttsUiGeneration = 0L
+    @Volatile private var ttsUiGeneration = 0L
+    private var ttsRetirement: Job? = null
     private val ttsMutex = Mutex()
-    private val ttsEventExecutor = Executor { action -> viewModelScope.launch(Dispatchers.IO) { action.run() } }
-    private val ttsCoreExecutor = Executor { action -> viewModelScope.launch(Dispatchers.IO) { action.run() } }
+    private val ttsEventDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val ttsEventExecutor = Executor { action -> viewModelScope.launch(ttsEventDispatcher) { action.run() } }
     private var shelfRead: Job? = null
     private var searchGeneration = 0L
     private var lastRetiredSearchScope: ReaderSearchCloseScope? = null
@@ -868,6 +871,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun showSettings() {
         if (state.value.route in setOf(ReaderRoute.OnlineReading, ReaderRoute.OnlineDirectory, ReaderRoute.MangaReading)) return
         if (!state.value.busy) {
+            if (state.value.route == ReaderRoute.Reading) retireTts()
             if (state.value.route == ReaderRoute.Management) shelfManagement.retirePresentation()
             if (state.value.route == ReaderRoute.Online) onlineSources.leave()
             mutableState.update { it.copy(route = ReaderRoute.Settings, error = null) }
@@ -995,6 +999,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val reading = state.value.reading ?: return
         if (reading.identity != owner || state.value.readerPanel != ReaderPanel.Bookmarks || state.value.busy ||
             state.value.pendingPosition != null || bookmark.bookId != reading.book.id || state.value.bookmarks.none { it == bookmark }) return
+        retireTts()
         perform(bookmarkOwner = true) { request ->
             persist(reading)
             val chapter = library.openBookmark(bookmark)
@@ -1081,6 +1086,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val session = captured.searchSession ?: return
         if (reading.identity != owner || captured.readerPanel != ReaderPanel.Search || captured.busy || captured.searchBusy || captured.pendingPosition != null ||
             hit.bookId != reading.book.id || captured.searchResults.none { it.id == hit.id }) return
+        retireTts()
         perform { request ->
             persist(reading)
             val chapter = library.openContentSearchHit(session, hit)
@@ -1178,82 +1184,101 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleTts() {
         val reading = state.value.reading ?: return
         if (state.value.route != ReaderRoute.Reading || state.value.busy ||
+            state.value.pendingPosition != null || reading.format != ReaderLocalBookFormat.TXT ||
             reading.chapter.presentationKind != ReaderTextPresentationKind.LOCAL_DOCUMENT) return
         when (state.value.ttsPlayback.status) {
-            ReaderTtsPlaybackStatus.PLAYING, ReaderTtsPlaybackStatus.PREPARING -> pauseTts()
-            ReaderTtsPlaybackStatus.PAUSED -> resumeTts()
+            ReaderTtsPlaybackStatus.PLAYING, ReaderTtsPlaybackStatus.PREPARING ->
+                ttsCoordinator?.let { coordinator -> ttsAction(reading) { coordinator.pause() } }
+            ReaderTtsPlaybackStatus.PAUSED ->
+                ttsCoordinator?.let { coordinator -> ttsAction(reading) { coordinator.resume() } }
             else -> startTts(reading)
         }
     }
 
     fun stopTts() {
+        val reading = state.value.reading ?: return
         val coordinator = ttsCoordinator ?: return
-        ttsAction { coordinator.stop() }
+        ttsAction(reading) { coordinator.stop() }
     }
 
     private fun startTts(reading: ReadingSession) {
-        val owner = reading.identity
-        val chapterToken = reading.chapter.sessionToken
-        ttsAction {
+        retireTts()
+        val ticket = ttsUiGeneration
+        val coordinator = createTtsCoordinator(reading, ticket)
+        ttsCoordinator = coordinator
+        ttsAction(reading) {
             val chapter = reading.chapter
-            val plan = library.ttsSlice(ReaderTtsChapterRef("local", chapter.bookId, chapter.index, chapter.title), chapter.text)
-            if (state.value.route != ReaderRoute.Reading || state.value.reading?.identity != owner ||
-                state.value.reading?.chapter?.sessionToken != chapterToken) return@ttsAction
-            ttsCoordinator().start(plan)
+            val plan = library.ttsSlice(ReaderTtsChapterRef(chapter.sourceId, chapter.bookId, chapter.index, chapter.title),
+                chapter.text, ReaderTtsSlicingStrategy.SENTENCE)
+            if (isTtsOwner(state.value, reading, ticket))
+                coordinator.startAtVisibleScalar(plan, chapter.text, reading.visibleScalarOffset)
         }
     }
 
-    private fun pauseTts() {
-        ttsCoordinator?.let { coordinator -> ttsAction { coordinator.pause() } }
-    }
+    private fun isTtsOwner(state: ReaderUiState, reading: ReadingSession, ticket: Long): Boolean =
+        ticket == ttsUiGeneration && state.route == ReaderRoute.Reading &&
+            state.reading?.let { sameReadingScope(it, reading) } == true
 
-    private fun resumeTts() {
-        ttsCoordinator?.let { coordinator -> ttsAction { coordinator.resume() } }
-    }
-
-    private fun ttsAction(action: suspend () -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
+    private fun ttsAction(reading: ReadingSession, action: suspend () -> Unit) {
+        val ticket = ttsUiGeneration
+        val retirement = ttsRetirement
+        viewModelScope.launch {
+            retirement?.join()
             ttsMutex.withLock {
-                try { action() }
+                if (!isTtsOwner(state.value, reading, ticket)) return@withLock
+                try { withContext(Dispatchers.IO) { action() } }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Exception) { mutableState.update { it.copy(error = error.userMessage()) } }
+                catch (error: Exception) { mutableState.update {
+                    if (isTtsOwner(it, reading, ticket)) it.copy(error = error.userMessage()) else it
+                } }
             }
         }
     }
 
-    private fun ttsCoordinator(): ReaderTtsPlaybackCoordinator {
-        ttsCoordinator?.let { return it }
-        val ticket = ++ttsUiGeneration
-        val coordinator = ReaderTtsPlaybackCoordinator(
+    private fun createTtsCoordinator(reading: ReadingSession, ticket: Long): ReaderTtsPlaybackCoordinator {
+        val playbackOwner = UUID.randomUUID()
+        return ReaderTtsPlaybackCoordinator(
             commands = object : ReaderTtsPlaybackCommands {
                 override fun queuePlay(plan: io.reader.android.runtime.ReaderTtsSlicePlan, startSliceIndex: Int): ReaderTtsQueueSnapshot =
-                    runBlocking { library.ttsQueuePlay(plan, startSliceIndex) }
+                    runBlocking { library.ttsQueuePlay(plan, startSliceIndex, playbackOwner) }
                 override fun queuePause(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-                    runBlocking { library.ttsQueuePause(chapter) }
+                    runBlocking { library.ttsQueuePause(chapter, playbackOwner) }
                 override fun queueResume(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-                    runBlocking { library.ttsQueueResume(chapter) }
+                    runBlocking { library.ttsQueueResume(chapter, playbackOwner) }
                 override fun queueStop(chapter: ReaderTtsChapterRef): ReaderTtsQueueSnapshot =
-                    runBlocking { library.ttsQueueStop(chapter) }
+                    runBlocking { library.ttsQueueStop(chapter, playbackOwner) }
                 override fun queueSetRate(chapter: ReaderTtsChapterRef, rate: Int): ReaderTtsQueueSetRateResult =
-                    runBlocking { library.ttsQueueSetRate(chapter, rate) }
+                    runBlocking { library.ttsQueueSetRate(chapter, rate, playbackOwner) }
                 override fun queueReportCallback(chapter: ReaderTtsChapterRef, sliceIndex: Int, status: ReaderTtsSliceStatus,
                     callbackId: String, failurePolicy: ReaderTtsFailurePolicy, failureLimit: Int): ReaderTtsQueueCallbackResult =
-                    runBlocking { library.ttsQueueReportCallback(chapter, sliceIndex, status, callbackId, failurePolicy, failureLimit) }
+                    runBlocking { library.ttsQueueReportCallback(chapter, sliceIndex, status, callbackId, failurePolicy,
+                        failureLimit, playbackOwner) }
             },
             engine = AndroidTextToSpeechEngine(getApplication<Application>().applicationContext),
             eventExecutor = ttsEventExecutor,
-            coreExecutor = ttsCoreExecutor,
-            onStateChanged = { playback -> if (ticket == ttsUiGeneration) mutableState.update { it.copy(ttsPlayback = playback) } },
+            onStateChanged = { playback -> mutableState.update {
+                if (isTtsOwner(it, reading, ticket)) it.copy(ttsPlayback = playback) else it
+            } },
         )
-        ttsCoordinator = coordinator
-        return coordinator
     }
 
     private fun retireTts() {
         ++ttsUiGeneration
-        ttsCoordinator?.close()
+        val obsolete = ttsCoordinator ?: return
         ttsCoordinator = null
+        obsolete.retireEngine()
         mutableState.update { it.copy(ttsPlayback = ReaderTtsPlaybackState(ReaderTtsPlaybackStatus.IDLE)) }
+        val previous = ttsRetirement
+        ttsRetirement = viewModelScope.launch {
+            previous?.join()
+            ttsMutex.withLock {
+                try { withContext(Dispatchers.IO) { obsolete.close() } }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    if (!retainProtocolPending(error)) Log.w("ReaderTts", "Unable to stop retired Core TTS queue", error)
+                }
+            }
+        }
     }
 
     private fun openChapter(book: LibraryBook, index: Int, scalarOffset: Int) {
@@ -1538,9 +1563,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
         if (state.value.route == ReaderRoute.OnlineReading) { backgroundOnline(); return }
+        retireTts()
         if (state.value.positionSaveBarrier != null) return
         val reading = state.value.reading ?: return
-        retireTts()
         delayedSave?.cancel()
         viewModelScope.launch {
             gate.withLock {

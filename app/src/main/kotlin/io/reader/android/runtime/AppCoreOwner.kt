@@ -110,6 +110,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val managementService by lazy { requireHeldLane(); ReaderBookshelfManagement(serviceTransport, journal) }
     private val sourceRulesService by lazy { requireHeldLane(); ReaderSourceRules(serviceTransport, journal, ::clearSourceHostSession) }
     private val ttsService by lazy { requireHeldLane(); ReaderTtsService(serviceTransport) }
+    // Accessed only on the operation lane shared by business turns and retirement cleanup.
+    private val foregroundTtsQueues = mutableMapOf<Triple<String, String, Int>, UUID>()
     private val mangaProgressService by lazy {
         requireHeldLane()
         ReaderMangaProgressService(serviceTransport, journal, ::requireHeldLane,
@@ -306,11 +308,36 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
             return owner.lane.get()!!.turn ?: error("NO_BUSINESS_TURN")
         }
         fun registerSearchCleanup(turn: ReaderOperationOwner.Turn, sessionId: String, closeOriginal: suspend () -> Unit) {
-            val id = "search:$sessionId"
+            registerRetiringCleanup(turn, "search:$sessionId", closeOriginal = closeOriginal)
+        }
+        fun registerTtsQueue(chapter: ReaderTtsChapterRef, playback: UUID) {
+            val turn = currentTurn()
+            val key = Triple(chapter.sourceId, chapter.bookId, chapter.chapterIndex)
+            owner.foregroundTtsQueues[key] = playback
+            registerRetiringCleanup(turn, "tts:$playback", chapter) {
+                if (owner.foregroundTtsQueues[key] == playback) {
+                    check(tts.queueStop(chapter).state == ReaderTtsQueueState.STOPPED) { "TTS_STOP_RESULT" }
+                    owner.foregroundTtsQueues.remove(key)
+                }
+            }
+        }
+        fun requireTtsQueue(chapter: ReaderTtsChapterRef, playback: UUID) {
+            owner.requireBusinessLane(lease)
+            val key = Triple(chapter.sourceId, chapter.bookId, chapter.chapterIndex)
+            check(owner.foregroundTtsQueues[key] == playback) { "TTS_PLAYBACK_OWNER_RETIRED" }
+        }
+        fun finishTtsQueue(chapter: ReaderTtsChapterRef, playback: UUID) {
+            requireTtsQueue(chapter, playback)
+            owner.foregroundTtsQueues.remove(Triple(chapter.sourceId, chapter.bookId, chapter.chapterIndex))
+            currentTurn().cleanupCompleted("tts:$playback")
+        }
+        private fun registerRetiringCleanup(turn: ReaderOperationOwner.Turn, id: String,
+            ttsChapter: ReaderTtsChapterRef? = null, closeOriginal: suspend () -> Unit) {
             check(turn.lease == lease)
             turn.registerRetiringCleanup(id) {
                 withContext(Dispatchers.IO + owner.lane.asContextElement(
-                    Lane(lease, Purpose.Cleanup, { owner.operations.assertCleanupActive(lease, id) }, null),
+                    Lane(lease, Purpose.Cleanup, { owner.operations.assertCleanupActive(lease, id) }, null,
+                        ttsCleanup = ttsChapter),
                 )) {
                     try { closeOriginal() } finally { owner.publishIfInitialized() }
                 }
@@ -328,7 +355,8 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private enum class Purpose { Business, TurnFinally, Maintenance, Cleanup }
     private class Lane(val lease: ReaderOperationOwner.ClientLease, val purpose: Purpose,
         val assertHeld: () -> Unit, val turn: ReaderOperationOwner.Turn?,
-        val observer: ReaderReadObservers.ReadObserver? = null)
+        val observer: ReaderReadObservers.ReadObserver? = null,
+        val ttsCleanup: ReaderTtsChapterRef? = null)
     override fun requireHeldLane() {
         check(Looper.myLooper() != Looper.getMainLooper()) { "CORE_TRANSPORT_ON_MAIN" }
         val held = lane.get() ?: error("CORE_TRANSPORT_OUTSIDE_OWNER_LANE")
@@ -344,9 +372,13 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     }
     override fun requireRequestLane(lease: ReaderOperationOwner.ClientLease, method: String, params: JSONObject) {
         requireLane(lease)
-        if (lane.get()!!.purpose != Purpose.Business) check(lane.get()!!.purpose in setOf(Purpose.Cleanup, Purpose.TurnFinally) &&
-            method == "search.content" && params.optBoolean("closeCursor") && params.optString("cursor").isNotBlank()) {
-            "MAINTENANCE_CANNOT_DISPATCH_NEW_BUSINESS"
+        val held = lane.get()!!
+        if (held.purpose != Purpose.Business) {
+            val exactTtsStop = held.purpose == Purpose.Cleanup && held.ttsCleanup != null && method == "tts.queue.stop" &&
+                params.length() == 1 && params.optJSONObject("chapter")?.let(ReaderTtsPolicy::chapter) == held.ttsCleanup
+            val searchClose = held.ttsCleanup == null && held.purpose in setOf(Purpose.Cleanup, Purpose.TurnFinally) &&
+                method == "search.content" && params.optBoolean("closeCursor") && params.optString("cursor").isNotBlank()
+            check(exactTtsStop || searchClose) { "MAINTENANCE_CANNOT_DISPATCH_NEW_BUSINESS" }
         }
         // Guard existing publisher entrances before they reserve another mutation as well as the final apply.
         // Original drains/recovery do not dispatch these methods and keep their existing exact route.
