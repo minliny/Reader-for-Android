@@ -1602,7 +1602,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         ReaderRoute.OnlineDirectory -> directoryId != null && state.value.onlineDirectoryIdentity == directoryId
         else -> false
     }
-    private fun onlineAction(original: ReaderOnlineReadingUi? = state.value.onlineReading, block: suspend (Long) -> Unit) = perform { request ->
+    private fun onlineAction(original: ReaderOnlineReadingUi? = state.value.onlineReading,
+        failureMessage: String = "正文或阅读位置暂时不可用，原操作事实会继续保留。", block: suspend (Long) -> Unit) = perform { request ->
         mutableState.update { it.copy(onlineError = null) }
         try { block(request) }
         catch (cancelled: CancellationException) { throw cancelled }
@@ -1613,7 +1614,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 val pending = PendingPosition(error.operationId, key.bookId, error.stage, key.sourceId)
                 mutableState.update { it.copy(pendingPositions = it.pendingPositions.filterNot { old -> old.id == pending.id } + pending, error = null) }
             } else if (error is ReaderOnlineOriginalPending) mutableState.update { it.copy(onlineOriginal = error.original, error = null) }
-            else mutableState.update { it.copy(onlineError = "正文或阅读位置暂时不可用，原操作事实会继续保留。") }
+            else mutableState.update { it.copy(onlineError = failureMessage) }
         }
     }
     fun openRemoteBook(book: ReaderRemoteShelfBook) {
@@ -1635,6 +1636,19 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             if (state.value.onlineDirectory?.identity != identity || state.value.route != ReaderRoute.OnlineDirectory) return@onlineAction
             val page = library.nextOnlineDirectory(directory.page.directory, offset)
             if (request == generation) mutableState.update { it.copy(onlineDirectory = directory.copy(page = page, nodes = directory.nodes + page.nodes)) }
+        }
+    }
+    fun refreshOnlineDirectory(identity: String) {
+        val directory = state.value.onlineDirectory ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.OnlineDirectory || directory.identity != identity ||
+            onlineBlocked(directory.book.key) || coreProtocolRecoveries.value.items.isNotEmpty()) return
+        onlineAction(failureMessage = "目录更新未完成，仍显示原目录。") { request ->
+            if (state.value.onlineDirectory !== directory || state.value.route != ReaderRoute.OnlineDirectory || onlineBlocked(directory.book.key)) return@onlineAction
+            val page = library.refreshOnlineDirectory(directory.page.directory)
+            if (request == generation) {
+                val refreshed = ReaderOnlineDirectoryUi(java.util.UUID.randomUUID().toString(), directory.book, page)
+                mutableState.update { it.copy(onlineDirectory = refreshed, onlineDirectoryIdentity = refreshed.identity) }
+            }
         }
     }
     fun openOnlineDirectoryNode(identity: String, node: ReaderOnlineDirectoryNode) {
@@ -1660,11 +1674,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             if (request == generation) publishOnlineReading(book, opened, request)
         }
     }
-    private fun publishOnlineReading(book: ReaderRemoteShelfBook, opened: ReaderOnlineChapter, nativeOwner: Long) {
+    private fun publishOnlineReading(book: ReaderRemoteShelfBook, opened: ReaderOnlineChapter, nativeOwner: Long, controls: Boolean = false) {
         stopOnlineWindow(retire = true)
         check(opened.chapter.key == book.key && opened.chapter.presentationKind == ReaderTextPresentationKind.ONLINE_TEXT)
         mutableState.update { it.copy(route = ReaderRoute.OnlineReading, onlineReading = ReaderOnlineReadingUi(
-            java.util.UUID.randomUUID().toString(), nativeOwner, book, opened), onlineOriginal = null, error = null) }
+            java.util.UUID.randomUUID().toString(), nativeOwner, book, opened, controls = controls), onlineOriginal = null, error = null) }
     }
     /** Only the existing Native body can report this after raw/visible-line/OnDraw admission. */
     fun onlineNativeReady(identity: String, opened: ReaderOnlineChapter) {
@@ -1807,6 +1821,19 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         val reading = state.value.onlineReading ?: return
         if (state.value.route == ReaderRoute.OnlineReading && !state.value.busy && reading.identity == identity)
             mutableState.update { it.copy(onlineReading = reading.copy(controls = !reading.controls)) }
+    }
+    fun refreshOnlineChapter(identity: String) {
+        val reading = state.value.onlineReading ?: return
+        if (state.value.busy || state.value.route != ReaderRoute.OnlineReading || reading.identity != identity ||
+            !reading.nativePresented || reading.opened.resumeOnly || onlineWindowBlocked(reading)) return
+        stopOnlineWindow(retire = true)
+        mutableState.update { it.copy(onlineReading = reading.copy(window = null, windowRequested = false, windowLoading = false, windowError = null)) }
+        onlineAction(reading, failureMessage = "本章更新未完成，正文与当前位置已保留。") { request ->
+            if (!sameOnline(reading) || state.value.route != ReaderRoute.OnlineReading || onlineWindowBlocked(reading)) return@onlineAction
+            val confirmed = persistOnline(reading)
+            val opened = library.refreshOnlineChapter(reading.opened, confirmed)
+            if (request == generation) publishOnlineReading(reading.book, opened, request, controls = reading.controls)
+        }
     }
     fun showOnlineDirectory() {
         val reading = state.value.onlineReading ?: return

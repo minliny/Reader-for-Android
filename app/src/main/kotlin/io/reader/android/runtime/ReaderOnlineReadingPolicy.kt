@@ -15,6 +15,28 @@ internal object ReaderOnlineReadingPolicy {
         selectedChapter(key, version, entry, progress, target?.chapterIndex, target?.scalarOffset, target?.positionScopeJson)
     internal fun neighborChapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject, index: Int): ReaderOnlineChapter =
         selectedChapter(key, version, entry, progress, index, 0, null)
+    fun refreshedChapter(opened: ReaderOnlineChapter, visibleScalar: Int, result: JSONObject, entry: JSONObject,
+        progress: JSONObject): ReaderOnlineChapter {
+        val old = opened.chapter
+        scope(result, old.key)
+        val migration = result.getJSONObject("positionMigration")
+        val body = result.getString("bodyVersion")
+        val processing = result.getString("processingVersion")
+        check(migration.getString("status") in setOf("committed", "unchanged") &&
+            migration.getString("previousBodyVersion") == old.bodyVersion &&
+            migration.getString("previousProcessingVersion") == old.processingVersion &&
+            migration.getString("bodyVersion") == body && migration.getString("processingVersion") == processing) {
+            "ONLINE_REFRESH_POSITION_SCOPE"
+        }
+        val anchors = migration.getJSONArray("anchors")
+        check(anchors.length() == 1) { "ONLINE_REFRESH_VISIBLE_ANCHOR_COUNT" }
+        val anchor = anchors.getJSONObject(0)
+        check(anchor.getString("id") == "visible" && anchor.getLong("previousOffset") == visibleScalar.toLong()) { "ONLINE_REFRESH_VISIBLE_ANCHOR" }
+        val offset = anchor.getLong("offset").also { check(it in 0..Int.MAX_VALUE.toLong()) }.toInt()
+        return selectedChapter(old.key, opened.sourceVersion, entry, progress, old.index, offset, null).also {
+            check(it.chapter.bodyVersion == body && it.chapter.processingVersion == processing) { "ONLINE_REFRESH_CANONICAL_SCOPE" }
+        }
+    }
     private fun selectedChapter(key: ShelfBookKey, version: String, entry: JSONObject, progress: JSONObject,
         selectedIndex: Int?, selectedOffset: Int?, selectedScope: String?): ReaderOnlineChapter {
         remote(key); scope(entry, key)

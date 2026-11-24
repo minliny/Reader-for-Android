@@ -26,7 +26,8 @@ data class ReaderOnlineReadingUi(
     val window: ReaderOnlineReadingWindowSnapshot? = null,
 )
 data class ReaderOnlineDirectoryUi(val identity: String, val book: ReaderRemoteShelfBook,
-    val page: ReaderOnlineDirectoryPage, val nodes: List<ReaderOnlineDirectoryNode> = page.nodes)
+    val page: ReaderOnlineDirectoryPage, val nodes: List<ReaderOnlineDirectoryNode> = page.nodes,
+    val unreadNewChapters: Long? = page.unreadNewChapters)
 data class ReaderOnlineSaveProjection(val readingIdentity: String, val sessionToken: String,
     val result: ReaderPositionSaveResult.ConfirmedNewOriginal)
 
@@ -55,11 +56,20 @@ internal fun ReaderOnlineDirectoryScreen(state: ReaderUiState, model: ReaderView
         state.onlineFeedback?.let { message -> key(state.onlineFeedbackId) { ReaderTransientFeedback(message) { model.retireOnlineFeedback(state.onlineFeedbackId) } } }
         Text(directory.book.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(19.dp))
         ReaderOnlineOriginalNotice(state, model)
-        state.onlineError?.let { ReaderPageState("正文暂时不可用", it) }
+        state.onlineError?.let { ReaderPageState("本次操作未完成", it) }
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(19.dp)) {
-            item { TextButton({ model.continueOnlineReading(directory.identity) }, enabled = !blocked,
-                modifier = Modifier.testTag("reader_online_resume")) { Text("继续阅读") } }
+            item {
+                Row {
+                    TextButton({ model.continueOnlineReading(directory.identity) }, enabled = !blocked,
+                        modifier = Modifier.testTag("reader_online_resume")) { Text("继续阅读") }
+                    TextButton({ model.refreshOnlineDirectory(directory.identity) }, enabled = !blocked,
+                        modifier = Modifier.testTag("reader_online_refresh_directory")) { Text("更新目录") }
+                }
+                directory.unreadNewChapters?.let { unread ->
+                    Text(if (unread == 0L) "目录已更新" else "目录已更新，未读新章 ${unread} 章", style = MaterialTheme.typography.bodySmall)
+                }
+            }
             itemsIndexed(directory.nodes) { index, node ->
                 TextButton({ model.openOnlineDirectoryNode(directory.identity, node) }, enabled = !blocked && node.kind == "target",
                     modifier = Modifier.fillMaxWidth().testTag("reader_online_directory_$index")) { Text(node.title) }
@@ -126,6 +136,8 @@ internal fun ReaderOnlineReadingScreen(state: ReaderUiState, model: ReaderViewMo
                             enabled = !blocked && neighbor != null && reading.window?.window?.isRetired == false,
                             modifier = Modifier.testTag(if (offset < 0) "reader_online_previous" else "reader_online_next")) { Text(label) }
                     }
+                    TextButton({ model.refreshOnlineChapter(reading.identity) }, enabled = !blocked && reading.nativePresented && !reading.opened.resumeOnly,
+                        modifier = Modifier.testTag("reader_online_refresh_chapter")) { Text("更新本章") }
                 }
                 if (reading.windowLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("reader_online_window_loading"))
                 reading.windowError?.let { message -> ReaderPageState("邻章暂时不可用", message, "重新准备邻章",

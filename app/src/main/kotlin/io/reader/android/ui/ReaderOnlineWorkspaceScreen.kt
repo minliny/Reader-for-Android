@@ -34,8 +34,13 @@ internal fun ReaderOnlineWorkspaceScreen(
         if (state.unconfirmedId != null && state.pendingSources.isEmpty() && state.pendingAdds.isEmpty() && state.pendingReads.isEmpty())
             ReaderRecoveryNotice("原操作尚未确认，原意图会继续保留。", state.busy, null)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("reader_online_loading"))
-        val retrySearch = state.sessionFailed && !state.pending && state.selection != null && state.query.isNotBlank()
-        if (state.error != null || retrySearch) {
+        val retrySearch = OnlineWorkspaceUiPolicy.searchRetry(state, revision) != null
+        if (state.searchInFlight && !state.searchStopped) TextButton({ owner.stopSearch(revision) },
+            modifier = Modifier.testTag("reader_online_search_stop")) { Text("停止显示搜索结果") }
+        if (state.searchStopped) {
+            ReaderPageState("已停止显示本次搜索结果", if (state.busy) "正在等待原请求结束。" else if (state.pending) "原请求尚未确认。" else "可以重新搜索。",
+                if (retrySearch) "重试搜索" else null, if (retrySearch) ({ owner.retrySearch(revision) }) else null)
+        } else if (state.error != null || retrySearch) {
             ReaderPageState(
                 if (retrySearch) "搜索未完成" else "本次操作未完成",
                 state.error ?: "原操作已核对，可以重新执行相同查询。",
@@ -85,7 +90,7 @@ internal fun ReaderOnlineWorkspaceScreen(
                         Text(state.selected?.name.orEmpty(), style = MaterialTheme.typography.titleMedium)
                         OutlinedTextField(state.query, { owner.editQuery(it, revision) }, enabled = enabled,
                             singleLine = true, label = { Text("搜索书名或作者") }, modifier = Modifier.fillMaxWidth().testTag("reader_online_query"))
-                        TextButton({ owner.search(revision) }, enabled = enabled && state.query.isNotBlank() && state.selection != null,
+                        TextButton({ owner.search(revision) }, enabled = enabled && state.query.isNotBlank() && state.selection != null && !state.sessionFailed && !state.searchStopped,
                             modifier = Modifier.testTag("reader_online_search")) { Text("搜索") }
                     }
                     if (state.loadedPage && state.books.isEmpty() && !state.busy && !state.pending && state.error == null) item { ReaderPageState("没有找到书籍", "试试其他关键词。") }

@@ -130,6 +130,35 @@ internal class ReaderOnlineCatalog(
         configureCapabilities()
         return originals.request(method, key.sourceId, params)
     }
+    /** A refresh must use a real stored-source TOC URL, since an omitted URL only reads cache. */
+    fun refreshToc(key: ShelfBookKey, version: String, variables: JSONObject) {
+        checkLane(); ReaderOnlineReadingPolicy.remote(key); configureCapabilities()
+        val stored = originals.request("search-book.get", key.sourceId,
+            JSONObject().put("origin", key.sourceId).put("bookUrl", key.bookId)).optJSONObject("book")
+        stored?.let {
+            check(it.getString("origin") == key.sourceId && it.getString("bookUrl") == key.bookId) { "ONLINE_REFRESH_BOOK_IDENTITY" }
+        }
+        val params = JSONObject().put("sourceId", key.sourceId).put("bookId", key.bookId)
+        val retainedUrl = stored?.let { ReaderOnlineCatalogPolicy.optional(it, "tocUrl") }?.takeIf { it.isNotBlank() }
+        if (retainedUrl != null) {
+            params.put("tocUrl", retainedUrl).put("variables", variables)
+        } else {
+            val shelf = readStored("bookshelf.get", key, params).getJSONObject("book")
+            ReaderOnlineReadingPolicy.scope(shelf, key)
+            val book = JSONObject().put("bookId", key.bookId).put("title", shelf.getString("title")).put("author", shelf.getString("author"))
+            val detail = originals.request("book.detail", key.sourceId,
+                JSONObject().put("sourceId", key.sourceId).put("book", book).put("bookUrl", key.bookId))
+            check(detail.getString("sourceId") == key.sourceId && detail.getString("sourceVersion") == version &&
+                detail.getJSONObject("book").getString("bookId") == key.bookId &&
+                ReaderOnlineCatalogPolicy.kind(detail) == ReaderOnlineContentKind.TEXT) { "ONLINE_REFRESH_DETAIL_SCOPE" }
+            val tocUrl = detail.getString("tocUrl").also { check(it.isNotBlank()) { "ONLINE_REFRESH_TOC_URL_UNAVAILABLE" } }
+            params.put("tocUrl", tocUrl).put("variables", detail.optJSONObject("variables") ?: JSONObject())
+        }
+        val refreshed = originals.request("book.toc", key.sourceId, params)
+        ReaderOnlineReadingPolicy.scope(refreshed, key)
+        check(refreshed.getString("sourceVersion") == version && refreshed.getBoolean("catalogInstalled") &&
+            refreshed.isNull("catalogDeferredReason")) { "ONLINE_REFRESH_CATALOG_NOT_INSTALLED" }
+    }
     /** Native manga directory projection over the same original-call owner, without a text/shelf entry. */
     fun readMangaDirectory(method: String, chapter: ReaderMangaChapterRef, params: JSONObject): JSONObject {
         checkLane()

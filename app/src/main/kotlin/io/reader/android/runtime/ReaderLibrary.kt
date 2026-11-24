@@ -500,6 +500,13 @@ class ReaderLibrary(context: Context) : AutoCloseable {
         client.registerSearchCleanup(client.currentTurn(), "online-dir:" + page.directory.id) { onlineReading.close(page.directory) }
         page
     }
+    suspend fun refreshOnlineDirectory(directory: ReaderOnlineDirectory): ReaderOnlineDirectoryPage = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        requireNoPendingOnlinePosition(directory.key)
+        val page = onlineReading.refreshDirectory(client.lease, directory)
+        client.currentTurn().cleanupCompleted("search:online-dir:" + directory.id)
+        client.registerSearchCleanup(client.currentTurn(), "online-dir:" + page.directory.id) { onlineReading.close(page.directory) }
+        page
+    }
     suspend fun nextOnlineDirectory(page: ReaderOnlineDirectory, offset: Int): ReaderOnlineDirectoryPage =
         onIO(WholeTurnMode.RETAIN_ORIGINAL) { onlineReading.next(client.lease, page, offset) }
     suspend fun resolveOnlineDirectory(node: ReaderOnlineDirectoryNode): ReaderOnlineDirectoryTarget =
@@ -540,17 +547,34 @@ class ReaderLibrary(context: Context) : AutoCloseable {
     /** Only the exact newly archived current-runtime ACK can authorize leaving this chapter. */
     suspend fun openOnlineNeighbor(window: ReaderOnlineReadingWindow, neighbor: ReaderOnlineNeighbor,
         confirmed: ReaderPositionSaveResult.ConfirmedNewOriginal): ReaderOnlineChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
-        requireOnlineChapter(window.opened)
-        val record = checkNotNull(journal.exact(confirmed.originalId, includeCompleted = true)) { "ONLINE_MOVE_ORIGINAL_MISSING" }
-        check(record.getBoolean("completed")) { "ONLINE_MOVE_ORIGINAL_NOT_COMPLETED" }
+        requireOnlinePositionSave(window.opened, confirmed)
+        publishOnlineChapter(onlineReading.move(client.lease, window, neighbor))
+    }
+    suspend fun refreshOnlineChapter(opened: ReaderOnlineChapter,
+        confirmed: ReaderPositionSaveResult.ConfirmedNewOriginal): ReaderOnlineChapter = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
+        requireNoPendingOnlinePosition(opened.chapter.key)
+        val actual = requireOnlinePositionSave(opened, confirmed)
+        publishOnlineChapter(onlineReading.refreshChapter(client.lease, opened, actual.scalarOffset))
+    }
+    private fun requireNoPendingOnlinePosition(key: ShelfBookKey) {
+        journal.readAll().firstOrNull {
+            it.optString("kind") == "progress" && ProgressReceiptPolicy.key(it) == key && !it.optBoolean("completed")
+        }?.let { throw PendingOperationException(it.getString("id"), "reading.progress.update") }
+    }
+    private fun requireOnlinePositionSave(opened: ReaderOnlineChapter,
+        confirmed: ReaderPositionSaveResult.ConfirmedNewOriginal): ReaderPositionSaveResult.ConfirmedNewOriginal {
+        requireOnlineChapter(opened)
+        val chapter = opened.chapter
+        val record = checkNotNull(journal.exact(confirmed.originalId, includeCompleted = true)) { "ONLINE_POSITION_ORIGINAL_MISSING" }
+        check(record.getBoolean("completed")) { "ONLINE_POSITION_ORIGINAL_NOT_COMPLETED" }
         val actual = ReaderProgressNewIntentPolicy.confirmed(record)
-        check(actual.sourceId == window.key.sourceId && actual.bookId == window.key.bookId && actual.chapterIndex == window.chapterIndex &&
-            actual.runtimeSession == transport.session && actual.bodyVersion == window.bodyVersion && actual.processingVersion == window.processingVersion &&
-            actual.progressRevision == readingSessions[window.key]?.revision && actual.originalId == confirmed.originalId && actual.requestId == confirmed.requestId &&
+        check(actual.sourceId == chapter.sourceId && actual.bookId == chapter.bookId && actual.chapterIndex == chapter.index &&
+            actual.runtimeSession == transport.session && actual.bodyVersion == chapter.bodyVersion && actual.processingVersion == chapter.processingVersion &&
+            actual.progressRevision == readingSessions[chapter.key]?.revision && actual.originalId == confirmed.originalId && actual.requestId == confirmed.requestId &&
             actual.scalarOffset == confirmed.scalarOffset && actual.progressRevision == confirmed.progressRevision &&
             ProgressJournalCandidatePolicy.sameObject(JSONObject(actual.originalParametersJson), JSONObject(confirmed.originalParametersJson)) &&
-            ProgressJournalCandidatePolicy.sameObject(JSONObject(actual.parsedTerminalJson), JSONObject(confirmed.parsedTerminalJson))) { "ONLINE_MOVE_ORIGINAL_SCOPE" }
-        publishOnlineChapter(onlineReading.move(client.lease, window, neighbor))
+            ProgressJournalCandidatePolicy.sameObject(JSONObject(actual.parsedTerminalJson), JSONObject(confirmed.parsedTerminalJson))) { "ONLINE_POSITION_ORIGINAL_SCOPE" }
+        return actual
     }
     suspend fun closeOnlineChapter(opened: ReaderOnlineChapter): Unit = onIO(WholeTurnMode.RETAIN_ORIGINAL) {
         onlineReading.retire(client.lease, opened)

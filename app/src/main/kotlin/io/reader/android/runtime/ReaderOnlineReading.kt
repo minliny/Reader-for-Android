@@ -16,7 +16,10 @@ class ReaderOnlineDirectoryNode internal constructor(
     val nodeId: String, val title: String, val kind: String, val chapterIndex: Int?,
     internal val directory: ReaderOnlineDirectory,
 )
-data class ReaderOnlineDirectoryPage(val directory: ReaderOnlineDirectory, val nodes: List<ReaderOnlineDirectoryNode>, val nextOffset: Int?)
+data class ReaderOnlineDirectoryPage(
+    val directory: ReaderOnlineDirectory, val nodes: List<ReaderOnlineDirectoryNode>, val nextOffset: Int?,
+    val unreadNewChapters: Long? = null,
+)
 class ReaderOnlineDirectoryTarget internal constructor(
     val directory: ReaderOnlineDirectory, val chapterIndex: Int, val scalarOffset: Int,
     internal val proofJson: String, internal val positionScopeJson: String?,
@@ -81,21 +84,39 @@ internal class ReaderOnlineReading(
         val value = request("reading.directory.view.open.v2", key, params(key).put("query", "").put("descending", false)
             .put("collapsedNodeIds", JSONArray()).put("limit", 256))
         check(value.getString("status") == "ready"); ReaderOnlineReadingPolicy.scope(value, key)
-        views.values.filter { it.directory.lease == lease && it.directory.key == key }.map { it.directory }.forEach(::close)
-        check(views.size < 4) { "ONLINE_DIRECTORY_CAPACITY" }
+        val previous = views.values.filter { it.directory.lease == lease && it.directory.key == key }
+        check(views.size - previous.size < 4) { "ONLINE_DIRECTORY_CAPACITY" }
         val directory = ReaderOnlineDirectory(UUID.randomUUID().toString(), key, version, value.getString("viewId"),
             value.getString("catalogRevision"), value.getString("structureRevision"), owner, lease, transport.session)
-        views[directory.id] = View(directory)
-        return page(value, directory)
+        val view = View(directory)
+        val opened = page(value, view)
+        previous.forEach { close(it.directory) }
+        views[directory.id] = view
+        return opened
+    }
+    fun refreshDirectory(lease: ReaderOperationOwner.ClientLease, directory: ReaderOnlineDirectory): ReaderOnlineDirectoryPage {
+        current(lease, directory)
+        val key = directory.key
+        val version = installed(key)
+        if (!canAcquire(key, version)) throw ReaderOnlineEntryUnavailable(key, "missing", "sourceUnavailableForAcquisition")
+        val status = request("cache.book.status", key, params(key).put("includeGlobalStats", false).put("includeChapterStates", false))
+        ReaderOnlineReadingPolicy.scope(status, key)
+        check(status.optString("sourceVersion") == version) { "ONLINE_REFRESH_CATALOG_CHANGED" }
+        catalog.refreshToc(key, version, status.optJSONObject("continuationVariables") ?: JSONObject())
+        val shelf = request("bookshelf.get", key).getJSONObject("book")
+        ReaderOnlineReadingPolicy.scope(shelf, key)
+        val unread = shelf.optLong("unreadCount", 0).also { check(it >= 0) }
+        return directory(lease, key).copy(unreadNewChapters = unread)
     }
     fun next(lease: ReaderOperationOwner.ClientLease, directory: ReaderOnlineDirectory, offset: Int): ReaderOnlineDirectoryPage {
         val view = current(lease, directory)
         check(offset > 0 && view.next == offset) { "ONLINE_DIRECTORY_NOT_NEXT" }
-        return page(request("reading.directory.view.page.v2", directory.key, viewParams(directory).put("offset", offset).put("limit", 256)), directory)
+        return page(request("reading.directory.view.page.v2", directory.key, viewParams(directory).put("offset", offset).put("limit", 256)), view)
     }
-    private fun page(value: JSONObject, directory: ReaderOnlineDirectory): ReaderOnlineDirectoryPage {
+    private fun page(value: JSONObject, view: View): ReaderOnlineDirectoryPage {
+        val directory = view.directory
         identity(value, directory)
-        val view = checkNotNull(views[directory.id]); val rows = value.getJSONArray("nodes")
+        val rows = value.getJSONArray("nodes")
         check(view.issued.size <= 50_000 - rows.length()) { "ONLINE_DIRECTORY_NODE_BUDGET" }
         val nodes = (0 until rows.length()).map { index ->
             val row = rows.getJSONObject(index)
@@ -136,10 +157,8 @@ internal class ReaderOnlineReading(
             val rows = status.getJSONArray("chapters")
             val row = (0 until rows.length()).map { rows.getJSONObject(it) }.single { it.getInt("chapterIndex") == target.chapterIndex }
             check(row.optBoolean("navigable", true) && row.getString("url") == JSONObject(target.proofJson).getString("url"))
-            val variables = JSONObject((status.optJSONObject("continuationVariables") ?: JSONObject()).toString())
-            row.optJSONObject("variables")?.let { values -> values.keys().forEach { variables.put(it, values.getString(it)) } }
-            val acquired = request("chapter.content", key, params(key).put("chapterIndex", target.chapterIndex).put("chapterTitle", row.getString("title"))
-                .put("chapterUrl", row.getString("url")).put("variables", variables).put("directoryTargetProof", JSONObject(target.proofJson)))
+            val acquired = request("chapter.content", key, chapterParams(key, status, row)
+                .put("directoryTargetProof", JSONObject(target.proofJson)))
             ReaderOnlineReadingPolicy.scope(acquired, key)
             check(acquired.get("content") is String) { "ONLINE_STRUCTURED_CONTENT_NOT_ADMITTED" }
             request("reading.entry.prepare", key, prepare)
@@ -155,6 +174,28 @@ internal class ReaderOnlineReading(
         check(cachedVersion(key, requireCatalog = target != null) == version) { "ONLINE_READING_CACHED_CATALOG_CHANGED" }
         val progress = request("reading.progress.get", key)
         return retainEntry(lease, ReaderOnlineReadingPolicy.chapter(key, version, entry, progress, target))
+    }
+    fun refreshChapter(lease: ReaderOperationOwner.ClientLease, opened: ReaderOnlineChapter, visibleScalar: Int): ReaderOnlineChapter {
+        entry(lease, opened)
+        val previous = opened.chapter
+        val key = previous.key
+        check(visibleScalar in 0..previous.scalarCount) { "ONLINE_REFRESH_VISIBLE_SCALAR" }
+        if (!canAcquire(key, opened.sourceVersion)) throw ReaderOnlineEntryUnavailable(key, "missing", "sourceUnavailableForAcquisition")
+        val status = cacheStatus(key, opened.sourceVersion)
+        val row = cacheRow(status, previous.index)
+        val context = JSONObject().put("bodyVersion", previous.bodyVersion).put("processingVersion", previous.processingVersion)
+            .put("anchors", JSONArray().put(JSONObject().put("id", "visible").put("offset", visibleScalar)))
+        val refreshed = request("chapter.content", key, chapterParams(key, status, row).put("forceRefresh", true).put("positionContext", context))
+        check(cachedVersion(key) == opened.sourceVersion) { "ONLINE_REFRESH_CATALOG_CHANGED" }
+        val snapshot = request("reading.entry.snapshot", key, params(key).put("chapterIndex", previous.index))
+        val progress = request("reading.progress.get", key)
+        return retainEntry(lease, ReaderOnlineReadingPolicy.refreshedChapter(opened, visibleScalar, refreshed, snapshot, progress))
+    }
+    private fun chapterParams(key: ShelfBookKey, status: JSONObject, row: JSONObject): JSONObject {
+        val variables = JSONObject((status.optJSONObject("continuationVariables") ?: JSONObject()).toString())
+        row.optJSONObject("variables")?.let { values -> values.keys().forEach { variables.put(it, values.getString(it)) } }
+        return params(key).put("chapterIndex", row.getInt("chapterIndex")).put("chapterTitle", row.getString("title"))
+            .put("chapterUrl", row.getString("url")).put("variables", variables)
     }
     private fun retainEntry(lease: ReaderOperationOwner.ClientLease, opened: ReaderOnlineChapter): ReaderOnlineChapter {
         entries.keys.filter { entries[it]?.lease == lease }.toList().forEach { retire(lease, it) }
@@ -293,12 +334,8 @@ internal class ReaderOnlineReading(
             val status = cacheStatus(value.key, value.sourceVersion); currentWindow(lease, value, neighbor)
             val row = cacheRow(status, neighbor.chapterIndex)
             if (!canAcquire(value.key, value.sourceVersion)) throw ReaderOnlineEntryUnavailable(value.key, "missing", "sourceUnavailableForAcquisition")
-            val variables = JSONObject((status.optJSONObject("continuationVariables") ?: JSONObject()).toString())
-            row.optJSONObject("variables")?.let { values -> values.keys().forEach { variables.put(it, values.getString(it)) } }
             currentWindow(lease, value, neighbor)
-            val fetched = request("chapter.content", value.key, params(value.key).put("chapterIndex", neighbor.chapterIndex)
-                .put("chapterTitle", row.getString("title")).put("chapterUrl", row.getString("url")).put("variables", variables)
-                .put("preparationRevision", revision))
+            val fetched = request("chapter.content", value.key, chapterParams(value.key, status, row).put("preparationRevision", revision))
             ReaderOnlineReadingPolicy.scope(fetched, value.key)
             check(fetched.get("content") is String && fetched.getString("bodyVersion").isNotBlank() && fetched.getString("processingVersion").isNotBlank()) { "ONLINE_OPTIONAL_TEXT_CACHE_RESULT" }
             currentWindow(lease, value, neighbor)
