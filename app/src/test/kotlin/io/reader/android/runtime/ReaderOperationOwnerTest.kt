@@ -31,6 +31,8 @@ class ReaderOperationOwnerTest {
                 val closeEntered = CompletableDeferred<Unit>()
                 val directory = directory()
                 val owner = ReaderOperationOwner.create(directory, dispatcher) { events += "close"; closeEntered.complete(Unit) }
+                val alias = File(directory, ".")
+                assertThrows(IllegalStateException::class.java) { ReaderOperationOwner.create(alias, dispatcher) {} }
                 val lease = owner.activateClient(UUID.randomUUID(), 1)
                 val caller = async {
                     owner.withTurn(lease) {
@@ -58,7 +60,7 @@ class ReaderOperationOwnerTest {
                 assertEquals(listOf("prepare", "persist", "settle", "finally-enter", "finally-exit", "close"), events)
                 assertEquals(ReaderOperationOwner.CloseStatus.HostDrainedNativeQuiescenceUnconfirmed, result.status)
                 assertNull(result.closeFailure)
-                assertThrows(IllegalStateException::class.java) { ReaderOperationOwner.create(directory, dispatcher) {} }
+                assertThrows(IllegalStateException::class.java) { ReaderOperationOwner.create(alias, dispatcher) {} }
             }
         }
     }

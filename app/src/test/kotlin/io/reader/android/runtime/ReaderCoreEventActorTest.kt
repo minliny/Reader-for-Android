@@ -456,7 +456,8 @@ class ReaderCoreEventActorTest {
 
             val next = actor.prepare("runtime.ping", kind = ReaderCoreEventActor.Kind.READ_ONLY)
             assertTrue(actor.inspectRetiredOriginal(next.requestId, next.token) == null)
-            port.emit(host(original.requestId, 91, 7))
+            val oldHost = host(original.requestId, 91, 7)
+            port.emit(oldHost)
             val snapshot = waitFor(actor) { state -> state.deliveries.any { it.delivery.deliveryId == 91L } }
             val held = snapshot.deliveries.single()
             assertEquals(original.requestId, held.delivery.requestId)
@@ -476,6 +477,17 @@ class ReaderCoreEventActorTest {
             val afterOwnerTurn = actor.snapshot()
             assertEquals(1, port.acknowledgements.count { it == 91L }) // Failure did not auto-retry.
             assertEquals(91L, afterOwnerTurn.deliveries.single().delivery.deliveryId)
+
+            port.ackStatus = { ok("rc_runtime_ack_event") }
+            assertEquals(ReaderCoreEventActor.Acknowledgement.Succeeded, actor.retryAcknowledgement(held.delivery))
+            port.emit(oldHost)
+            val replay = waitFor(actor) { it.unparsedOriginals == listOf(oldHost) }
+            assertTrue(replay.deliveries.isEmpty())
+            assertTrue(replay.requests.single().request === next)
+            assertFalse(next.terminal.isCompleted)
+            assertEquals(listOf(92L, 91L, 91L), port.acknowledgements.toList())
+            assertEquals(0, handlerCalls.get())
+            assertEquals(1L, actor.inspectRetiredOriginal(original.requestId, original.token)!!.lateHostDiscardCount)
         }
     }
 

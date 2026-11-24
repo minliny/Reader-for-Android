@@ -22,12 +22,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.json.JSONObject
+import java.util.TreeMap
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Unwired A0 foundation. The future 1fe adapter owns the native handle; ONLY this
- * actor may call its RuntimePort. No dependency on the currently pinned a8 SDK.
+ * The App's sole event actor. Only this actor calls its RuntimePort.
  *
  * prepare -> caller/whole-turn durable beforeSend -> one dispatch. Consumers run
  * on their caller, never in the poll actor. A retained original is handed to an
@@ -40,11 +40,10 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * OPEN RESOURCE LIMIT: retired originals retain minimal identities until close;
  * successful controls retain theirs until exact control-error ACK or close. Their COUNT is not bounded by
- * Core delivery credits once earlier events were ACKed. Fixed1fe has no success
+ * Core delivery credits once earlier events were ACKed. The pinned protocol has no success
  * control event and may publish a control error after the primary terminal, so
- * no TTL/count eviction is justified. This unwired draft does not claim bounded
- * long-running A4 operation; a finite identity lifecycle is a separate adoption
- * condition. Do not solve it by dropping old evidence or changing Rust here.
+ * no TTL/count eviction is justified. Bounding the history requires a Core
+ * retirement signal that rules out further deliveries on the old route.
  */
 internal class ReaderCoreEventActor(
     private val port: RuntimePort,
@@ -192,6 +191,9 @@ internal class ReaderCoreEventActor(
     // OPEN like control history: exact routes persist until close; no TTL/count eviction.
     private val retiredOriginalRoutes = linkedMapOf<Long, RetiredOriginalRoute>()
     private val frames = linkedMapOf<Long, Frame>()
+    // Core allocates IDs sequentially, but concurrent callbacks can reach the
+    // Host out of order. Merge adjacent successful ACKs without assuming arrival order.
+    private val acknowledgedDeliveries = TreeMap<Long, Long>()
     private val hosts = linkedMapOf<HostKey, HostWork>()
     private val controls = linkedMapOf<Long, Control>()
     private val faults = linkedMapOf<String, Fault>()
@@ -537,6 +539,7 @@ internal class ReaderCoreEventActor(
         val event = JSONObject(raw)
         check(integer(event, "protocolVersion") == 1L)
         val deliveryId = integer(event, "deliveryId").also { check(it > 0 && it !in frames) }
+        check((acknowledgedDeliveries.floorEntry(deliveryId)?.value ?: 0L) < deliveryId) { "ACKNOWLEDGED_DELIVERY_REPLAY" }
         val requestId = integer(event, "requestId").also { check(it > 0) }
         val type = event.opt("type") as? String ?: error("EVENT_TYPE_REQUIRED")
         val control = controls[requestId]
@@ -856,31 +859,43 @@ internal class ReaderCoreEventActor(
         // Internal Host consumption and explicit caller consumption share this
         // transition. Core ACK is NOT idempotent; never call it after success.
         frame.phase = DeliveryPhase.CONSUMED_ACK_FAILED
-        return try {
-            val status = port.acknowledge(frame.delivery.deliveryId)
-            if (status.operation != "rc_runtime_ack_event" || status.status != 0)
-                Acknowledgement.Failed(fail("DELIVERY_ACK", frame.delivery.requestId, frame.delivery.deliveryId, status))
-            else {
-                if (acknowledgedRoute != null) retiredOriginalRoutes[acknowledgedRoute.requestId] = acknowledgedRoute
-                frames.remove(frame.delivery.deliveryId)
-                resolveDeliveryFaults(frame.delivery.deliveryId)
-                if (frame.delivery.origin == Origin.ORIGINAL_TERMINAL) {
-                    requests[frame.primary.requestId]?.terminalAcked = true
-                    // Actual original terminal consumption proves a failed read
-                    // cancellation is no longer waiting, unlike cancel(status0).
-                    resolveRequestFaults(frame.primary.requestId, setOf("SEND_UNKNOWN", "READ_CANCEL"))
-                } else if (frame.delivery.origin == Origin.CONTROL_ERROR) {
-                    controls.remove(frame.delivery.requestId)
-                    if (requests[frame.primary.requestId] == null)
-                        resolveRequestFaults(frame.delivery.requestId, setOf("HOST_CONTROL_ERROR"))
-                }
-                retireIfFinished(frame.primary.requestId)
-                notifyChanged()
-                Acknowledgement.Succeeded
-            }
+        val delivery = frame.delivery
+        val status = try {
+            port.acknowledge(delivery.deliveryId)
         } catch (error: Throwable) {
-            Acknowledgement.Failed(fail("DELIVERY_ACK", frame.delivery.requestId, frame.delivery.deliveryId, root = error))
+            return Acknowledgement.Failed(fail("DELIVERY_ACK", delivery.requestId, delivery.deliveryId, root = error))
         }
+        if (status.operation != "rc_runtime_ack_event" || status.status != 0)
+            return Acknowledgement.Failed(fail("DELIVERY_ACK", delivery.requestId, delivery.deliveryId, status))
+
+        recordAcknowledgedDelivery(delivery.deliveryId)
+        frames.remove(delivery.deliveryId)
+        if (acknowledgedRoute != null) retiredOriginalRoutes[acknowledgedRoute.requestId] = acknowledgedRoute
+        resolveDeliveryFaults(delivery.deliveryId)
+        if (delivery.origin == Origin.ORIGINAL_TERMINAL) {
+            requests[frame.primary.requestId]?.terminalAcked = true
+            // Actual original terminal consumption proves a failed read
+            // cancellation is no longer waiting, unlike cancel(status0).
+            resolveRequestFaults(frame.primary.requestId, setOf("SEND_UNKNOWN", "READ_CANCEL"))
+        } else if (delivery.origin == Origin.CONTROL_ERROR) {
+            controls.remove(delivery.requestId)
+            if (requests[frame.primary.requestId] == null)
+                resolveRequestFaults(delivery.requestId, setOf("HOST_CONTROL_ERROR"))
+        }
+        retireIfFinished(frame.primary.requestId)
+        notifyChanged()
+        return Acknowledgement.Succeeded
+    }
+
+    private fun recordAcknowledgedDelivery(id: Long) {
+        val before = acknowledgedDeliveries.lowerEntry(id)
+        val after = acknowledgedDeliveries.higherEntry(id)
+        val start = if (before?.value == id - 1) before.key else id
+        val end = if (after != null && after.key - 1 == id) {
+            acknowledgedDeliveries.remove(after.key)
+            after.value
+        } else id
+        acknowledgedDeliveries[start] = end
     }
     private fun retireIfFinished(requestId: Long) {
         val request = requests[requestId] ?: return
@@ -931,6 +946,7 @@ internal class ReaderCoreEventActor(
         while (mailbox.tryReceive().isSuccess) { /* reject queued commands; never execute after destroy */ }
         controls.clear()
         retiredOriginalRoutes.clear()
+        acknowledgedDeliveries.clear()
     }
 
     companion object {

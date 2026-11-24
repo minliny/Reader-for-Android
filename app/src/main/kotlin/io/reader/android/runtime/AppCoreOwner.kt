@@ -45,7 +45,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     private val mangaResourceHost = ReaderMangaResourceHost(httpHost, mangaResourceStore)
     private val actorDelegate = lazy {
         ReaderCoreEventActor(
-            NativeCoreRuntimePort(File(root, "Core"), File(application.cacheDir, "ReaderCore")),
+            NativeCoreRuntimePort(File(operations.dataDirectory), File(application.cacheDir, "ReaderCore")),
             hostHandler = ReaderCoreEventActor.HostHandler { original ->
                 if (original.capability == ReaderMangaResourceHost.CAPABILITY) {
                     mangaResourceHost.execute(original)
@@ -60,7 +60,7 @@ internal class AppCoreOwner(application: Application, private val recoveryFeed: 
     @Volatile private var lastActorClose: ReaderCoreEventActor.CloseReport? = null
     // The directory is claimed before any lazy bridge can cause Native handle creation.
     // Native destroy does not prove worker join: this directory is never released/reopened here.
-    private val operations = ReaderOperationOwner.create(File(root, "Core"), closeAction = {
+    private val operations: ReaderOperationOwner = ReaderOperationOwner.create(File(root, "Core"), closeAction = {
         httpHost.beginClose()
         if (actorDelegate.isInitialized()) {
             val report = actor.close()

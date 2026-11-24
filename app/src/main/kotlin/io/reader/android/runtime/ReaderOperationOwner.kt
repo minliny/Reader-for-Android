@@ -264,7 +264,9 @@ internal class ReaderOperationOwner private constructor(
     }
 
     companion object {
-        private val claimedDirectories = mutableMapOf<String, ReaderOperationOwner>()
+        // Keep the canonical claim for the process lifetime even after Host close.
+        // The marker does not need to hold the closed runtime or its callbacks.
+        private val claimedDirectories = mutableSetOf<String>()
 
         fun create(
             dataDirectory: File,
@@ -275,9 +277,9 @@ internal class ReaderOperationOwner private constructor(
             require(cleanupTimeoutMs in 1..30_000)
             val directory = dataDirectory.canonicalPath
             return synchronized(claimedDirectories) {
-                check(!claimedDirectories.containsKey(directory)) { "READER_DIRECTORY_OWNER_ALREADY_CLAIMED" }
+                check(directory !in claimedDirectories) { "READER_DIRECTORY_OWNER_ALREADY_CLAIMED" }
                 ReaderOperationOwner(directory, dispatcher, cleanupTimeoutMs, closeAction)
-                    .also { claimedDirectories[directory] = it }
+                    .also { claimedDirectories.add(directory) }
             }
         }
     }
