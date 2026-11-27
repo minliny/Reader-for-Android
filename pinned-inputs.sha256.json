@@ -1,0 +1,106 @@
+{
+  "harmonyPairedCore": "f9c06b68166fe71970b6b458d14fcddf0ca588cd",
+  "inputs": {
+    "crates/reader-storage/tests/fixtures/library47-schema.sql": "c7b3bca4ecbe4ef44ab653b0620f45152022ee61fec4a7a758c2bc46e848c097",
+    "protocol/reader-command.schema.json": "ee756bfe7985af16beb3712fd9449ce5a690374285ec300b853a1a7c4d5177bb",
+    "protocol/reader-event.schema.json": "42a2f08a71f67f30e55bda18ca129651e02ed841769255c284822f5ad08ea56b",
+    "protocol/reader-runtime-config.schema.json": "7f80c3a548f71ab2b5d4415af83579f03c725cb0bec0fc72a1e7dc6e91368afa",
+    "reader_ebook_runtime/fixtures/generate-m1-window.py": "dad21aeb7fab6e4c83caaecbb3513a696084646319710b978a16fbe4eb631d78",
+    "reader_ebook_runtime/manifest.json": "db5eaef68a49e7215b471d8b396b04f3e9f81e31ad1eb07931f4f5a378d28702",
+    "scripts/core-dependency.json": "9ed0ba36d22e3cbfa3971a0b85ea7bc8d7500f13899dcc84c10634372a1489bd",
+    "scripts/generate-m1-ui.mjs": "f8f632d733eb6d840db0825e6b77f56e124e14f69a19997f71fda9ca6014287b",
+    "scripts/generate-theme-tokens.mjs": "d1d45e180ea1392d9e2b9420d81abe5711ed91f69e8a8e79fbd81ec183a01ed5",
+    "theme/design-metrics.json": "625cd2861d568f1f8ebd63c1a58a46cf677d43dbfd8cbcf4b6d71ef33d1502ae",
+    "theme/icon-registry.json": "074f22c1db2ccbf48826723625e4dd1ffb3ac59fa9fd34bef46ed7b573ce80b7",
+    "theme/icons/reader_control_header_chevron.svg": "176f7ea3416d297cf7437ff30b40877e7dc54aeb0fe492153930cb29e2aa1caa",
+    "theme/icons/settings_gen_navigation.svg": "ef696bb6844746dd733207c0e436be713ad1eda666681a137dc141ede0440f5d",
+    "theme/registry.json": "17339c9c8d876989575894e4a1f3c5a6b229cf72748d6398963c681820bda1df"
+  },
+  "outputs": {
+    "app/src/androidTest/assets/fixtures/m1-window.epub": {
+      "sha256": "35efc3246026578c8f56ea227964bb05a5d7cd8d49ee0f7794221f9ab3a4481e",
+      "source": "ui:reader_ebook_runtime/fixtures/m1-window.epub"
+    },
+    "app/src/main/assets/reader_ebook_runtime/reader-ebook-dom.js": {
+      "sha256": "013f16e5f39bda18d3aa3175bd1c16442a6130a7f80107db1211061744927f66",
+      "source": "ui:reader_ebook_runtime/reader-ebook-dom.js"
+    },
+    "app/src/main/assets/reader_ebook_runtime/reader-ebook-runtime.js": {
+      "sha256": "c3df68596aad8872a2a6525e5c33748e77e42d0c4d5c1aa0bb7edb1551cbfc4b",
+      "source": "ui:reader_ebook_runtime/reader-ebook-runtime.js"
+    },
+    "app/src/main/assets/reader_ebook_runtime/shell.html": {
+      "sha256": "e687a3c70480d8e2685c4625ad73d376dc9a3a9eed55d1aec8231eff22f64b14",
+      "source": "ui:reader_ebook_runtime/shell.html"
+    },
+    "app/src/main/java/com/reader/core/NativeCoreBridge.java": {
+      "sha256": "ee4e5180d332d81294907f86e2152ad1942e6eb13664397eb8626749dd9578fd",
+      "source": "core:bindings/android/src/main/java/com/reader/core/NativeCoreBridge.java"
+    },
+    "app/src/main/java/com/reader/core/ReaderCoreAssetException.java": {
+      "sha256": "25b215e26790b5bb68ebadf39818393d673a625ba525483f029fa5df0b42cb44",
+      "source": "core:bindings/android/src/main/java/com/reader/core/ReaderCoreAssetException.java"
+    },
+    "app/src/main/java/com/reader/core/ReaderCoreException.java": {
+      "sha256": "e60b4abb853212292cc4b79052c79efa79e2b76ad046bc28d18d8b53408136d1",
+      "source": "core:bindings/android/src/main/java/com/reader/core/ReaderCoreException.java"
+    },
+    "app/src/main/java/com/reader/core/ReaderCoreLastError.java": {
+      "sha256": "427a2988d5d2fff74f5d81b39136c83daac5e3c1581dab95b083d8f0cbc0e894",
+      "source": "core:bindings/android/src/main/java/com/reader/core/ReaderCoreLastError.java"
+    },
+    "app/src/main/java/com/reader/core/ReaderCoreRuntime.java": {
+      "sha256": "d178e79aa8fdf2e8be8015c918019dd69f6f2dd4abc4ace52d6300faf169bf72",
+      "source": "core:bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java"
+    },
+    "app/src/main/kotlin/com/reader/core/ReaderStorageProbe.kt": {
+      "sha256": "7d3792491a8193f4fe56efb7c8e65d4e7a459bdf7f9121e83e09c2330e27267c",
+      "source": "core:bindings/android/src/main/kotlin/com/reader/core/ReaderStorageProbe.kt"
+    },
+    "app/src/main/kotlin/io/reader/rebuild/core/generated/ReaderProtocolModels.kt": {
+      "sha256": "c9e14c87ebb1859ce7c2f0b947153ae4c5f84e7f3bace4793d5de394c5a7261c",
+      "source": "core:bindings/android/generated/ReaderProtocolModels.kt"
+    },
+    "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderDesignMetrics.kt": {
+      "sha256": "53ee73ffe85798435bd1ddbf4e1a707141a83b6486e6f256613367a2e1a2e7bd",
+      "source": "ui:theme/generated/android/ReaderDesignMetrics.kt"
+    },
+    "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderIconRegistry.kt": {
+      "sha256": "3f78b0b4a61d2401693464bdcd7cc786d21a50be18f8ab39a9b2c71c827cc180",
+      "source": "ui:theme/generated/android/ReaderIconRegistry.kt"
+    },
+    "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderThemeTokens.kt": {
+      "sha256": "6f85cabc2ad5bec34121bb21f973f5619f3dc3f1c26db5b6a5aeebc72a75c3fb",
+      "source": "ui:theme/generated/android/ReaderThemeTokens.kt"
+    },
+    "app/src/test/resources/m1/hold_storage_write.py": {
+      "sha256": "536bc7ed50493ccd7337d55d95e0a61bf8a3b0e8d3ca249f1e3e1f1a9ea082f3",
+      "source": "core:tools/m1-rpc-smoke/hold_storage_write.py"
+    },
+    "app/src/test/resources/m1/library47-schema.1.sql": {
+      "sha256": "c93383cbcf9db355d04bfcd9e76e9222db973a3202cf7d7c8ef528126945e1f2",
+      "source": "core:crates/reader-storage/tests/fixtures/library47-schema.sql[part 1]"
+    },
+    "app/src/test/resources/m1/library47-schema.2.sql": {
+      "sha256": "f0de65cda2bfabcb7ea7b91b196b9ede2827272fb6c6e33578705309cef58a1f",
+      "source": "core:crates/reader-storage/tests/fixtures/library47-schema.sql[part 2]"
+    },
+    "app/src/test/resources/m1/local-reading.txt": {
+      "sha256": "e8909dde7e25a2c81b51629284a21ab82651e97c9c9f3416bc068fd9b347b63e",
+      "source": "core:protocol/fixtures/m1/local-reading.txt"
+    },
+    "app/src/test/resources/m1/reading-lifecycle.json": {
+      "sha256": "985924832803518b5162d27e90e0d063d54bd4e33e6d44d28d64d97484b26499",
+      "source": "core:protocol/fixtures/m1/reading-lifecycle.json"
+    },
+    "app/src/test/resources/m1/scalar-selection.json": {
+      "sha256": "614414f2370795e98fc63df8e0a463f1ff8c9f4be733fde565bac573b3daa579",
+      "source": "core:protocol/fixtures/m1/scalar-selection.json"
+    }
+  },
+  "pins": {
+    "core": "fa536a10c31ab5a35df2e2c1c1fbf70ebf3e1be9",
+    "harmony": "4acfefc1a71f62572f653cc9a5e79162a2d347f9",
+    "ui": "1e652fcc5653a8b6f2b04560784cbee9fcfaf01c"
+  }
+}
