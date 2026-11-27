@@ -78,6 +78,8 @@ def main():
                if key.removeprefix(MAIN).startswith(prefixes)}
     fixture_sha = outputs['app/src/androidTest/' + FIXTURE]['sha256']
     native = ROOT / '.build/native-m2/android-jni/libs/arm64-v8a/libreader_core_jni.so'
+    goldens = ROOT / 'app/src/test/resources/goldens'
+    golden_pngs = {sha(path.read_bytes()) for path in goldens.glob('*.png')}
     for apk, test in [(production, False), (instrument, True)]:
         with zipfile.ZipFile(apk) as zipped:
             names = zipped.namelist()
@@ -85,9 +87,12 @@ def main():
             assert not [p for p in names if re.fullmatch(r'META-INF/[^/]+\.(SF|RSA|DSA|EC)', p, re.I)], apk
             dex = b''.join(zipped.read(p) for p in names if re.fullmatch(r'classes\d*\.dex', p))
             for name in (b'NativeCoreTest', b'M2HostNetworkTest', b'M2CoordinatorTest', b'M2ColdDownload',
-                         b'StaticLayoutTest', b'TextScalarMapTest', b'TransientToastStateTest'):
+                         b'StaticLayoutTest', b'TextScalarMapTest', b'TransientToastStateTest', b'ReaderGoldenTest'):
                 assert b'/' + name + b';' not in dex, (apk, name)
             assert (b'Lio/reader/rebuild/EbookWebViewTest;' in dex) == test, apk
+            assert (b'Lio/reader/rebuild/NativeM2JourneyTest;' in dex) == test, apk
+            assert not [p for p in names if 'goldens/' in p or 'loopback_fixture.py' in p], apk
+            assert not [p for p in names if p.endswith('.png') and sha(zipped.read(p)) in golden_pngs], apk
             if test:
                 assert [p for p in names if p.endswith('.epub')] == [FIXTURE]
                 assert sha(zipped.read(FIXTURE)) == fixture_sha
@@ -96,6 +101,7 @@ def main():
                 print(f'Test-only EPUB sha256 {fixture_sha} {FIXTURE}')
             else:
                 assert not [p for p in names if p.endswith('.epub') or p.startswith('assets/fixtures')]
+                print(f'Production fixture count 0; golden image count 0 ({len(golden_pngs)} baseline digests checked)')
                 actual = {p: sha(zipped.read(p)) for p in names if p.startswith(prefixes)}
                 assert actual == desired == {p: sha((ROOT / MAIN / p).read_bytes()) for p in desired}
                 for name, digest in sorted(actual.items()):

@@ -74,6 +74,8 @@ internal fun ReaderIcon(
             val svg = SVG.getFromAsset(assets, "reader_design/icons/$asset")
             val image = Bitmap.createBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
             val edge = pixels.toFloat()
+            svg.setDocumentWidth(edge)
+            svg.setDocumentHeight(edge)
             svg.renderToCanvas(Canvas(image), RectF(0f, 0f, edge, edge))
             image.asImageBitmap()
         }

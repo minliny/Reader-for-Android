@@ -15,6 +15,8 @@ import io.reader.rebuild.core.CoreRuntimeActor
 import io.reader.rebuild.host.storage.AuthorizedDocument
 import io.reader.rebuild.host.storage.FileAndAssetHost
 import io.reader.rebuild.host.storage.StagedDocument
+import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -37,6 +39,44 @@ internal class LocalImportCoordinator(private val core: CoreRuntimeActor, privat
     suspend fun import(document: AuthorizedDocument): BookshelfAddData = imports.withLock {
         // Once admitted, this operation settles under its journal independently of its observing UI.
         withContext(NonCancellable + Dispatchers.IO) { perform(files.stage(document.name, document.open)) }
+    }
+
+    suspend fun pending(): List<String> = imports.withLock {
+        withContext(Dispatchers.IO) {
+            files.journals.listFiles().orEmpty().filter { it.extension == "json" }.mapNotNull { file ->
+                val id = runCatching { UUID.fromString(file.nameWithoutExtension) }.getOrNull()
+                id?.toString()
+            }.sorted()
+        }
+    }
+
+    suspend fun verify(id: String): Boolean = imports.withLock {
+        withContext(NonCancellable + Dispatchers.IO) {
+            val identity = UUID.fromString(id)
+            val file = File(files.journals, "$id.json")
+            if (!file.exists()) return@withContext true
+            check(file.length() <= 2_097_152)
+            val journal = ReaderProtocolJson.decodeFromString<Journal>(file.readText())
+            check(journal.transactionId == id)
+            val stage = StagedDocument(identity, File(journal.stagedPath), journal.sourceSha256)
+            check(stage.bookId == journal.bookId)
+            if (journal.phase == Phase.SHELVING || journal.phase == Phase.FINALIZING) {
+                val token = requireNotNull(journal.rollbackToken)
+                check(token.token.transactionId == id)
+                val membership = core.call(ReaderM1.bookshelfGet,
+                    com.reader.core.protocol.BookshelfGetParams("local", journal.bookId))
+                if (membership.book?.bookId != journal.bookId || membership.original?.sha256 != journal.sourceSha256)
+                    return@withContext false
+                files.authorize(journal.sourceSha256)
+                val result = core.call(ReaderM1.importFinalize, ImportLocalBookFinalizeParams(token))
+                check(result.data.finalized && result.data.bookId == journal.bookId)
+            } else if (journal.phase != Phase.CLEANING && journal.phase != Phase.STAGED) {
+                return@withContext false
+            }
+            files.cleanStage(stage)
+            files.removeJournal(identity)
+            true
+        }
     }
 
     private suspend fun perform(staged: StagedDocument): BookshelfAddData {

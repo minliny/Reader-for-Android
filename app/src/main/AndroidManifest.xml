@@ -1,8 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:allowBackup="false" android:usesCleartextTraffic="true"
+    <application android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:usesCleartextTraffic="true"
         android:label="Reader M2 Dev" android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".features.shell.ReaderActivity" android:exported="true">
+        <activity android:name=".features.shell.ReaderActivity" android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

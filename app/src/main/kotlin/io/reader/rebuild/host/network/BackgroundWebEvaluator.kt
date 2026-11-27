@@ -1,6 +1,8 @@
 package io.reader.rebuild.host.network
 
 import android.content.Context
+import com.reader.core.protocol.M2HostErrorCode
+import com.reader.core.protocol.M2HostErrorPhase
 import com.reader.core.protocol.M2HostWebViewDocumentHtml
 import com.reader.core.protocol.M2HostWebViewDocumentUrl
 import com.reader.core.protocol.M2HostWebViewEvaluateJavaScriptRequest
@@ -10,7 +12,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,34 +28,44 @@ internal interface BackgroundWebEvaluator {
 
 internal class AndroidBackgroundWebEvaluator(private val context: Context, override val available: Boolean) : BackgroundWebEvaluator {
     override suspend fun run(request: M2HostWebViewEvaluateJavaScriptRequest, cookies: List<Pair<String, String>>):
-        M2HostWebViewEvaluateJavaScriptResponse = withTimeout(timeoutMillis(request.timeoutMillis)) {
-        withContext(Dispatchers.Main.immediate) {
-            val profile = IsolatedWebProfile(context, "background")
-            val view = profile.view
-            val navigation = PendingWebNavigation(view)
-            try {
-                profile.seed(cookies)
-                when (val document = request.document) {
-                    is M2HostWebViewDocumentHtml -> view.loadDataWithBaseURL(document.baseUrl?.let { httpUrl(it).toString() },
-                        document.body, "text/html", "UTF-8", null)
-                    is M2HostWebViewDocumentUrl -> view.loadUrl(httpUrl(document.url).toString(),
-                        request.headers?.mapValues { it.value.headerValue() }.orEmpty())
+        M2HostWebViewEvaluateJavaScriptResponse {
+        var stage = "WEBVIEW_PROFILE"
+        return withTimeoutOrNull(timeoutMillis(request.timeoutMillis)) {
+            withContext(Dispatchers.Main.immediate) {
+                val profile = IsolatedWebProfile(context, ReaderWebProfilePurpose.BACKGROUND)
+                val view = profile.view
+                val inline = request.document is M2HostWebViewDocumentHtml
+                val navigation = PendingWebNavigation(view, inlineDocument = inline)
+                try {
+                    stage = "WEBVIEW_COOKIES"
+                    profile.seed(cookies)
+                    stage = "WEBVIEW_NAVIGATION"
+                    when (val document = request.document) {
+                        is M2HostWebViewDocumentHtml -> {
+                            val base = document.baseUrl?.let { httpUrl(it).toString() }
+                            view.loadDataWithBaseURL(base, document.body, "text/html", "UTF-8", base)
+                        }
+                        is M2HostWebViewDocumentUrl -> view.loadUrl(httpUrl(document.url).toString(),
+                            request.headers?.mapValues { it.value.headerValue() }.orEmpty())
+                    }
+                    navigation.await()
+                    stage = "WEBVIEW_JAVASCRIPT"
+                    delay((request.settleDelayMillis ?: 0).coerceIn(0, 120_000))
+                    val slot = JsonPrimitive("__reader_" + UUID.randomUUID().toString()).toString()
+                    view.evaluate(script(slot, request))
+                    val result = awaitResult { view.evaluate("JSON.stringify(window[$slot])") }
+                    val value = result["value"] ?: JsonNull
+                    val resource = if (request.resourceUrlMatcherJavaScript == null) null
+                    else (value as? JsonPrimitive)?.contentOrNull?.let { httpUrl(it).toString() }
+                        ?: throw NetworkHostFailure.invalid("WebView resource observation unavailable")
+                    M2HostWebViewEvaluateJavaScriptResponse(resource, value, view.url, view.title)
+                } finally {
+                    navigation.retire()
+                    profile.close()
                 }
-                navigation.await()
-                delay((request.settleDelayMillis ?: 0).coerceIn(0, 120_000))
-                val slot = JsonPrimitive("__reader_" + UUID.randomUUID().toString()).toString()
-                view.evaluate(script(slot, request))
-                val result = awaitResult { view.evaluate("JSON.stringify(window[$slot])") }
-                val value = result["value"] ?: JsonNull
-                val resource = if (request.resourceUrlMatcherJavaScript == null) null
-                else (value as? JsonPrimitive)?.contentOrNull?.let { httpUrl(it).toString() }
-                    ?: throw NetworkHostFailure.invalid("WebView resource observation unavailable")
-                M2HostWebViewEvaluateJavaScriptResponse(resource, value, view.url, view.title)
-            } finally {
-                navigation.retire()
-                profile.close()
             }
-        }
+        } ?: throw NetworkHostFailure(M2HostErrorCode.TIMEOUT, M2HostErrorPhase.RUNTIME,
+            "Background WebView operation timed out", retryable = true, category = stage)
     }
 
     private suspend fun awaitResult(read: suspend () -> String): JsonObject {

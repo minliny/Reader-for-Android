@@ -30,6 +30,8 @@ internal class SearchCoordinator(private val core: CoreRuntimeActor) {
     private var active: Owner? = null
     private var previous: Pair<String, Long?>? = null
     private var closed = false
+    private val searchRunning = MutableStateFlow(false)
+    val running = searchRunning.asStateFlow()
     private val view = MutableStateFlow<List<SourceSearchResult>>(emptyList())
     val results: StateFlow<List<SourceSearchResult>> = view.asStateFlow()
     val inFlight: Boolean get() = synchronized(monitor) { active != null }
@@ -39,12 +41,16 @@ internal class SearchCoordinator(private val core: CoreRuntimeActor) {
         check(!closed && active == null) { "The previous search still owns its requests" }
         val owner = Owner()
         active = owner
+        searchRunning.value = true
         previous = query to page
         view.value = emptyList()
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             val final = runCatching { run(owner, query, page) }
             synchronized(monitor) {
-                if (active === owner) active = null
+                if (active === owner) {
+                    active = null
+                    searchRunning.value = false
+                }
                 final.fold(owner.terminal::complete, owner.terminal::completeExceptionally)
             }
         }

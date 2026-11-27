@@ -59,11 +59,16 @@ class StaticLayoutTest {
         surface.layout(0, 0, 260, 150)
         surface.currentPosition { assertEquals(ReadingPosition(29L, "😀"), it) }
         surface.currentSelection { assertEquals(ReadingSelection(28L, 35L), it) }
+        surface.scrolling = true
+        surface.currentPosition { assertEquals(ReadingPosition(29L, "😀"), it) }
+        surface.currentSelection { assertEquals(ReadingSelection(28L, 35L), it) }
+        surface.scrolling = false
+        surface.currentPosition { assertEquals(ReadingPosition(29L, "😀"), it) }
         surface.restore(chapter.coordinates.chapterEnd) { assertEquals(null, it) }
         surface.currentPosition { assertEquals(ReadingPosition(29L, "😀"), it) }
         surface.retire()
         surface.currentPosition { assertEquals(null, it) }
-        println("ROBOLECTRIC_STATIC_LAYOUT api=${RuntimeEnvironment.getApiLevel()} anchor=29 selection=28..35 font=18→23 width=140→260")
+        println("ROBOLECTRIC_STATIC_LAYOUT api=${RuntimeEnvironment.getApiLevel()} anchor=29 selection=28..35 font=18→23 width=140→260 modes=page,scroll,page")
     }
 
     private fun layout(source: String, width: Int, fontPx: Float) = StaticTextLayout.create(

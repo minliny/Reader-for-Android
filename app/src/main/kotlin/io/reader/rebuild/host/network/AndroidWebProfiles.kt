@@ -2,14 +2,16 @@ package io.reader.rebuild.host.network
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.webkit.CookieManagerCompat
-import androidx.webkit.ProfileStore
+import androidx.webkit.Profile
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.reader.core.protocol.M2HostErrorCode
@@ -23,6 +25,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -34,10 +38,11 @@ internal fun supportsIsolatedWebProfiles(): Boolean =
 
 internal class IsolatedWebProfile @SuppressLint("SetJavaScriptEnabled", "RequiresFeature") constructor(
     context: Context,
-    purpose: String,
+    private val purpose: ReaderWebProfilePurpose,
 ) {
-    private val name = "reader-$purpose-${UUID.randomUUID()}"
+    private val name: String
     val view: WebView
+    private val browserProfile: Profile
     private val manager: CookieManager
     private data class MirroredCookie(val origin: HttpUrl, val cookie: Cookie) {
         val key get() = Triple(cookie.name, cookie.domain, cookie.path)
@@ -50,9 +55,11 @@ internal class IsolatedWebProfile @SuppressLint("SetJavaScriptEnabled", "Require
         check(android.os.Looper.myLooper() == android.os.Looper.getMainLooper())
         if (!supportsIsolatedWebProfiles()) throw NetworkHostFailure(
             M2HostErrorCode.CAPABILITY_UNAVAILABLE, M2HostErrorPhase.RUNTIME, "Isolated WebView profiles are unavailable")
+        name = ReaderWebProfilePool.acquire(purpose)
         view = WebView(context)
         WebViewCompat.setProfile(view, name)
-        manager = WebViewCompat.getProfile(view).cookieManager
+        browserProfile = WebViewCompat.getProfile(view)
+        manager = browserProfile.cookieManager
         view.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -125,13 +132,14 @@ internal class IsolatedWebProfile @SuppressLint("SetJavaScriptEnabled", "Require
 
     @SuppressLint("RequiresFeature")
     fun close() {
+        if (!active) return
         active = false
         cookieWrite?.cancel()
         view.stopLoading()
         view.webViewClient = WebViewClient()
         (view.parent as? android.view.ViewGroup)?.removeView(view)
         view.destroy()
-        check(ProfileStore.getInstance().deleteProfile(name)) { "Could not retire isolated WebView profile" }
+        ReaderWebProfilePool.retire(purpose, name, manager, browserProfile.webStorage)
     }
 }
 
@@ -143,14 +151,18 @@ internal open class HttpNavigationClient : WebViewClient() {
         url == "about:blank" || runCatching { httpUrl(url) }.isSuccess
 }
 
-internal class PendingWebNavigation(private val view: WebView) {
+internal class PendingWebNavigation(private val view: WebView, private val inlineDocument: Boolean = false) {
     private val terminal = CompletableDeferred<Unit>()
     private var active = true
 
     init {
         view.webViewClient = object : HttpNavigationClient() {
             override fun onPageFinished(view: WebView, url: String) {
-                if (active && this@PendingWebNavigation.view === view && view.url == url) terminal.complete(Unit)
+                // A new evaluator owns this one inline document. The provider may
+                // report its base URL while WebView.url reports its history entry.
+                if (active && this@PendingWebNavigation.view === view && (inlineDocument || view.url == url)) {
+                    terminal.complete(Unit)
+                }
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -182,6 +194,16 @@ internal suspend fun WebView.evaluate(script: String): String = suspendCancellab
     }
 }
 
+internal data class LoginNavigation(
+    val url: String,
+    val canGoBack: Boolean = false,
+    val canGoForward: Boolean = false,
+    val loading: Boolean = true,
+    val progress: Float = 0f,
+    val failed: Boolean = false,
+    val retired: Boolean = false,
+)
+
 internal class SourceLoginSession(
     val sourceId: String,
     val generation: UUID,
@@ -191,6 +213,8 @@ internal class SourceLoginSession(
 ) {
     val view get() = site.view
     private var active = true
+    private val loadState = MutableStateFlow(LoginNavigation(requestedUrl.toString()))
+    val navigation = loadState.asStateFlow()
     internal val cookieLock = Mutex()
     internal var opening: PendingWebNavigation? = null
 
@@ -199,8 +223,26 @@ internal class SourceLoginSession(
         view.loadUrl(httpUrl(url).toString())
     }
 
+    fun goBack() { if (active && view.canGoBack()) view.goBack() }
+    fun goForward() { if (active && view.canGoForward()) view.goForward() }
+    fun refresh() { if (active) view.reload() }
+
+    internal fun updateNavigation(
+        url: String? = null,
+        progress: Float = loadState.value.progress,
+        loading: Boolean = loadState.value.loading,
+        failed: Boolean = loadState.value.failed,
+    ) {
+        if (!active) return
+        loadState.value = LoginNavigation(
+            url ?: view.url ?: loadState.value.url,
+            view.canGoBack(), view.canGoForward(), loading, progress, failed,
+        )
+    }
+
     fun retire() {
         active = false
+        loadState.value = loadState.value.copy(loading = false, retired = true)
         opening?.cancel()
         site.close()
     }
@@ -212,7 +254,7 @@ internal class AndroidSourceLogins(private val context: Context) {
     suspend fun begin(sourceId: String, url: HttpUrl, jar: PersistentCookieJar, timeout: Long = 60_000): SourceLoginSession =
         withContext(Dispatchers.Main.immediate) {
             closeCurrent(sourceId)
-            val site = IsolatedWebProfile(context, "login")
+            val site = IsolatedWebProfile(context, ReaderWebProfilePurpose.LOGIN)
             val session = SourceLoginSession(sourceId, UUID.randomUUID(), site, jar, url)
             sessions[sourceId] = session
             try {
@@ -229,9 +271,38 @@ internal class AndroidSourceLogins(private val context: Context) {
                     session.opening = null
                 }
                 if (sessions[sourceId] !== session) throw kotlinx.coroutines.CancellationException()
+                session.updateNavigation(progress = 1f, loading = false)
+                site.view.webChromeClient = object : WebChromeClient() {
+                    override fun onProgressChanged(view: WebView, newProgress: Int) {
+                        if (sessions[sourceId] === session) session.updateNavigation(progress = newProgress / 100f)
+                    }
+                }
                 site.view.webViewClient = object : HttpNavigationClient() {
+                    override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                        if (sessions[sourceId] === session) {
+                            session.updateNavigation(url, progress = 0f, loading = true, failed = false)
+                        }
+                    }
+
+                    override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                        if (sessions[sourceId] === session) session.updateNavigation(url)
+                    }
+
+                    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                        if (sessions[sourceId] === session && request.isForMainFrame) {
+                            session.updateNavigation(loading = false, failed = true)
+                        }
+                    }
+
+                    override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+                        if (sessions[sourceId] === session && request.isForMainFrame) {
+                            session.updateNavigation(loading = false, failed = true)
+                        }
+                    }
+
                     override fun onPageFinished(view: WebView, url: String) {
                         if (sessions[sourceId] === session && view.url == url) {
+                            session.updateNavigation(url, progress = 1f, loading = false)
                             // Explicit sync and completion surface any I/O failure.
                             if (session.cookieLock.tryLock()) {
                                 try { runCatching { importCookies(session) } } finally { session.cookieLock.unlock() }
@@ -274,6 +345,10 @@ internal class AndroidSourceLogins(private val context: Context) {
 
     suspend fun revoke(sourceId: String) = withContext(NonCancellable + Dispatchers.Main.immediate) {
         closeCurrent(sourceId)
+    }
+
+    suspend fun revoke(session: SourceLoginSession) = withContext(NonCancellable + Dispatchers.Main.immediate) {
+        if (sessions[session.sourceId] === session) closeCurrent(session.sourceId)
     }
 
     suspend fun close() = withContext(NonCancellable + Dispatchers.Main.immediate) {

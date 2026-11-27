@@ -83,6 +83,8 @@ internal class FileAndAssetHost(private val root: File) {
     }
 
     fun cleanStage(document: StagedDocument) {
+        val expectedDirectory = File(staging, document.transactionId.toString()).canonicalFile
+        check(document.file.canonicalFile.parentFile == expectedDirectory) { "Staged original identity changed" }
         check(!document.file.exists() || document.file.delete()) { "Staged original cleanup pending" }
         val directory = requireNotNull(document.file.parentFile)
         check(!directory.exists() || directory.delete()) { "Staged directory cleanup pending" }

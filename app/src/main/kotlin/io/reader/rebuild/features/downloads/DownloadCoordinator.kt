@@ -116,6 +116,9 @@ internal class DownloadCoordinator(private val reading: OnlineReadingCoordinator
 
     suspend fun queryPrefetch(params: M2CacheBookPrefetchParams) = query(exactPrefetch(params))
 
+    suspend fun pendingPrefetches(): List<M2CacheBookPrefetchParams> =
+        withContext(Dispatchers.IO) { journal.entries().map { it.prefetch } }
+
     suspend fun recoverSavedPrefetches(): List<M2DownloadOperationReceipt> =
         withContext(Dispatchers.IO) { journal.entries().map { recoverPrefetch(it.prefetch) } }
 

@@ -114,6 +114,8 @@ internal class NetworkAndWebHost(
     suspend fun finishLogin(session: SourceLoginSession) { logins?.finish(session) }
     suspend fun revokeLogin(sourceId: String) { logins?.revoke(sourceId) }
 
+    suspend fun revokeLogin(session: SourceLoginSession) { logins?.revoke(session) }
+
     suspend fun clearLogin(sourceId: String) {
         revokeLogin(sourceId)
         withContext(Dispatchers.IO) { cookies.clear(sourceId) }

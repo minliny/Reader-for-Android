@@ -40,6 +40,16 @@ internal class StaticTextLayout private constructor(
         return coordinates.scalarAtOrBefore(offset)?.coerceIn(page.start, page.end - 1)
     }
 
+    fun lineTop(scalar: Long): Int {
+        val offset = checkNotNull(coordinates.utf16(scalar))
+        return layout.getLineTop(layout.getLineForOffset(offset))
+    }
+
+    fun offsetAt(pixel: Int): Long {
+        val line = layout.getLineForVertical(pixel.coerceIn(0, (layout.height - 1).coerceAtLeast(0)))
+        return checkNotNull(coordinates.scalar(layout.getLineStart(line))).coerceAtMost(coordinates.chapterEnd - 1)
+    }
+
     fun draw(canvas: Canvas, page: TextPage, selected: ReadingSelection?, selectionColor: Int) {
         val saved = canvas.save()
         try {

@@ -7,6 +7,11 @@ import io.reader.rebuild.core.CoreRuntimeActor
 import io.reader.rebuild.core.HostCapabilities
 import io.reader.rebuild.core.PageObservation
 import io.reader.rebuild.features.bookshelf.LocalImportCoordinator
+import io.reader.rebuild.features.bookshelf.ShelfLibrary
+import io.reader.rebuild.features.library.BookReference
+import io.reader.rebuild.features.reading.OnlineReadingCoordinator
+import io.reader.rebuild.features.reading.ReadingJourney
+import io.reader.rebuild.features.reading.SourceSwitchCoordinator
 import io.reader.rebuild.features.reading.ReadingSessionCoordinator
 import io.reader.rebuild.host.storage.AuthorizedDocument
 import io.reader.rebuild.host.storage.FileAndAssetHost
@@ -149,6 +154,20 @@ class NativeCoreTest {
                 otherReadback.chapterOffset == cases.otherScalar)
             val untouched = coordinator.text(receipt.bookId, 0)
             check(untouched.savedScalar == scalar)
+            val shelf = ShelfLibrary(library.core).list().single()
+            check(shelf.bookId == receipt.bookId && shelf.sourceId == cases.localSourceId)
+            val book = BookReference(shelf)
+            val online = OnlineReadingCoordinator(library.core)
+            val reader = ReadingJourney(library.core, coordinator, online, SourceSwitchCoordinator(online))
+            val opened = reader.open(book, index = null, checkpoint = null)
+            check(opened.initialScalar == scalar && opened.entries.first().index == 0L)
+            reader.bookmark(opened, scalar)
+            val mark = reader.bookmarks(book).single()
+            val jumped = reader.open(book, mark.chapterIndex, checkpoint = null, bookmark = mark)
+            check(jumped.initialScalar == scalar && mark.positionScope == opened.positionScope)
+            reader.deleteBookmark(mark)
+            check(reader.bookmarks(book).isEmpty())
+            println("ANDROID_LOCAL_PRODUCT shelf=true directory=true bookmark=create,jump,delete scalar=$scalar")
             check(errors.isEmpty()) { errors.toString() }
             println("PASS fresh Library47 variant=${layout.layoutId} source=local scalar=$scalar second=${other.chapterOffset} " +
                 "conflicts=3 write=${save.identity} stalePage=${oldPage.get()} pendingDelivery=0 duplicate=preserved")

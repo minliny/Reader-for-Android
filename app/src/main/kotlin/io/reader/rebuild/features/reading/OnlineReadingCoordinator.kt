@@ -41,7 +41,7 @@ internal data class OnlineChapter(
 internal class OnlineReadingCoordinator(internal val core: CoreRuntimeActor) {
     suspend fun detail(params: M2BookDetailParams) = core.call(ReaderM2.bookDetail, params).also {
         check(it.sourceId == params.sourceId && it.book.bookId == params.book.bookId &&
-            it.contentKind != M2BookDetailDataContentKind.MANGA)
+            it.contentKind != M2BookDetailDataContentKind.MANGA && it.contentKind != M2BookDetailDataContentKind.AUDIO)
     }
 
     suspend fun addToShelf(detail: M2BookDetailData) = core.call(ReaderM1.bookshelfAdd,

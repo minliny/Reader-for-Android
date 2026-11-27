@@ -60,6 +60,8 @@ tasks.withType<KotlinJvmCompile>().matching { it.name.endsWith("UnitTestKotlin")
 }
 
 dependencies {
+    implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.webkit:webkit:1.18.0")
     implementation("androidx.compose.ui:ui:1.10.0")
     implementation("androidx.compose.foundation:foundation:1.10.0")

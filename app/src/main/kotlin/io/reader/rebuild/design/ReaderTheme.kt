@@ -1,7 +1,12 @@
 package io.reader.rebuild.design
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.ripple.RippleAlpha
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RippleConfiguration
+import androidx.compose.material3.RippleDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -62,6 +67,7 @@ internal object ReaderReadingColors {
 internal val LocalReaderColors = staticCompositionLocalOf { ReaderColors(night = false) }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun ReaderTheme(night: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colors = remember(night) { ReaderColors(night) }
     val materialColors = remember(colors) {
@@ -74,13 +80,25 @@ internal fun ReaderTheme(night: Boolean = isSystemInDarkTheme(), content: @Compo
                 secondaryContainer = mutedFill, onSecondaryContainer = primaryText,
                 background = background, onBackground = primaryText,
                 surface = surface, onSurface = primaryText, surfaceVariant = panel,
+                surfaceBright = surface, surfaceDim = background,
+                surfaceContainerLowest = background, surfaceContainerLow = surface,
+                surfaceContainer = elevated, surfaceContainerHigh = panel, surfaceContainerHighest = field,
                 onSurfaceVariant = secondaryText, outline = outline, outlineVariant = divider,
                 error = danger, errorContainer = dangerTint, onErrorContainer = danger,
                 scrim = scrim, surfaceTint = Color.Transparent,
             )
         }
     }
+    val neutralRipple = remember(colors) {
+        val normal = RippleDefaults.RippleAlpha
+        RippleConfiguration(color = colors.press.copy(alpha = 1f), rippleAlpha = RippleAlpha(
+            draggedAlpha = normal.draggedAlpha, focusedAlpha = normal.focusedAlpha, hoveredAlpha = normal.hoveredAlpha,
+            pressedAlpha = colors.press.alpha,
+        ))
+    }
     CompositionLocalProvider(LocalReaderColors provides colors) {
-        MaterialTheme(colorScheme = materialColors, typography = readerMaterialTypography(), content = content)
+        MaterialTheme(colorScheme = materialColors, typography = readerMaterialTypography()) {
+            CompositionLocalProvider(LocalRippleConfiguration provides neutralRipple, content = content)
+        }
     }
 }

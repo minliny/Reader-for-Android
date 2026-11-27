@@ -16,9 +16,10 @@ import com.reader.core.protocol.M2CookieSetSmokeParams
 import com.reader.core.protocol.M2DownloadOperationReceiptPhase
 import com.reader.core.protocol.M2HostCookieRecord
 import com.reader.core.protocol.M2HostCookieSetRequest
-import com.reader.core.protocol.M2RuleSubPutParams
 import com.reader.core.protocol.M2RuleSubUpdateChangeKind
 import com.reader.core.protocol.M2RulesMutationReceiptRejected
+import com.reader.core.protocol.M2RulesMutationReceiptRuleSubDelete
+import com.reader.core.protocol.M2RulesMutationReceiptRuleSubPut
 import com.reader.core.protocol.M2RulesMutationReceiptRuleSubUpdateApplyV1
 import com.reader.core.protocol.M2RulesMutationReceiptSourceDelete
 import com.reader.core.protocol.M2RulesMutationReceiptSourceImport
@@ -37,8 +38,10 @@ import com.reader.core.protocol.ReaderM1
 import com.reader.core.protocol.ReaderM2
 import com.reader.core.protocol.ReaderProtocolJson
 import com.reader.core.protocol.TextReadingProgressGetParams
+import io.reader.rebuild.core.CoreRejected
 import io.reader.rebuild.features.downloads.DownloadCoordinator
 import io.reader.rebuild.features.downloads.DownloadJournal
+import io.reader.rebuild.features.library.BookReference
 import io.reader.rebuild.features.reading.OnlineBookKey
 import io.reader.rebuild.features.reading.OnlineReadingCoordinator
 import io.reader.rebuild.features.reading.SourceSwitchCoordinator
@@ -56,9 +59,9 @@ class M2CoordinatorTest {
         val home = m2Temp()
         M2Loopback().use { fixture ->
             val (library, network) = openM2(home)
+            val core = library.core
+            val sources = SourceManagementCoordinator(core, network)
             try {
-                val core = library.core
-                val sources = SourceManagementCoordinator(core, network)
                 val first = fixture.source("alpha")
                 val second = fixture.source("beta")
                 for (source in listOf(first, second)) sources.importFixture(source)
@@ -90,18 +93,27 @@ class M2CoordinatorTest {
                 check(sources.list(M2SourceListParams(sourceId = first.id)).sources.single().enabled == false)
                 sources.setEnabled(first.id, true)
 
-                val subscription = M2RuleSubPutParams(6123L, name = "规则回环", url = fixture.origin + "/rules", type = 3L)
-                sources.saveSubscription(subscription)
-                val initial = sources.fetchSubscriptionPreview(6123L, fixture.origin + "/rules")
+                val rulesUrl = fixture.origin + "/rules"
+                val created = sources.saveSubscription("规则回环", rulesUrl, null)
+                check(created is M2RulesMutationReceiptRuleSubPut)
+                val subscription = created.data.sub
+                val edited = sources.saveSubscription("规则回环·修订", rulesUrl, subscription)
+                check(edited is M2RulesMutationReceiptRuleSubPut && edited.data.sub.id == subscription.id)
+                check(runCatching { sources.fetchSubscriptionPreview(subscription) }.exceptionOrNull() is CoreRejected)
+                val initial = sources.fetchSubscriptionPreview(edited.data.sub)
                 val import = sources.confirmSubscription(initial, initial.changes.filter {
                     it.kind == M2RuleSubUpdateChangeKind.ADDED
                 }.map { it.sourceId })
                 check(import is M2RulesMutationReceiptRuleSubUpdateApplyV1)
                 fixture.subscriptionUpdate = true
-                val secondVersion = sources.fetchSubscriptionPreview(6123L, fixture.origin + "/rules")
+                val currentSubscription = sources.subscriptions().subs.single { it.id == subscription.id }
+                val secondVersion = sources.fetchSubscriptionPreview(currentSubscription)
                 val added = secondVersion.changes.single { it.kind == M2RuleSubUpdateChangeKind.ADDED }
                 check(added.sourceId == fixture.source("additional").id)
                 check(sources.confirmSubscription(secondVersion, listOf(added.sourceId)) is M2RulesMutationReceiptRuleSubUpdateApplyV1)
+                check(sources.deleteSubscription(subscription.id) is M2RulesMutationReceiptRuleSubDelete)
+                check(sources.subscriptions().subs.none { it.id == subscription.id } &&
+                    sources.list(M2SourceListParams(sourceId = added.sourceId)).sources.single().sourceId == added.sourceId)
 
                 val online = OnlineReadingCoordinator(core)
                 val detail = online.detail(first.detail())
@@ -121,8 +133,13 @@ class M2CoordinatorTest {
                     retained.content == chapter.body.content && retained.bodyVersion == chapter.body.bodyVersion)
                 check(originalLocation?.chapterOffset == 7L &&
                     core.call(ReaderM1.readingProgressGet, TextReadingProgressGetParams(first.bookId, first.id)).progress == originalLocation)
-                println("ANDROID_M2_SOURCE derivedGroup=2 editConflict=true reports=L1-L5 scopedClear=true subscription=2 deletePreservedScalar=7")
-            } finally { closeM2(library, network); home.deleteRecursively() }
+                println("ANDROID_M2_SOURCE derivedGroup=2 editConflict=true reports=L1-L5 scopedClear=true " +
+                    "subscription=2 versionGuard=true subscriptionDeletionKeepsSource=true deletePreservedScalar=7")
+            } finally {
+                sources.close()
+                closeM2(library, network)
+                home.deleteRecursively()
+            }
         }
     }
 
@@ -154,8 +171,15 @@ class M2CoordinatorTest {
                 check(original.map { it.identity }.intersect(retried.map { it.identity }.toSet()).isEmpty())
 
                 val online = OnlineReadingCoordinator(library.core)
-                online.addToShelf(online.detail(first.detail()))
-                val firstCatalog = online.refreshDirectory(first.directory())
+                val hit = retried.single { it.sourceId == first.id }.result.getOrThrow().books.single()
+                val reference = BookReference(first.id, hit, null)
+                check(reference.bookId == first.bookId && reference.detailParams.bookUrl == first.bookId)
+                val detail = online.detail(reference.detailParams)
+                check(detail.book.author == "测试作者")
+                online.addToShelf(detail)
+                val book = reference.fromDetail(detail)
+                val firstCatalog = online.refreshDirectory(M2BookTocParams(sourceId = book.sourceId,
+                    bookId = book.bookId, tocUrl = book.tocUrl, variables = book.variables))
                 val initial = online.open(firstCatalog, 0)
                 check(online.save(initial, 14).await().stored)
                 val cached = online.open(firstCatalog, 0, cacheOnly = true)
@@ -178,7 +202,7 @@ class M2CoordinatorTest {
                     scalar = 14)
                 check(switched.scalar == 14L && switched.catalog.book == OnlineBookKey(other.id, other.bookId))
                 check(online.open(switched.catalog, 0, cacheOnly = true).scalar == 14L)
-                println("ANDROID_M2_ONLINE original=${original.map { it.identity.requestId }} retried=${retried.map { it.identity.requestId }} offlineScalar=14 switchedScalar=${switched.scalar}")
+                println("ANDROID_M2_ONLINE original=${original.map { it.identity.requestId }} retried=${retried.map { it.identity.requestId }} searchReferenceDetail=true offlineScalar=14 switchedScalar=${switched.scalar}")
             } finally { search.close(); closeM2(library, network); home.deleteRecursively() }
         }
     }
