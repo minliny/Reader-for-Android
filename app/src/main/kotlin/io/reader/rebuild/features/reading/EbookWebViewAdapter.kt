@@ -202,7 +202,7 @@ internal class EbookWebViewAdapter(private val view: WebView, private val publis
         private const val MESSAGE = "ReaderNativePort"
         private const val SHELL_CSP = "default-src 'none'; style-src 'unsafe-inline' $ORIGIN; img-src $ORIGIN; font-src $ORIGIN; frame-src about:; base-uri 'none'; form-action 'none'"
         private val WEB = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-        private val kinds = setOf("ready", "position", "selection", "link", "failure")
+        private val kinds = setOf("ready", "position", "selection", "tap", "link", "failure")
         private val mimeTypes = mapOf("png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg",
             "gif" to "image/gif", "webp" to "image/webp", "avif" to "image/avif", "svg" to "image/svg+xml",
             "css" to "text/css", "woff" to "font/woff", "woff2" to "font/woff2", "otf" to "font/otf", "ttf" to "font/ttf")

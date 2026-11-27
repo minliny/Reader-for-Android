@@ -56,6 +56,23 @@ private data class ColdProof(val book: String, val original: String, val scalar:
 class NativeCoreTest {
     @get:Rule val temp = TemporaryFolder()
 
+    @Test fun idleCloseWakesNativePollAndBothCallers() = runBlocking {
+        val errors = ConcurrentLinkedQueue<Throwable>()
+        val library = LibraryRuntime.open(File(temp.newFolder(), "library"), SystemSurfaceHost(), errors::add)
+        try {
+            // Let the consumer return to its idle poll after the last RPC.
+            delay(50)
+            val started = System.nanoTime()
+            coroutineScope { awaitAll(async { library.close() }, async { library.close() }) }
+            val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            check(errors.isEmpty()) { errors.toString() }
+            println("Idle close with two callers: ${elapsed}ms")
+            check(elapsed < 1_000) { "Idle close waited ${elapsed}ms for the native poll" }
+        } finally {
+            library.close()
+        }
+    }
+
     @Test fun freshImportConflictAndColdRead() = runBlocking {
         val home = temp.newFolder("fresh")
         val db = File(home, "library")

@@ -212,9 +212,9 @@ internal class CoreRuntimeActor private constructor(
             try {
                 withTimeoutOrNull(5_000) { unsettled.joinAll() }
                 synchronized(state) { stopping = true }
+                binding.close()
                 consumer.join()
                 scope.cancel()
-                binding.close()
                 pending.values.forEach { it.result.completeExceptionally(IllegalStateException("Core runtime closed")) }
                 pending.clear()
                 hostReplies.clear()
