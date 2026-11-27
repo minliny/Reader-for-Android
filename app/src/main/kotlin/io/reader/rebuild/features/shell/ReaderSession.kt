@@ -10,11 +10,14 @@ import io.reader.rebuild.features.bookshelf.LocalImportCoordinator
 import io.reader.rebuild.features.bookshelf.ShelfLibrary
 import io.reader.rebuild.features.downloads.DownloadCoordinator
 import io.reader.rebuild.features.downloads.DownloadJournal
+import io.reader.rebuild.features.manga.MangaReadingCoordinator
 import io.reader.rebuild.features.reading.OnlineReadingCoordinator
 import io.reader.rebuild.features.reading.ReadingSessionCoordinator
 import io.reader.rebuild.features.reading.SourceSwitchCoordinator
+import io.reader.rebuild.features.reading.SpeechSessionCoordinator
 import io.reader.rebuild.features.search.SearchCoordinator
 import io.reader.rebuild.features.source.SourceManagementCoordinator
+import io.reader.rebuild.host.media.SpeechAndMediaHost
 import io.reader.rebuild.host.network.NetworkAndWebHost
 import io.reader.rebuild.host.storage.FileAndAssetHost
 import io.reader.rebuild.host.storage.LibraryRuntime
@@ -29,8 +32,9 @@ import kotlinx.coroutines.launch
 internal class ReaderSession private constructor(
     private val runtime: LibraryRuntime,
     private val network: NetworkAndWebHost,
-    filesRoot: File,
+    app: Application,
 ) {
+    private val filesRoot = app.filesDir
     val core get() = runtime.core
     val actions = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val files = FileAndAssetHost(File(filesRoot, "Documents"))
@@ -42,6 +46,14 @@ internal class ReaderSession private constructor(
     val search = SearchCoordinator(core)
     val sources = SourceManagementCoordinator(core, network)
     val downloads = DownloadCoordinator(online, DownloadJournal(File(filesRoot, "download-operations.json")))
+    private val speechOwner = lazy {
+        SpeechSessionCoordinator(core, SpeechAndMediaHost(app, File(app.cacheDir, "SpeechAudio"), network::fetch))
+    }
+    val speech get() = speechOwner.value
+    private var mangaOwner: MangaReadingCoordinator? = null
+
+    fun mangaReader(): MangaReadingCoordinator = mangaOwner
+        ?: MangaReadingCoordinator(core, network.mangaTransfers).also { mangaOwner = it }
 
     suspend fun cover(url: String): ByteArray? {
         val response = network.fetch(M2HostHttpRequest(url = url, timeoutMs = 5_000, responseAsset = true))
@@ -53,7 +65,11 @@ internal class ReaderSession private constructor(
         search.close()
         downloads.close()
         sources.close()
-        try { runtime.close() } finally { network.close() }
+        try {
+            try { if (speechOwner.isInitialized()) speech.close() } finally { mangaOwner?.retire() }
+        } finally {
+            try { runtime.close() } finally { network.close() }
+        }
     }
 
     fun recoverDownloads() {
@@ -71,7 +87,7 @@ internal class ReaderSession private constructor(
             try {
                 val host = HostCapabilityRouter(SystemSurfaceHost(), network)
                 val runtime = LibraryRuntime.open(File(files, "Library"), host) { Log.e("Reader", "Core event failed", it) }
-                return ReaderSession(runtime, network, files)
+                return ReaderSession(runtime, network, app)
             } catch (failure: Throwable) {
                 network.close()
                 throw failure

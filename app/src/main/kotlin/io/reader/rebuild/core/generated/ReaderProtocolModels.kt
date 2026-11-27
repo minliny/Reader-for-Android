@@ -11,6 +11,10 @@
 //   protocol/reader-m2-search.schema.json  64f69b9b22522f5af679db85e0510f7779cffcfddbd294b7c52408bde5accd81
 //   protocol/reader-m2-download.schema.json  ad1dcd655280eff33ad53c099fa5a8d4a670e76306f0472243465408cf108554
 //   protocol/reader-m2-reading.schema.json  8add0b72bea24ee8aa696684b219f1a931ab869691154ee80e601fb5c675650c
+//   protocol/reader-m3-bindings.schema.json  57bab07360efa8c8d4b8034ac250d50e3da30058256c7c83d6c926a270ee5bc0
+//   protocol/reader-m3-manga.schema.json  6b4f2724126b1beddd69192908ee690aca37f2b9775d2297c98fcabb49d115a7
+//   protocol/reader-m3-speech.schema.json  2b4f58a59c1329782fa90bd271217d2187a292171577cc9cb89cac1dbc54fed4
+//   protocol/reader-m3-reading-entry.schema.json  cb9f04605baf3975d109703c32da3e955aed6957d0f481757645be7a1691641e
 // Package: com.reader.core.protocol (new namespace; no conflict with the
 // hand-written com.reader.core JNI wrapper).
 @file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -36,7 +40,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-/** Every command method declared by reader-command.schema.json (242). */
+/** Every command method declared by reader-command.schema.json (247). */
 @Serializable
 public enum class ReaderCommandMethod(public val wireValue: String) {
     @SerialName("book-highlight.create") BOOK_HIGHLIGHT_CREATE("book-highlight.create"),
@@ -87,6 +91,11 @@ public enum class ReaderCommandMethod(public val wireValue: String) {
     @SerialName("dict-rule.query") DICT_RULE_QUERY("dict-rule.query"),
     @SerialName("host.complete") HOST_COMPLETE("host.complete"),
     @SerialName("host.error") HOST_ERROR("host.error"),
+    @SerialName("http-tts.build-request") HTTP_TTS_BUILD_REQUEST("http-tts.build-request"),
+    @SerialName("http-tts.delete") HTTP_TTS_DELETE("http-tts.delete"),
+    @SerialName("http-tts.get") HTTP_TTS_GET("http-tts.get"),
+    @SerialName("http-tts.list") HTTP_TTS_LIST("http-tts.list"),
+    @SerialName("http-tts.put") HTTP_TTS_PUT("http-tts.put"),
     @SerialName("import.finalize") IMPORT_FINALIZE("import.finalize"),
     @SerialName("import.parse") IMPORT_PARSE("import.parse"),
     @SerialName("import.persist") IMPORT_PERSIST("import.persist"),
@@ -9839,5 +9848,2779 @@ public enum class M2ProtocolErrorEventType(public val wireValue: String) {
             values().associateBy(M2ProtocolErrorEventType::wireValue)
         /** Returns null for a wire value outside the frozen v1 schema. */
         public fun fromWire(value: String): M2ProtocolErrorEventType? = BY_WIRE[value]
+    }
+}
+
+public object ReaderM3 {
+    public val mangaChapterGet: ReaderRPC<M3MangaChapterGetParams, M3MangaChapterData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CHAPTER_GET, M3MangaChapterGetParams.serializer(), M3MangaChapterData.serializer(),
+    )
+    public val mangaResourcePrepare: ReaderRPC<M3MangaResourcePrepareParams, M3MangaResourcePrepareData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_RESOURCE_PREPARE, M3MangaResourcePrepareParams.serializer(), M3MangaResourcePrepareData.serializer(),
+    )
+    public val mangaEntryGet: ReaderRPC<M3MangaEntryGetParams, M3MangaEntryData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_ENTRY_GET, M3MangaEntryGetParams.serializer(), M3MangaEntryData.serializer(),
+    )
+    public val mangaPagesWindow: ReaderRPC<M3MangaPagesWindowParams, M3MangaChapterWindow> = ReaderRPC(
+        ReaderCommandMethod.MANGA_PAGES_WINDOW, M3MangaPagesWindowParams.serializer(), M3MangaChapterWindow.serializer(),
+    )
+    public val mangaSourceSwitchCommit: ReaderRPC<M3MangaSourceSwitchParams, M3MangaSourceSwitchData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SOURCE_SWITCH_COMMIT, M3MangaSourceSwitchParams.serializer(), M3MangaSourceSwitchData.serializer(),
+    )
+    public val mangaResourceInspect: ReaderRPC<M3MangaResourceInspectParams, M3MangaResourceInspectData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_RESOURCE_INSPECT, M3MangaResourceInspectParams.serializer(), M3MangaResourceInspectData.serializer(),
+    )
+    public val mangaRetentionSet: ReaderRPC<M3MangaRetentionSetParams, M3MangaRetentionSetResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_RETENTION_SET, M3MangaRetentionSetParams.serializer(), M3MangaRetentionSetResult.serializer(),
+    )
+    public val mangaRetentionGet: ReaderRPC<M3MangaRetentionGetParams, M3MangaRetentionSetResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_RETENTION_GET, M3MangaRetentionGetParams.serializer(), M3MangaRetentionSetResult.serializer(),
+    )
+    public val mangaRetentionList: ReaderRPC<M3MangaRetentionListParams, M3MangaRetentionListResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_RETENTION_LIST, M3MangaRetentionListParams.serializer(), M3MangaRetentionListResult.serializer(),
+    )
+    public val mangaCacheRecordRead: ReaderRPC<M3MangaCacheRecordReadParams, M3MangaCacheRecordReadResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_RECORD_READ, M3MangaCacheRecordReadParams.serializer(), M3MangaCacheRecordReadResult.serializer(),
+    )
+    public val mangaCacheEvict: ReaderRPC<M3MangaCacheEvictParams, M3MangaCacheEvictResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_EVICT, M3MangaCacheEvictParams.serializer(), M3MangaCacheEvictResult.serializer(),
+    )
+    public val mangaSessionProtect: ReaderRPC<M3MangaSessionProtectParams, M3MangaSessionProtectResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SESSION_PROTECT, M3MangaSessionProtectParams.serializer(), M3MangaSessionProtectResult.serializer(),
+    )
+    public val mangaSessionRelease: ReaderRPC<M3MangaSessionReleaseParams, M3MangaSessionReleaseResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SESSION_RELEASE, M3MangaSessionReleaseParams.serializer(), M3MangaSessionReleaseResult.serializer(),
+    )
+    public val mangaSessionRuntime: ReaderRPC<M3MangaSessionRuntimeParams, M3MangaSessionRuntimeResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SESSION_RUNTIME, M3MangaSessionRuntimeParams.serializer(), M3MangaSessionRuntimeResult.serializer(),
+    )
+    public val mangaSessionReplace: ReaderRPC<M3MangaSessionReplaceParams, M3MangaSessionReplaceResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SESSION_REPLACE, M3MangaSessionReplaceParams.serializer(), M3MangaSessionReplaceResult.serializer(),
+    )
+    public val mangaCacheMaterializationPrepare: ReaderRPC<M3MangaCacheMaterializationPrepareParams, M3MangaCacheMaterializationPrepareResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_MATERIALIZATION_PREPARE, M3MangaCacheMaterializationPrepareParams.serializer(), M3MangaCacheMaterializationPrepareResult.serializer(),
+    )
+    public val mangaCacheMaterializationComplete: ReaderRPC<M3MangaCacheMaterializationCompleteParams, M3MangaCacheMaterializationCompleteResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_MATERIALIZATION_COMPLETE, M3MangaCacheMaterializationCompleteParams.serializer(), M3MangaCacheMaterializationCompleteResult.serializer(),
+    )
+    public val mangaCacheMaterializationAbort: ReaderRPC<M3MangaCacheMaterializationAbortParams, M3MangaCacheMaterializationAbortResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_MATERIALIZATION_ABORT, M3MangaCacheMaterializationAbortParams.serializer(), M3MangaCacheMaterializationAbortResult.serializer(),
+    )
+    public val mangaCacheClassify: ReaderRPC<M3MangaCacheVersionParams, M3MangaCacheClassifyResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_CLASSIFY, M3MangaCacheVersionParams.serializer(), M3MangaCacheClassifyResult.serializer(),
+    )
+    public val mangaCacheClassifyBatch: ReaderRPC<M3MangaCacheClassifyBatchParams, M3MangaCacheClassifyBatchResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_CLASSIFY_BATCH, M3MangaCacheClassifyBatchParams.serializer(), M3MangaCacheClassifyBatchResult.serializer(),
+    )
+    public val mangaCacheEvictionClaim: ReaderRPC<M3MangaCacheEvictionClaimParams, M3MangaCacheEvictionClaimResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_EVICTION_CLAIM, M3MangaCacheEvictionClaimParams.serializer(), M3MangaCacheEvictionClaimResult.serializer(),
+    )
+    public val mangaCacheEvictionComplete: ReaderRPC<M3MangaCacheEvictionCompleteParams, M3MangaCacheEvictionCompleteResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_EVICTION_COMPLETE, M3MangaCacheEvictionCompleteParams.serializer(), M3MangaCacheEvictionCompleteResult.serializer(),
+    )
+    public val mangaCacheEvictionPending: ReaderRPC<M3MangaCacheEvictionPendingParams, M3MangaCacheEvictionPendingResult> = ReaderRPC(
+        ReaderCommandMethod.MANGA_CACHE_EVICTION_PENDING, M3MangaCacheEvictionPendingParams.serializer(), M3MangaCacheEvictionPendingResult.serializer(),
+    )
+    public val mangaSourceSwitchCommitV2: ReaderRPC<M3MangaSourceSwitchOperationParams, M3MangaSourceSwitchOperationReceipt> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SOURCE_SWITCH_COMMIT_V2, M3MangaSourceSwitchOperationParams.serializer(), M3MangaSourceSwitchOperationReceipt.serializer(),
+    )
+    public val mangaSourceSwitchOperationQueryV1: ReaderRPC<M3MangaSourceSwitchOperationQueryParams, M3MangaSourceSwitchOperationQueryData> = ReaderRPC(
+        ReaderCommandMethod.MANGA_SOURCE_SWITCH_OPERATION_QUERY_V1, M3MangaSourceSwitchOperationQueryParams.serializer(), M3MangaSourceSwitchOperationQueryData.serializer(),
+    )
+    public val readingProgressGetManga: ReaderRPC<M3MangaProgressGetParams, M3MangaProgressState> = ReaderRPC(
+        ReaderCommandMethod.READING_PROGRESS_GET, M3MangaProgressGetParams.serializer(), M3MangaProgressState.serializer(),
+    )
+    public val readingProgressUpdateManga: ReaderRPC<M3MangaProgressUpdateParams, M3MangaProgressState> = ReaderRPC(
+        ReaderCommandMethod.READING_PROGRESS_UPDATE, M3MangaProgressUpdateParams.serializer(), M3MangaProgressState.serializer(),
+    )
+    public val cacheBookPrefetch: ReaderRPC<M3CacheBookPrefetchParams, M3CacheBookPrefetchData> = ReaderRPC(
+        ReaderCommandMethod.CACHE_BOOK_PREFETCH, M3CacheBookPrefetchParams.serializer(), M3CacheBookPrefetchData.serializer(),
+    )
+    public val cacheBookStatus: ReaderRPC<M3CacheBookStatusParams, M3CacheBookStatusData> = ReaderRPC(
+        ReaderCommandMethod.CACHE_BOOK_STATUS, M3CacheBookStatusParams.serializer(), M3CacheBookStatusData.serializer(),
+    )
+    public val cacheDownloadPause: ReaderRPC<M3CacheDownloadTaskParams, M3CacheDownloadTaskResult> = ReaderRPC(
+        ReaderCommandMethod.CACHE_DOWNLOAD_PAUSE, M3CacheDownloadTaskParams.serializer(), M3CacheDownloadTaskResult.serializer(),
+    )
+    public val cacheDownloadResume: ReaderRPC<M3CacheDownloadTaskParams, M3CacheDownloadTaskResult> = ReaderRPC(
+        ReaderCommandMethod.CACHE_DOWNLOAD_RESUME, M3CacheDownloadTaskParams.serializer(), M3CacheDownloadTaskResult.serializer(),
+    )
+    public val cacheDownloadCancel: ReaderRPC<M3CacheDownloadTaskParams, M3CacheDownloadTaskResult> = ReaderRPC(
+        ReaderCommandMethod.CACHE_DOWNLOAD_CANCEL, M3CacheDownloadTaskParams.serializer(), M3CacheDownloadTaskResult.serializer(),
+    )
+    public val cacheDownloadOperationQuery: ReaderRPC<M3CacheDownloadOperationQueryParams, M3DownloadOperationQueryData> = ReaderRPC(
+        ReaderCommandMethod.CACHE_DOWNLOAD_OPERATION_QUERY, M3CacheDownloadOperationQueryParams.serializer(), M3DownloadOperationQueryData.serializer(),
+    )
+    public val cacheDownloadOperationSettle: ReaderRPC<M3CacheDownloadOperationSettleParams, M3DownloadOperationReceipt> = ReaderRPC(
+        ReaderCommandMethod.CACHE_DOWNLOAD_OPERATION_SETTLE, M3CacheDownloadOperationSettleParams.serializer(), M3DownloadOperationReceipt.serializer(),
+    )
+    public val cacheChapterMaterializationReport: ReaderRPC<M3CacheChapterMaterializationReportParams, M3CacheChapterMaterializationReportData> = ReaderRPC(
+        ReaderCommandMethod.CACHE_CHAPTER_MATERIALIZATION_REPORT, M3CacheChapterMaterializationReportParams.serializer(), M3CacheChapterMaterializationReportData.serializer(),
+    )
+    public val readingEntryPrepare: ReaderRPC<M3ReadingEntryPrepareParams, M3ReadingEntryPrepareData> = ReaderRPC(
+        ReaderCommandMethod.READING_ENTRY_PREPARE, M3ReadingEntryPrepareParams.serializer(), M3ReadingEntryPrepareData.serializer(),
+    )
+    public val ttsQueueReportCallback: ReaderRPC<M3TtsQueueReportCallbackParams, M3TtsQueueReportCallbackData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_REPORT_CALLBACK, M3TtsQueueReportCallbackParams.serializer(), M3TtsQueueReportCallbackData.serializer(),
+    )
+    public val ttsSlice: ReaderRPC<M3TtsSliceParams, M3TtsSliceData> = ReaderRPC(
+        ReaderCommandMethod.TTS_SLICE, M3TtsSliceParams.serializer(), M3TtsSliceData.serializer(),
+    )
+    public val ttsQueueStatus: ReaderRPC<M3TtsQueueStatusParams, M3TtsQueueStatusData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_STATUS, M3TtsQueueStatusParams.serializer(), M3TtsQueueStatusData.serializer(),
+    )
+    public val ttsChapterPlan: ReaderRPC<M3TtsChapterPlanParams, M3TtsChapterPlanData> = ReaderRPC(
+        ReaderCommandMethod.TTS_CHAPTER_PLAN, M3TtsChapterPlanParams.serializer(), M3TtsChapterPlanData.serializer(),
+    )
+    public val ttsQueuePlay: ReaderRPC<M3TtsQueuePlayParams, M3TtsQueuePlayData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_PLAY, M3TtsQueuePlayParams.serializer(), M3TtsQueuePlayData.serializer(),
+    )
+    public val ttsQueuePause: ReaderRPC<M3TtsQueuePauseParams, M3TtsQueuePauseData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_PAUSE, M3TtsQueuePauseParams.serializer(), M3TtsQueuePauseData.serializer(),
+    )
+    public val ttsQueueResume: ReaderRPC<M3TtsQueueResumeParams, M3TtsQueueResumeData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_RESUME, M3TtsQueueResumeParams.serializer(), M3TtsQueueResumeData.serializer(),
+    )
+    public val ttsQueueStop: ReaderRPC<M3TtsQueueStopParams, M3TtsQueueStopData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_STOP, M3TtsQueueStopParams.serializer(), M3TtsQueueStopData.serializer(),
+    )
+    public val ttsQueueNext: ReaderRPC<M3TtsQueueNextParams, M3TtsQueueNextData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_NEXT, M3TtsQueueNextParams.serializer(), M3TtsQueueNextData.serializer(),
+    )
+    public val ttsQueuePrev: ReaderRPC<M3TtsQueuePrevParams, M3TtsQueuePrevData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_PREV, M3TtsQueuePrevParams.serializer(), M3TtsQueuePrevData.serializer(),
+    )
+    public val ttsQueueSeek: ReaderRPC<M3TtsQueueSeekParams, M3TtsQueueSeekData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_SEEK, M3TtsQueueSeekParams.serializer(), M3TtsQueueSeekData.serializer(),
+    )
+    public val ttsQueueSkip: ReaderRPC<M3TtsQueueSkipParams, M3TtsQueueSkipData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_SKIP, M3TtsQueueSkipParams.serializer(), M3TtsQueueSkipData.serializer(),
+    )
+    public val ttsQueueSetRate: ReaderRPC<M3TtsQueueSetRateParams, M3TtsQueueSetRateData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_SET_RATE, M3TtsQueueSetRateParams.serializer(), M3TtsQueueSetRateData.serializer(),
+    )
+    public val ttsQueueReportStatus: ReaderRPC<M3TtsQueueReportStatusParams, M3TtsQueueReportStatusData> = ReaderRPC(
+        ReaderCommandMethod.TTS_QUEUE_REPORT_STATUS, M3TtsQueueReportStatusParams.serializer(), M3TtsQueueReportStatusData.serializer(),
+    )
+    public val ttsConfigGet: ReaderRPC<M3EmptyParams, M3TtsConfigGetData> = ReaderRPC(
+        ReaderCommandMethod.TTS_CONFIG_GET, M3EmptyParams.serializer(), M3TtsConfigGetData.serializer(),
+    )
+    public val ttsConfigPut: ReaderRPC<M3TtsConfigPutParams, M3TtsConfigPutData> = ReaderRPC(
+        ReaderCommandMethod.TTS_CONFIG_PUT, M3TtsConfigPutParams.serializer(), M3TtsConfigPutData.serializer(),
+    )
+    public val httpTtsPut: ReaderRPC<M3HttpTtsPutParams, M3HttpTtsPutData> = ReaderRPC(
+        ReaderCommandMethod.HTTP_TTS_PUT, M3HttpTtsPutParams.serializer(), M3HttpTtsPutData.serializer(),
+    )
+    public val httpTtsGet: ReaderRPC<M3HttpTtsGetParams, M3HttpTtsGetData> = ReaderRPC(
+        ReaderCommandMethod.HTTP_TTS_GET, M3HttpTtsGetParams.serializer(), M3HttpTtsGetData.serializer(),
+    )
+    public val httpTtsList: ReaderRPC<M3EmptyParams, M3HttpTtsListData> = ReaderRPC(
+        ReaderCommandMethod.HTTP_TTS_LIST, M3EmptyParams.serializer(), M3HttpTtsListData.serializer(),
+    )
+    public val httpTtsDelete: ReaderRPC<M3HttpTtsDeleteParams, M3HttpTtsDeleteData> = ReaderRPC(
+        ReaderCommandMethod.HTTP_TTS_DELETE, M3HttpTtsDeleteParams.serializer(), M3HttpTtsDeleteData.serializer(),
+    )
+    public val httpTtsBuildRequest: ReaderRPC<M3HttpTtsBuildRequestParams, M3HttpTtsBuildRequestData> = ReaderRPC(
+        ReaderCommandMethod.HTTP_TTS_BUILD_REQUEST, M3HttpTtsBuildRequestParams.serializer(), M3HttpTtsBuildRequestData.serializer(),
+    )
+    public val hostCompleteMangaTransferInput: ReaderRPC<M3MangaTransferInputCompleteParams, M3EmptyParams> = ReaderRPC(
+        ReaderCommandMethod.HOST_COMPLETE, M3MangaTransferInputCompleteParams.serializer(), M3EmptyParams.serializer(),
+    )
+    public val hostCompleteMangaTransferOutput: ReaderRPC<M3MangaTransferOutputCompleteParams, M3EmptyParams> = ReaderRPC(
+        ReaderCommandMethod.HOST_COMPLETE, M3MangaTransferOutputCompleteParams.serializer(), M3EmptyParams.serializer(),
+    )
+    /** Codec for rc_runtime_read_prepared_entry. No RPC envelope or requestId. */
+    public fun encodePreparedEntryParams(params: M3ReadingEntryFirstFrameParams): String =
+        ReaderProtocolJson.encodeToString(M3ReadingEntryFirstFrameParams.serializer(), params)
+    public fun decodePreparedEntryResult(bytes: ByteArray): M3ReadingEntryFirstFrameData =
+        ReaderProtocolJson.decodeFromString(M3ReadingEntryFirstFrameData.serializer(), bytes.decodeToString(throwOnInvalidSequence = true))
+}
+
+@Serializable
+public data class M3MangaChapterGetParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val directoryTargetProof: M3DirectoryTargetProof? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val policy: M3MangaChapterGetParamsPolicy? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val expectedManifestVersion: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val preparationRevision: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val anchor: M3MangaChapterAnchor? = null,
+)
+
+@Serializable
+public data class M3DirectoryTargetProof(
+    public val sourceId: String,
+    public val bookId: String,
+    public val catalogRevision: String,
+    public val structureRevision: String,
+    public val nodeId: String,
+    public val chapterIndex: Long,
+    public val url: String,
+)
+
+/** Wire values of M3MangaChapterGetParamsPolicy. */
+@Serializable
+public enum class M3MangaChapterGetParamsPolicy(public val wireValue: String) {
+    @SerialName("cacheOnly") CACHE_ONLY("cacheOnly"),
+    @SerialName("cacheFirst") CACHE_FIRST("cacheFirst"),
+    @SerialName("refresh") REFRESH("refresh"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaChapterGetParamsPolicy> =
+            values().associateBy(M3MangaChapterGetParamsPolicy::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaChapterGetParamsPolicy? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaChapterAnchor(
+    public val pageId: String,
+    public val ordinal: Long,
+)
+
+@Serializable
+public data class M3MangaChapterData(
+    public val manifest: M3MangaManifest,
+    public val chapterIndex: Long,
+    public val chapterTitle: String,
+    public val cached: Boolean,
+    public val resources: List<M3MangaResourceData>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val progressMapping: M3MangaProgressMapping? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val anchorMapping: M3MangaAnchorMapping? = null,
+)
+
+@Serializable
+public data class M3MangaManifest(
+    public val chapter: M3MangaChapterIdentity,
+    public val sourceRuleVersion: String,
+    public val manifestVersion: String,
+    public val decodeRevision: String,
+    public val pages: List<M3MangaManifestPage>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val displayHints: M3MangaDisplayHints? = null,
+)
+
+@Serializable
+public data class M3MangaChapterIdentity(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterId: String,
+)
+
+@Serializable
+public data class M3MangaManifestPage(
+    public val pageId: String,
+    public val ordinal: Long,
+    public val resourceRef: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val identity: M3MangaPageIdentity? = null,
+)
+
+@Serializable
+public data class M3MangaPageIdentity(
+    public val kind: M3MangaPageIdentityKind,
+    public val `value`: String,
+)
+
+/** Wire values of M3MangaPageIdentityKind. */
+@Serializable
+public enum class M3MangaPageIdentityKind(public val wireValue: String) {
+    @SerialName("sourceId") SOURCE_ID("sourceId"),
+    @SerialName("request") REQUEST("request"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaPageIdentityKind> =
+            values().associateBy(M3MangaPageIdentityKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaPageIdentityKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaDisplayHints(
+    public val sourceImageStyle: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val fit: M3MangaDisplayHintsFit? = null,
+)
+
+/** Wire values of M3MangaDisplayHintsFit. */
+@Serializable
+public enum class M3MangaDisplayHintsFit(public val wireValue: String) {
+    @SerialName("width") WIDTH("width"),
+    @SerialName("contain") CONTAIN("contain"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaDisplayHintsFit> =
+            values().associateBy(M3MangaDisplayHintsFit::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaDisplayHintsFit? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaResourceData(
+    public val resourceRef: String,
+    public val request: M3MangaResourceDataRequest,
+)
+
+@Serializable
+public data class M3MangaResourceDataRequest(
+    public val url: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val requestRule: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val referrer: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val headers: Map<String, String>? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sourcePageId: String? = null,
+)
+
+@Serializable
+public data class M3MangaProgressMapping(
+    public val status: M3MangaProgressMappingStatus,
+    public val reason: String,
+    public val fromManifestVersion: String,
+    public val fromPageId: String,
+    public val progressRevision: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val targetPageId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val targetOrdinal: Long? = null,
+)
+
+/** Wire values of M3MangaProgressMappingStatus. */
+@Serializable
+public enum class M3MangaProgressMappingStatus(public val wireValue: String) {
+    @SerialName("exact") EXACT("exact"),
+    @SerialName("approximate") APPROXIMATE("approximate"),
+    @SerialName("unresolved") UNRESOLVED("unresolved"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaProgressMappingStatus> =
+            values().associateBy(M3MangaProgressMappingStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaProgressMappingStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaAnchorMapping(
+    public val status: M3MangaAnchorMappingStatus,
+    public val reason: String,
+    public val fromManifestVersion: String,
+    public val fromPageId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val targetPageId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val targetOrdinal: Long? = null,
+)
+
+/** Wire values of M3MangaAnchorMappingStatus. */
+@Serializable
+public enum class M3MangaAnchorMappingStatus(public val wireValue: String) {
+    @SerialName("exact") EXACT("exact"),
+    @SerialName("approximate") APPROXIMATE("approximate"),
+    @SerialName("unresolved") UNRESOLVED("unresolved"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaAnchorMappingStatus> =
+            values().associateBy(M3MangaAnchorMappingStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaAnchorMappingStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaResourcePrepareParams(
+    public val chapter: M3MangaChapterIdentity,
+    public val manifestVersion: String,
+    public val resourceRef: String,
+    public val sourceRuleVersion: String,
+    public val transferId: String,
+)
+
+@Serializable
+public data class M3MangaResourcePrepareData(
+    public val prepared: Boolean,
+    public val resourceRef: String,
+    public val transferId: String,
+    public val bytes: Long,
+)
+
+@Serializable
+public data class M3MangaEntryGetParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val directoryTargetProof: M3DirectoryTargetProof? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterIndex: Long? = null,
+)
+
+@Serializable
+public data class M3MangaEntryData(
+    public val entry: M3MangaPreparedEntry?,
+)
+
+@Serializable
+public data class M3MangaPreparedEntry(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val resumeOnly: Boolean? = null,
+    public val chapter: M3MangaChapterWindow,
+    public val progress: M3MangaProgressState,
+    public val targetOrdinal: Long,
+    public val recoveryRequired: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val progressMapping: M3MangaProgressMapping? = null,
+)
+
+@Serializable
+public data class M3MangaChapterWindow(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val resumeOnly: Boolean? = null,
+    public val manifest: M3MangaWindowManifest,
+    public val chapterIndex: Long,
+    public val chapterTitle: String,
+    public val cached: Boolean,
+    public val resources: List<M3MangaResourceData>,
+    public val pageStart: Long,
+    public val totalPages: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val progressMapping: M3MangaProgressMapping? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val anchorMapping: M3MangaAnchorMapping? = null,
+)
+
+@Serializable
+public data class M3MangaWindowManifest(
+    public val chapter: M3MangaChapterIdentity,
+    public val sourceRuleVersion: String,
+    public val manifestVersion: String,
+    public val decodeRevision: String,
+    public val pages: List<M3MangaManifestPage>,
+)
+
+@Serializable
+public data class M3MangaProgressState(
+    public val token: M3MangaProgressToken,
+    public val location: M3MangaLocation?,
+)
+
+@Serializable
+public data class M3MangaProgressToken(
+    public val epoch: Long,
+    public val revision: Long,
+)
+
+@Serializable
+public data class M3MangaLocation(
+    @Required
+    public val kind: M3MangaLocationKind = M3MangaLocationKind.MANGA,
+    public val chapter: M3MangaChapterIdentity,
+    public val manifestVersion: String,
+    public val pageId: String,
+    public val pageOrdinalFallback: Long,
+    public val x: Double,
+    public val y: Double,
+    public val progressRevision: Long,
+)
+
+/** Wire values of M3MangaLocationKind. */
+@Serializable
+public enum class M3MangaLocationKind(public val wireValue: String) {
+    @SerialName("manga") MANGA("manga"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaLocationKind> =
+            values().associateBy(M3MangaLocationKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaLocationKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaPagesWindowParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterId: String,
+    public val manifestVersion: String,
+    public val start: Long,
+    public val limit: Long,
+)
+
+@Serializable
+public data class M3MangaSourceSwitchParams(
+    public val fromSourceId: String,
+    public val fromBookId: String,
+    public val expectedFrom: M3MangaProgressToken,
+    public val expectedTarget: M3MangaProgressToken,
+    public val firstImage: M3MangaFirstImageReceipt,
+    public val targetPageOrdinal: Long,
+    public val acceptApproximate: Boolean,
+)
+
+@Serializable
+public data class M3MangaFirstImageReceipt(
+    public val chapter: M3MangaChapterIdentity,
+    public val chapterIndex: Long,
+    public val width: Long,
+    public val height: Long,
+    public val manifestVersion: String,
+    public val sourceRuleVersion: String,
+    public val decodeRevision: String,
+    public val pageId: String,
+    public val resourceRef: String,
+    public val imageRevision: String,
+)
+
+@Serializable
+public data class M3MangaSourceSwitchData(
+    @Required
+    public val mapping: M3MangaSourceSwitchDataMapping = M3MangaSourceSwitchDataMapping.APPROXIMATE,
+    public val progress: M3MangaProgressState,
+)
+
+/** Wire values of M3MangaSourceSwitchDataMapping. */
+@Serializable
+public enum class M3MangaSourceSwitchDataMapping(public val wireValue: String) {
+    @SerialName("approximate") APPROXIMATE("approximate"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaSourceSwitchDataMapping> =
+            values().associateBy(M3MangaSourceSwitchDataMapping::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaSourceSwitchDataMapping? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaResourceInspectParams(
+    public val transferId: String,
+    public val sha256: String,
+    public val bytes: Long,
+)
+
+@Serializable(with = M3MangaResourceInspectDataSerializer::class)
+public sealed interface M3MangaResourceInspectData
+
+public object M3MangaResourceInspectDataSerializer : JsonContentPolymorphicSerializer<M3MangaResourceInspectData>(M3MangaResourceInspectData::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3MangaResourceInspectData> =
+        when ((element as? JsonObject)?.get("status")?.jsonPrimitive?.content) {
+            "absent" -> M3MangaResourceInspectDataAbsent.serializer()
+            "present" -> M3MangaResourceInspectDataPresent.serializer()
+            else -> throw SerializationException("Unknown M3MangaResourceInspectData kind")
+        }
+}
+
+@Serializable
+public data class M3MangaResourceInspectDataAbsent(
+    public val transferId: String,
+    public val sha256: String,
+    public val bytes: Long,
+    @Required
+    public val status: M3MangaResourceInspectDataAbsentStatus = M3MangaResourceInspectDataAbsentStatus.ABSENT,
+    public val orientation: M3Null,
+    public val decodeProfile: M3MangaImageDecodeProfile,
+) : M3MangaResourceInspectData
+
+/** Wire values of M3MangaResourceInspectDataAbsentStatus. */
+@Serializable
+public enum class M3MangaResourceInspectDataAbsentStatus(public val wireValue: String) {
+    @SerialName("absent") ABSENT("absent"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaResourceInspectDataAbsentStatus> =
+            values().associateBy(M3MangaResourceInspectDataAbsentStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaResourceInspectDataAbsentStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3NullSerializer::class)
+public object M3Null
+
+public object M3NullSerializer : KSerializer<M3Null> {
+    override val descriptor: SerialDescriptor = JsonNull.serializer().descriptor
+    override fun serialize(encoder: Encoder, value: M3Null) {
+        (encoder as JsonEncoder).encodeJsonElement(JsonNull)
+    }
+    override fun deserialize(decoder: Decoder): M3Null {
+        if ((decoder as JsonDecoder).decodeJsonElement() !== JsonNull) throw SerializationException("Expected null for M3Null")
+        return M3Null
+    }
+}
+
+@Serializable
+public data class M3MangaImageDecodeProfile(
+    public val format: M3MangaImageDecodeProfileFormat,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val encodedWidth: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val encodedHeight: Long? = null,
+    public val allocationClass: M3MangaImageDecodeProfileAllocationClass,
+)
+
+/** Wire values of M3MangaImageDecodeProfileFormat. */
+@Serializable
+public enum class M3MangaImageDecodeProfileFormat(public val wireValue: String) {
+    @SerialName("jpeg") JPEG("jpeg"),
+    @SerialName("png") PNG("png"),
+    @SerialName("webp") WEBP("webp"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaImageDecodeProfileFormat> =
+            values().associateBy(M3MangaImageDecodeProfileFormat::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaImageDecodeProfileFormat? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3MangaImageDecodeProfileAllocationClass. */
+@Serializable
+public enum class M3MangaImageDecodeProfileAllocationClass(public val wireValue: String) {
+    @SerialName("scanline") SCANLINE("scanline"),
+    @SerialName("pngInterlaced") PNG_INTERLACED("pngInterlaced"),
+    @SerialName("fullFrame") FULL_FRAME("fullFrame"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaImageDecodeProfileAllocationClass> =
+            values().associateBy(M3MangaImageDecodeProfileAllocationClass::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaImageDecodeProfileAllocationClass? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaResourceInspectDataPresent(
+    public val transferId: String,
+    public val sha256: String,
+    public val bytes: Long,
+    @Required
+    public val status: M3MangaResourceInspectDataPresentStatus = M3MangaResourceInspectDataPresentStatus.PRESENT,
+    public val orientation: Long,
+    public val decodeProfile: M3MangaImageDecodeProfile,
+) : M3MangaResourceInspectData
+
+/** Wire values of M3MangaResourceInspectDataPresentStatus. */
+@Serializable
+public enum class M3MangaResourceInspectDataPresentStatus(public val wireValue: String) {
+    @SerialName("present") PRESENT("present"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaResourceInspectDataPresentStatus> =
+            values().associateBy(M3MangaResourceInspectDataPresentStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaResourceInspectDataPresentStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaRetentionSetParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val retain: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val retainedAt: Long? = null,
+)
+
+@Serializable
+public data class M3MangaRetentionChapterIdentity(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterId: String,
+)
+
+@Serializable
+public data class M3MangaRetentionSetResult(
+    public val retention: M3MangaRetentionData?,
+)
+
+@Serializable
+public data class M3MangaRetentionData(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val retainedAt: Long,
+)
+
+@Serializable
+public data class M3MangaRetentionGetParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+)
+
+@Serializable
+public data class M3MangaRetentionListParams(
+    public val sourceId: String,
+    public val bookId: String,
+)
+
+@Serializable
+public data class M3MangaRetentionListResult(
+    public val retentions: List<M3MangaRetentionData>,
+)
+
+@Serializable
+public data class M3MangaCacheRecordReadParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val readAt: Long,
+)
+
+@Serializable
+public data class M3MangaCacheRecordReadResult(
+    public val recorded: Boolean,
+)
+
+@Serializable
+public data class M3MangaCacheEvictParams(
+    public val nowSeconds: Long,
+    public val ttlSeconds: Long,
+)
+
+@Serializable
+public data class M3MangaCacheEvictResult(
+    public val candidates: List<M3MangaEvictionCandidateData>,
+)
+
+@Serializable
+public data class M3MangaEvictionCandidateData(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val lastReadAt: Long?,
+)
+
+@Serializable
+public data class M3MangaSessionProtectParams(
+    public val chapters: List<M3MangaRetentionChapterIdentity>,
+    public val sessionEpoch: Long,
+)
+
+@Serializable
+public data class M3MangaSessionProtectResult(
+    public val `protected`: Long,
+)
+
+@Serializable
+public data class M3MangaSessionReleaseParams(
+    public val sessionEpoch: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val expectedRuntimeEpoch: Long? = null,
+)
+
+@Serializable
+public data class M3MangaSessionReleaseResult(
+    public val released: Boolean,
+)
+
+@Serializable
+public class M3MangaSessionRuntimeParams
+
+@Serializable
+public data class M3MangaSessionRuntimeResult(
+    public val runtimeEpoch: Long,
+)
+
+@Serializable
+public data class M3MangaSessionReplaceParams(
+    public val chapters: List<M3MangaRetentionChapterIdentity>,
+    public val sessionEpoch: Long,
+    public val expectedRuntimeEpoch: Long,
+)
+
+@Serializable
+public data class M3MangaSessionReplaceResult(
+    public val `protected`: Long,
+    public val runtimeEpoch: Long,
+)
+
+@Serializable
+public data class M3MangaCacheMaterializationPrepareParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val intent: M3MangaCacheMaterializationPrepareParamsIntent,
+)
+
+/** Wire values of M3MangaCacheMaterializationPrepareParamsIntent. */
+@Serializable
+public enum class M3MangaCacheMaterializationPrepareParamsIntent(public val wireValue: String) {
+    @SerialName("cache") CACHE("cache"),
+    @SerialName("download") DOWNLOAD("download"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaCacheMaterializationPrepareParamsIntent> =
+            values().associateBy(M3MangaCacheMaterializationPrepareParamsIntent::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaCacheMaterializationPrepareParamsIntent? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaCacheMaterializationPrepareResult(
+    public val token: String,
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val intent: M3MangaCacheMaterializationPrepareResultIntent,
+)
+
+/** Wire values of M3MangaCacheMaterializationPrepareResultIntent. */
+@Serializable
+public enum class M3MangaCacheMaterializationPrepareResultIntent(public val wireValue: String) {
+    @SerialName("cache") CACHE("cache"),
+    @SerialName("download") DOWNLOAD("download"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaCacheMaterializationPrepareResultIntent> =
+            values().associateBy(M3MangaCacheMaterializationPrepareResultIntent::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaCacheMaterializationPrepareResultIntent? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaCacheMaterializationCompleteParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val token: String,
+    public val resourceRefs: List<String>,
+)
+
+@Serializable
+public data class M3MangaCacheMaterializationCompleteResult(
+    public val completed: Boolean,
+    public val manifestVersion: String,
+)
+
+@Serializable
+public data class M3MangaCacheMaterializationAbortParams(
+    public val token: String,
+)
+
+@Serializable
+public data class M3MangaCacheMaterializationAbortResult(
+    public val aborted: Boolean,
+)
+
+@Serializable
+public data class M3MangaCacheVersionParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+)
+
+@Serializable
+public data class M3MangaCacheClassifyResult(
+    public val status: M3MangaCacheClassifyResultStatus,
+    public val inUse: Boolean,
+    public val lastReadAt: Long?,
+)
+
+/** Wire values of M3MangaCacheClassifyResultStatus. */
+@Serializable
+public enum class M3MangaCacheClassifyResultStatus(public val wireValue: String) {
+    @SerialName("cache") CACHE("cache"),
+    @SerialName("download") DOWNLOAD("download"),
+    @SerialName("protected") PROTECTED("protected"),
+    @SerialName("unknown") UNKNOWN("unknown"),
+    @SerialName("missing") MISSING("missing"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaCacheClassifyResultStatus> =
+            values().associateBy(M3MangaCacheClassifyResultStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaCacheClassifyResultStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaCacheClassifyBatchParams(
+    public val versions: List<M3MangaCacheVersionParams>,
+)
+
+@Serializable
+public data class M3MangaCacheClassifyBatchResult(
+    public val results: List<M3MangaCacheClassifyResult>,
+)
+
+@Serializable
+public data class M3MangaCacheEvictionClaimParams(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val nowSeconds: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val ttlSeconds: Long? = null,
+)
+
+@Serializable
+public data class M3MangaCacheEvictionClaimResult(
+    public val grant: M3MangaEvictionGrantData?,
+)
+
+@Serializable
+public data class M3MangaEvictionGrantData(
+    public val chapter: M3MangaRetentionChapterIdentity,
+    public val manifestVersion: String,
+    public val token: String,
+)
+
+@Serializable
+public data class M3MangaCacheEvictionCompleteParams(
+    public val token: String,
+    public val removed: Boolean,
+)
+
+@Serializable
+public data class M3MangaCacheEvictionCompleteResult(
+    public val completed: Boolean,
+)
+
+@Serializable
+public class M3MangaCacheEvictionPendingParams
+
+@Serializable
+public data class M3MangaCacheEvictionPendingResult(
+    public val grants: List<M3MangaEvictionGrantData>,
+)
+
+@Serializable
+public data class M3MangaSourceSwitchOperationParams(
+    public val operationId: String,
+    public val sequence: Long,
+    public val fromSourceId: String,
+    public val fromBookId: String,
+    public val expectedFrom: M3MangaProgressToken,
+    public val expectedTarget: M3MangaProgressToken,
+    public val firstImage: M3MangaFirstImageReceipt,
+    public val targetPageOrdinal: Long,
+    public val acceptApproximate: Boolean,
+)
+
+@Serializable
+public data class M3MangaSourceSwitchOperationReceipt(
+    public val binding: M3ReadingOperationBinding,
+    @Required
+    public val mapping: M3MangaSourceSwitchOperationReceiptMapping = M3MangaSourceSwitchOperationReceiptMapping.APPROXIMATE,
+    public val progress: M3MangaProgressState,
+)
+
+@Serializable
+public data class M3ReadingOperationBinding(
+    public val operationId: String,
+    public val sequence: Long,
+    public val payloadFingerprint: String,
+)
+
+/** Wire values of M3MangaSourceSwitchOperationReceiptMapping. */
+@Serializable
+public enum class M3MangaSourceSwitchOperationReceiptMapping(public val wireValue: String) {
+    @SerialName("approximate") APPROXIMATE("approximate"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaSourceSwitchOperationReceiptMapping> =
+            values().associateBy(M3MangaSourceSwitchOperationReceiptMapping::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaSourceSwitchOperationReceiptMapping? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaSourceSwitchOperationQueryParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val expected: M3MangaSourceSwitchOperationParams? = null,
+)
+
+@Serializable
+public data class M3MangaSourceSwitchOperationQueryData(
+    public val head: M3ReadingOperationBinding?,
+    public val receipt: M3MangaSourceSwitchOperationReceipt?,
+)
+
+@Serializable
+public data class M3MangaProgressGetParams(
+    @Required
+    public val kind: M3MangaProgressGetParamsKind = M3MangaProgressGetParamsKind.MANGA,
+    public val sourceId: String,
+    public val bookId: String,
+)
+
+/** Wire values of M3MangaProgressGetParamsKind. */
+@Serializable
+public enum class M3MangaProgressGetParamsKind(public val wireValue: String) {
+    @SerialName("manga") MANGA("manga"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaProgressGetParamsKind> =
+            values().associateBy(M3MangaProgressGetParamsKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaProgressGetParamsKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaProgressUpdateParams(
+    @Required
+    public val kind: M3MangaProgressUpdateParamsKind = M3MangaProgressUpdateParamsKind.MANGA,
+    public val location: M3MangaLocation,
+    public val expectedEpoch: Long,
+    public val expectedRevision: Long,
+)
+
+/** Wire values of M3MangaProgressUpdateParamsKind. */
+@Serializable
+public enum class M3MangaProgressUpdateParamsKind(public val wireValue: String) {
+    @SerialName("manga") MANGA("manga"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaProgressUpdateParamsKind> =
+            values().associateBy(M3MangaProgressUpdateParamsKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaProgressUpdateParamsKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3CacheBookPrefetchParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val preparationRevision: Long? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterRange: List<Long>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val priority: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val requestedAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contentKind: M3CacheBookPrefetchParamsContentKind? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sequence: Long? = null,
+)
+
+/** Wire values of M3CacheBookPrefetchParamsContentKind. */
+@Serializable
+public enum class M3CacheBookPrefetchParamsContentKind(public val wireValue: String) {
+    @SerialName("text") TEXT("text"),
+    @SerialName("manga") MANGA("manga"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheBookPrefetchParamsContentKind> =
+            values().associateBy(M3CacheBookPrefetchParamsContentKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheBookPrefetchParamsContentKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3CacheBookPrefetchData(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterRange: List<Long>,
+    public val chapterCount: Long,
+    public val prefetchedCount: Long,
+    public val queuedIndexes: List<Long>,
+    public val alreadyQueuedIndexes: List<Long>,
+    public val skippedCachedIndexes: List<Long>,
+    public val materializations: List<M3CacheChapterMaterializationData>,
+) : M3DownloadOperationData
+
+@Serializable
+public data class M3CacheChapterMaterializationData(
+    public val chapterIndex: Long,
+    public val token: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val manga: M3MangaChapterData? = null,
+)
+
+@Serializable
+public data class M3CacheBookStatusParams(
+    public val sourceId: String,
+    public val bookId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val includeGlobalStats: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val includeChapterStates: Boolean? = null,
+)
+
+@Serializable
+public data class M3CacheBookStatusData(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sourceVersion: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val catalogAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val catalogVersion: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contextVersion: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val continuationVariables: Map<String, String>? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    public val tocAvailable: Boolean,
+    public val chapterCount: Long,
+    public val chapters: List<M3CacheChapterStatusData>,
+    public val cachedCount: Long,
+    public val queuedCount: Long,
+    public val inProgressCount: Long,
+    public val completedCount: Long,
+    public val failedCount: Long,
+    public val cancelledCount: Long,
+    public val missingCount: Long,
+    public val globalStats: M3CacheGlobalStatsData,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val readableChapterCount: Long? = null,
+)
+
+@Serializable
+public data class M3CacheChapterStatusData(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val level: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val displayTitle: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contextTitle: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val isVip: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val isPay: Boolean? = null,
+    public val chapterIndex: Long,
+    public val title: String,
+    public val url: String,
+    public val state: M3CacheChapterState,
+    public val cachedBytes: Long,
+    public val attempts: Long,
+    public val maxAttempts: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val lastError: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val navigable: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val proofState: M3CacheChapterStatusDataProofState? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val resumeOnly: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val mangaManifestVersion: String? = null,
+)
+
+/** Wire values of M3CacheChapterState. */
+@Serializable
+public enum class M3CacheChapterState(public val wireValue: String) {
+    @SerialName("missing") MISSING("missing"),
+    @SerialName("queued") QUEUED("queued"),
+    @SerialName("paused") PAUSED("paused"),
+    @SerialName("inProgress") IN_PROGRESS("inProgress"),
+    @SerialName("cached") CACHED("cached"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("failed") FAILED("failed"),
+    @SerialName("cancelled") CANCELLED("cancelled"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheChapterState> =
+            values().associateBy(M3CacheChapterState::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheChapterState? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3CacheChapterStatusDataProofState. */
+@Serializable
+public enum class M3CacheChapterStatusDataProofState(public val wireValue: String) {
+    @SerialName("verified") VERIFIED("verified"),
+    @SerialName("legacyUnknown") LEGACY_UNKNOWN("legacyUnknown"),
+    @SerialName("invalid") INVALID("invalid"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheChapterStatusDataProofState> =
+            values().associateBy(M3CacheChapterStatusDataProofState::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheChapterStatusDataProofState? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3CacheGlobalStatsData(
+    public val entryCount: Long,
+    public val totalContentBytes: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val oldestCachedAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val newestCachedAt: Long? = null,
+    public val queueEntryCount: Long,
+    public val queuedCount: Long,
+    public val inProgressCount: Long,
+    public val completedCount: Long,
+    public val failedCount: Long,
+    public val cancelledCount: Long,
+)
+
+@Serializable
+public data class M3CacheDownloadTaskParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val now: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sequence: Long? = null,
+)
+
+@Serializable
+public data class M3CacheDownloadTaskResult(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val status: M3CacheDownloadTaskResultStatus,
+    public val attempts: Long,
+    public val maxAttempts: Long,
+) : M3DownloadOperationData
+
+/** Wire values of M3CacheDownloadTaskResultStatus. */
+@Serializable
+public enum class M3CacheDownloadTaskResultStatus(public val wireValue: String) {
+    @SerialName("pending") PENDING("pending"),
+    @SerialName("paused") PAUSED("paused"),
+    @SerialName("inProgress") IN_PROGRESS("inProgress"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("failed") FAILED("failed"),
+    @SerialName("cancelled") CANCELLED("cancelled"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheDownloadTaskResultStatus> =
+            values().associateBy(M3CacheDownloadTaskResultStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheDownloadTaskResultStatus? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3CacheDownloadOperationQueryParams(
+    public val sourceId: String,
+    public val bookId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val expected: M3DownloadOperationExpected? = null,
+    public val action: M3CacheDownloadOperationQueryParamsAction,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterIndex: Long? = null,
+)
+
+@Serializable(with = M3DownloadOperationExpectedSerializer::class)
+public sealed interface M3DownloadOperationExpected
+
+public object M3DownloadOperationExpectedSerializer : JsonContentPolymorphicSerializer<M3DownloadOperationExpected>(M3DownloadOperationExpected::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3DownloadOperationExpected> =
+        when ((element as? JsonObject)?.get("action")?.jsonPrimitive?.content) {
+            "prefetch" -> M3DownloadOperationExpectedPrefetch.serializer()
+            "pause" -> M3DownloadOperationExpectedPause.serializer()
+            "resume" -> M3DownloadOperationExpectedResume.serializer()
+            "cancel" -> M3DownloadOperationExpectedCancel.serializer()
+            "report" -> M3DownloadOperationExpectedReport.serializer()
+            else -> throw SerializationException("Unknown M3DownloadOperationExpected kind")
+        }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedPrefetch(
+    @Required
+    public val action: M3DownloadOperationExpectedPrefetchAction = M3DownloadOperationExpectedPrefetchAction.PREFETCH,
+    public val params: M3DownloadOperationExpectedPrefetchParams,
+) : M3DownloadOperationExpected
+
+/** Wire values of M3DownloadOperationExpectedPrefetchAction. */
+@Serializable
+public enum class M3DownloadOperationExpectedPrefetchAction(public val wireValue: String) {
+    @SerialName("prefetch") PREFETCH("prefetch"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedPrefetchAction> =
+            values().associateBy(M3DownloadOperationExpectedPrefetchAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedPrefetchAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedPrefetchParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val preparationRevision: Long? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterRange: List<Long>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val priority: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val requestedAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contentKind: M3DownloadOperationExpectedPrefetchParamsContentKind? = null,
+    public val operationId: String,
+    public val sequence: Long,
+)
+
+/** Wire values of M3DownloadOperationExpectedPrefetchParamsContentKind. */
+@Serializable
+public enum class M3DownloadOperationExpectedPrefetchParamsContentKind(public val wireValue: String) {
+    @SerialName("text") TEXT("text"),
+    @SerialName("manga") MANGA("manga"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedPrefetchParamsContentKind> =
+            values().associateBy(M3DownloadOperationExpectedPrefetchParamsContentKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedPrefetchParamsContentKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedPause(
+    @Required
+    public val action: M3DownloadOperationExpectedPauseAction = M3DownloadOperationExpectedPauseAction.PAUSE,
+    public val params: M3DownloadOperationExpectedPauseParams,
+) : M3DownloadOperationExpected
+
+/** Wire values of M3DownloadOperationExpectedPauseAction. */
+@Serializable
+public enum class M3DownloadOperationExpectedPauseAction(public val wireValue: String) {
+    @SerialName("pause") PAUSE("pause"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedPauseAction> =
+            values().associateBy(M3DownloadOperationExpectedPauseAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedPauseAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedPauseParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val now: Long? = null,
+    public val operationId: String,
+    public val sequence: Long,
+)
+
+@Serializable
+public data class M3DownloadOperationExpectedResume(
+    @Required
+    public val action: M3DownloadOperationExpectedResumeAction = M3DownloadOperationExpectedResumeAction.RESUME,
+    public val params: M3DownloadOperationExpectedResumeParams,
+) : M3DownloadOperationExpected
+
+/** Wire values of M3DownloadOperationExpectedResumeAction. */
+@Serializable
+public enum class M3DownloadOperationExpectedResumeAction(public val wireValue: String) {
+    @SerialName("resume") RESUME("resume"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedResumeAction> =
+            values().associateBy(M3DownloadOperationExpectedResumeAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedResumeAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedResumeParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val now: Long? = null,
+    public val operationId: String,
+    public val sequence: Long,
+)
+
+@Serializable
+public data class M3DownloadOperationExpectedCancel(
+    @Required
+    public val action: M3DownloadOperationExpectedCancelAction = M3DownloadOperationExpectedCancelAction.CANCEL,
+    public val params: M3DownloadOperationExpectedCancelParams,
+) : M3DownloadOperationExpected
+
+/** Wire values of M3DownloadOperationExpectedCancelAction. */
+@Serializable
+public enum class M3DownloadOperationExpectedCancelAction(public val wireValue: String) {
+    @SerialName("cancel") CANCEL("cancel"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedCancelAction> =
+            values().associateBy(M3DownloadOperationExpectedCancelAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedCancelAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedCancelParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val now: Long? = null,
+    public val operationId: String,
+    public val sequence: Long,
+)
+
+@Serializable
+public data class M3DownloadOperationExpectedReport(
+    @Required
+    public val action: M3DownloadOperationExpectedReportAction = M3DownloadOperationExpectedReportAction.REPORT,
+    public val params: M3DownloadOperationExpectedReportParams,
+) : M3DownloadOperationExpected
+
+/** Wire values of M3DownloadOperationExpectedReportAction. */
+@Serializable
+public enum class M3DownloadOperationExpectedReportAction(public val wireValue: String) {
+    @SerialName("report") REPORT("report"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedReportAction> =
+            values().associateBy(M3DownloadOperationExpectedReportAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedReportAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationExpectedReportParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val token: String,
+    public val outcome: M3DownloadOperationExpectedReportParamsOutcome,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val errorCode: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val reportedAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val manga: M3MangaOfflineReceipt? = null,
+    public val operationId: String,
+    public val sequence: Long,
+)
+
+/** Wire values of M3DownloadOperationExpectedReportParamsOutcome. */
+@Serializable
+public enum class M3DownloadOperationExpectedReportParamsOutcome(public val wireValue: String) {
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("failed") FAILED("failed"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationExpectedReportParamsOutcome> =
+            values().associateBy(M3DownloadOperationExpectedReportParamsOutcome::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationExpectedReportParamsOutcome? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaOfflineReceipt(
+    public val chapter: M3MangaChapterIdentity,
+    public val manifestVersion: String,
+    public val resourceRefs: List<String>,
+)
+
+/** Wire values of M3CacheDownloadOperationQueryParamsAction. */
+@Serializable
+public enum class M3CacheDownloadOperationQueryParamsAction(public val wireValue: String) {
+    @SerialName("prefetch") PREFETCH("prefetch"),
+    @SerialName("pause") PAUSE("pause"),
+    @SerialName("resume") RESUME("resume"),
+    @SerialName("cancel") CANCEL("cancel"),
+    @SerialName("report") REPORT("report"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheDownloadOperationQueryParamsAction> =
+            values().associateBy(M3CacheDownloadOperationQueryParamsAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheDownloadOperationQueryParamsAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3DownloadOperationQueryData(
+    public val head: M3ReadingOperationBinding?,
+    public val receipt: M3DownloadOperationReceipt?,
+    public val canResumeOriginal: Boolean,
+)
+
+@Serializable
+public data class M3DownloadOperationReceipt(
+    public val binding: M3ReadingOperationBinding,
+    public val phase: M3DownloadOperationReceiptPhase,
+    public val action: M3DownloadOperationReceiptAction,
+    public val `data`: M3DownloadOperationData?,
+)
+
+/** Wire values of M3DownloadOperationReceiptPhase. */
+@Serializable
+public enum class M3DownloadOperationReceiptPhase(public val wireValue: String) {
+    @SerialName("pending") PENDING("pending"),
+    @SerialName("committed") COMMITTED("committed"),
+    @SerialName("settled") SETTLED("settled"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationReceiptPhase> =
+            values().associateBy(M3DownloadOperationReceiptPhase::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationReceiptPhase? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3DownloadOperationReceiptAction. */
+@Serializable
+public enum class M3DownloadOperationReceiptAction(public val wireValue: String) {
+    @SerialName("prefetch") PREFETCH("prefetch"),
+    @SerialName("pause") PAUSE("pause"),
+    @SerialName("resume") RESUME("resume"),
+    @SerialName("cancel") CANCEL("cancel"),
+    @SerialName("report") REPORT("report"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3DownloadOperationReceiptAction> =
+            values().associateBy(M3DownloadOperationReceiptAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3DownloadOperationReceiptAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3DownloadOperationDataSerializer::class)
+public sealed interface M3DownloadOperationData
+
+public object M3DownloadOperationDataSerializer : JsonContentPolymorphicSerializer<M3DownloadOperationData>(M3DownloadOperationData::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3DownloadOperationData> {
+        val fields = element as? JsonObject ?: throw SerializationException("Expected M3DownloadOperationData object")
+        val variants = listOfNotNull<DeserializationStrategy<M3DownloadOperationData>>(
+            if (fields.containsKey("chapterRange")) M3CacheBookPrefetchData.serializer() else null,
+            if (fields.containsKey("status")) M3CacheDownloadTaskResult.serializer() else null,
+            if (fields.containsKey("state")) M3CacheChapterMaterializationReportData.serializer() else null,
+        )
+        return variants.singleOrNull() ?: throw SerializationException("Unknown or ambiguous M3DownloadOperationData variant")
+    }
+}
+
+@Serializable
+public data class M3CacheChapterMaterializationReportData(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val state: M3CacheChapterState,
+    public val retainedCachedBody: Boolean,
+) : M3DownloadOperationData
+
+@Serializable
+public data class M3CacheDownloadOperationSettleParams(
+    public val operationId: String,
+    public val sequence: Long,
+    public val payloadFingerprint: String,
+    public val sourceId: String,
+    public val bookId: String,
+    public val action: M3CacheDownloadOperationSettleParamsAction,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterIndex: Long? = null,
+)
+
+/** Wire values of M3CacheDownloadOperationSettleParamsAction. */
+@Serializable
+public enum class M3CacheDownloadOperationSettleParamsAction(public val wireValue: String) {
+    @SerialName("prefetch") PREFETCH("prefetch"),
+    @SerialName("pause") PAUSE("pause"),
+    @SerialName("resume") RESUME("resume"),
+    @SerialName("cancel") CANCEL("cancel"),
+    @SerialName("report") REPORT("report"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheDownloadOperationSettleParamsAction> =
+            values().associateBy(M3CacheDownloadOperationSettleParamsAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheDownloadOperationSettleParamsAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3CacheChapterMaterializationReportParams(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val token: String,
+    public val outcome: M3CacheChapterMaterializationReportParamsOutcome,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val errorCode: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val reportedAt: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val manga: M3MangaOfflineReceipt? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sequence: Long? = null,
+)
+
+/** Wire values of M3CacheChapterMaterializationReportParamsOutcome. */
+@Serializable
+public enum class M3CacheChapterMaterializationReportParamsOutcome(public val wireValue: String) {
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("failed") FAILED("failed"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3CacheChapterMaterializationReportParamsOutcome> =
+            values().associateBy(M3CacheChapterMaterializationReportParamsOutcome::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3CacheChapterMaterializationReportParamsOutcome? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3ReadingEntryPrepareParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val localSourcePath: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterIndex: Long? = null,
+    public val sourceId: String,
+    public val bookId: String,
+    public val neighborOffset: Long,
+)
+
+@Serializable
+public data class M3ReadingEntryPrepareData(
+    public val kind: String,
+    public val reason: String,
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long?,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val imagePresentationChanged: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val pendingRestore: M3LocalPositionPendingRestoreData? = null,
+)
+
+@Serializable
+public data class M3LocalPositionPendingRestoreData(
+    public val archiveIds: List<String>,
+    public val progressEntries: Long,
+    public val legacyProgressEntries: Long,
+    public val historyEntries: Long,
+    public val bookmarkEntries: Long,
+    public val highlightEntries: Long,
+    public val currentProgressUnverified: Boolean,
+)
+
+@Serializable
+public data class M3TtsQueueReportCallbackParams(
+    public val chapter: M3TtsChapterRef,
+    public val sliceIndex: Long,
+    public val status: M3TtsSliceStatus,
+    public val callbackId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val failurePolicy: M3TtsFailurePolicy? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val failureLimit: Long? = null,
+)
+
+@Serializable
+public data class M3TtsChapterRef(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterTitle: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterUrl: String? = null,
+)
+
+/** Wire values of M3TtsSliceStatus. */
+@Serializable
+public enum class M3TtsSliceStatus(public val wireValue: String) {
+    @SerialName("pending") PENDING("pending"),
+    @SerialName("speaking") SPEAKING("speaking"),
+    @SerialName("done") DONE("done"),
+    @SerialName("skipped") SKIPPED("skipped"),
+    @SerialName("failed") FAILED("failed"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsSliceStatus> =
+            values().associateBy(M3TtsSliceStatus::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsSliceStatus? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3TtsFailurePolicy. */
+@Serializable
+public enum class M3TtsFailurePolicy(public val wireValue: String) {
+    @SerialName("skip") SKIP("skip"),
+    @SerialName("stop") STOP("stop"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsFailurePolicy> =
+            values().associateBy(M3TtsFailurePolicy::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsFailurePolicy? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3TtsQueueReportCallbackData(
+    public val snapshot: M3TtsQueueSnapshot,
+    public val callbackDisposition: M3TtsCallbackDisposition,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val failureAction: M3TtsFailureAction? = null,
+)
+
+@Serializable
+public data class M3TtsQueueSnapshot(
+    public val state: M3TtsQueueState,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val currentSliceIndex: Long? = null,
+    public val totalSlices: Long,
+    public val completedSlices: Long,
+    public val chapter: M3TtsChapterRef,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val sliceStatuses: List<M3TtsSliceStatus>? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val failurePolicy: M3TtsFailurePolicy? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val consecutiveFailures: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val failureLimit: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val drainBehavior: M3TtsQueueDrainBehavior? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val restartPolicy: M3TtsQueueRestartPolicy? = null,
+)
+
+/** Wire values of M3TtsQueueState. */
+@Serializable
+public enum class M3TtsQueueState(public val wireValue: String) {
+    @SerialName("idle") IDLE("idle"),
+    @SerialName("playing") PLAYING("playing"),
+    @SerialName("paused") PAUSED("paused"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("stopped") STOPPED("stopped"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsQueueState> =
+            values().associateBy(M3TtsQueueState::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsQueueState? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3TtsQueueDrainBehavior. */
+@Serializable
+public enum class M3TtsQueueDrainBehavior(public val wireValue: String) {
+    @SerialName("stop-on-boundary") STOP_ON_BOUNDARY("stop-on-boundary"),
+    @SerialName("advance-to-next") ADVANCE_TO_NEXT("advance-to-next"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsQueueDrainBehavior> =
+            values().associateBy(M3TtsQueueDrainBehavior::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsQueueDrainBehavior? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3TtsQueueRestartPolicy. */
+@Serializable
+public enum class M3TtsQueueRestartPolicy(public val wireValue: String) {
+    @SerialName("reset-on-core-restart") RESET_ON_CORE_RESTART("reset-on-core-restart"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsQueueRestartPolicy> =
+            values().associateBy(M3TtsQueueRestartPolicy::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsQueueRestartPolicy? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3TtsCallbackDisposition. */
+@Serializable
+public enum class M3TtsCallbackDisposition(public val wireValue: String) {
+    @SerialName("applied") APPLIED("applied"),
+    @SerialName("duplicate") DUPLICATE("duplicate"),
+    @SerialName("stale") STALE("stale"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsCallbackDisposition> =
+            values().associateBy(M3TtsCallbackDisposition::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsCallbackDisposition? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3TtsFailureAction. */
+@Serializable
+public enum class M3TtsFailureAction(public val wireValue: String) {
+    @SerialName("skip") SKIP("skip"),
+    @SerialName("stop") STOP("stop"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsFailureAction> =
+            values().associateBy(M3TtsFailureAction::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsFailureAction? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3TtsSliceParams(
+    public val chapter: M3TtsChapterRef,
+    public val content: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val strategy: M3TtsSlicingStrategy? = null,
+)
+
+/** Wire values of M3TtsSlicingStrategy. */
+@Serializable
+public enum class M3TtsSlicingStrategy(public val wireValue: String) {
+    @SerialName("paragraph") PARAGRAPH("paragraph"),
+    @SerialName("sentence") SENTENCE("sentence"),
+    @SerialName("paragraph-then-sentence") PARAGRAPH_THEN_SENTENCE("paragraph-then-sentence"),
+    @SerialName("line-break") LINE_BREAK("line-break"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3TtsSlicingStrategy> =
+            values().associateBy(M3TtsSlicingStrategy::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3TtsSlicingStrategy? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3TtsSliceData(
+    public val plan: M3TtsSlicePlan,
+)
+
+@Serializable
+public data class M3TtsSlicePlan(
+    public val chapter: M3TtsChapterRef,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val strategy: M3TtsSlicingStrategy? = null,
+    public val slices: List<M3TtsSlice>,
+    public val sourceCharCount: Long,
+)
+
+@Serializable
+public data class M3TtsSlice(
+    public val index: Long,
+    public val text: String,
+    public val charStart: Long,
+    public val charEnd: Long,
+    public val paragraphIndex: Long,
+)
+
+@Serializable
+public data class M3TtsQueueStatusParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueueStatusData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsChapterPlanParams(
+    public val chapter: M3TtsChapterRef,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val drainBehavior: M3TtsQueueDrainBehavior? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val nextChapter: M3TtsChapterRef? = null,
+)
+
+@Serializable
+public data class M3TtsChapterPlanData(
+    public val transition: M3TtsChapterTransition,
+)
+
+@Serializable
+public data class M3TtsChapterTransition(
+    public val current: M3TtsChapterRef,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val next: M3TtsChapterRef? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val drainBehavior: M3TtsQueueDrainBehavior? = null,
+)
+
+@Serializable
+public data class M3TtsQueuePlayParams(
+    public val plan: M3TtsSlicePlan,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val startSliceIndex: Long? = null,
+)
+
+@Serializable
+public data class M3TtsQueuePlayData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueuePauseParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueuePauseData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueResumeParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueueResumeData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueStopParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueueStopData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueNextParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueueNextData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueuePrevParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueuePrevData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueSeekParams(
+    public val chapter: M3TtsChapterRef,
+    public val sliceIndex: Long,
+)
+
+@Serializable
+public data class M3TtsQueueSeekData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueSkipParams(
+    public val chapter: M3TtsChapterRef,
+)
+
+@Serializable
+public data class M3TtsQueueSkipData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public data class M3TtsQueueSetRateParams(
+    public val chapter: M3TtsChapterRef,
+    public val rate: Long,
+)
+
+@Serializable
+public data class M3TtsQueueSetRateData(
+    public val snapshot: M3TtsQueueSnapshot,
+    public val rate: Long,
+)
+
+@Serializable
+public data class M3TtsQueueReportStatusParams(
+    public val chapter: M3TtsChapterRef,
+    public val sliceIndex: Long,
+    public val status: M3TtsSliceStatus,
+)
+
+@Serializable
+public data class M3TtsQueueReportStatusData(
+    public val snapshot: M3TtsQueueSnapshot,
+)
+
+@Serializable
+public class M3EmptyParams
+
+@Serializable
+public data class M3TtsConfigGetData(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val config: M3TtsConfigData? = null,
+)
+
+@Serializable
+public data class M3TtsConfigData(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val configId: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val engine: String? = null,
+    public val rate: Long,
+    public val pitch: Long,
+    public val followSys: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val ratePercent: Long? = null,
+)
+
+@Serializable
+public data class M3TtsConfigPutParams(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val engine: String? = null,
+    public val rate: Long,
+    public val pitch: Long,
+    public val followSys: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val ratePercent: Long? = null,
+)
+
+@Serializable
+public data class M3TtsConfigPutData(
+    public val config: M3TtsConfigData,
+)
+
+@Serializable
+public data class M3HttpTtsPutParams(
+    public val id: Long,
+    public val name: String,
+    public val url: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contentType: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val concurrentRate: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginUrl: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginUi: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val header: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val jsLib: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val enabledCookieJar: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginCheckJs: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val lastUpdateTime: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val readerProfile: String? = null,
+)
+
+@Serializable
+public data class M3HttpTtsPutData(
+    public val tts: M3HttpTtsData,
+)
+
+@Serializable
+public data class M3HttpTtsData(
+    public val id: Long,
+    public val name: String,
+    public val url: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contentType: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val concurrentRate: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginUrl: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginUi: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val header: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val jsLib: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val enabledCookieJar: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val loginCheckJs: String? = null,
+    public val lastUpdateTime: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val readerProfile: String? = null,
+)
+
+@Serializable
+public data class M3HttpTtsGetParams(
+    public val id: Long,
+)
+
+@Serializable
+public data class M3HttpTtsGetData(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val tts: M3HttpTtsData? = null,
+)
+
+@Serializable
+public data class M3HttpTtsListData(
+    public val items: List<M3HttpTtsData>,
+)
+
+@Serializable
+public data class M3HttpTtsDeleteParams(
+    public val id: Long,
+)
+
+@Serializable
+public data class M3HttpTtsDeleteData(
+    public val id: Long,
+    public val deleted: Boolean,
+)
+
+@Serializable
+public data class M3HttpTtsBuildRequestParams(
+    public val id: Long,
+    public val text: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val ratePercent: Long? = null,
+)
+
+@Serializable
+public data class M3HttpTtsBuildRequestData(
+    public val method: String,
+    public val url: String,
+    public val headers: Map<String, String>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val body: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val contentType: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val concurrentRate: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val playback: M3HttpTtsPlayback? = null,
+)
+
+@Serializable
+public data class M3HttpTtsPlayback(
+    public val format: M3HttpTtsPlaybackFormat,
+    public val sampleRate: Long?,
+    public val channels: M3HttpTtsPlaybackChannels?,
+    @Required
+    public val sampleFormat: M3HttpTtsPlaybackSampleFormat = M3HttpTtsPlaybackSampleFormat.S16LE,
+    public val credentialRef: String?,
+    public val credentialHeader: String?,
+    public val credentialPrefix: String,
+    public val rateApplied: Boolean,
+    public val ratePercent: Long,
+)
+
+/** Wire values of M3HttpTtsPlaybackFormat. */
+@Serializable
+public enum class M3HttpTtsPlaybackFormat(public val wireValue: String) {
+    @SerialName("mp3") MP3("mp3"),
+    @SerialName("wav") WAV("wav"),
+    @SerialName("pcm") PCM("pcm"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3HttpTtsPlaybackFormat> =
+            values().associateBy(M3HttpTtsPlaybackFormat::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3HttpTtsPlaybackFormat? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3HttpTtsPlaybackChannelsSerializer::class)
+public enum class M3HttpTtsPlaybackChannels(public val wireValue: Long) {
+    V1(1L),
+    V2(2L),
+}
+
+public object M3HttpTtsPlaybackChannelsSerializer : KSerializer<M3HttpTtsPlaybackChannels> {
+    override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "M3HttpTtsPlaybackChannels", kotlinx.serialization.descriptors.PrimitiveKind.LONG,
+    )
+    override fun serialize(encoder: Encoder, value: M3HttpTtsPlaybackChannels) = encoder.encodeLong(value.wireValue)
+    override fun deserialize(decoder: Decoder): M3HttpTtsPlaybackChannels {
+        val wire = decoder.decodeLong()
+        return M3HttpTtsPlaybackChannels.entries.firstOrNull { it.wireValue == wire }
+            ?: throw SerializationException("Unknown M3HttpTtsPlaybackChannels value: $wire")
+    }
+}
+
+/** Wire values of M3HttpTtsPlaybackSampleFormat. */
+@Serializable
+public enum class M3HttpTtsPlaybackSampleFormat(public val wireValue: String) {
+    @SerialName("s16le") S16LE("s16le"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3HttpTtsPlaybackSampleFormat> =
+            values().associateBy(M3HttpTtsPlaybackSampleFormat::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3HttpTtsPlaybackSampleFormat? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaTransferInputCompleteParams(
+    public val operationId: Long,
+    public val result: M3MangaTransferInputReceipt,
+)
+
+@Serializable
+public data class M3MangaTransferInputReceipt(
+    public val assetId: Long,
+    public val operationId: Long,
+    public val bytes: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val width: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val height: Long? = null,
+)
+
+@Serializable
+public data class M3MangaTransferOutputCompleteParams(
+    public val operationId: Long,
+    public val result: M3MangaTransferOutputReceipt,
+)
+
+@Serializable
+public data class M3MangaTransferOutputReceipt(
+    public val consumed: Boolean,
+    public val assetId: Long,
+    public val bytes: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val preparedBytes: Long? = null,
+)
+
+@Serializable
+public data class M3MangaResourceTransferHostRequest(
+    @Required
+    public val type: M3MangaResourceTransferHostRequestType = M3MangaResourceTransferHostRequestType.HOST_REQUEST,
+    public val protocolVersion: Long,
+    public val requestId: Long,
+    public val operationId: Long,
+    @Required
+    public val capability: M3MangaResourceTransferHostRequestCapability = M3MangaResourceTransferHostRequestCapability.MANGA_RESOURCE_TRANSFER,
+    public val params: M3MangaTransferStage,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val deliveryId: Long? = null,
+)
+
+/** Wire values of M3MangaResourceTransferHostRequestType. */
+@Serializable
+public enum class M3MangaResourceTransferHostRequestType(public val wireValue: String) {
+    @SerialName("host.request") HOST_REQUEST("host.request"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaResourceTransferHostRequestType> =
+            values().associateBy(M3MangaResourceTransferHostRequestType::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaResourceTransferHostRequestType? = BY_WIRE[value]
+    }
+}
+
+/** Wire values of M3MangaResourceTransferHostRequestCapability. */
+@Serializable
+public enum class M3MangaResourceTransferHostRequestCapability(public val wireValue: String) {
+    @SerialName("manga.resource.transfer") MANGA_RESOURCE_TRANSFER("manga.resource.transfer"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaResourceTransferHostRequestCapability> =
+            values().associateBy(M3MangaResourceTransferHostRequestCapability::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaResourceTransferHostRequestCapability? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3MangaTransferStageSerializer::class)
+public sealed interface M3MangaTransferStage
+
+public object M3MangaTransferStageSerializer : JsonContentPolymorphicSerializer<M3MangaTransferStage>(M3MangaTransferStage::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3MangaTransferStage> =
+        when ((element as? JsonObject)?.get("stage")?.jsonPrimitive?.content) {
+            "input" -> M3MangaTransferInput.serializer()
+            "output" -> M3MangaTransferOutput.serializer()
+            "inspectInput" -> M3MangaTransferInspectInput.serializer()
+            else -> throw SerializationException("Unknown M3MangaTransferStage kind")
+        }
+}
+
+@Serializable
+public data class M3MangaTransferInput(
+    @Required
+    public val stage: M3MangaTransferInputStage = M3MangaTransferInputStage.INPUT,
+    public val inspectGraphics: Boolean,
+    public val transferId: String,
+    public val resourceRef: String,
+    public val request: M3MangaTransferRequest,
+    public val maxBytes: M3MangaTransferInputMaxBytes,
+) : M3MangaTransferStage
+
+/** Wire values of M3MangaTransferInputStage. */
+@Serializable
+public enum class M3MangaTransferInputStage(public val wireValue: String) {
+    @SerialName("input") INPUT("input"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaTransferInputStage> =
+            values().associateBy(M3MangaTransferInputStage::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaTransferInputStage? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3MangaTransferRequestSerializer::class)
+public sealed interface M3MangaTransferRequest
+
+public object M3MangaTransferRequestSerializer : JsonContentPolymorphicSerializer<M3MangaTransferRequest>(M3MangaTransferRequest::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3MangaTransferRequest> {
+        val fields = element as? JsonObject ?: throw SerializationException("Expected M3MangaTransferRequest object")
+        val variants = listOfNotNull<DeserializationStrategy<M3MangaTransferRequest>>(
+            if (fields.containsKey("url")) M3HostHttpRequest.serializer() else null,
+            if (fields.containsKey("dataUri")) M3MangaTransferDataUri.serializer() else null,
+        )
+        return variants.singleOrNull() ?: throw SerializationException("Unknown or ambiguous M3MangaTransferRequest variant")
+    }
+}
+
+@Serializable
+public data class M3HostHttpRequest(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val timeoutMs: Long? = null,
+    public val url: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val method: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val headers: JsonObject? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val body: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val charset: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val followRedirects: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val maxRedirects: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val retry: M3HostHttpRetryPolicy? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val usePlatformCookieJar: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val session: M3HostHttpSession? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val responseAsset: Boolean? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val diagnostic: M3HostHttpDiagnostic? = null,
+) : M3MangaTransferRequest
+
+@Serializable
+public data class M3HostHttpRetryPolicy(
+    public val maxAttempts: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val backoffMillis: Long? = null,
+)
+
+@Serializable
+public data class M3HostHttpSession(
+    public val id: String,
+)
+
+@Serializable
+public data class M3HostHttpDiagnostic(
+    public val traceId: String,
+    public val requestId: Long,
+    public val sourceId: String,
+    public val stage: M3HostHttpDiagnosticStage,
+)
+
+/** Wire values of M3HostHttpDiagnosticStage. */
+@Serializable
+public enum class M3HostHttpDiagnosticStage(public val wireValue: String) {
+    @SerialName("L2") L2("L2"),
+    @SerialName("L3") L3("L3"),
+    @SerialName("L4") L4("L4"),
+    @SerialName("L5") L5("L5"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3HostHttpDiagnosticStage> =
+            values().associateBy(M3HostHttpDiagnosticStage::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3HostHttpDiagnosticStage? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaTransferDataUri(
+    public val dataUri: String,
+) : M3MangaTransferRequest
+
+@Serializable(with = M3MangaTransferInputMaxBytesSerializer::class)
+public enum class M3MangaTransferInputMaxBytes(public val wireValue: Long) {
+    V8388608(8388608L),
+    V16777216(16777216L),
+}
+
+public object M3MangaTransferInputMaxBytesSerializer : KSerializer<M3MangaTransferInputMaxBytes> {
+    override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "M3MangaTransferInputMaxBytes", kotlinx.serialization.descriptors.PrimitiveKind.LONG,
+    )
+    override fun serialize(encoder: Encoder, value: M3MangaTransferInputMaxBytes) = encoder.encodeLong(value.wireValue)
+    override fun deserialize(decoder: Decoder): M3MangaTransferInputMaxBytes {
+        val wire = decoder.decodeLong()
+        return M3MangaTransferInputMaxBytes.entries.firstOrNull { it.wireValue == wire }
+            ?: throw SerializationException("Unknown M3MangaTransferInputMaxBytes value: $wire")
+    }
+}
+
+@Serializable
+public data class M3MangaTransferOutput(
+    @Required
+    public val stage: M3MangaTransferOutputStage = M3MangaTransferOutputStage.OUTPUT,
+    public val graphicsPlan: M3MangaGraphicsPlan?,
+    public val transferId: String,
+    public val resourceRef: String,
+    public val assetId: Long,
+    public val operationId: Long,
+    public val bytes: Long,
+) : M3MangaTransferStage
+
+/** Wire values of M3MangaTransferOutputStage. */
+@Serializable
+public enum class M3MangaTransferOutputStage(public val wireValue: String) {
+    @SerialName("output") OUTPUT("output"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaTransferOutputStage> =
+            values().associateBy(M3MangaTransferOutputStage::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaTransferOutputStage? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaGraphicsPlan(
+    @SerialName("__readerMangaGraphicsPlan")
+    public val readerMangaGraphicsPlan: Boolean,
+    @SerialName("toJSON")
+    public val toJson: M3Null,
+    public val width: Long,
+    public val height: Long,
+    @Required
+    public val format: M3MangaGraphicsPlanFormat = M3MangaGraphicsPlanFormat.JPEG,
+    @Required
+    public val quality: M3MangaGraphicsPlanQuality = M3MangaGraphicsPlanQuality.V90,
+    @Required
+    public val pixelFormat: M3MangaGraphicsPlanPixelFormat = M3MangaGraphicsPlanPixelFormat.RGB565,
+    public val strips: List<M3MangaGraphicsPlanStripsItem>,
+)
+
+/** Wire values of M3MangaGraphicsPlanFormat. */
+@Serializable
+public enum class M3MangaGraphicsPlanFormat(public val wireValue: String) {
+    @SerialName("jpeg") JPEG("jpeg"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaGraphicsPlanFormat> =
+            values().associateBy(M3MangaGraphicsPlanFormat::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaGraphicsPlanFormat? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3MangaGraphicsPlanQualitySerializer::class)
+public enum class M3MangaGraphicsPlanQuality(public val wireValue: Long) {
+    V90(90L),
+}
+
+public object M3MangaGraphicsPlanQualitySerializer : KSerializer<M3MangaGraphicsPlanQuality> {
+    override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "M3MangaGraphicsPlanQuality", kotlinx.serialization.descriptors.PrimitiveKind.LONG,
+    )
+    override fun serialize(encoder: Encoder, value: M3MangaGraphicsPlanQuality) = encoder.encodeLong(value.wireValue)
+    override fun deserialize(decoder: Decoder): M3MangaGraphicsPlanQuality {
+        val wire = decoder.decodeLong()
+        return M3MangaGraphicsPlanQuality.entries.firstOrNull { it.wireValue == wire }
+            ?: throw SerializationException("Unknown M3MangaGraphicsPlanQuality value: $wire")
+    }
+}
+
+/** Wire values of M3MangaGraphicsPlanPixelFormat. */
+@Serializable
+public enum class M3MangaGraphicsPlanPixelFormat(public val wireValue: String) {
+    @SerialName("rgb565") RGB565("rgb565"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaGraphicsPlanPixelFormat> =
+            values().associateBy(M3MangaGraphicsPlanPixelFormat::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaGraphicsPlanPixelFormat? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3MangaGraphicsPlanStripsItem(
+    public val sourceY: Long,
+    public val targetY: Long,
+    public val height: Long,
+)
+
+@Serializable
+public data class M3MangaTransferInspectInput(
+    @Required
+    public val stage: M3MangaTransferInspectInputStage = M3MangaTransferInspectInputStage.INSPECT_INPUT,
+    public val transferId: String,
+    public val sha256: String,
+    public val bytes: Long,
+    @Required
+    public val maxBytes: M3MangaTransferInspectInputMaxBytes = M3MangaTransferInspectInputMaxBytes.V16777216,
+) : M3MangaTransferStage
+
+/** Wire values of M3MangaTransferInspectInputStage. */
+@Serializable
+public enum class M3MangaTransferInspectInputStage(public val wireValue: String) {
+    @SerialName("inspectInput") INSPECT_INPUT("inspectInput"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3MangaTransferInspectInputStage> =
+            values().associateBy(M3MangaTransferInspectInputStage::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3MangaTransferInspectInputStage? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3MangaTransferInspectInputMaxBytesSerializer::class)
+public enum class M3MangaTransferInspectInputMaxBytes(public val wireValue: Long) {
+    V16777216(16777216L),
+}
+
+public object M3MangaTransferInspectInputMaxBytesSerializer : KSerializer<M3MangaTransferInspectInputMaxBytes> {
+    override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "M3MangaTransferInspectInputMaxBytes", kotlinx.serialization.descriptors.PrimitiveKind.LONG,
+    )
+    override fun serialize(encoder: Encoder, value: M3MangaTransferInspectInputMaxBytes) = encoder.encodeLong(value.wireValue)
+    override fun deserialize(decoder: Decoder): M3MangaTransferInspectInputMaxBytes {
+        val wire = decoder.decodeLong()
+        return M3MangaTransferInspectInputMaxBytes.entries.firstOrNull { it.wireValue == wire }
+            ?: throw SerializationException("Unknown M3MangaTransferInspectInputMaxBytes value: $wire")
+    }
+}
+
+@Serializable
+public data class M3ReadingEntryFirstFrameParams(
+    public val sourceId: String,
+    public val bookId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val chapterIndex: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val positionContext: M3RemoteContentPositionContext? = null,
+    public val windowScalarLimit: Long,
+)
+
+@Serializable
+public data class M3RemoteContentPositionContext(
+    public val bodyVersion: String,
+    public val processingVersion: String,
+    public val anchors: List<M3RemoteContentPositionAnchor>,
+)
+
+@Serializable
+public data class M3RemoteContentPositionAnchor(
+    public val id: String,
+    public val offset: Long,
+)
+
+@Serializable(with = M3ReadingEntryFirstFrameDataSerializer::class)
+public sealed interface M3ReadingEntryFirstFrameData
+
+public object M3ReadingEntryFirstFrameDataSerializer : JsonContentPolymorphicSerializer<M3ReadingEntryFirstFrameData>(M3ReadingEntryFirstFrameData::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3ReadingEntryFirstFrameData> =
+        when ((element as? JsonObject)?.get("kind")?.jsonPrimitive?.content) {
+            "ready" -> M3ReadingEntryFirstFrameReady.serializer()
+            "unavailable" -> M3ReadingEntryFirstFrameUnavailable.serializer()
+            else -> throw SerializationException("Unknown M3ReadingEntryFirstFrameData kind")
+        }
+}
+
+@Serializable
+public data class M3ReadingEntryFirstFrameReady(
+    @Required
+    public val kind: M3ReadingEntryFirstFrameReadyKind = M3ReadingEntryFirstFrameReadyKind.READY,
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val chapterTitle: String,
+    public val content: String,
+    public val blocks: List<M3ReadingDocumentBlockData>,
+    public val positionScope: M3RemoteContentPositionScope,
+    public val progress: M3ReadingProgressData?,
+    public val pendingRestore: M3LocalPositionPendingRestoreData?,
+    public val baseUrl: String?,
+    public val contentFormatVersion: Long,
+    public val contentRefreshRequired: Boolean,
+    public val sourceCorrectionRequired: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val imagePresentationVersion: String? = null,
+    public val progressRevision: String,
+    public val navigation: M3ReadingNavigation,
+    public val documentWindow: M3ReadingEntryWindow,
+) : M3ReadingEntryFirstFrameData
+
+/** Wire values of M3ReadingEntryFirstFrameReadyKind. */
+@Serializable
+public enum class M3ReadingEntryFirstFrameReadyKind(public val wireValue: String) {
+    @SerialName("ready") READY("ready"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3ReadingEntryFirstFrameReadyKind> =
+            values().associateBy(M3ReadingEntryFirstFrameReadyKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3ReadingEntryFirstFrameReadyKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable(with = M3ReadingDocumentBlockDataSerializer::class)
+public sealed interface M3ReadingDocumentBlockData
+
+public object M3ReadingDocumentBlockDataSerializer : JsonContentPolymorphicSerializer<M3ReadingDocumentBlockData>(M3ReadingDocumentBlockData::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<M3ReadingDocumentBlockData> =
+        when ((element as? JsonObject)?.get("kind")?.jsonPrimitive?.content) {
+            "text" -> M3ReadingDocumentBlockDataText.serializer()
+            "image" -> M3ReadingDocumentBlockDataImage.serializer()
+            else -> throw SerializationException("Unknown M3ReadingDocumentBlockData kind")
+        }
+}
+
+@Serializable
+public data class M3ReadingDocumentBlockDataText(
+    @Required
+    public val kind: M3ReadingDocumentBlockDataTextKind = M3ReadingDocumentBlockDataTextKind.TEXT,
+    public val text: String,
+    public val startScalar: Long,
+    public val endScalar: Long,
+) : M3ReadingDocumentBlockData
+
+/** Wire values of M3ReadingDocumentBlockDataTextKind. */
+@Serializable
+public enum class M3ReadingDocumentBlockDataTextKind(public val wireValue: String) {
+    @SerialName("text") TEXT("text"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3ReadingDocumentBlockDataTextKind> =
+            values().associateBy(M3ReadingDocumentBlockDataTextKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3ReadingDocumentBlockDataTextKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3ReadingDocumentBlockDataImage(
+    @Required
+    public val kind: M3ReadingDocumentBlockDataImageKind = M3ReadingDocumentBlockDataImageKind.IMAGE,
+    public val source: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val imageWidthBasisPoints: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val imageIntrinsicWidth: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val imageIntrinsicHeight: Long? = null,
+    public val startScalar: Long,
+    public val endScalar: Long,
+) : M3ReadingDocumentBlockData
+
+/** Wire values of M3ReadingDocumentBlockDataImageKind. */
+@Serializable
+public enum class M3ReadingDocumentBlockDataImageKind(public val wireValue: String) {
+    @SerialName("image") IMAGE("image"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3ReadingDocumentBlockDataImageKind> =
+            values().associateBy(M3ReadingDocumentBlockDataImageKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3ReadingDocumentBlockDataImageKind? = BY_WIRE[value]
+    }
+}
+
+@Serializable
+public data class M3RemoteContentPositionScope(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val bodyVersion: String,
+    public val processingVersion: String,
+)
+
+@Serializable
+public data class M3ReadingProgressData(
+    public val sourceId: String,
+    public val bookId: String,
+    public val chapterIndex: Long,
+    public val chapterOffset: Long,
+    public val chapterProgress: Double,
+    public val updatedAt: Long,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val deviceId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val locationRevision: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val bodyVersion: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val processingVersion: String? = null,
+)
+
+@Serializable
+public data class M3ReadingNavigation(
+    public val revision: String,
+    public val chapterCount: Long,
+    public val readableChapterCount: Long,
+    public val current: M3ReadingCatalogChapter,
+    public val before: List<M3ReadingCatalogChapter>,
+    public val after: List<M3ReadingCatalogChapter>,
+)
+
+@Serializable
+public data class M3ReadingCatalogChapter(
+    public val index: Long,
+    public val position: Long,
+    public val readablePosition: Long?,
+    public val title: String,
+    public val navigable: Boolean,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val level: Long? = null,
+)
+
+@Serializable
+public data class M3ReadingEntryWindow(
+    public val startScalar: Long,
+    public val endScalar: Long,
+    public val totalScalars: Long,
+    public val requestedScalar: Long,
+)
+
+@Serializable
+public data class M3ReadingEntryFirstFrameUnavailable(
+    @Required
+    public val kind: M3ReadingEntryFirstFrameUnavailableKind = M3ReadingEntryFirstFrameUnavailableKind.UNAVAILABLE,
+    public val sourceId: String,
+    public val bookId: String,
+    public val reason: String,
+) : M3ReadingEntryFirstFrameData
+
+/** Wire values of M3ReadingEntryFirstFrameUnavailableKind. */
+@Serializable
+public enum class M3ReadingEntryFirstFrameUnavailableKind(public val wireValue: String) {
+    @SerialName("unavailable") UNAVAILABLE("unavailable"),
+    ;
+    public companion object {
+        private val BY_WIRE: Map<String, M3ReadingEntryFirstFrameUnavailableKind> =
+            values().associateBy(M3ReadingEntryFirstFrameUnavailableKind::wireValue)
+        /** Returns null for a wire value outside the frozen v1 schema. */
+        public fun fromWire(value: String): M3ReadingEntryFirstFrameUnavailableKind? = BY_WIRE[value]
     }
 }

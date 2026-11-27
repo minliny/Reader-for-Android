@@ -47,7 +47,21 @@ internal class OkHttpNetwork {
     private data class NextHop<T>(val response: T? = null, val target: HttpUrl? = null, val next: Request? = null,
         val redirect: M2HostHttpRedirect? = null)
 
-    suspend fun fetch(model: M2HostHttpRequest, jar: PersistentCookieJar?): M2HostHttpResponse {
+    suspend fun fetch(model: M2HostHttpRequest, jar: PersistentCookieJar?): M2HostHttpResponse =
+        capture(model, jar) { response, redirectTrace, cookies ->
+            if (response.code >= 400) throw NetworkHostFailure.http(response.code)
+            val data = response.body.readBounded(HTTP_BYTES)
+            val charset = runCatching { response.body.contentType()?.charset(Charsets.UTF_8) }.getOrNull()
+                ?: Charsets.UTF_8
+            val text = if (model.responseAsset == true) "" else String(data, charset)
+            M2HostHttpResponse(body = text, status = response.code.toLong(), headers = response.headers.wire(),
+                finalUrl = response.request.url.toString(), charsetHint = charset.name(),
+                bodyBase64 = if (model.responseAsset == true) Base64.getEncoder().encodeToString(data) else null,
+                session = model.session, redirects = redirectTrace, cookies = cookies.map(::wireCookie))
+        }
+
+    suspend fun <T : Any> capture(model: M2HostHttpRequest, jar: PersistentCookieJar?,
+        receive: (Response, List<M2HostHttpRedirect>, List<Cookie>) -> T): T {
         val request = request(model)
         val attempts = (model.retry?.maxAttempts ?: 1).coerceIn(1, 8).toInt()
         return withTimeout(timeoutMillis(model.timeoutMs)) {
@@ -55,17 +69,7 @@ internal class OkHttpNetwork {
             repeat(attempts) { attempt ->
                 try {
                     return@withTimeout exchange(request, jar, model.followRedirects ?: true,
-                        (model.maxRedirects ?: 10).coerceIn(0, 20).toInt(), model.timeoutMs) { response, redirectTrace, cookies ->
-                        if (response.code >= 400) throw NetworkHostFailure.http(response.code)
-                        val data = response.body.readBounded(HTTP_BYTES)
-                        val charset = runCatching { response.body.contentType()?.charset(Charsets.UTF_8) }.getOrNull()
-                            ?: Charsets.UTF_8
-                        val text = if (model.responseAsset == true) "" else String(data, charset)
-                        M2HostHttpResponse(body = text, status = response.code.toLong(), headers = response.headers.wire(),
-                            finalUrl = response.request.url.toString(), charsetHint = charset.name(),
-                            bodyBase64 = if (model.responseAsset == true) Base64.getEncoder().encodeToString(data) else null,
-                            session = model.session, redirects = redirectTrace, cookies = cookies.map(::wireCookie))
-                    }
+                        (model.maxRedirects ?: 10).coerceIn(0, 20).toInt(), model.timeoutMs, map = receive)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {

@@ -65,6 +65,10 @@ def check_native_payload(apk, archive, library, expected_bytes=None):
         artifact = Path(temp) / Path(library).name
         artifact.write_bytes(binary)
         readelf = subprocess.check_output([ELF, '-lW', artifact], text=True)
+        if library == LIBRARY:
+            symbols = subprocess.check_output([ELF, '--dyn-syms', '-W', artifact], text=True)
+            flock = next(line.strip() for line in symbols.splitlines() if 'flock@LIBC' in line)
+            print(f'Core JNI symbol {flock}')
     loads = [line.split()[-1] for line in readelf.splitlines() if line.strip().startswith('LOAD ')]
     assert len(loads) == 3 and set(loads) == {'0x4000'}, readelf
     print(f'{library} {len(loads)} ELF LOAD segments aligned at 16384, ZIP offset {data_offset}, sha256 {digest}')
@@ -77,7 +81,7 @@ def main():
     desired = {key.removeprefix(MAIN): row['sha256'] for key, row in outputs.items()
                if key.removeprefix(MAIN).startswith(prefixes)}
     fixture_sha = outputs['app/src/androidTest/' + FIXTURE]['sha256']
-    native = ROOT / '.build/native-m2/android-jni/libs/arm64-v8a/libreader_core_jni.so'
+    native = ROOT / '.build/native-m3/android-jni/libs/arm64-v8a/libreader_core_jni.so'
     goldens = ROOT / 'app/src/test/resources/goldens'
     golden_pngs = {sha(path.read_bytes()) for path in goldens.glob('*.png')}
     for apk, test in [(production, False), (instrument, True)]:
@@ -91,7 +95,10 @@ def main():
                 assert b'/' + name + b';' not in dex, (apk, name)
             assert (b'Lio/reader/rebuild/EbookWebViewTest;' in dex) == test, apk
             assert (b'Lio/reader/rebuild/NativeM2JourneyTest;' in dex) == test, apk
-            assert not [p for p in names if 'goldens/' in p or 'loopback_fixture.py' in p], apk
+            assert (b'Lio/reader/rebuild/NativeM3MangaTest;' in dex) == test, apk
+            assert (b'Lio/reader/rebuild/NativeM3SpeechTest;' in dex) == test, apk
+            assert not [p for p in names if 'goldens/' in p or
+                        any(script in p for script in ('loopback_fixture.py', 'm3_manga_fixture.py', 'm3_speech_fixture.py'))], apk
             assert not [p for p in names if p.endswith('.png') and sha(zipped.read(p)) in golden_pngs], apk
             if test:
                 assert [p for p in names if p.endswith('.epub')] == [FIXTURE]

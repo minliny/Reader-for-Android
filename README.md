@@ -1,4 +1,4 @@
-# Reader Android M1／M2 开发宿主
+# Reader Android M1／M2 开发宿主与 M3 原生底层
 
 开发身份为 `io.reader.minliny.rebuild.android.dev`。应用以列表书架为入口，接通本地文件导入、在线搜索、详情、目录、统一阅读器、书源管理 v9 和下载管理。书架在 600dp 起提供详情分栏。应用外观、书架排序和阅读排版保存为平台偏好。
 
@@ -9,6 +9,7 @@
 - `design` 消费 Reader-UI 语义令牌、度量和图标，提供五类消息组件。电子书脚本、Noto 字体和共享 SVG 从锁定的 Reader-UI 对象同步。阅读器采用同一 `ReadingSurface`，文本在 Android `StaticLayout` 分页，电子书使用私有 HTTPS 壳和限定来源的消息端口。
 - `features/shell` 装配应用级 Runtime 与协调器，持有类型化页面路径，并通过 AndroidX Activity 接入系统返回及 Predictive Back。
 - `features` 通过生成 RPC 协调导入、搜索、在线阅读、换源、书源和下载。页面只持有观察权。Core 保存书库和操作终态，下载 journal 保存待核原参数。Library47 远端布局通过 `source.group.catalog` 消费 Core 派生分组。
+- M3 漫画使用 Core 队列实际授权的 request／operation 独立资产上下文，单块不超过 1 MiB，Core 资产声明不超过 128 MiB。Host 把压缩资产写入私有目录，由进程锁和 192 MiB 临时文件预算管理。Coil 3、telephoto 在本机 Gradle 只读缓存及 Android 工作树依赖缓存中均不可用，采用 API 26 可用的 Android `BitmapRegionDecoder` 分片与进程级 24 MP 分配预算。绘制切片使用逻辑页的原图坐标，章内页序与进度由 Core 确认。生产 UI 路径延续 M1／M2。
 - `app/src/test` 运行独立主机验证，Compose 黄金快照使用 Robolectric API 35 的原生图形 Bitmap 渲染和逐像素比对。`app/src/androidTest` 保存独立 Runner 测试和 EPUB 夹具。产品包不包含测试类或测试 EPUB。
 
 ## 依赖
@@ -22,6 +23,7 @@
 | Compose Material 3 | 1.4.0 | Apache-2.0 |
 | Compose Material Icons Extended | 1.7.8 | Apache-2.0 |
 | Compose Compiler Gradle plugin | 2.2.21 | Apache-2.0 |
+| AndroidX Media3 Session、ExoPlayer | 1.8.0 | Apache-2.0 |
 | Lifecycle Runtime Compose | 2.9.4 | Apache-2.0 |
 | AndroidSVG AAR | 1.4 | Apache-2.0 |
 | Robolectric，仅主机测试 | 4.16.1 | MIT |
@@ -38,13 +40,15 @@ Mac 构建输入为 JDK 17、Gradle 8.13、AGP 8.13.2、Kotlin 2.2.21、Android 
 ```sh
 python3 scripts/sync-pinned.py --check
 python3 scripts/check-layout.py
-scripts/build-native.sh .build/native-m2 android
-scripts/build-native.sh .build/native-m2 host
+scripts/build-native.sh .build/native-m3 android
+scripts/build-native.sh .build/native-m3-host host
 scripts/gradle.sh :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 python3 scripts/check-unsigned-apks.py \
   app/build/outputs/apk/debug/app-debug-unsigned.apk \
   app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 ```
+
+Android M3 原生漫画测试在指定 16 KB AVD 和开发 App／Runner 上运行。使用 `app/src/androidTest/host/run-m3-manga.sh <serial> <run-key> <absolute-evidence-path>` 启动独立回环服务并分别验证写入与独立进程冷启。
 
 `READER_GRADLE_BIN` 可指向已安装的 Gradle 8.13。`READER_CORE_SOURCE` 可指向同一 pin 的干净 Core 源。默认 Core 快照为 `.build/core-source/<sha>`。`sync-pinned.py --check` 对照 `pins.json` 重新读取锁定的 Git 对象，逐项核对生成物、字体、图标和夹具。
 

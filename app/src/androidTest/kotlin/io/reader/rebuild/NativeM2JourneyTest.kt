@@ -391,7 +391,7 @@ class NativeM2JourneyTest {
         try {
             val runtime = LibraryRuntime.open(File(home, "library"), HostCapabilityRouter(SystemSurfaceHost(), network), errors::add)
             try {
-                check(runtime.info.buildIdentity.gitCommit == "4a840493d0a39f8771adb631c3dce490a365d915")
+                check(runtime.info.buildIdentity.gitCommit == "14fdd8f91549a30a7b7235088d3c524d128201d1")
                 val layout = requireNotNull(runtime.admitted.observation.layout)
                 check(runtime.info.sqliteUserVersion == 47L && layout.layoutId == "reader-sqlite-47-remote")
                 println("M2_NATIVE_TARGET pid=${Process.myPid()} api=${Build.VERSION.SDK_INT} pageSize=${Os.sysconf(OsConstants._SC_PAGESIZE)}" +

@@ -24,6 +24,7 @@ internal class StaticLayoutReadingSurface(context: Context) : View(context), Rea
     private var engine: StaticTextLayout? = null
     private var anchor: Long? = null
     private var selected: ReadingSelection? = null
+    private var spoken: ReadingSelection? = null
     private var style = ReadingStyle()
     private var sideInset = 0
     private var scrollOffset = 0
@@ -100,6 +101,7 @@ internal class StaticLayoutReadingSurface(context: Context) : View(context), Rea
         this.anchor = anchor.takeIf(chapter.coordinates::hasCharacter)
         this.style = style
         selected = null
+        spoken = null
         measureText()
     }
 
@@ -142,6 +144,13 @@ internal class StaticLayoutReadingSurface(context: Context) : View(context), Rea
 
     override fun currentSelection(completion: (ReadingSelection?) -> Unit) = completion(selected)
 
+    fun projectSpeech(highlight: SpeechHighlight?) {
+        val coordinates = document?.coordinates
+        spoken = highlight?.takeIf { coordinates?.utf16(it.start) != null && coordinates.utf16(it.endExclusive) != null }
+            ?.let { ReadingSelection(it.start, it.endExclusive) }
+        invalidate()
+    }
+
     fun scalarAt(x: Float, y: Float): Long? {
         val current = engine ?: return null
         val absoluteY = y - paddingTop + if (scrolling) scrollOffset else 0
@@ -167,6 +176,7 @@ internal class StaticLayoutReadingSurface(context: Context) : View(context), Rea
         document = null
         anchor = null
         selected = null
+        spoken = null
         selectionAnchor = null
         engine = null
         invalidate()
@@ -195,10 +205,10 @@ internal class StaticLayoutReadingSurface(context: Context) : View(context), Rea
                     .takeWhile { it.top < scrollOffset + visibleHeight }.forEach { tile ->
                         val tileSave = canvas.save()
                         canvas.translate(0f, (tile.top - scrollOffset).toFloat())
-                        current.draw(canvas, tile, selected, selection.toInt())
+                        current.draw(canvas, tile, selected ?: spoken, selection.toInt())
                         canvas.restoreToCount(tileSave)
                     }
-            } else current.draw(canvas, page, selected, selection.toInt())
+            } else current.draw(canvas, page, selected ?: spoken, selection.toInt())
         } finally {
             canvas.restoreToCount(saved)
         }

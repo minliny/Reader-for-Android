@@ -202,7 +202,7 @@ internal suspend fun openM2(home: File): Pair<LibraryRuntime, NetworkAndWebHost>
         network.close()
         throw failure
     }
-    check(hosted.info.buildIdentity.gitCommit == "4a840493d0a39f8771adb631c3dce490a365d915")
+    check(hosted.info.buildIdentity.gitCommit == "14fdd8f91549a30a7b7235088d3c524d128201d1")
     return hosted to network
 }
 

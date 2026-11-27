@@ -17,7 +17,9 @@ import com.reader.core.protocol.ReaderM2
 import com.reader.core.protocol.ReaderProtocolJson
 import com.reader.core.protocol.ReaderTypedHostRequest
 import io.reader.rebuild.core.HostCapabilities
+import io.reader.rebuild.core.CoreMangaAssets
 import java.io.File
+import java.io.RandomAccessFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -33,12 +35,15 @@ internal class NetworkAndWebHost(
     private val network = OkHttpNetwork()
     private val cookies = SourceCookieStore(File(directory, "cookies"))
     private val media = MediaTransfer(network, File(directory, "media"))
+    private val mangaStore = lazy { MangaTransferStore(File(directory, "manga-scratch")) }
+    val mangaTransfers get() = mangaStore.value
     override val extensions = listOf("http.execute.timeoutMs.v1")
     override val available = buildSet {
         add(ReaderHostCapability.HTTP_EXECUTE)
         add(ReaderHostCapability.COOKIE_GET)
         add(ReaderHostCapability.COOKIE_SET)
         add(ReaderHostCapability.MEDIA_DOWNLOAD)
+        add(ReaderHostCapability.MANGA_RESOURCE_TRANSFER)
         if (evaluator.available) add(ReaderHostCapability.WEBVIEW_EVALUATE_JAVA_SCRIPT)
     }
 
@@ -100,6 +105,34 @@ internal class NetworkAndWebHost(
         }
     }
 
+    override suspend fun replyWithAssets(capability: ReaderHostCapability, request: String, replyId: Long,
+        assets: CoreMangaAssets): String {
+        check(capability == ReaderHostCapability.MANGA_RESOURCE_TRANSFER)
+        val reply = MangaResourceTransfer(mangaTransfers, ::fetchManga)
+        return try {
+            reply.reply(request, replyId, assets)
+        } catch (failure: Exception) {
+            if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
+            ReaderM2.hostError.encode(replyId, NetworkHostFailure.classified(failure).reply(assets.operationId))
+        }
+    }
+
+    private suspend fun fetchManga(params: M2HostHttpRequest, file: File, limit: Long) {
+        val session = params.session?.id
+        val useCookies = params.usePlatformCookieJar ?: (session != null)
+        if (useCookies) logins?.pull(session)
+        val jar = if (useCookies) cookies.profile(session, httpUrl(params.url)) else null
+        RandomAccessFile(file, "rw").use { output ->
+            network.capture(params, jar) { response, _, _ ->
+                if (!response.isSuccessful) throw NetworkHostFailure.http(response.code)
+                output.setLength(0)
+                output.seek(0)
+                response.body.forEachSegment(limit) { segment, size -> output.write(segment, 0, size) }
+            }
+        }
+        if (useCookies) logins?.push(session, jar)
+    }
+
     suspend fun fetch(params: M2HostHttpRequest): M2HostHttpResponse {
         val session = params.session?.id
         val useCookies = params.usePlatformCookieJar ?: (session != null)
@@ -122,7 +155,10 @@ internal class NetworkAndWebHost(
     }
 
     suspend fun close() {
-        try { logins?.close() } finally { network.close() }
+        try { logins?.close() } finally {
+            network.close()
+            if (mangaStore.isInitialized()) mangaTransfers.close()
+        }
     }
 
     private inline fun <reified P> params(wire: String): P =

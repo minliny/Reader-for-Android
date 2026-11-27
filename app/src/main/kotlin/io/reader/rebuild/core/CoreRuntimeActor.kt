@@ -58,6 +58,8 @@ internal interface HostCapabilities {
     val extensions: List<String> get() = emptyList()
     /** Decode the generated host payload and return the generated completion or failure command. */
     suspend fun reply(capability: ReaderHostCapability, request: String, replyId: Long): String
+    suspend fun replyWithAssets(capability: ReaderHostCapability, request: String, replyId: Long,
+        assets: CoreMangaAssets): String = reply(capability, request, replyId)
     fun discardUnsent(capability: ReaderHostCapability, reply: String) = Unit
 }
 
@@ -74,6 +76,8 @@ internal class HostCapabilityRouter(vararg providers: HostCapabilities) : HostCa
     override val extensions = providers.flatMap { it.extensions }.distinct().sorted()
     override suspend fun reply(capability: ReaderHostCapability, request: String, replyId: Long): String =
         routes.getValue(capability).reply(capability, request, replyId)
+    override suspend fun replyWithAssets(capability: ReaderHostCapability, request: String, replyId: Long,
+        assets: CoreMangaAssets): String = routes.getValue(capability).replyWithAssets(capability, request, replyId, assets)
     override fun discardUnsent(capability: ReaderHostCapability, reply: String) =
         routes.getValue(capability).discardUnsent(capability, reply)
 }
@@ -229,7 +233,9 @@ internal class CoreRuntimeActor private constructor(
         wire: String) {
         val id = nextId.incrementAndGet()
         val completion = try {
-            host.reply(capability, wire, id)
+            if (capability == ReaderHostCapability.MANGA_RESOURCE_TRANSFER) {
+                host.replyWithAssets(capability, wire, id, CoreMangaAssets(binding, original, operationId))
+            } else host.reply(capability, wire, id)
         } catch (_: CancellationException) {
             return
         } catch (failure: Exception) {

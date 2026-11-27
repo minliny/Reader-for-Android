@@ -1,7 +1,7 @@
 {
     "pins": {
-        "core": "4a840493d0a39f8771adb631c3dce490a365d915",
-        "ui": "4b096fe058731afe791747007f428182784d1592",
+        "core": "14fdd8f91549a30a7b7235088d3c524d128201d1",
+        "ui": "2f09c1855b043608f013da8df666714f387b60c3",
         "harmony": "0f3b468dcf95c3869b7f28f47cf5019a7c26b8ef"
     },
     "runtime": "Android API 35 / Robolectric 4.16.1 (MIT) / native Skia / zh-CN / mdpi",
@@ -208,8 +208,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "a22ab94994463d3cef873f477b43158c079f935e46c2b2b7ab58b6cc1f1278c9",
-            "pngSHA256": "1ec92094dac61d1e6637b88f59040fd3c83d4ed72855606b1b6f2680605e86c7"
+            "pixelSHA256": "2b7cdd0834a913f8c1cc875d17215b0b2c129090a62d5ae94f83da91525d5173",
+            "pngSHA256": "8aafaf5544c71961225c8e23e45677fb66be2e2adeb716d48da58fd36694a8f1"
         },
         {
             "id": "reader-light-status",

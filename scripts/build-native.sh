@@ -4,8 +4,10 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 workspace=$(cd "$root/../.." && pwd)
 core_pin=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["core"])' "$root/pins.json")
 core=${READER_CORE_SOURCE:-$root/.build/core-source/$core_pin}
-output=${1:-$root/.build/native-m2}
 mode=${2:-android}
+default_output="$root/.build/native-m3"
+[[ "$mode" != host ]] || default_output="$root/.build/native-m3-host"
+output=${1:-$default_output}
 if [[ -z ${READER_CORE_SOURCE:-} && ! -e "$core/.git" ]]; then
   mkdir -p "$(dirname "$core")"
   git clone --quiet --shared --no-checkout "$workspace/Reader-Core" "$core"
@@ -43,6 +45,7 @@ else
   readelf=$(find "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt" -path '*/bin/llvm-readelf' | head -1)
   "$readelf" -lW "$lib" | tee "$output/elf-load.txt"
   awk '$1=="LOAD"{found++; if ($NF != "0x4000") bad++} END {exit (found != 3 || bad)}' "$output/elf-load.txt"
+  "$readelf" --dyn-syms -W "$lib" | awk '/flock@LIBC/ {print; found=1} END {exit !found}' +    | tee "$output/elf-flock.txt"
   shasum -a 256 "$lib"
 fi
 node scripts/build-input-snapshot.mjs verify "$READER_CORE_BUILD_INPUT_SNAPSHOT"

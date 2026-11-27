@@ -30,7 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-private const val CORE_PIN = "4a840493d0a39f8771adb631c3dce490a365d915"
+private const val CORE_PIN = "14fdd8f91549a30a7b7235088d3c524d128201d1"
 private val hostFixtures get() = File(requireNotNull(System.getProperty("reader.hostFixtures")))
 private val epubFixture get() = File(requireNotNull(System.getProperty("reader.fixture")))
 private val txtFixture get() = File(hostFixtures, "local-reading.txt")

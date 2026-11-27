@@ -54,7 +54,7 @@ def main():
     for name in ('ReaderThemeTokens', 'ReaderDesignMetrics', 'ReaderIconRegistry'):
         ui_map[f'theme/generated/android/{name}.kt'] = KOTLIN / f'design/generated/{name}.kt'
     icon_paths = sorted(path for path in manifest['designInputs'] if path.startswith('theme/icons/'))
-    assert len(icon_paths) == 8
+    assert len(icon_paths) == 26
     for path in icon_paths:
         ui_map[path] = MAIN / 'assets/reader_design/icons' / Path(path).name
     for name in ('NotoSansSC-VF.otf', 'NotoSerifSC-Regular.ttf', 'OFL.txt'):

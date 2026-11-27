@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reader.core.theme.ReaderDesignMetrics as Metrics
@@ -67,14 +69,14 @@ internal fun ReadingControlsContent(
                 if (onSwitch != null) ReaderAction(ReaderIconRegistry.sourceSwitch, "换源", onSwitch)
             }
             if (expanded) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Metrics.spaceExtraSmall.dp)) {
-                    TextButton({ onAppearance(appearance.copy(font = (appearance.font - 1).coerceAtLeast(12.0))) }) { Text("字号 −") }
-                    TextButton({ onAppearance(appearance.copy(font = (appearance.font + 1).coerceAtMost(36.0))) }) { Text("字号 +") }
-                    TextButton({ onAppearance(appearance.copy(line = (appearance.line - .1).coerceAtLeast(1.25))) }) { Text("行距 −") }
-                    TextButton({ onAppearance(appearance.copy(line = (appearance.line + .1).coerceAtMost(2.6))) }) { Text("行距 +") }
-                    TextButton({ onAppearance(appearance.copy(scrolling = !appearance.scrolling)) }) {
-                        Text(if (appearance.scrolling) "切换分页" else "切换滚动")
-                    }
+                ReadingControlStepper("字号",
+                    { onAppearance(appearance.copy(font = (appearance.font - 1).coerceAtLeast(12.0))) },
+                    { onAppearance(appearance.copy(font = (appearance.font + 1).coerceAtMost(36.0))) })
+                ReadingControlStepper("行距",
+                    { onAppearance(appearance.copy(line = (appearance.line - .1).coerceAtLeast(1.25))) },
+                    { onAppearance(appearance.copy(line = (appearance.line + .1).coerceAtMost(2.6))) })
+                TextButton({ onAppearance(appearance.copy(scrolling = !appearance.scrolling)) }) {
+                    Text(if (appearance.scrolling) "切换分页" else "切换滚动")
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Metrics.spaceExtraSmall.dp)) {
                     ReaderPaperThemes.all.forEach { paper ->
@@ -88,5 +90,15 @@ internal fun ReadingControlsContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReadingControlStepper(label: String, decrease: () -> Unit, increase: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Metrics.spaceSmall.dp)) {
+        Text(label, Modifier.weight(1f), style = readerTextStyle(Metrics.rowDetail))
+        TextButton(decrease, Modifier.semantics { contentDescription = "减小$label" }) { Text("−") }
+        TextButton(increase, Modifier.semantics { contentDescription = "增大$label" }) { Text("+") }
     }
 }

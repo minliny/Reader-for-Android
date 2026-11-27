@@ -7,12 +7,18 @@
     "protocol/reader-event.schema.json": "e0a79f46acfa62370dcc48311c03636e3b034c8e9207e6d176450bf65f45c695",
     "protocol/reader-runtime-config.schema.json": "7f80c3a548f71ab2b5d4415af83579f03c725cb0bec0fc72a1e7dc6e91368afa",
     "reader_ebook_runtime/fixtures/generate-m1-window.py": "dad21aeb7fab6e4c83caaecbb3513a696084646319710b978a16fbe4eb631d78",
-    "reader_ebook_runtime/manifest.json": "78f606fddce507d66639bbba8dbced5b3d2d1f07cf8bfef8b1b83cddf73ee0d7",
+    "reader_ebook_runtime/manifest.json": "519c002186501c132d9cf1fa28b287021e894b5303d469eafeff28611faf5b59",
     "scripts/core-dependency.json": "9ed0ba36d22e3cbfa3971a0b85ea7bc8d7500f13899dcc84c10634372a1489bd",
     "scripts/generate-m1-ui.mjs": "036ed5d7e75f57db709e86b4bd67356a74d8aa37e40d6d786f357c4a645cba86",
     "scripts/generate-theme-tokens.mjs": "d1d45e180ea1392d9e2b9420d81abe5711ed91f69e8a8e79fbd81ec183a01ed5",
-    "theme/design-metrics.json": "ee9faa0aed4f7daab49744cacb248ebd1ecbc5c244bc553be95423990d5dbbfd",
-    "theme/icon-registry.json": "9ab2d1fc4817be591e444749ef85865491464a948214b6f9a7cf2e6ad642ab94",
+    "theme/design-metrics.json": "aef9a0326a1730702c458ddb94e2746928e86fdc9676a64c90bec0aef5afb592",
+    "theme/icon-registry.json": "09bfc5ea8e27a07a636da6b689eb933f83e48e9e480b1f3812e4cbd9cffd0d53",
+    "theme/icons/manga_image_unavailable.svg": "f80ae0083470362ea15ebb61875fc8492c12c98172f98139f06c355c33c2018c",
+    "theme/icons/manga_ink.svg": "b1c64c879355fd212da0bdf2857d519b317bd4eb9f18d842b112f37a8e8ba82b",
+    "theme/icons/manga_locate.svg": "72d5743a52b86f7024ae11ca3c27c843d809bbf286f38d88c08a32343c6949c9",
+    "theme/icons/manga_paper.svg": "170e7429dfa24c02d489642ee6bbdc1f7f8a09b62342138ece34293582afa651",
+    "theme/icons/manga_reading_horizontal.svg": "00f61d684ce357f83b1d8f56849f16bf3b8212d5ce443aec039d69facdda8cd9",
+    "theme/icons/manga_reading_vertical.svg": "28a15b4ad6e93e52dc48f0d5a200621e8b89b3b5c3b21f4f582368ad919bcd19",
     "theme/icons/reader_control_header_chevron.svg": "176f7ea3416d297cf7437ff30b40877e7dc54aeb0fe492153930cb29e2aa1caa",
     "theme/icons/settings_gen_navigation.svg": "ef696bb6844746dd733207c0e436be713ad1eda666681a137dc141ede0440f5d",
     "theme/icons/source_login_lock.svg": "89bf510744936a1a6512692b30e59e2b9530b60c5381c914a5d8dc9b8fd14c4a",
@@ -21,6 +27,18 @@
     "theme/icons/source_v9_question.svg": "abd067b653830c57b76d4e05d0977eaa876bb6642ddbf4c8f943c56e07bed29f",
     "theme/icons/source_v9_upload.svg": "f94e36c05543543260798135dfd21e9aea03422852ee034763949a4cb4a40da6",
     "theme/icons/source_v9_wave.svg": "8bbb986a14152df870b29e30aab9522dc22e6f8656c8bf0516b69f20748bcaa2",
+    "theme/icons/tts_capsule_pause.svg": "ca109c8b77336c05e066837361833758a9836f060ca4e68928de3c80ea6b61a2",
+    "theme/icons/tts_capsule_play.svg": "66066bafbf955727a942f159db94f67093cf8697906d94098ff3f9a7b4b9ae3a",
+    "theme/icons/tts_headphones.svg": "0bb91b6e30d5205e324a305595300d4c9bebd10c2c6c1a0ff128c517edece7fc",
+    "theme/icons/tts_next.svg": "e425a07bc37bb6b4dcf35ad4e6f873c553a1ce57eb29c367c1b7c58fec28cbdb",
+    "theme/icons/tts_online_engine.svg": "38fba472d24377cd6566cd6f493b2c44a5c08df43a9e849b52e789389fb253e6",
+    "theme/icons/tts_pause.svg": "e36e12e4e0e8cbf9a1fe9775d4559dd20f9a4ab27b0f5f770118d79f4ea46472",
+    "theme/icons/tts_play.svg": "7cfb9f6718efd5dbb3b3e4392288e3d63322150001f147cf5297e5aa25254391",
+    "theme/icons/tts_previous.svg": "3cd3d273ee8ef688291991031cfa0bd9c4044f9a480c3e0305761f7acf37a05c",
+    "theme/icons/tts_rate.svg": "d1dad6ef80f693ae50547ae945cd591e763817244685edb8f93b3d6d20b0e2c5",
+    "theme/icons/tts_stop.svg": "8f40a30ec8e2f54c12101137397fb40beadc1cae1bdf05f1a6d100fbddf5803d",
+    "theme/icons/tts_system_engine.svg": "2d118efa833f8109307d0aa2f27eb803ea14c4babffcffb0de6aab369a8546b0",
+    "theme/icons/tts_timer.svg": "8f1f5d0fb6fbca54f9fdd358e8b7b26716307f235a35b2878b1c5280c1594340",
     "theme/registry.json": "17339c9c8d876989575894e4a1f3c5a6b229cf72748d6398963c681820bda1df"
   },
   "outputs": {
@@ -39,6 +57,30 @@
     "app/src/main/assets/reader_design/fonts/OFL.txt": {
       "sha256": "5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6",
       "source": "ui:fonts/OFL.txt"
+    },
+    "app/src/main/assets/reader_design/icons/manga_image_unavailable.svg": {
+      "sha256": "f80ae0083470362ea15ebb61875fc8492c12c98172f98139f06c355c33c2018c",
+      "source": "ui:theme/icons/manga_image_unavailable.svg"
+    },
+    "app/src/main/assets/reader_design/icons/manga_ink.svg": {
+      "sha256": "b1c64c879355fd212da0bdf2857d519b317bd4eb9f18d842b112f37a8e8ba82b",
+      "source": "ui:theme/icons/manga_ink.svg"
+    },
+    "app/src/main/assets/reader_design/icons/manga_locate.svg": {
+      "sha256": "72d5743a52b86f7024ae11ca3c27c843d809bbf286f38d88c08a32343c6949c9",
+      "source": "ui:theme/icons/manga_locate.svg"
+    },
+    "app/src/main/assets/reader_design/icons/manga_paper.svg": {
+      "sha256": "170e7429dfa24c02d489642ee6bbdc1f7f8a09b62342138ece34293582afa651",
+      "source": "ui:theme/icons/manga_paper.svg"
+    },
+    "app/src/main/assets/reader_design/icons/manga_reading_horizontal.svg": {
+      "sha256": "00f61d684ce357f83b1d8f56849f16bf3b8212d5ce443aec039d69facdda8cd9",
+      "source": "ui:theme/icons/manga_reading_horizontal.svg"
+    },
+    "app/src/main/assets/reader_design/icons/manga_reading_vertical.svg": {
+      "sha256": "28a15b4ad6e93e52dc48f0d5a200621e8b89b3b5c3b21f4f582368ad919bcd19",
+      "source": "ui:theme/icons/manga_reading_vertical.svg"
     },
     "app/src/main/assets/reader_design/icons/reader_control_header_chevron.svg": {
       "sha256": "176f7ea3416d297cf7437ff30b40877e7dc54aeb0fe492153930cb29e2aa1caa",
@@ -71,6 +113,54 @@
     "app/src/main/assets/reader_design/icons/source_v9_wave.svg": {
       "sha256": "8bbb986a14152df870b29e30aab9522dc22e6f8656c8bf0516b69f20748bcaa2",
       "source": "ui:theme/icons/source_v9_wave.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_capsule_pause.svg": {
+      "sha256": "ca109c8b77336c05e066837361833758a9836f060ca4e68928de3c80ea6b61a2",
+      "source": "ui:theme/icons/tts_capsule_pause.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_capsule_play.svg": {
+      "sha256": "66066bafbf955727a942f159db94f67093cf8697906d94098ff3f9a7b4b9ae3a",
+      "source": "ui:theme/icons/tts_capsule_play.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_headphones.svg": {
+      "sha256": "0bb91b6e30d5205e324a305595300d4c9bebd10c2c6c1a0ff128c517edece7fc",
+      "source": "ui:theme/icons/tts_headphones.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_next.svg": {
+      "sha256": "e425a07bc37bb6b4dcf35ad4e6f873c553a1ce57eb29c367c1b7c58fec28cbdb",
+      "source": "ui:theme/icons/tts_next.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_online_engine.svg": {
+      "sha256": "38fba472d24377cd6566cd6f493b2c44a5c08df43a9e849b52e789389fb253e6",
+      "source": "ui:theme/icons/tts_online_engine.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_pause.svg": {
+      "sha256": "e36e12e4e0e8cbf9a1fe9775d4559dd20f9a4ab27b0f5f770118d79f4ea46472",
+      "source": "ui:theme/icons/tts_pause.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_play.svg": {
+      "sha256": "7cfb9f6718efd5dbb3b3e4392288e3d63322150001f147cf5297e5aa25254391",
+      "source": "ui:theme/icons/tts_play.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_previous.svg": {
+      "sha256": "3cd3d273ee8ef688291991031cfa0bd9c4044f9a480c3e0305761f7acf37a05c",
+      "source": "ui:theme/icons/tts_previous.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_rate.svg": {
+      "sha256": "d1dad6ef80f693ae50547ae945cd591e763817244685edb8f93b3d6d20b0e2c5",
+      "source": "ui:theme/icons/tts_rate.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_stop.svg": {
+      "sha256": "8f40a30ec8e2f54c12101137397fb40beadc1cae1bdf05f1a6d100fbddf5803d",
+      "source": "ui:theme/icons/tts_stop.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_system_engine.svg": {
+      "sha256": "2d118efa833f8109307d0aa2f27eb803ea14c4babffcffb0de6aab369a8546b0",
+      "source": "ui:theme/icons/tts_system_engine.svg"
+    },
+    "app/src/main/assets/reader_design/icons/tts_timer.svg": {
+      "sha256": "8f1f5d0fb6fbca54f9fdd358e8b7b26716307f235a35b2878b1c5280c1594340",
+      "source": "ui:theme/icons/tts_timer.svg"
     },
     "app/src/main/assets/reader_ebook_runtime/reader-ebook-dom.js": {
       "sha256": "013f16e5f39bda18d3aa3175bd1c16442a6130a7f80107db1211061744927f66",
@@ -109,15 +199,15 @@
       "source": "core:bindings/android/src/main/kotlin/com/reader/core/ReaderStorageProbe.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/core/generated/ReaderProtocolModels.kt": {
-      "sha256": "6c24b0467b4b6da3220b1701fee049244a91e70a5d7690fe9ffd8b0769038e95",
+      "sha256": "ad5eba1c749a2ebe4c8486739ca2fe4e7b03a1a374dffabcca4fcf552e42bab1",
       "source": "core:bindings/android/generated/ReaderProtocolModels.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderDesignMetrics.kt": {
-      "sha256": "8a6daffaba83911aacd6777db4efd1453d23f807562de3e14b0c0e2d37c1bd17",
+      "sha256": "cbeb8ce17f57263786fd74e30276d6e1ecce8ae0b7214e1ed7de394b97e7a0dc",
       "source": "ui:theme/generated/android/ReaderDesignMetrics.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderIconRegistry.kt": {
-      "sha256": "c09a0e1a44dc82a08e9fd825d1aeb328b8ff0bdd5d52f0e2e3e423cf08134a38",
+      "sha256": "f9f8c1d7b1b88720ceb0f44a23c8ba42fefefef3fb5822647e1623372c2bf849",
       "source": "ui:theme/generated/android/ReaderIconRegistry.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderThemeTokens.kt": {
@@ -150,8 +240,8 @@
     }
   },
   "pins": {
-    "core": "4a840493d0a39f8771adb631c3dce490a365d915",
+    "core": "14fdd8f91549a30a7b7235088d3c524d128201d1",
     "harmony": "0f3b468dcf95c3869b7f28f47cf5019a7c26b8ef",
-    "ui": "4b096fe058731afe791747007f428182784d1592"
+    "ui": "2f09c1855b043608f013da8df666714f387b60c3"
   }
 }

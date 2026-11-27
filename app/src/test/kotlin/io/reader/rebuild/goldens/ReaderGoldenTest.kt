@@ -74,7 +74,7 @@ class ReaderGoldenTest {
 
     companion object {
         private val manifestJson = Json { prettyPrint = true }
-        private val pins = Pins("4a840493d0a39f8771adb631c3dce490a365d915", "4b096fe058731afe791747007f428182784d1592",
+        private val pins = Pins("14fdd8f91549a30a7b7235088d3c524d128201d1", "2f09c1855b043608f013da8df666714f387b60c3",
             "0f3b468dcf95c3869b7f28f47cf5019a7c26b8ef")
         private const val runtime = "Android API 35 / Robolectric 4.16.1 (MIT) / native Skia / zh-CN / mdpi"
         private const val rendering = "Production Compose/View content, Android Canvas to 1x ARGB_8888, exact pixels and SHA-256. Approved Android capture differs from iOS by system chrome, layout engines and symbols."

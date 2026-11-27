@@ -8,7 +8,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-val nativeOutput = rootProject.layout.projectDirectory.dir(".build/native-m2")
+val nativeOutput = rootProject.layout.projectDirectory.dir(".build/native-m3")
+val nativeHostOutput = rootProject.layout.projectDirectory.dir(".build/native-m3-host")
 
 android {
     namespace = "io.reader.rebuild"
@@ -42,7 +43,7 @@ android {
     }
     testOptions.unitTests.isIncludeAndroidResources = true
     testOptions.unitTests.all {
-        it.jvmArgs("-Xcheck:jni", "-Djava.library.path=${nativeOutput.dir("host-jni/lib").asFile}")
+        it.jvmArgs("-Xcheck:jni", "-Djava.library.path=${nativeHostOutput.dir("host-jni/lib").asFile}")
         it.systemProperty("reader.fixture", file("src/androidTest/assets/fixtures/m1-window.epub").absolutePath)
         it.systemProperty("reader.hostFixtures", file("src/test/resources/m1").absolutePath)
         it.doFirst { it.systemProperty("reader.cold.classpath", it.classpath.asPath) }
@@ -68,6 +69,8 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.4.0")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+    implementation("androidx.media3:media3-session:1.8.0")
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
     implementation("com.caverock:androidsvg-aar:1.4")
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
