@@ -34,6 +34,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
@@ -80,9 +81,9 @@ class EbookWebViewTest {
             check(chapter1.descriptor.entryPath == chapter2.descriptor.entryPath)
             check(chapter2.descriptor.chapterStartScalar == 65L && chapter2.descriptor.chapterEndScalar == 962L)
             ui { surface.adapter.open(chapter1, 0, ReadingStyle(fontSize = 18.0)) }
-            val first = verifyReady(0)
+            val first = verifyReady("chapter 1 open", 0)
             ui { surface.adapter.open(chapter2, 27, ReadingStyle(fontSize = 18.0)) }
-            val second = verifyReady(27, wantImage = true)
+            val second = verifyReady("chapter 2 open", 27, wantImage = true)
             check(first.documentId != second.documentId && first.session == second.session)
             check(awaitValue<String> { callback ->
                 surface.view.evaluateJavascript("document.querySelector('iframe').contentDocument.images[0].naturalWidth", callback)
@@ -96,9 +97,14 @@ class EbookWebViewTest {
             }
             check(ReaderProtocolJson.decodeFromString<String>(requireNotNull(text)) == "𠀀与Café")
             ui { surface.adapter.reflow(ReadingStyle(fontSize = 23.0), null) }
-            val reflow = verifyReady(27, wantImage = true)
+            val reflow = verifyReady("chapter 2 reflow", 27, wantImage = true)
             check(reflow.documentId == second.documentId && reflow.layoutGeneration == 1L)
             checkFontSize(surface, "23px")
+            val reflowed = checkPosition(surface)
+            val beforeTap = endSelectionForTap(surface)
+            println("M1_WEBVIEW_REFLOW pid=${Process.myPid()} reflow=18->23 scalar=${reflowed.scalar}" +
+                " preClearSelection=${beforeTap?.let { "[${it.startScalar},${it.endScalar})" } ?: "none"}" +
+                " selectionBeforeTap=none")
             nativeTap(surface, reflow)
             rejectRetiredMessages(surface, listOf(first, second), reflow)
             val measured = checkPosition(surface)
@@ -106,7 +112,8 @@ class EbookWebViewTest {
                 " provider=${WebView.getCurrentWebViewPackage()?.packageName}/${WebView.getCurrentWebViewPackage()?.versionName}" +
                 " fixture=${NativeM1CoreProof.EPUB_SHA} xhtml=${chapter2.descriptor.entryPath} window=[65,962)" +
                 " imageWidth=96 images=${readyPosition(reflow).loadedImageCount} selection=[27,34) text=𠀀与Café" +
-                " reflow=18->23 scalar=${measured.scalar} tap=trusted staleDocument=rejected staleGeneration=rejected")
+                " reflow=18->23 scalar=${measured.scalar} selectionBeforeTap=none tap=trusted" +
+                " staleDocument=rejected staleGeneration=rejected")
             val terminal = NativeM1CoreProof.saveAfterRetire(runtime, coordinator, chapter2.text, measured.scalar) {
                 ui { surface.adapter.retire() }
             }
@@ -144,13 +151,13 @@ class EbookWebViewTest {
             val chapter = ReadingSessionCoordinator(runtime.core, files).ebook(proof.bookId, proof.chapter)
             check(chapter.text.savedScalar == 27L)
             ui { surface.adapter.open(chapter, chapter.text.savedScalar, ReadingStyle(fontSize = 23.0)) }
-            verifyReady(27, wantImage = true)
+            verifyReady("independent chapter 2 reopen", 27, wantImage = true)
             val visible = checkPosition(surface)
             val mismatch = chapter.copy(descriptor = chapter.descriptor.copy(
                 chapterStartScalar = chapter.descriptor.chapterStartScalar + 7,
             ))
             ui { surface.adapter.open(mismatch, 27) }
-            val failure = awaitEvent(setOf("failure", "ready"))
+            val failure = awaitEvent("wrong chapter window", setOf("failure", "ready"))
             val failureCode = failure.value.jsonObject.getValue("code").jsonPrimitive.content
             check(failure.kind == "failure" && failureCode == "CORE_PROCESSED_MAPPING_UNPROVEN") { failure.toString() }
             check(awaitValue<ReadingPosition> { surface.adapter.currentPosition(it) } == null)
@@ -171,6 +178,19 @@ class EbookWebViewTest {
         val original = files.authorize(NativeM1CoreProof.EPUB_SHA).file
         check(original.name == "${NativeM1CoreProof.EPUB_SHA}.source" &&
             FileAndAssetHost.sha256(original) == NativeM1CoreProof.EPUB_SHA)
+    }
+
+    private suspend fun endSelectionForTap(surface: NativeSurface): ReadingSelection? {
+        val previous = awaitValue<ReadingSelection> { surface.adapter.currentSelection(it) }
+        // This case ends its programmatic selection before testing the unrelated reading tap.
+        val cleared = awaitValue<String> { callback ->
+            surface.view.evaluateJavascript(
+                "(() => { const selection = document.querySelector('iframe').contentWindow.getSelection();" +
+                    " selection.removeAllRanges(); return selection.rangeCount === 0; })()", callback,
+            )
+        }
+        check(cleared == "true" && awaitValue<ReadingSelection> { surface.adapter.currentSelection(it) } == null)
+        return previous
     }
 
     private suspend fun nativeTap(surface: NativeSurface, current: SurfaceEvent) {
@@ -208,7 +228,7 @@ class EbookWebViewTest {
                 check(runner.uiAutomation.injectInputEvent(event, true))
             } finally { event.recycle() }
         }
-        val received = awaitEvent(setOf("tap", "link", "failure"))
+        val received = awaitEvent("trusted native iframe tap", setOf("tap", "link", "failure"))
         check(received.kind == "tap" && received.value == JsonNull &&
             received.session == current.session && received.documentId == current.documentId &&
             received.layoutGeneration == current.layoutGeneration) { received.toString() }
@@ -220,7 +240,7 @@ class EbookWebViewTest {
             awaitValue<String> { surface.view.evaluateJavascript("window.ReaderNativePort.postMessage($payload); 'sent'", it) }
         }
         check(awaitValue<ReadingPosition> { surface.adapter.restore(27, it) }?.scalar == 27L)
-        val position = awaitEvent(setOf("position", "ready"))
+        val position = awaitEvent("fresh restore after retired messages", setOf("position", "ready"))
         check(position.kind == "position" && position.documentId == current.documentId &&
             position.layoutGeneration == current.layoutGeneration) { position.toString() }
     }
@@ -241,8 +261,8 @@ class EbookWebViewTest {
         return position
     }
 
-    private suspend fun verifyReady(scalar: Long, wantImage: Boolean = false): SurfaceEvent {
-        val ready = awaitEvent(setOf("ready", "failure"))
+    private suspend fun verifyReady(stage: String, scalar: Long, wantImage: Boolean = false): SurfaceEvent {
+        val ready = awaitEvent(stage, setOf("ready", "failure"))
         check(ready.kind == "ready") { ready.value.toString() }
         val body = readyPosition(ready)
         check(body.scalar == scalar && (!wantImage || (body.loadedImageCount ?: 0) >= 1)) { body.toString() }
@@ -252,10 +272,16 @@ class EbookWebViewTest {
     private fun readyPosition(event: SurfaceEvent) =
         ReaderProtocolJson.decodeFromJsonElement(ReadingPosition.serializer(), event.value)
 
-    private suspend fun awaitEvent(kinds: Set<String>): SurfaceEvent = withTimeout(15_000) {
-        var event = events.receive()
-        while (event.kind !in kinds) event = events.receive()
-        event
+    private suspend fun awaitEvent(stage: String, kinds: Set<String>): SurfaceEvent {
+        val seen = mutableSetOf<String>()
+        return withTimeoutOrNull(15_000) {
+            var event = events.receive()
+            while (event.kind !in kinds) {
+                seen += event.kind
+                event = events.receive()
+            }
+            event
+        } ?: error("Timed out during $stage waiting for $kinds (received $seen)")
     }
 
     private fun launch(): Activity = runner.startActivitySync(
