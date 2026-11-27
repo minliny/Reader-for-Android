@@ -11,7 +11,7 @@ import sys
 
 POLICY_PATH = Path("tools/design-input-retirement.json")
 # Binds reviewed identities, original definition hashes and individual dispositions; not inventory counts.
-RETIREMENT_DEFINITION_SHA256 = "396495b8af182fd05eba21be179f5c2443b15fb9509471dac14f654324f63d12"
+RETIREMENT_DEFINITION_SHA256 = "89a08a69f43970ee34c71896320e109cf4ad95f14d73536971d18295ad9a7d48"
 EXECUTABLE_ROOTS = ("app", ".github", "tools")
 EXECUTABLE_SUFFIXES = {".kt", ".kts", ".java", ".py", ".js", ".mjs", ".sh", ".yml", ".yaml"}
 
@@ -45,7 +45,17 @@ def inspect(root):
                 raise ValueError(f"Unknown disposition: {outcome}")
             if outcome == "RETIRE" or outcome == "MIGRATE":
                 forbidden_methods.add(method["name"])
-            if outcome != "RETIRE":
+            if outcome == "RETIRE":
+                if "retiredMethod" in method:
+                    forbidden_methods.add(method["retiredMethod"])
+                if "retiredPath" in method:
+                    former_path = Path(method["retiredPath"])
+                    if former_path.is_absolute() or ".." in former_path.parts:
+                        raise ValueError("Policy paths must stay inside this checkout")
+                    forbidden_classes.add(former_path.stem)
+                    if (root / former_path).exists():
+                        errors.append(f"Retired JUnit file restored: {former_path}")
+            else:
                 target = root / method["currentPath"]
                 declaration = f'fun `{method["currentMethod"]}`'
                 if not target.is_file() or declaration not in target.read_text(encoding="utf-8"):

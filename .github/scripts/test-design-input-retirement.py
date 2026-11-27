@@ -48,12 +48,21 @@ def main():
         restored_root.mkdir(parents=True)
         assert any("Withdrawn design input restored" in e for e in checker.inspect(fixture))
         restored_root.rmdir()
-        preserved = next(m for item in policy["originalTests"] for m in item["methods"] if m["outcome"] == "RETAIN")
-        current_path = fixture / preserved["currentPath"]
-        current_source = current_path.read_text(encoding="utf-8")
-        current_path.write_text(current_source.replace(f"fun `{preserved['currentMethod']}`", "fun removedPreservedAssertion"))
-        assert any("Preserved JUnit declaration missing" in e for e in checker.inspect(fixture))
-        current_path.write_text(current_source)
+        preserved = next((m for item in policy["originalTests"] for m in item["methods"]
+                          if m["outcome"] in {"RETAIN", "MIGRATE"}), None)
+        if preserved:
+            current_path = fixture / preserved["currentPath"]
+            current_source = current_path.read_text(encoding="utf-8")
+            current_path.write_text(current_source.replace(f"fun `{preserved['currentMethod']}`", "fun removedPreservedAssertion"))
+            assert any("Preserved JUnit declaration missing" in e for e in checker.inspect(fixture))
+            current_path.write_text(current_source)
+        former_binding = next(m for item in policy["originalTests"] for m in item["methods"]
+                              if "retiredPath" in m)
+        probe.write_text(f"class {Path(former_binding['retiredPath']).stem} {{}}\n")
+        assert any("Retired JUnit class discovered" in e for e in checker.inspect(fixture))
+        probe.write_text(f"class Renamed {{ fun `{former_binding['retiredMethod']}`() {{}} }}\n")
+        assert any("Retired JUnit method discovered" in e for e in checker.inspect(fixture))
+        probe.unlink()
         assert checker.inspect(fixture) == [], "Counterexamples must leave the temporary baseline intact"
         policy_path = fixture / checker.POLICY_PATH
         weakened = dict(policy)
@@ -65,7 +74,7 @@ def main():
             assert "Retirement definition changed" in str(error)
         else:
             raise AssertionError("Removing a reviewed disposition must fail admission")
-    print("PASS restore-refusal: restored path/class/method/dependency/input, removed preserved declaration and weakened disposition are rejected")
+    print("PASS restore-refusal: retired paths/classes/methods, withdrawn inputs and weakened dispositions are rejected")
     print("NOT_RUN Kotlin/JUnit/Compose/Gradle/APK/device checks")
 
 

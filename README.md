@@ -11,11 +11,9 @@
 
 - 当前生产 Kotlin 在 `app/src/main/kotlin/io/reader/android`。
 - `app/src/core/java` 从固定 Core Git 对象同步，不能手改；配套 JNI 由独立入口构建。
-- 旧 `app/src/main/kotlin/com` 生产树已退役（2026-11-27，见
-  [设计测试输入迁移](docs/testing/ANDROID_INPUT_MIGRATION.md)）；仅
-  `app/src/test/kotlin/com` 下 3 个受 `tools/design-input-retirement.json`
-  绑定的断言文件保留原位，它们不在任何 `sourceSets` 内、不参与编译。当前 Gradle
-  `sourceSets` 只使用 `io/reader/android` 的生产、JVM 和 instrumentation 源集。
+- 旧 `app/src/main/kotlin/com` 生产树及 `app/src/test/kotlin/com` 原型测试已退役。
+  [设计测试输入迁移](docs/testing/ANDROID_INPUT_MIGRATION.md)记录退役依据；当前 Gradle
+  Kotlin 源集使用 `io/reader/android` 的生产、JVM 和 instrumentation 源码。
 - Core 负责解析、书架、章节、位置、事务和原操作回执；Android 提供 SAF 原书、
   网络、窗口、系统媒体与渲染。显示偏好和短生命周期页面状态由 Android 持有。
 - 本地导入持久保存原书和原操作 journal；超时保留未决，显式恢复核对原绑定。

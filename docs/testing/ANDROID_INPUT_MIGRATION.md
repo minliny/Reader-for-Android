@@ -2,9 +2,9 @@
 
 当前输入是本仓 Kotlin 生产源码和对应测试；已撤回的 Android 设计稿不再是需求或测试前提。迁移基线为 `ebdc6a94390e3568f123b58d7d6c0c2a82f11bb9`。独立工作树从该 HEAD 建立后，单独应用主工作树已有的 379 项设计删除；不改动主工作树的删除 WIP。
 
-8 份原测试共 36 个方法：9 个保留、4 个迁移、23 个旧方法退出。逐方法决定、旧文件 SHA-256、替代覆盖及未决项见 [受控退役登记](../../tools/design-input-retirement.json)。历史测试只在本机私有证据中保留为 `.kt.txt`，不属于测试发现集。
+2026-10-21 的初次迁移处理了 8 份原测试的 36 个方法，其中 9 个保留、4 个迁移、23 个退出。2026-11-27 的原型退役完成后，原先保留和迁移的 13 个方法也已退出。逐方法决定、旧文件 SHA-256、替代覆盖及未决项见 [受控退役登记](../../tools/design-input-retirement.json)。历史测试只在本机私有证据中保留为 `.kt.txt`，不属于测试发现集。
 
-| 原测试 | 当前承接 | 退出的旧前提 |
+| 原测试 | 2026-10-21 承接 | 退出的旧前提 |
 | --- | --- | --- |
 | `ReaderIconTokenMappingTest` | 保留主 Tab 语义 token、所有 enum 到 ImageVector、设置图标 3 项 | HTML/JS 79 图标库存及对 JS 名称的映射 2 项 |
 | `ReaderSharedComponentsStructureTest` | 保留组件 API、主题角色、semantics、集中图标适配及当前原生宿主源码锚点 9 项 | 组件 Markdown 存在、HTML shell 分类/数量、历史 CSS/五色值禁令；移除这些前提后仍保留实际 Kotlin API 要求 |
@@ -29,18 +29,17 @@
 
 CI 的 `retired-inputs`、`workflow-lint`、`secrets` 各自独立手动选择；只准备所选入口实际需要的工具。旧 `json` 只读取已撤回的 30 份演示 JSON，无剩余运行输入职责，选择器已退出；旧 `full` 聚合选择同样退出。`retired-inputs` 不隐式运行准入反例、workflow lint、secret scan 或任何 Android 测试。CI 从未运行过这批 JUnit，不作 CI 测试覆盖宣称。
 
-准入检查绑定本次已审的原文件 SHA-256、方法身份及逐项承接/退出定义，不用历史数量替代职责。修改定义须审读实际变化后再显式更新定义摘要。
+准入检查绑定已审的原文件 SHA-256、方法身份及逐项承接和退出定义。修改定义须审读实际变化后再显式更新定义摘要。
 
-## 保留的真实缺口
+## 2026-10-21 迁移时的证据边界
 
 - 迁移来源 `ebdc6a94` 的独立工作树没有 Git 跟踪的 Gradle 构建入口及 `AndroidManifest`。合入后的产品源码按当前 `io/reader/android` 源集和单独的验证入口检查。这批迁移回执的范围是源码，Kotlin/JUnit/Compose、APK、设备和用户验收均未执行。
-- 当前源码缺 `ReaderTheme`、`BookComponents.kt`、`SearchAdapterShell.kt`、`BookDetailAdapterShell.kt` 和 `booksource/SourceManagementUiState.kt` 等前提。相应源码/API 断言仍保留，缺失不会因退役而被掩盖。
-- `ReaderRouteHost` 的 `onSwitchSource` 当前仅返回上一页。真实 Core 换源、阅读位置保留、Compose 点击次数及迟到回调隔离尚无执行证据。
+- 迁移时的原型源码缺 `ReaderTheme`、`BookComponents.kt`、`SearchAdapterShell.kt`、`BookDetailAdapterShell.kt` 和 `booksource/SourceManagementUiState.kt` 等前提。相应源码/API 断言仍保留，缺失不会因退役而被掩盖。
+- 原型 `ReaderRouteHost` 的 `onSwitchSource` 当时仅返回上一页。真实 Core 换源、阅读位置保留、Compose 点击次数及迟到回调隔离尚无执行证据。
 - 源码输入迁移完成、准入检查通过、JUnit 执行、产品行为和用户验收分别记账。私有本次结果保存在隔离工作区 `.reader-artifacts/android-input-migration-20261021/`。
 
 ## 2026-11-27 遗留生产树退役
 
 - 删除 `app/src/main/kotlin/com`（80 个文件）与未被退役登记绑定的 `app/src/test/kotlin/com` 测试（58 个文件），合计 138 个文件 / 30,109 行。依据：Gradle `sourceSets` 从未编译该树，`io/reader/android` 已承接全部生产入口，仓库内除该树自身的路径断言外无任何引用。
-- 保留 `ReaderIconTokenMappingTest.kt`、`ReaderSharedComponentsStructureTest.kt`、`AndroidComposeSourceCoverageTest.kt` 三个文件原位：它们是 `tools/design-input-retirement.json` 中 13 个 RETAIN/MIGRATE 方法的 `currentPath`，删除会使 `check-design-inputs.py --case retired-inputs` 失去保留声明。
-- 这三个文件仍不在任何 `sourceSets` 内，不参与编译；`ReaderIconTokenMappingTest` 对已删除的 `com.reader.android.ui.appScreens` 的 import 因此失效，属已知残留，需人工决定是迁移到 `io/reader/android` 测试源集还是移入 `tools/` 证据目录。
-- 删除后复跑 `python3 .github/scripts/check-design-inputs.py --case retired-inputs`：PASS。
+- 最后退出三份此前仅由治理清单绑定的测试。`ReaderIconTokenMappingTest` 的 `appScreens` 和 `ReaderIconToken` 属于四 Tab 原型，现役 `ReaderApp` 使用两个 Tab 和 drawable 资源。`ReaderSharedComponentsStructureTest` 与 `AndroidComposeSourceCoverageTest` 检查已删除的 `com` 组件、主题、映射与 Preview 锚点。
+- `tools/design-input-retirement.json` 将这 13 项登记为 `RETIRE`，保留原文件 SHA-256 及原型测试身份。现役 Kotlin 测试继续由 `io/reader/android` JVM 源集维护。

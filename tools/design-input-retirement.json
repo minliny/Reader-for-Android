@@ -18,108 +18,87 @@
     {
       "path": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
       "originalSha256": "4c56f8eb1e99da73182bbd02aebd619623c1e1d508d3af8c9d718398d5340c27",
-      "retiredFile": false,
+      "retiredFile": true,
       "methods": [
         {
           "name": "main tabs use semantic icon tokens",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
-          "currentMethod": "main tabs use semantic icon tokens",
-          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+          "outcome": "RETIRE",
+          "reason": "Checks the retired com prototype's ReaderIconToken/ImageVector contract. The io host uses drawable resources, including two live navigation tabs in ReaderApp."
         },
         {
           "name": "all declared icon tokens resolve to image vectors",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
-          "currentMethod": "all declared icon tokens resolve to image vectors",
-          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+          "outcome": "RETIRE",
+          "reason": "Checks the retired com prototype's ReaderIconToken/ImageVector contract. The io host uses drawable resources, including two live navigation tabs in ReaderApp."
         },
         {
           "name": "local asset library exposes current icon token inventory",
           "outcome": "RETIRE",
-          "reason": "Withdrawn JS asset registry inventory/mapping only. Actual appScreens semantic tokens, exhaustive enum to ImageVector resolution and settings tokens are retained."
+          "reason": "Withdrawn JS asset registry inventory or mapping. The former com icon token checks retired with the prototype."
         },
         {
           "name": "compose semantic icon tokens trace to local asset tokens",
           "outcome": "RETIRE",
-          "reason": "Withdrawn JS asset registry inventory/mapping only. Actual appScreens semantic tokens, exhaustive enum to ImageVector resolution and settings tokens are retained."
+          "reason": "Withdrawn JS asset registry inventory or mapping. The former com icon token checks retired with the prototype."
         },
         {
           "name": "settings secondary semantic icons are available",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconTokenMappingTest.kt",
-          "currentMethod": "settings secondary semantic icons are available",
-          "reason": "Actual Kotlin semantic icon mapping assertion; no design document input."
+          "outcome": "RETIRE",
+          "reason": "Checks the retired com prototype's ReaderIconToken/ImageVector contract. The io host uses drawable resources, including two live navigation tabs in ReaderApp."
         }
       ]
     },
     {
       "path": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
       "originalSha256": "78f4c0c655ad2faf7499b008ad53a3a2f70b8ed8f7b8327c8bdb089fde4282c8",
-      "retiredFile": false,
+      "retiredFile": true,
       "methods": [
         {
           "name": "slice 2 shared component package exposes required components",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "slice 2 shared component package exposes required components",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "slice 2 shared components use reader theme tokens",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "slice 2 shared components use reader theme tokens",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "slice 2 shared components expose base semantics",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "slice 2 shared components expose base semantics",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "shared top bar uses icon token for back action",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "shared top bar uses icon token for back action",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "shared icon tokens cover main navigation and common actions",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "shared icon tokens cover main navigation and common actions",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "shared component files use icon tokens instead of page local material icons",
-          "outcome": "RETAIN",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "shared component files use icon tokens instead of page local material icons",
-          "reason": "Current shared component API/theme role/semantics/icon assertion retained, including missing BookComponents APIs; missing implementations are not removed to produce a pass."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens."
         },
         {
           "name": "component library core semantics have compose implementation anchors",
-          "outcome": "MIGRATE",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "shared component APIs have current Kotlin implementation anchors",
-          "reason": "Retains every current Kotlin component API source anchor, including missing BookComponents.kt. Removes only the withdrawn Markdown declaration premise."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens.",
+          "retiredMethod": "shared component APIs have current Kotlin implementation anchors"
         },
         {
           "name": "manifest runtime shell taxonomy has compose implementation anchors",
-          "outcome": "MIGRATE",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "current screen hosts retain native source and preview anchors",
-          "reason": "Retains actual native component/route/preview source anchors. Removes only HTML shell counts/taxonomy self-comparisons and comment labels; existing preview/route tests remain. No flow comparison/detection behavior is accepted."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens.",
+          "retiredMethod": "current screen hosts retain native source and preview anchors"
         },
         {
           "name": "slice 2 shared components do not reintroduce stitch or webview runtime",
-          "outcome": "MIGRATE",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/components/ReaderSharedComponentsStructureTest.kt",
-          "currentMethod": "shared components keep the native rendering boundary",
-          "reason": "Retains native rendering boundary. Retires unapproved historical CSS token names and five fixed color bans; they are not current product requirements."
+          "outcome": "RETIRE",
+          "reason": "Checks source anchors in the retired com prototype's shared component, theme or preview tree. The io host implements its own Compose screens.",
+          "retiredMethod": "shared components keep the native rendering boundary"
         }
       ]
     },
@@ -131,17 +110,17 @@
         {
           "name": "asset library fixture tracks every UI design screen and cover asset",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+          "reason": "Only checks withdrawn design images, covers, screenshots, JS icon inventory and report claims."
         },
         {
           "name": "asset library icon registry stays aligned with fixture groups and docs",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+          "reason": "Only checks withdrawn design images, covers, screenshots, JS icon inventory and report claims."
         },
         {
           "name": "asset library manifest target and validation report stay aligned",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn design images/covers/screenshots, JS icon inventory and report claims. Actual Kotlin enum/icon guarantees remain in ReaderIconTokenMappingTest."
+          "reason": "Only checks withdrawn design images, covers, screenshots, JS icon inventory and report claims."
         }
       ]
     },
@@ -153,17 +132,17 @@
         {
           "name": "component library renderer inventory stays aligned with shared input contract",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims."
         },
         {
           "name": "component library fixture icons come from the shared asset registry",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims."
         },
         {
           "name": "component library docs manifest and validation report stay aligned",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims. Current shared Kotlin component API assertions remain active."
+          "reason": "Only checks withdrawn HTML component cards, demo icon fixture mirrors, DOM counts and report claims."
         }
       ]
     },
@@ -174,10 +153,11 @@
       "methods": [
         {
           "name": "formal frontend input pages have compose state mapping coverage",
-          "outcome": "MIGRATE",
-          "currentPath": "app/src/test/kotlin/com/reader/android/ui/preview/AndroidComposeSourceCoverageTest.kt",
-          "currentMethod": "current Kotlin mapper and preview anchors remain present",
-          "reason": "Preserves every existing sourcePaths/sourceTokens/previewPath/previewTokens assertion. Removes withdrawn spec, HTML and manifest premises; static anchors only, not state execution."
+          "outcome": "RETIRE",
+          "reason": "Checks deleted com mapper and Preview source anchors. The io host has its own screens and behavioral tests.",
+          "retiredMethod": "current Kotlin mapper and preview anchors remain present",
+          "retiredPath": "app/src/test/kotlin/com/reader/android/ui/preview/AndroidComposeSourceCoverageTest.kt",
+          "retiredSha256": "4907c1c41eef65844529f08572b0c5d428fa03a22e8841b0847dad2f9e1caea2"
         },
         {
           "name": "formal frontend input pages have global data state event contracts",
@@ -219,22 +199,22 @@
         {
           "name": "source switch package keeps the FlowShell frontend input file set",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata. The former com source anchors retired with the prototype."
         },
         {
           "name": "source switch renderer uses centralized FlowShell and non empty state host",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata. The former com source anchors retired with the prototype."
         },
         {
           "name": "source switch fixture keeps the landscape flow and state matrix data",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata. The former com source anchors retired with the prototype."
         },
         {
           "name": "source switch manifest validation report docs and compose anchors stay aligned",
           "outcome": "RETIRE",
-          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata; current Kotlin anchors are adopted by AndroidComposeSourceCoverageTest and SourceSwitchFlowStructureTest. Does not establish real source switching."
+          "reason": "Only checks withdrawn HTML package/renderers, demo candidate/filter/step counts and report metadata. The former com source anchors retired with the prototype."
         }
       ]
     },
@@ -279,24 +259,11 @@
     }
   ],
   "adoptedExistingCoverage": {
-    "stateMapperAssertions": "Existing *UiStateMappingTest / *DesignUiStateMappingTest files retain actual current Kotlin state/context/owner assertions; do not compare them with the removed TypeScript design model.",
-    "nativeShellAndPreviewAnchors": [
-      "app/src/test/kotlin/com/reader/android/ui/preview/MainTabStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/preview/LibraryFlowStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/preview/ReaderShellStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/preview/ReaderControlStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/preview/SettingsSecondaryStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/preview/SourceManagementStateMatrixPreviewTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/reader/source/SourceSwitchFlowStructureTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/ReaderRouteHostSmokeTest.kt",
-      "app/src/test/kotlin/com/reader/android/ui/ReaderRouteReachabilityTest.kt"
-    ],
-    "iconBoundary": "app/src/test/kotlin/com/reader/android/ui/components/ReaderIconImportBoundaryTest.kt"
+    "historicalScope": "The previous source and Preview tests referred to the retired com prototype. The io host's separately maintained Kotlin tests remain in the active Gradle JVM source set."
   },
   "openProductEvidence": [
-    "No tracked Gradle settings/build/wrapper or AndroidManifest exists; Kotlin/JUnit/Compose/APK/device tests are NOT_RUN in this migration.",
-    "Missing ReaderTheme, BookComponents.kt, SearchAdapterShell.kt, BookDetailAdapterShell.kt and booksource/SourceManagementUiState.kt are retained source prerequisites, not retired assertions.",
-    "Real Compose callback invocation, once/stale owner handling and Core source-switch/progress preservation remain OPEN. ReaderRouteHost onSwitchSource currently only pops back.",
+    "The original migration did not run Kotlin, JUnit, Compose, APK or device checks. The io host now has a Gradle build and its own validation entry points.",
+    "Real Compose callback invocation, once/stale owner handling and Core source-switch/progress evidence are tracked in the Reader workspace backlog.",
     "Reader-UI protocol event inventory is not a replacement for the removed 30 page UI models."
   ]
 }
