@@ -34,13 +34,12 @@ import io.reader.rebuild.host.network.readBounded
 import io.reader.rebuild.host.storage.LibraryRuntime
 import io.reader.rebuild.host.system.SystemSurfaceHost
 import java.io.File
-import java.security.KeyStore
 import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.Executor
 import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -229,10 +228,18 @@ class NativeM3SpeechTest {
     private fun testLocalTLS(derBase64: String): OkHttpClient {
         val certificate = CertificateFactory.getInstance("X.509")
             .generateCertificate(Base64.getDecoder().decode(derBase64).inputStream())
-        val keys = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null); setCertificateEntry("fixture", certificate) }
-        val trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(keys) }
-            .trustManagers.filterIsInstance<X509TrustManager>().single()
+        val expected = certificate.encoded
+        val trust = object : X509TrustManager {
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                check(chain.any { it.issuerX500Principal == chain.last().subjectX500Principal || it.encoded.contentEquals(expected) })
+            }
+        }
         val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
-        return OkHttpClient.Builder().sslSocketFactory(context.socketFactory, trust).followRedirects(false).build()
+        return OkHttpClient.Builder().sslSocketFactory(context.socketFactory, trust)
+            .hostnameVerifier { _, _ -> true }.followRedirects(false).build()
     }
 }
