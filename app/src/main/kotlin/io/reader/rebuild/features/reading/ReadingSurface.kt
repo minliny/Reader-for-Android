@@ -1,7 +1,7 @@
 package io.reader.rebuild.features.reading
 
-import com.reader.core.theme.ReaderAppRole
 import com.reader.core.theme.ReaderDesignMetrics
+import io.reader.rebuild.design.ReaderReadingColors
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -11,13 +11,10 @@ internal data class ReadingStyle(
     val lineHeight: Double = ReaderDesignMetrics.readerBody.lineHeight,
     val horizontalInset: Int = ReaderDesignMetrics.screenInset,
     val paragraphSpacing: Int = ReaderDesignMetrics.readerParagraphSpacing,
-    val paper: String = css(ReaderAppRole.TOK_PAPER.day),
-    val ink: String = css(ReaderAppRole.TOK_INK.day),
-) {
-    companion object {
-        private fun css(argb: Long) = "#" + (argb and 0xffffff).toString(16).padStart(6, '0')
-    }
-}
+    val paper: String = ReaderReadingColors.paper,
+    val ink: String = ReaderReadingColors.ink,
+    val letterSpacing: Double = 0.0,
+)
 
 @Serializable
 internal data class ReadingPosition(val scalar: Long, val text: String, val loadedImageCount: Int? = null)

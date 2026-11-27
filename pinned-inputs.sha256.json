@@ -2,24 +2,75 @@
   "harmonyPairedCore": "f9c06b68166fe71970b6b458d14fcddf0ca588cd",
   "inputs": {
     "crates/reader-storage/tests/fixtures/library47-schema.sql": "c7b3bca4ecbe4ef44ab653b0620f45152022ee61fec4a7a758c2bc46e848c097",
-    "protocol/reader-command.schema.json": "ee756bfe7985af16beb3712fd9449ce5a690374285ec300b853a1a7c4d5177bb",
-    "protocol/reader-event.schema.json": "42a2f08a71f67f30e55bda18ca129651e02ed841769255c284822f5ad08ea56b",
+    "design/source-switch/source-switch.visual.json": "205de7f89121243e6ef4490f4863c6f4874e928a7eb5a66f52b41f0275c8d977",
+    "protocol/reader-command.schema.json": "0ba9a587929fe7612886bc54fd463ba1cea382cf9cb0a979b37e96c0cd7fbad0",
+    "protocol/reader-event.schema.json": "e0a79f46acfa62370dcc48311c03636e3b034c8e9207e6d176450bf65f45c695",
     "protocol/reader-runtime-config.schema.json": "7f80c3a548f71ab2b5d4415af83579f03c725cb0bec0fc72a1e7dc6e91368afa",
     "reader_ebook_runtime/fixtures/generate-m1-window.py": "dad21aeb7fab6e4c83caaecbb3513a696084646319710b978a16fbe4eb631d78",
-    "reader_ebook_runtime/manifest.json": "db5eaef68a49e7215b471d8b396b04f3e9f81e31ad1eb07931f4f5a378d28702",
+    "reader_ebook_runtime/manifest.json": "78f606fddce507d66639bbba8dbced5b3d2d1f07cf8bfef8b1b83cddf73ee0d7",
     "scripts/core-dependency.json": "9ed0ba36d22e3cbfa3971a0b85ea7bc8d7500f13899dcc84c10634372a1489bd",
-    "scripts/generate-m1-ui.mjs": "f8f632d733eb6d840db0825e6b77f56e124e14f69a19997f71fda9ca6014287b",
+    "scripts/generate-m1-ui.mjs": "036ed5d7e75f57db709e86b4bd67356a74d8aa37e40d6d786f357c4a645cba86",
     "scripts/generate-theme-tokens.mjs": "d1d45e180ea1392d9e2b9420d81abe5711ed91f69e8a8e79fbd81ec183a01ed5",
-    "theme/design-metrics.json": "625cd2861d568f1f8ebd63c1a58a46cf677d43dbfd8cbcf4b6d71ef33d1502ae",
-    "theme/icon-registry.json": "074f22c1db2ccbf48826723625e4dd1ffb3ac59fa9fd34bef46ed7b573ce80b7",
+    "theme/design-metrics.json": "ee9faa0aed4f7daab49744cacb248ebd1ecbc5c244bc553be95423990d5dbbfd",
+    "theme/icon-registry.json": "9ab2d1fc4817be591e444749ef85865491464a948214b6f9a7cf2e6ad642ab94",
     "theme/icons/reader_control_header_chevron.svg": "176f7ea3416d297cf7437ff30b40877e7dc54aeb0fe492153930cb29e2aa1caa",
     "theme/icons/settings_gen_navigation.svg": "ef696bb6844746dd733207c0e436be713ad1eda666681a137dc141ede0440f5d",
+    "theme/icons/source_login_lock.svg": "89bf510744936a1a6512692b30e59e2b9530b60c5381c914a5d8dc9b8fd14c4a",
+    "theme/icons/source_switch.svg": "045b598535fb93042437ef023c59b7a86541d6641eb00b4ca78c03ec5aeb1226",
+    "theme/icons/source_v9_cloud.svg": "027c8a09d12cb498291107595883aa7b9b781f1efd97cecd144fbcd7cea407bd",
+    "theme/icons/source_v9_question.svg": "abd067b653830c57b76d4e05d0977eaa876bb6642ddbf4c8f943c56e07bed29f",
+    "theme/icons/source_v9_upload.svg": "f94e36c05543543260798135dfd21e9aea03422852ee034763949a4cb4a40da6",
+    "theme/icons/source_v9_wave.svg": "8bbb986a14152df870b29e30aab9522dc22e6f8656c8bf0516b69f20748bcaa2",
     "theme/registry.json": "17339c9c8d876989575894e4a1f3c5a6b229cf72748d6398963c681820bda1df"
   },
   "outputs": {
     "app/src/androidTest/assets/fixtures/m1-window.epub": {
       "sha256": "35efc3246026578c8f56ea227964bb05a5d7cd8d49ee0f7794221f9ab3a4481e",
       "source": "ui:reader_ebook_runtime/fixtures/m1-window.epub"
+    },
+    "app/src/main/assets/reader_design/fonts/NotoSansSC-VF.otf": {
+      "sha256": "d13ed01ec8aa45d6178999b648e96fb92150683e9f8e2a581f2acf208dcbe44b",
+      "source": "ui:fonts/NotoSansSC-VF.otf"
+    },
+    "app/src/main/assets/reader_design/fonts/NotoSerifSC-Regular.ttf": {
+      "sha256": "9502147ceba7b5bc7fd3415083f6a5d133f22d8f9efb4974d4b85f3a97ea2d3a",
+      "source": "ui:fonts/NotoSerifSC-Regular.ttf"
+    },
+    "app/src/main/assets/reader_design/fonts/OFL.txt": {
+      "sha256": "5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6",
+      "source": "ui:fonts/OFL.txt"
+    },
+    "app/src/main/assets/reader_design/icons/reader_control_header_chevron.svg": {
+      "sha256": "176f7ea3416d297cf7437ff30b40877e7dc54aeb0fe492153930cb29e2aa1caa",
+      "source": "ui:theme/icons/reader_control_header_chevron.svg"
+    },
+    "app/src/main/assets/reader_design/icons/settings_gen_navigation.svg": {
+      "sha256": "ef696bb6844746dd733207c0e436be713ad1eda666681a137dc141ede0440f5d",
+      "source": "ui:theme/icons/settings_gen_navigation.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_login_lock.svg": {
+      "sha256": "89bf510744936a1a6512692b30e59e2b9530b60c5381c914a5d8dc9b8fd14c4a",
+      "source": "ui:theme/icons/source_login_lock.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_switch.svg": {
+      "sha256": "045b598535fb93042437ef023c59b7a86541d6641eb00b4ca78c03ec5aeb1226",
+      "source": "ui:theme/icons/source_switch.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_v9_cloud.svg": {
+      "sha256": "027c8a09d12cb498291107595883aa7b9b781f1efd97cecd144fbcd7cea407bd",
+      "source": "ui:theme/icons/source_v9_cloud.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_v9_question.svg": {
+      "sha256": "abd067b653830c57b76d4e05d0977eaa876bb6642ddbf4c8f943c56e07bed29f",
+      "source": "ui:theme/icons/source_v9_question.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_v9_upload.svg": {
+      "sha256": "f94e36c05543543260798135dfd21e9aea03422852ee034763949a4cb4a40da6",
+      "source": "ui:theme/icons/source_v9_upload.svg"
+    },
+    "app/src/main/assets/reader_design/icons/source_v9_wave.svg": {
+      "sha256": "8bbb986a14152df870b29e30aab9522dc22e6f8656c8bf0516b69f20748bcaa2",
+      "source": "ui:theme/icons/source_v9_wave.svg"
     },
     "app/src/main/assets/reader_ebook_runtime/reader-ebook-dom.js": {
       "sha256": "013f16e5f39bda18d3aa3175bd1c16442a6130a7f80107db1211061744927f66",
@@ -58,15 +109,15 @@
       "source": "core:bindings/android/src/main/kotlin/com/reader/core/ReaderStorageProbe.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/core/generated/ReaderProtocolModels.kt": {
-      "sha256": "c9e14c87ebb1859ce7c2f0b947153ae4c5f84e7f3bace4793d5de394c5a7261c",
+      "sha256": "6c24b0467b4b6da3220b1701fee049244a91e70a5d7690fe9ffd8b0769038e95",
       "source": "core:bindings/android/generated/ReaderProtocolModels.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderDesignMetrics.kt": {
-      "sha256": "53ee73ffe85798435bd1ddbf4e1a707141a83b6486e6f256613367a2e1a2e7bd",
+      "sha256": "8a6daffaba83911aacd6777db4efd1453d23f807562de3e14b0c0e2d37c1bd17",
       "source": "ui:theme/generated/android/ReaderDesignMetrics.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderIconRegistry.kt": {
-      "sha256": "3f78b0b4a61d2401693464bdcd7cc786d21a50be18f8ab39a9b2c71c827cc180",
+      "sha256": "c09a0e1a44dc82a08e9fd825d1aeb328b8ff0bdd5d52f0e2e3e423cf08134a38",
       "source": "ui:theme/generated/android/ReaderIconRegistry.kt"
     },
     "app/src/main/kotlin/io/reader/rebuild/design/generated/ReaderThemeTokens.kt": {
@@ -99,8 +150,8 @@
     }
   },
   "pins": {
-    "core": "d81f396dbee8a2a8f12c4c03fced063d701c8e33",
-    "harmony": "4acfefc1a71f62572f653cc9a5e79162a2d347f9",
-    "ui": "1e652fcc5653a8b6f2b04560784cbee9fcfaf01c"
+    "core": "4a840493d0a39f8771adb631c3dce490a365d915",
+    "harmony": "0f3b468dcf95c3869b7f28f47cf5019a7c26b8ef",
+    "ui": "4b096fe058731afe791747007f428182784d1592"
   }
 }

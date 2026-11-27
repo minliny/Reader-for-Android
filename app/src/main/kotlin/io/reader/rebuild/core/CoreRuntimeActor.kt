@@ -16,9 +16,12 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -52,8 +55,27 @@ internal class CoreOperation<R>(
 
 internal interface HostCapabilities {
     val available: Set<ReaderHostCapability>
+    val extensions: List<String> get() = emptyList()
     /** Decode the generated host payload and return the generated completion or failure command. */
     suspend fun reply(capability: ReaderHostCapability, request: String, replyId: Long): String
+    fun discardUnsent(capability: ReaderHostCapability, reply: String) = Unit
+}
+
+internal class HostCapabilityRouter(vararg providers: HostCapabilities) : HostCapabilities {
+    private val routes = buildMap {
+        for (provider in providers) {
+            for (capability in provider.available) {
+                check(put(capability, provider) == null) { "Duplicate Host capability" }
+            }
+        }
+    }
+
+    override val available: Set<ReaderHostCapability> = routes.keys
+    override val extensions = providers.flatMap { it.extensions }.distinct().sorted()
+    override suspend fun reply(capability: ReaderHostCapability, request: String, replyId: Long): String =
+        routes.getValue(capability).reply(capability, request, replyId)
+    override fun discardUnsent(capability: ReaderHostCapability, reply: String) =
+        routes.getValue(capability).discardUnsent(capability, reply)
 }
 
 @Serializable
@@ -80,6 +102,7 @@ internal class CoreRuntimeActor private constructor(
     // Core resumes the original command on accepted host.complete/host.error. Only
     // a rejected control command has a terminal under its own request identifier.
     private val hostReplies = ConcurrentHashMap<RequestIdentity, RequestIdentity>()
+    private val hostWork = mutableMapOf<RequestIdentity, MutableMap<Long, Job>>()
     @Volatile private var closing = false
     @Volatile private var stopping = false
     private val consumer = scope.launch { consume() }
@@ -104,7 +127,10 @@ internal class CoreRuntimeActor private constructor(
     fun cancelRead(identity: RequestIdentity) = synchronized(state) {
         require(identity.runtimeId == runtimeId)
         check(!closing)
-        if (pending.containsKey(identity)) binding.cancel(identity.requestId)
+        if (pending.containsKey(identity)) {
+            binding.cancel(identity.requestId)
+            hostWork[identity]?.values?.toList()?.forEach(Job::cancel)
+        }
     }
 
     private fun consume() {
@@ -144,15 +170,19 @@ internal class CoreRuntimeActor private constructor(
                     val failure = if (event.type == "error") rejected(wire)
                         else IllegalStateException("Unexpected terminal $key")
                     binding.ackEvent(delivery)
-                    if (original != null) pending.remove(original)?.result?.completeExceptionally(failure)
+                    if (original != null) {
+                        cancelHostWork(original)
+                        pending.remove(original)?.result?.completeExceptionally(failure)
+                    }
                     else report(failure)
                 } else {
                     val settle = owner.decode(wire, event.type == "error", key)
                     binding.ackEvent(delivery)
+                    pending.remove(key, owner)
+                    cancelHostWork(key)
                     try {
                         settle()
                     } finally {
-                        pending.remove(key, owner)
                         hostReplies.entries.removeAll { it.value == key }
                     }
                 }
@@ -160,8 +190,7 @@ internal class CoreRuntimeActor private constructor(
             "host.request" -> {
                 val capability = requireNotNull(event.capability)
                 val operationId = requireNotNull(event.operationId)
-                checkNotNull(owner) { "Unowned host request $key" }
-                scope.launch { replyToHost(key, capability, operationId, wire, delivery) }
+                startHostWork(key, capability, operationId, wire, delivery)
             }
             else -> {
                 binding.ackEvent(delivery)
@@ -170,23 +199,54 @@ internal class CoreRuntimeActor private constructor(
         }
     }
 
+    private fun startHostWork(original: RequestIdentity, capability: ReaderHostCapability, operationId: Long,
+        wire: String, delivery: Long) = synchronized(state) {
+        if (!stopping) {
+            // ACK releases the event after taking ownership of its copied payload. The
+            // original RPC still owns settlement and can retire its physical work.
+            binding.ackEvent(delivery)
+            if (pending.containsKey(original)) {
+                val work = hostWork.getOrPut(original) { mutableMapOf() }
+                check(operationId !in work) { "Duplicate Host operation" }
+                val job = scope.launch(start = CoroutineStart.LAZY) { replyToHost(original, capability, operationId, wire) }
+                work[operationId] = job
+                job.invokeOnCompletion {
+                    synchronized(state) {
+                        work.remove(operationId, job)
+                        if (work.isEmpty()) hostWork.remove(original, work)
+                    }
+                }
+                job.start()
+            }
+        }
+    }
+
+    private fun cancelHostWork(original: RequestIdentity) = synchronized(state) {
+        hostWork.remove(original)?.values?.toList()?.forEach(Job::cancel)
+    }
+
     private suspend fun replyToHost(original: RequestIdentity, capability: ReaderHostCapability, operationId: Long,
-        wire: String, delivery: Long) {
+        wire: String) {
         val id = nextId.incrementAndGet()
         val completion = try {
             host.reply(capability, wire, id)
+        } catch (_: CancellationException) {
+            return
         } catch (failure: Exception) {
             ReaderM1.hostError.encode(id, HostErrorParams(operationId,
                 ReaderCoreError(ReaderErrorCode.INTERNAL, failure.message ?: "Host request failed", false)))
         }
+        var delivered = false
         try {
             synchronized(state) {
                 if (!stopping) {
-                    binding.ackEvent(delivery)
                     if (pending.containsKey(original)) {
                         val key = RequestIdentity(runtimeId, id)
                         hostReplies[key] = original
-                        try { binding.send(completion) } catch (failure: Exception) {
+                        try {
+                            binding.send(completion)
+                            delivered = true
+                        } catch (failure: Exception) {
                             hostReplies.remove(key)
                             pending.remove(original)?.result?.completeExceptionally(failure)
                             throw failure
@@ -196,6 +256,8 @@ internal class CoreRuntimeActor private constructor(
             }
         } catch (failure: Exception) {
             report(failure)
+        } finally {
+            if (!delivered) host.discardUnsent(capability, completion)
         }
     }
 
@@ -211,9 +273,14 @@ internal class CoreRuntimeActor private constructor(
         } else {
             try {
                 withTimeoutOrNull(5_000) { unsettled.joinAll() }
-                synchronized(state) { stopping = true }
+                val hostOperations = synchronized(state) {
+                    stopping = true
+                    hostWork.values.flatMap { it.values }.also { hostWork.clear() }
+                }
+                hostOperations.forEach(Job::cancel)
                 binding.close()
                 consumer.join()
+                hostOperations.joinAll()
                 scope.cancel()
                 pending.values.forEach { it.result.completeExceptionally(IllegalStateException("Core runtime closed")) }
                 pending.clear()
@@ -259,6 +326,7 @@ internal class CoreRuntimeActor private constructor(
                     opened = runtime
                     val manifest = runtime.call(ReaderM1.runtimeSetHostCapabilities, RuntimeSetHostCapabilitiesParams(
                         capabilities = host.available.sortedBy { it.wireValue }, platform = "android",
+                        extensions = host.extensions.takeUnless { it.isEmpty() },
                     ))
                     check(manifest.applied && manifest.capabilities == host.available.size.toLong() && manifest.lanes == 0L)
                     runtime

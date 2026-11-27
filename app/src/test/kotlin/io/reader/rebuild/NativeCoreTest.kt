@@ -25,7 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-private const val CORE_PIN = "d81f396dbee8a2a8f12c4c03fced063d701c8e33"
+private const val CORE_PIN = "4a840493d0a39f8771adb631c3dce490a365d915"
 private val hostFixtures get() = File(requireNotNull(System.getProperty("reader.hostFixtures")))
 private val epubFixture get() = File(requireNotNull(System.getProperty("reader.fixture")))
 private val txtFixture get() = File(hostFixtures, "local-reading.txt")
@@ -33,7 +33,7 @@ private fun source(file: File) = AuthorizedDocument(file.name, file::inputStream
 
 // The Android compile bootclasspath excludes java.lang.ProcessHandle. These tests
 // are host-only and pin the observed PID of the current JDK process via reflection.
-private fun processId(): Long {
+internal fun processId(): Long {
     val process = Class.forName("java.lang.ProcessHandle")
     return process.getMethod("pid").invoke(process.getMethod("current").invoke(null)) as Long
 }

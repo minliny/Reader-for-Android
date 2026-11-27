@@ -53,6 +53,12 @@ def main():
     ui_map = source_paths['ui']
     for name in ('ReaderThemeTokens', 'ReaderDesignMetrics', 'ReaderIconRegistry'):
         ui_map[f'theme/generated/android/{name}.kt'] = KOTLIN / f'design/generated/{name}.kt'
+    icon_paths = sorted(path for path in manifest['designInputs'] if path.startswith('theme/icons/'))
+    assert len(icon_paths) == 8
+    for path in icon_paths:
+        ui_map[path] = MAIN / 'assets/reader_design/icons' / Path(path).name
+    for name in ('NotoSansSC-VF.otf', 'NotoSerifSC-Regular.ttf', 'OFL.txt'):
+        ui_map[f'fonts/{name}'] = MAIN / 'assets/reader_design/fonts' / name
     for path in manifest['productionResources']:
         ui_map[path] = MAIN / 'assets' / path
     for path in manifest['testResources']:
@@ -95,9 +101,10 @@ def main():
         data = b''.join(lines[start:start + 800])
         outputs[str(target)] = {'source': f'core:{storage_fixture}[part {number}]', 'sha256': sha(data)}
         update(target, data)
-    runtime = MAIN / 'assets/reader_ebook_runtime'
-    actual_resources = {str(path.relative_to(ROOT)) for path in (ROOT / runtime).glob('**/*') if path.is_file()}
-    assert actual_resources == {p for p in outputs if p.startswith(str(runtime) + '/')}, actual_resources
+    for folder in ('reader_ebook_runtime', 'reader_design'):
+        asset_path = MAIN / 'assets' / folder
+        actual_resources = {str(path.relative_to(ROOT)) for path in (ROOT / asset_path).glob('**/*') if path.is_file()}
+        assert actual_resources == {p for p in outputs if p.startswith(str(asset_path) + '/')}, actual_resources
     metadata = {'pins': pins, 'harmonyPairedCore': json.loads(harmony_dependency)['coreCommit'],
                 'inputs': inputs, 'outputs': outputs}
     update(Path('pinned-inputs.sha256.json'), (json.dumps(metadata, sort_keys=True, indent=2) + '\n').encode())
