@@ -235,7 +235,7 @@ class NativeM3SpeechTest {
             override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
 
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
-                check(chain.any { it.issuerX500Principal == chain.last().subjectX500Principal || it.encoded.contentEquals(expected) })
+                check(chain.any { it.encoded.contentEquals(expected) })
             }
         }
         val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
