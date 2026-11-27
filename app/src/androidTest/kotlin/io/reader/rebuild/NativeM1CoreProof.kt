@@ -37,7 +37,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 internal object NativeM1CoreProof {
     const val EPUB_SHA = "35efc3246026578c8f56ea227964bb05a5d7cd8d49ee0f7794221f9ab3a4481e"
-    const val CORE_PIN = "fa536a10c31ab5a35df2e2c1c1fbf70ebf3e1be9"
+    const val CORE_PIN = "d81f396dbee8a2a8f12c4c03fced063d701c8e33"
     const val LAYOUT = "reader-sqlite-47-remote"
     const val OTHER_SOURCE = "fixture-second-source"
     const val OTHER_CHAPTER = 3L
