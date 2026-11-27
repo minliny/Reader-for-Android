@@ -128,7 +128,12 @@ class NativeM3SpeechTest {
                 "$origin/wave3.wav?q={{text}}&rate={{rate}}", readerProfile = """{"version":1,"format":"wav"}"""))
             val chapter = chapter("wave3-http", "Audio fixture.")
             coordinator.start(chapter, "Native HTTPS speech", 0, ReaderSpeechEngine.Http(3), ratePercent = 125)
-            val highlight = awaitValue { coordinator.highlight.value }
+            val highlight = try {
+                awaitValue { coordinator.highlight.value }
+            } catch (failure: Throwable) {
+                println("ANDROID_M3_HTTP_DIAGNOSTIC failure=${coordinator.failure.value} snapshot=${coordinator.snapshot.value} requests=$received")
+                throw failure
+            }
             check(highlight.start == 0L && highlight.endExclusive == 14L)
             check(received.toList() == listOf("1.25"))
             connect().use { controller ->

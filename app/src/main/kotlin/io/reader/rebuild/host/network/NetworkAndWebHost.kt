@@ -1,6 +1,7 @@
 package io.reader.rebuild.host.network
 
 import android.content.Context
+import android.util.Log
 import com.reader.core.protocol.M2CookieGetCompleteParams
 import com.reader.core.protocol.M2CookieSetCompleteParams
 import com.reader.core.protocol.M2HostCookieGetRequest
@@ -112,6 +113,7 @@ internal class NetworkAndWebHost(
         return try {
             reply.reply(request, replyId, assets)
         } catch (failure: Exception) {
+            Log.e("ReaderM3", "manga resource host operation failed", failure)
             if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
             ReaderM2.hostError.encode(replyId, NetworkHostFailure.classified(failure).reply(assets.operationId))
         }

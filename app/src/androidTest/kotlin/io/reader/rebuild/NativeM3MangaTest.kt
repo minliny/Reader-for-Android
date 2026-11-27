@@ -96,7 +96,13 @@ class NativeM3MangaTest {
             } finally { fixture("/test/online") }
             reader.page(window, page, 48).use { frame ->
                 check(frame.page.pageId == page.pageId)
-                val image = frame.content as MangaPageFrame.Content.Image
+                val image = frame.content as? MangaPageFrame.Content.Image
+                    ?: run {
+                        val cause = (frame.content as MangaPageFrame.Content.Unavailable).cause
+                        val details = (cause as? CoreRejected)?.detail
+                        println("ANDROID_M3_MANGA_DIAGNOSTIC onlineUnavailable=$cause error=${details?.code} reason=${details?.details?.reason} host=${details?.details?.host}")
+                        error("online image decode unavailable: $cause")
+                    }
                 val tiles = image.tiles
                 check(tiles.encodedWidth == 96 && tiles.encodedHeight == 22000 && tiles.sampleSize == 2)
                 check(tiles.originalPoint(x, y) == (x to y))

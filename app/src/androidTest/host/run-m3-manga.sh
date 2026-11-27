@@ -42,7 +42,7 @@ phase() {
         /usr/bin/time -p "$adb" -s "$serial" shell am instrument -w -r -e readerM3MangaPort "$port" \
             -e readerM3MangaRun "$run" -e class "$class#$method" "$runner"
     ) 2>&1 | tee "$evidence/$name.log" || status=$?
-    "$adb" -s "$serial" shell "logcat -d -T '$since' -v threadtime -s System.out:I AndroidRuntime:E" > "$evidence/$name-logcat.log"
+    "$adb" -s "$serial" shell "logcat -d -T '$since' -v threadtime -s System.out:I AndroidRuntime:E ReaderM3:E" > "$evidence/$name-logcat.log"
     grep 'M3_ANDROID_MANGA_' "$evidence/$name-logcat.log" | tee "$evidence/$name-markers.log" || true
     [[ "$status" = 0 ]]
     grep -Fxq 'OK (1 test)' "$evidence/$name.log"

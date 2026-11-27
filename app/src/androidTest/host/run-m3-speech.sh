@@ -39,10 +39,11 @@ openssl req -new -newkey rsa:2048 -nodes -config "$private/fixture.cnf" \
   -keyout "$private/server.key" -out "$private/server.csr" > /dev/null 2>&1
 openssl x509 -req -in "$private/server.csr" -CA "$private/root.pem" -CAkey "$private/root.key" -CAcreateserial \
   -days 2 -sha256 -extfile "$private/fixture.cnf" -extensions server -out "$private/server.pem" > /dev/null 2>&1
+cat "$private/server.pem" "$private/root.pem" > "$private/server-chain.pem"
 openssl verify -CAfile "$private/root.pem" -purpose sslserver "$private/server.pem" > "$evidence/tls-verify.log"
 openssl x509 -in "$private/root.pem" -outform der -out "$private/root.der"
 fixture="$(cd "$(dirname "$0")" && pwd)/m3_speech_fixture.py"
-python3 "$fixture" --port-file "$evidence/port.txt" --certificate "$private/server.pem" --key "$private/server.key" \
+python3 "$fixture" --port-file "$evidence/port.txt" --certificate "$private/server-chain.pem" --key "$private/server.key" \
   > "$evidence/https.log" 2>&1 &
 server=$!
 for unused in {1..60}; do

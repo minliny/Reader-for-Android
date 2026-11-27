@@ -31,15 +31,18 @@ internal class MangaResourceTransfer(
 ) {
     suspend fun reply(wire: String, replyId: Long, assets: CoreMangaAssets): String {
         val request = ReaderProtocolJson.decodeFromString<M3MangaResourceTransferHostRequest>(wire)
-        check(request.protocolVersion == 1L && request.requestId == assets.request.requestId &&
-            request.operationId == assets.operationId)
+        check(request.protocolVersion == 1L && request.requestId == assets.request.requestId)
         val id = request.operationId
         return when (val params = request.params) {
-            is M3MangaTransferInput -> ReaderM3.hostCompleteMangaTransferInput.encode(replyId,
-                M3MangaTransferInputCompleteParams(id, fetchInput(params, assets)))
+            is M3MangaTransferInput -> {
+                check(request.operationId == assets.operationId)
+                ReaderM3.hostCompleteMangaTransferInput.encode(replyId,
+                    M3MangaTransferInputCompleteParams(id, fetchInput(params, assets)))
+            }
             is M3MangaTransferOutput -> ReaderM3.hostCompleteMangaTransferOutput.encode(replyId,
                 M3MangaTransferOutputCompleteParams(id, consumeOutput(params, assets)))
             is M3MangaTransferInspectInput -> {
+                check(request.operationId == assets.operationId)
                 require(params.bytes in 1..params.maxBytes.wireValue)
                 val image = store.inspection(params.transferId, params.bytes, params.sha256)
                 check(image.file.sha256() == image.sha256) { "Manga inspection file changed" }
@@ -109,7 +112,6 @@ internal class MangaResourceTransfer(
 
     private suspend fun consumeOutput(params: M3MangaTransferOutput, assets: CoreMangaAssets):
         M3MangaTransferOutputReceipt {
-        check(params.operationId == assets.operationId)
         val transformLimit = 8L * CoreMangaAssets.CHUNK_LIMIT
         val file = store.prepareOutput(params.transferId, params.bytes, if (params.graphicsPlan != null) transformLimit else 0)
         var released = false
@@ -120,15 +122,14 @@ internal class MangaResourceTransfer(
                 while (offset < params.bytes) {
                     currentCoroutineContext().ensureActive()
                     val limit = minOf(params.bytes - offset, CoreMangaAssets.CHUNK_LIMIT.toLong()).toInt()
-                    val chunk = assets.read(params.assetId, offset, limit)
+                    val chunk = assets.read(params.operationId, params.assetId, offset, limit)
                     check(chunk.size == limit)
                     output.write(chunk)
                     offset += chunk.size
                     chunks++
                 }
             }
-            check(assets.read(params.assetId, offset, 1).isEmpty())
-            assets.release(params.assetId)
+            assets.release(params.operationId, params.assetId)
             released = true
             params.graphicsPlan?.let { plan -> applyMangaGraphicsPlan(file, plan, transformLimit) }
             val amount = file.length()
@@ -136,7 +137,7 @@ internal class MangaResourceTransfer(
             return M3MangaTransferOutputReceipt(true, params.assetId, params.bytes,
                 amount.takeIf { params.graphicsPlan != null })
         } catch (error: Throwable) {
-            if (!released) runCatching { assets.release(params.assetId) }
+            if (!released) runCatching { assets.release(params.operationId, params.assetId) }
             store.discard(params.transferId)
             throw error
         }
