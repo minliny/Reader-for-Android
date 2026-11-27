@@ -37,3 +37,10 @@ CI 的 `retired-inputs`、`workflow-lint`、`secrets` 各自独立手动选择�
 - 当前源码缺 `ReaderTheme`、`BookComponents.kt`、`SearchAdapterShell.kt`、`BookDetailAdapterShell.kt` 和 `booksource/SourceManagementUiState.kt` 等前提。相应源码/API 断言仍保留，缺失不会因退役而被掩盖。
 - `ReaderRouteHost` 的 `onSwitchSource` 当前仅返回上一页。真实 Core 换源、阅读位置保留、Compose 点击次数及迟到回调隔离尚无执行证据。
 - 源码输入迁移完成、准入检查通过、JUnit 执行、产品行为和用户验收分别记账。私有本次结果保存在隔离工作区 `.reader-artifacts/android-input-migration-20261021/`。
+
+## 2026-11-27 遗留生产树退役
+
+- 删除 `app/src/main/kotlin/com`（80 个文件）与未被退役登记绑定的 `app/src/test/kotlin/com` 测试（58 个文件），合计 138 个文件 / 30,109 行。依据：Gradle `sourceSets` 从未编译该树，`io/reader/android` 已承接全部生产入口，仓库内除该树自身的路径断言外无任何引用。
+- 保留 `ReaderIconTokenMappingTest.kt`、`ReaderSharedComponentsStructureTest.kt`、`AndroidComposeSourceCoverageTest.kt` 三个文件原位：它们是 `tools/design-input-retirement.json` 中 13 个 RETAIN/MIGRATE 方法的 `currentPath`，删除会使 `check-design-inputs.py --case retired-inputs` 失去保留声明。
+- 这三个文件仍不在任何 `sourceSets` 内，不参与编译；`ReaderIconTokenMappingTest` 对已删除的 `com.reader.android.ui.appScreens` 的 import 因此失效，属已知残留，需人工决定是迁移到 `io/reader/android` 测试源集还是移入 `tools/` 证据目录。
+- 删除后复跑 `python3 .github/scripts/check-design-inputs.py --case retired-inputs`：PASS。
