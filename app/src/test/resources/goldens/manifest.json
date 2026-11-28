@@ -40,8 +40,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "ac49c2b3b8b8ba816b03ce23aee4c41306209b2e250431ea4cd3f5469620b1ed",
-            "pngSHA256": "eda4ba5eb557f2b1d6ef6cf330cfeab26d88519313f465e0d0c7483e925b19cb"
+            "pixelSHA256": "732d78d57e4d97f2f423c18ba3796dd5005a0a9c85694934ac94be0771cd2874",
+            "pngSHA256": "5b4ac8b4812c8e780e3ab12636d0674a439e21d6fbf7f419e0ea7931389d53ab"
         },
         {
             "id": "message-confirmation",
@@ -76,8 +76,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "3f3fb60a4233832c9104468a26b4d69ca1bccff567ee59ac75f14afac6d6c070",
-            "pngSHA256": "6890db3db6886715f4748131818596ee1e60e31d6b508fd8f2c656a1a51ceb9c"
+            "pixelSHA256": "0acc9fe14324b91561273fa8a0517e172c4a4f5bdcf0b1774d1beee01378ef20",
+            "pngSHA256": "940ee92017c6fda68362ec82b7e87187747135833899e1cd08314d1335d4583c"
         },
         {
             "id": "shelf-night",
@@ -88,8 +88,8 @@
             "fontScale": 1.0,
             "theme": "night",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "fc14a6435cd49789e385aa9fba7f8625a5317ee6439a5f6cf760d595caaa8eee",
-            "pngSHA256": "7a057e92b506f383506a0c6a302c8e02f375c92a8dda279ce90ad8433f77be60"
+            "pixelSHA256": "69594d69804800acf7558ea11c8b283880c7faaa271d75fec3e23c4e9b9cdfe6",
+            "pngSHA256": "96a7176b6e07d21c1fb74376bb30e276774c865e46c21450c2221105cee68427"
         },
         {
             "id": "shelf-empty",
@@ -100,8 +100,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "49f51c111b4f87ab71a243acbe827d9f302c6a7d930d3e2b97975ffb808c95df",
-            "pngSHA256": "a3e91c1887d6bf0077f29b260d0170a0589468bca8059bc91f682402d1d0013c"
+            "pixelSHA256": "bc81271fc0dfdeef7ff7da918143d3672d3b29abb2debbcd7683bcc067efc6ee",
+            "pngSHA256": "4d024f595f08bd27341d773436c86816bb44d59debcfe04fdde51bbda60e7d00"
         },
         {
             "id": "shelf-recovery",
@@ -112,8 +112,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "a923d3c4ca856c2a3de4594246d45095017abeb70408771138b2b0fa45987c4f",
-            "pngSHA256": "82bbf63bce80f37c1254131d4916050ee57338177ac9033d2dba089a4da1b8c2"
+            "pixelSHA256": "e5f81685cfcaa469aa9340915b9df49a42eebf5967ff5ec7de0dccdfb052449b",
+            "pngSHA256": "9477a97de599f0fd64411a78952e4c976c045361e4cf1961f05a9a2e27c9c560"
         },
         {
             "id": "shelf-narrow-large",
@@ -124,8 +124,8 @@
             "fontScale": 1.4,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "92d7bf88d08bdcf5ad721bb3d1fe6a189a590a67119950e0e3c7b7806aac08a8",
-            "pngSHA256": "a736846bd01042b4762eb2d0385d6b372a308f3d386079770ed69c5d32e209c3"
+            "pixelSHA256": "3cbfbc190feacd01c43a62c628afa921b413ed38ffbe9159fe7e42d39bc8b48b",
+            "pngSHA256": "fba61b11122f9451587bd7c7dfb23bde8a437747688d0adacd9a727db61cdf1b"
         },
         {
             "id": "shelf-wide",
@@ -136,8 +136,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "875977caf1db8ae7dc468547359991b42485e73b705240368693ba6e6ea2816f",
-            "pngSHA256": "6ef380def8bba136ca52c79290b900ed946408b36c88c1c3c7e17c59a0429712"
+            "pixelSHA256": "a65ed87894b008ee6355df874438b9434a748cec5df039845e45d67eb57b4f0e",
+            "pngSHA256": "dba31b2767d28c556b2be46a103340809074d23c3afabd39a4f787869608cf07"
         },
         {
             "id": "shelf-cover-grid",
@@ -148,8 +148,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "6224a1c6dfc73d8b93f6015c9ab19f8c9a5ad19e1dded14ef9995097399498ba",
-            "pngSHA256": "a678d58016e633819e25638f0fc01c575b1d51d28fdf6f0636b89827d8cf29b0"
+            "pixelSHA256": "401180ae53be93b841be7ea8ba7e24f8fc4e78989104257920f3fb3d02466a4c",
+            "pngSHA256": "d9b3c0e40113a7f8e5f520fe49c49644177f96aae4aae160e4cde8e4d6bfc02b"
         },
         {
             "id": "shelf-more-sheet",
@@ -172,8 +172,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "50206caf6706f0e207fb31ac0a94b9c7c6ceb904d7f4afbd5c2ab2beb610e1a9",
-            "pngSHA256": "4b3d3327e508820895889f73cbc4813887c4570a21271c3a714917016475197e"
+            "pixelSHA256": "0d9e5c411e5b240b7462007df48814faf8028122f6f967a47fa5b4200ccc3cc4",
+            "pngSHA256": "b210b072da2597f01fcb5beb9e0d0be9eb6b4d3fabc1ab67d8ea4f0bf1d972a9"
         },
         {
             "id": "book-directory",
@@ -220,8 +220,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "54a1fee91b7a3784fde538f7eccf20ba17b2685df07ad14dea3634a365cd40e4",
-            "pngSHA256": "90d33b90131aa48329b2df2eb88b786bb9677bf4c0097ff9e9471fa1166a187d"
+            "pixelSHA256": "f2e379ff3bbbf1af69224fd8095297ed8b26b785c6abe09556b5ff6eb4170cf1",
+            "pngSHA256": "6ce512368e1d72858528162345cd59c72787eaff0ee7432e43b0a83db4b12c02"
         },
         {
             "id": "reader-full",
@@ -256,8 +256,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "8718be47dc5104e7b58b147713398f317ce492b2cc771560dc2a19e0b612c980",
-            "pngSHA256": "f72f6d6899386ee60339768dc06312c42fdb38badf7a5c5b3903ea32c148ae2e"
+            "pixelSHA256": "3b1f3ac0ce295a325a0fd41ceeacb7cad4044ce5b18bea4d127f21333b227867",
+            "pngSHA256": "f38e790d433771524b1200caa1e4a4e96599e15dfda970f3976a9d4e5cd009d9"
         },
         {
             "id": "m2-online-detail",
@@ -268,8 +268,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "7b4e766d89431d833c54f415c24ded5d1576e11dfe1830f97599f69bcdfa159c",
-            "pngSHA256": "1807640ff0465caa41f48106ff69c507b7076ceef85104021096e12c738769c2"
+            "pixelSHA256": "4337921a3d2bb69cd3ff97134cd7d80c61e76d5457896a08d16af0bb6549b007",
+            "pngSHA256": "d12eeda0d87f9d43b4f6f243f5a0ca173536475ad74f859f775d6e683731f5c8"
         },
         {
             "id": "m2-source-switch",
@@ -292,8 +292,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "00de3a048976cd13a727cc194f9d00855ad3acd2e892abeb20327a08227251f8",
-            "pngSHA256": "8901e31cc0482ff56ed56eba360d99c5a8fa4589a528634daae730864098be52"
+            "pixelSHA256": "ebe69d9d8dccd5781829593df52c8ee284f0644a07fad00d0ce43565be4c192d",
+            "pngSHA256": "84d9839c72f71e8360004fbcd07cba70f11f2a90c8c07b8b0344901bf21335c4"
         },
         {
             "id": "m2-source-management",
