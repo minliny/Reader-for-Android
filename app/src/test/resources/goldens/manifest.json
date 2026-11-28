@@ -100,8 +100,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "8893841ac4a6eab9a41e6d0c07bac8989b81d747c08da497d8b971c5eca29d5c",
-            "pngSHA256": "eb8fd769f8a99deed18a3c71cf42ce33a06950e72ccd65742a07a5db11f6fbd5"
+            "pixelSHA256": "49f51c111b4f87ab71a243acbe827d9f302c6a7d930d3e2b97975ffb808c95df",
+            "pngSHA256": "a3e91c1887d6bf0077f29b260d0170a0589468bca8059bc91f682402d1d0013c"
         },
         {
             "id": "shelf-recovery",
@@ -136,8 +136,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "0f346a45b48c8d76bf624eef204c798503e919e25c08e7bfdbb6f61c61d4d957",
-            "pngSHA256": "048a0ee078e53fdadf4d28190aec9cb6e568f8c77d711521a11d5ca6722137a6"
+            "pixelSHA256": "875977caf1db8ae7dc468547359991b42485e73b705240368693ba6e6ea2816f",
+            "pngSHA256": "6ef380def8bba136ca52c79290b900ed946408b36c88c1c3c7e17c59a0429712"
         },
         {
             "id": "shelf-cover-grid",
@@ -160,8 +160,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "303dc09e975bd24b4ea189561032d568ebab9138ee1883895fbf263adf7a2428",
-            "pngSHA256": "d7b380d24fe8f09c55d153a0fedfbe0e8ceac824991b7e026c2876d3db6c3d79"
+            "pixelSHA256": "5d32f6345d3e4fcbd8763d253188eef3a1aa6e56d103d808362968825e40c62c",
+            "pngSHA256": "10774eba82201d72e1f2f0ecd1e92feb2eb07d523b7875df580660100473410f"
         },
         {
             "id": "book-detail",
@@ -172,8 +172,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "6f0c7934775545d7793596b26517b26b0e36a45c4a577e3e193d7aaa0d994b69",
-            "pngSHA256": "19f14bfcaef915e28ea6542842c0c195db7fa7ba789912cc820b99d55812109c"
+            "pixelSHA256": "50206caf6706f0e207fb31ac0a94b9c7c6ceb904d7f4afbd5c2ab2beb610e1a9",
+            "pngSHA256": "4b3d3327e508820895889f73cbc4813887c4570a21271c3a714917016475197e"
         },
         {
             "id": "book-directory",
@@ -220,8 +220,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "9fe9aa1ad44cb46f5fe70e66bb3dde3a6e7d0feeac87357bdb2f9f2395ccee76",
-            "pngSHA256": "05560888604b1dc7f00840bac82eed9fa872adfa5215561267917eae4061432e"
+            "pixelSHA256": "54a1fee91b7a3784fde538f7eccf20ba17b2685df07ad14dea3634a365cd40e4",
+            "pngSHA256": "90d33b90131aa48329b2df2eb88b786bb9677bf4c0097ff9e9471fa1166a187d"
         },
         {
             "id": "reader-full",
@@ -232,8 +232,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "2b7cdd0834a913f8c1cc875d17215b0b2c129090a62d5ae94f83da91525d5173",
-            "pngSHA256": "8aafaf5544c71961225c8e23e45677fb66be2e2adeb716d48da58fd36694a8f1"
+            "pixelSHA256": "2a93eaf9ded5f75cf5d7ca3ff34e73b5b737ff0577787562ead7ea6c3f41fb85",
+            "pngSHA256": "00d281fa3124c31b00dab6491f7ba6ec70ddaf765fab9dcb6fdf5263f7a42a87"
         },
         {
             "id": "reader-light-status",
@@ -268,8 +268,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "e74da2f56b68e3d2e4c1077f8b42d647e254b2281aec1055afb3d52042805be9",
-            "pngSHA256": "821bbd7eb046290347b34e57fe423ddf8d1130fdb167575db5979d7d34d17ff5"
+            "pixelSHA256": "7b4e766d89431d833c54f415c24ded5d1576e11dfe1830f97599f69bcdfa159c",
+            "pngSHA256": "1807640ff0465caa41f48106ff69c507b7076ceef85104021096e12c738769c2"
         },
         {
             "id": "m2-source-switch",
