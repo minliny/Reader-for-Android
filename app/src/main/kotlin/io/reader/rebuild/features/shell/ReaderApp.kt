@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.reader.core.protocol.BookshelfEntryData
@@ -246,6 +247,10 @@ private fun ReaderProduct(
                 }
             }
         }, Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+            val wideShell = maxWidth >= ReaderDesignMetrics.wideBreakpoint.dp
+            val mainDestination = if (route?.page == Destination.Settings) MainDestination.Settings else MainDestination.Shelf
+            val showMainNavigation = route == null || route?.page == Destination.Settings
             ReaderRouteMotion(route?.id, navigation.popping) {
                 val destination = route?.page
                 if (destination is Destination.Read) key(route.id) {
@@ -258,15 +263,21 @@ private fun ReaderProduct(
                             selected = it
                             shelfGeneration++
                         }, speech = session.speech)
-                } else Column(Modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
+                } else Column(
+                    Modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(start = if (showMainNavigation && wideShell) 94.dp else 0.dp,
+                            bottom = if (showMainNavigation && !wideShell) 94.dp else 0.dp),
+                ) {
                     if (destination == null) {
                         ReaderTopBar("书架") {
                             ReaderAction(ReaderIconRegistry.search, "全局搜索", { navigate(Destination.Search) })
-                            ReaderAction(ReaderIconRegistry.add, "导入本地书籍", ::importBook, enabled = !importRunning)
                             ReaderHomeMenu(
                                 onSources = { navigate(Destination.Sources) },
                                 onDownloads = { navigate(Destination.Downloads()) },
                                 onSettings = { navigate(Destination.Settings) },
+                                onImport = ::importBook,
+                                onCheckUpdates = { feedback("updates", "当前仅支持已准入书源更新") },
+                                onShelfData = { feedback("shelf-data", "书架数据管理将在本地备份恢复准入后开放") },
                             )
                         }
                         if (importRunning) ReaderTaskProgress(ReaderTaskProgressState("正在导入所选文件", 0, 0, 1, 0))
@@ -282,7 +293,7 @@ private fun ReaderProduct(
                                 { BookDetailScreen(book, session.shelf, session.online,
                                     { value, directory, sources -> navigate(Destination.Read(value, directory, sources)) },
                                     { navigate(Destination.Downloads(it)) }, { shelfGeneration++ }, ::feedback) }
-                            })
+                            }, onImport = ::importBook, onSearch = { navigate(Destination.Search) })
                         }
                     } else saved.SaveableStateProvider(checkNotNull(route).id) {
                         if (destination != Destination.Sources) ReaderTopBar(when (destination) {
@@ -307,6 +318,20 @@ private fun ReaderProduct(
                         }
                     }
                 }
+            }
+            if (showMainNavigation) {
+                Box(Modifier.fillMaxSize(), contentAlignment = if (wideShell) Alignment.CenterStart else Alignment.BottomCenter) {
+                    ReaderBottomNavigation(mainDestination, wideShell,
+                        onSelect = { destination ->
+                            if (destination == MainDestination.Settings && route == null) navigate(Destination.Settings)
+                            else if (destination == MainDestination.Shelf && route?.page == Destination.Settings) back()
+                        },
+                        onSelectedTap = { destination ->
+                            if (destination == MainDestination.Shelf && route == null) shelfGeneration++
+                            if (destination == MainDestination.Settings && route?.page == Destination.Settings) { /* keep settings at top */ }
+                        })
+                }
+            }
             }
         }
     }

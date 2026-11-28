@@ -76,6 +76,14 @@ internal fun localGoldenScenes() = listOf(
     AndroidGoldenScene("shelf-wide", "宽屏书架与详情分栏", "书架选中山间晚读", width = 820, height = 650) {
         GoldenShelf(localBooks, side = { BookDetailContent(localBook, inShelf = true) })
     },
+    AndroidGoldenScene("shelf-cover-grid", "书架封面网格", "山间晚读 TXT；旅人手记 EPUB") {
+        GoldenShelf(localBooks, cover = true)
+    },
+    AndroidGoldenScene("shelf-more-sheet", "书架操作底部 Sheet", "批量管理、本地导入、检查更新、下载管理、书架设置、书架数据管理", dialog = true) {
+        GoldenPage("书架") {
+            ReaderHomeMenu({}, {}, {}, initialOpen = true)
+        }
+    },
     AndroidGoldenScene("book-detail", "本地书详情", "山间晚读；林江；TXT") {
         GoldenPage("书籍详情") { BookDetailContent(localBook, inShelf = true) }
     },
@@ -101,14 +109,14 @@ internal fun localGoldenScenes() = listOf(
 )
 
 @Composable
-private fun GoldenShelf(books: List<BookshelfEntryData>, side: (@Composable () -> Unit)? = null) {
+private fun GoldenShelf(books: List<BookshelfEntryData>, side: (@Composable () -> Unit)? = null, cover: Boolean = false) {
     Column(Modifier.fillMaxSize()) {
         ReaderTopBar("书架") {
             ReaderAction(ReaderIconRegistry.search, "全局搜索", {})
             ReaderAction(ReaderIconRegistry.add, "导入本地书籍", {})
             ReaderHomeMenu({}, {}, {})
         }
-        BookshelfContent(books, side = side)
+        BookshelfContent(books, side = side, initialCover = cover)
     }
 }
 

@@ -76,8 +76,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "955272ce2e360a76e832dcd87e2f8b848da07c76938998b409b6eb9df1d1c68d",
-            "pngSHA256": "af852699ce0a417ca79059e71dfddfecc0160a337eba54e64a828b69b51ab390"
+            "pixelSHA256": "93f86a082cb6d6203c508c6026c909493acf348a0468f6e99fc6fd68d6bbe37f",
+            "pngSHA256": "1e4296bdec19d4b2cea96dfc9be081655eb447df79ed82dc178a0b4c88e806fb"
         },
         {
             "id": "shelf-night",
@@ -88,8 +88,8 @@
             "fontScale": 1.0,
             "theme": "night",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "5c1330bd6ad822cf4d6da5d206a4ec2906066dccd8d7977328b0343ddbd8a5ef",
-            "pngSHA256": "1938dc210aca914bf3770d1925c6e413c9dffb5817460f8443c317d5a51ba533"
+            "pixelSHA256": "10d9ab5d2d21a4dfe08c713ac2be25cfdf63df28d64e4f22e1cba86cef9ca8f6",
+            "pngSHA256": "8f9452c5448c5fcc3296df1e97939deae4768560414510e56640f0e870a4f5c1"
         },
         {
             "id": "shelf-empty",
@@ -100,8 +100,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "f30d0e49d19c1389f69659f0e59ba1e6bdd39b41bdde26398dee23c7a176d833",
-            "pngSHA256": "1d5c14b2a77b9301514a669de78098c24e76c9431c8269507f859ca29c0d8db2"
+            "pixelSHA256": "9b62fac88afba79071401e38e63ef07dd34e21e561df69fc8825ac0d91275a22",
+            "pngSHA256": "28f1d52439aae03b8f9d24e667c436bbc316aa695282b215e715c91cd093f9d6"
         },
         {
             "id": "shelf-recovery",
@@ -112,8 +112,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "42ca2deb6f8f3660b709741f7508ad42c141eb0593d7e5ed37096101db08fdf4",
-            "pngSHA256": "5f0d986d6641517053faa59bddc094df503749eeef3a07af2bb6a6f043cc9d43"
+            "pixelSHA256": "a923d3c4ca856c2a3de4594246d45095017abeb70408771138b2b0fa45987c4f",
+            "pngSHA256": "82bbf63bce80f37c1254131d4916050ee57338177ac9033d2dba089a4da1b8c2"
         },
         {
             "id": "shelf-narrow-large",
@@ -124,8 +124,8 @@
             "fontScale": 1.4,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "bfa0890e77945385c26e16295d1256de18e4d948c469c678582f30a6de1834b7",
-            "pngSHA256": "ce8b7de124c3227439f6f907e90cd2a1239d48623160c5c9a43ab79ab3e47922"
+            "pixelSHA256": "897510a4e4e9c5cff29c3bcb6348b36f621400834a5f06dc58f6b4d75b4bcd58",
+            "pngSHA256": "2d10d3c755b74f7d1a3ab5b92af61a0c04edd830af6c3dc221b37287248c6b5e"
         },
         {
             "id": "shelf-wide",
@@ -136,8 +136,32 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "ca5083d6bb85bd9b03d7654fad9de767cb8d0d7cc75761b72dc9ea246931a8aa",
-            "pngSHA256": "628437ccb02b494b842df5acb210b9081b200e2dd862d34c51a0803268e6832a"
+            "pixelSHA256": "28127c4484cb02fdc4d45954db7402e53271b5c9587ab2abdb24aa3e6bdaea23",
+            "pngSHA256": "873fb2c31a3f235fa70351bd14488f22af78563dd0834061943f4c0081fd2e89"
+        },
+        {
+            "id": "shelf-cover-grid",
+            "referenceState": "书架封面网格",
+            "sample": "山间晚读 TXT；旅人手记 EPUB",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "34e9baf77b2e79dfcb694879a79ebe88282a6bf40468742af4d296df2d252342",
+            "pngSHA256": "f8a91100d4ca187c739cc416f6df07aa615f7fc905d440502f6ccfc31fdad04b"
+        },
+        {
+            "id": "shelf-more-sheet",
+            "referenceState": "书架操作底部 Sheet",
+            "sample": "批量管理、本地导入、检查更新、下载管理、书架设置、书架数据管理",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "303dc09e975bd24b4ea189561032d568ebab9138ee1883895fbf263adf7a2428",
+            "pngSHA256": "d7b380d24fe8f09c55d153a0fedfbe0e8ceac824991b7e026c2876d3db6c3d79"
         },
         {
             "id": "book-detail",
@@ -148,8 +172,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "a27f05212ad107048dd21c1c851c018cd9057d055c80ebafb7cbcf631f078a9c",
-            "pngSHA256": "08ce839842297940f166cda57f0bb0b973b6e55d9618afdda19d46b1520a3391"
+            "pixelSHA256": "6f0c7934775545d7793596b26517b26b0e36a45c4a577e3e193d7aaa0d994b69",
+            "pngSHA256": "19f14bfcaef915e28ea6542842c0c195db7fa7ba789912cc820b99d55812109c"
         },
         {
             "id": "book-directory",
@@ -160,8 +184,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "efea1dc268074746c244ac666a39f29cb69f2d6549d553124b6495c2e6c8125e",
-            "pngSHA256": "9655d68f8d6c1c4b87042b582835e93eae984076cfd23f6c6fb0ecbc1da1dba9"
+            "pixelSHA256": "9ef53b87b3870298e2c0ce1df62420d26d8f560ddc7ce2743c8625ebd82f046e",
+            "pngSHA256": "66c627e43750d5f9e856f1fdf3a6963b7e0b66b52c4828f6cf655e136e93f757"
         },
         {
             "id": "reader-light",
@@ -244,8 +268,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "536ca9ad8a701c7dd80a8ff0f15ce3272a4ce000aaed91ed5c774d53fb8105c8",
-            "pngSHA256": "af6126fa527db06e89c372879bcea2d223e3b01e8a380abc6e0eabc504806a75"
+            "pixelSHA256": "e74da2f56b68e3d2e4c1077f8b42d647e254b2281aec1055afb3d52042805be9",
+            "pngSHA256": "821bbd7eb046290347b34e57fe423ddf8d1130fdb167575db5979d7d34d17ff5"
         },
         {
             "id": "m2-source-switch",
