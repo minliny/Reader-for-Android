@@ -22,7 +22,8 @@ internal data class BookReference(
 ) {
     val local get() = sourceId == "local"
     val key get() = BookshelfGetParams(sourceId, bookId)
-    val displaySource get() = sourceName?.takeIf(String::isNotBlank) ?: if (local) "本地书籍" else sourceId
+    val displaySource get() = sourceName?.takeIf(String::isNotBlank)?.let(::cleanDisplaySourceName)
+        ?: if (local) "本地书籍" else sourceId
     val detailParams get() = M2BookDetailParams(
         sourceId = sourceId,
         book = M2BookDetailBookInput(bookId, title, author, coverUrl, intro, kind, lastChapter, variables),
@@ -39,4 +40,41 @@ internal data class BookReference(
         BookReference(detail.sourceId, bookId, title, author, coverUrl, intro, lastChapter,
             this@BookReference.sourceName, kind, detail.variables ?: this@BookReference.variables, detail.tocUrl ?: tocUrl)
     }
+}
+
+private fun isLeadingDecorativeCodePoint(cp: Int): Boolean =
+    cp in 0x1F000..0x1FAFF ||
+        cp in 0x2600..0x27BF ||
+        cp in 0x2300..0x23FF ||
+        cp in 0x25A0..0x25FF ||
+        cp in 0x2B00..0x2BFF ||
+        cp in 0xFE00..0xFE0F ||
+        cp == 0x200D ||
+        cp == 0x20E3 ||
+        cp in 0xE0020..0xE007F
+
+private fun isTrailingPrefixSeparator(cp: Int): Boolean =
+    cp <= 0x20 || cp == 0x3000 || cp == 0x00B7 || cp == 0x2022 || cp == 0x007C
+
+private fun cleanDisplaySourceName(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return ""
+    var index = 0
+    var strippedDecorative = false
+    while (index < trimmed.length) {
+        val cp = trimmed.codePointAt(index)
+        val step = Character.charCount(cp)
+        if (isLeadingDecorativeCodePoint(cp)) {
+            strippedDecorative = true
+            index += step
+            continue
+        }
+        if (strippedDecorative && isTrailingPrefixSeparator(cp)) {
+            index += step
+            continue
+        }
+        break
+    }
+    val cleaned = trimmed.substring(index).trim()
+    return cleaned.ifEmpty { trimmed }
 }

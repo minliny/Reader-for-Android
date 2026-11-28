@@ -47,8 +47,19 @@ internal class ReaderColors(val night: Boolean) {
     val messageBorder = color(ReaderAppRole.TOK_MESSAGE_BORDER)
     val noticeSurface = color(ReaderAppRole.TOK_MESSAGE_NOTICE)
     val noticeText = color(ReaderAppRole.TOK_MESSAGE_NOTICE_INK)
+    val messageSoftSurface = color(ReaderAppRole.TOK_MESSAGE_SOFT)
+    val messageSoftText = color(ReaderAppRole.TOK_MESSAGE_SOFT_INK)
     val press = color(ReaderAppRole.TOK_INK).copy(alpha =
         (if (night) ReaderDesignMetrics.pressNightOpacity else ReaderDesignMetrics.pressDayOpacity).toFloat())
+
+    // Recessed segmented rail tokens aligned with Reader-UI/theme/registry.json (app.segment.*).
+    val segmentTrack = Color(if (night) 0xFF0B0D0B.toInt() else 0xFFE2D9C9.toInt())
+    val segmentTrackTopShade = Color(if (night) 0xB8000000.toInt() else 0x2E3E3223.toInt())
+    val segmentTrackBorder = Color(if (night) 0x73000000.toInt() else 0x245C4F3F.toInt())
+    val segmentTrackBevel = Color(if (night) 0x17ECE8E0.toInt() else 0xE6FFFDF9.toInt())
+    val segmentThumb = Color(if (night) 0xFF282E29.toInt() else 0xFFFFFDF9.toInt())
+    val segmentThumbBorder = Color(if (night) 0x21ECE8E0.toInt() else 0xF2FFFFFF.toInt())
+    val segmentThumbShadow = Color(if (night) 0x85000000.toInt() else 0x292D241A.toInt())
 
     internal fun iconTint(wireRole: String): Color =
         color(ReaderAppRole.entries.first { it.wireRole == wireRole })

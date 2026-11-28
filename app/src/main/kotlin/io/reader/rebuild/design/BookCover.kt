@@ -3,6 +3,7 @@ package io.reader.rebuild.design
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,7 +47,7 @@ internal fun BookCover(url: String?, modifier: Modifier = Modifier, radius: Int 
         }
     }
     Surface(modifier, shape = RoundedCornerShape(radius.dp), color = colors.coverPlaceholder,
-        contentColor = colors.accent) {
+        contentColor = colors.accent, border = BorderStroke(1.dp, colors.outline)) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val bitmap = cover
             if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)

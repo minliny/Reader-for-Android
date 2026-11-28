@@ -4,13 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,9 +63,22 @@ internal fun ReaderPageState(
             is PageState.Failure -> {
                 Text(state.message, style = readerTextStyle(ReaderDesignMetrics.rowDetail))
                 state.actionGeneration?.let { generation ->
-                    TextButton(onClick = {
-                        if ((current as? PageState.Failure)?.actionGeneration == generation) onRetry(generation)
-                    }) { Text("重试", style = readerTextStyle(ReaderDesignMetrics.rowLabel)) }
+                    val colors = LocalReaderColors.current
+                    Button(
+                        onClick = {
+                            if ((current as? PageState.Failure)?.actionGeneration == generation) onRetry(generation)
+                        },
+                        modifier = Modifier.defaultMinSize(
+                            minWidth = ReaderDesignMetrics.minimumActionTarget.dp,
+                            minHeight = ReaderDesignMetrics.minimumActionTarget.dp,
+                        ),
+                        shape = RoundedCornerShape(ReaderDesignMetrics.segmentedTrackRadius.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.messageSoftSurface,
+                            contentColor = colors.messageSoftText,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    ) { Text("重试", style = readerTextStyle(ReaderDesignMetrics.rowLabel)) }
                 }
             }
         }

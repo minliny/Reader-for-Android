@@ -1,7 +1,10 @@
 package io.reader.rebuild.features.bookshelf
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,12 +40,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.reader.core.protocol.BookshelfEntryData
 import com.reader.core.theme.ReaderDesignMetrics as Metrics
 import com.reader.core.theme.ReaderIconMapping
@@ -67,10 +76,11 @@ internal fun BookshelfContent(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= Metrics.wideBreakpoint.dp
         val contentWidth = if (wide) (maxWidth * .62f).coerceIn(420.dp, 760.dp) else maxWidth
+        val narrow = contentWidth < Metrics.narrowBreakpoint.dp
         var coverMode by remember { mutableStateOf(initialCover) }
         Row(Modifier.fillMaxSize()) {
             Column(Modifier.width(contentWidth).fillMaxHeight()) {
-                ShelfSection(books, coverMode, { coverMode = it }, onImport, onSearch, onBook)
+                ShelfSection(books, coverMode, { coverMode = it }, narrow, onImport, onSearch, onBook)
                 BookshelfBody(books, wide, coverMode, onBook, onRemove)
             }
             if (wide) Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -82,15 +92,18 @@ internal fun BookshelfContent(
 
 @Composable
 private fun ShelfSection(books: List<BookshelfEntryData>, cover: Boolean, onCover: (Boolean) -> Unit,
-    onImport: () -> Unit, onSearch: () -> Unit, onBook: (BookshelfEntryData) -> Unit) {
+    narrow: Boolean, onImport: () -> Unit, onSearch: () -> Unit, onBook: (BookshelfEntryData) -> Unit) {
     val colors = LocalReaderColors.current
+    val compactSwitch = narrow && LocalDensity.current.fontScale >= 1.3f
     Column(Modifier.fillMaxWidth().padding(horizontal = Metrics.screenInset.dp)) {
         books.firstOrNull { it.readingPosition != null }?.let { ContinueReadingCard(it, { onBook(it) }) }
         Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("我的书架", style = readerTextStyle(Metrics.sectionHeading), color = colors.primaryText)
-            Text(" · ${books.size} 本", style = readerTextStyle(Metrics.rowDetail), color = colors.secondaryText)
+            Text("我的书架", style = readerTextStyle(Metrics.sectionHeading), color = colors.primaryText,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(" · ${books.size} 本", style = readerTextStyle(Metrics.rowDetail), color = colors.secondaryText,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
-            ViewModeSwitch(cover, { onCover(false) }, { onCover(true) }, books.isNotEmpty())
+            ViewModeSwitch(cover, { onCover(false) }, { onCover(true) }, books.isNotEmpty(), showLabels = !compactSwitch)
             IconButton(onClick = onSearch, enabled = books.isNotEmpty()) { ReaderIcon(ReaderIconRegistry.filter, "筛选") }
         }
         if (books.isEmpty()) EmptyShelfCard(onImport, onSearch)
@@ -98,26 +111,72 @@ private fun ShelfSection(books: List<BookshelfEntryData>, cover: Boolean, onCove
 }
 
 @Composable
-private fun ViewModeSwitch(cover: Boolean, onList: () -> Unit, onCover: () -> Unit, enabled: Boolean) {
+private fun ViewModeSwitch(cover: Boolean, onList: () -> Unit, onCover: () -> Unit, enabled: Boolean, showLabels: Boolean) {
     val colors = LocalReaderColors.current
-    Surface(shape = RoundedCornerShape(Metrics.segmentedTrackRadius.dp), color = colors.field,
-        border = BorderStroke(1.dp, colors.outline), modifier = Modifier.height(34.dp).alpha(if (enabled) 1f else .42f)) {
-        Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            ViewModeItem("列表", ReaderIconRegistry.directory, !cover, enabled, onList)
-            ViewModeItem("封面", ReaderIconRegistry.shelf, cover, enabled, onCover)
+    val pillShape = RoundedCornerShape(Metrics.pillRadius.dp)
+    val laneWidth = if (showLabels) 62.dp else 30.dp
+    val laneProgress by animateFloatAsState(
+        targetValue = if (cover) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 480f),
+        label = "shelfViewModeThumb",
+    )
+    Box(Modifier.width(laneWidth * 2 + 6.dp).height(34.dp).alpha(if (enabled) 1f else .42f)) {
+        // Bottom bevel catch beneath the recessed groove.
+        Box(Modifier.matchParentSize().offset(y = 0.75.dp).background(colors.segmentTrackBevel, pillShape))
+        // Recessed groove track (darker than page canvas with subtle top inner shade).
+        Box(
+            Modifier.matchParentSize()
+                .clip(pillShape)
+                .background(colors.segmentTrack)
+                .background(Brush.verticalGradient(0f to colors.segmentTrackTopShade, 0.38f to Color.Transparent))
+                .border(0.75.dp, colors.segmentTrackBorder, pillShape),
+        )
+        // Animated elevated sliding thumb.
+        Box(Modifier.fillMaxSize().padding(3.dp)) {
+            Box(
+                Modifier.width(laneWidth)
+                    .height(28.dp)
+                    .offset { IntOffset((laneProgress * laneWidth.toPx()).roundToInt(), 0) }
+                    .shadow(
+                        elevation = 2.dp,
+                        shape = pillShape,
+                        ambientColor = colors.segmentThumbShadow,
+                        spotColor = colors.segmentThumbShadow,
+                    )
+                    .background(colors.segmentThumb, pillShape)
+                    .border(0.5.dp, colors.segmentThumbBorder, pillShape),
+            )
+        }
+        // Interactive segment slots.
+        Row(Modifier.fillMaxSize().padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            ViewModeItem("列表", ReaderIconRegistry.directory, !cover, enabled, showLabels, laneWidth, pillShape, onList)
+            ViewModeItem("封面", ReaderIconRegistry.shelf, cover, enabled, showLabels, laneWidth, pillShape, onCover)
         }
     }
 }
 
 @Composable
-private fun ViewModeItem(label: String, icon: ReaderIconMapping, active: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun ViewModeItem(
+    label: String,
+    icon: ReaderIconMapping,
+    active: Boolean,
+    enabled: Boolean,
+    showLabels: Boolean,
+    laneWidth: androidx.compose.ui.unit.Dp,
+    pillShape: RoundedCornerShape,
+    onClick: () -> Unit,
+) {
     val colors = LocalReaderColors.current
-    Row(Modifier.height(28.dp).clickable(enabled, onClick = onClick).background(
-        if (active) colors.surface else Color.Transparent, RoundedCornerShape(Metrics.pillRadius.dp)).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        ReaderIcon(icon, label, size = 17.dp, tint = if (active) colors.accent else colors.secondaryText)
-        Text(label, Modifier.padding(start = 3.dp), color = if (active) colors.accent else colors.secondaryText,
-            style = readerTextStyle(Metrics.shelfProgress))
+    Row(
+        Modifier.width(laneWidth).height(28.dp).clip(pillShape).clickable(enabled, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ReaderIcon(icon, label, size = if (showLabels) 16.dp else 15.dp, tint = if (active) colors.accent else colors.secondaryText)
+        if (showLabels) {
+            Text(label, Modifier.padding(start = 3.dp), color = if (active) colors.accent else colors.secondaryText,
+                style = readerTextStyle(Metrics.shelfProgress))
+        }
     }
 }
 

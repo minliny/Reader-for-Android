@@ -31,7 +31,9 @@ import com.reader.core.theme.ReaderDesignMetrics as Metrics
 import com.reader.core.theme.ReaderIconRegistry
 import io.reader.rebuild.design.BookCover
 import io.reader.rebuild.design.LocalReaderColors
+import io.reader.rebuild.design.PageState
 import io.reader.rebuild.design.ReaderIcon
+import io.reader.rebuild.design.ReaderPageState
 import io.reader.rebuild.design.readerTextStyle
 import io.reader.rebuild.features.library.BookReference
 
@@ -67,6 +69,11 @@ internal fun SearchContent(
                     AssistChip({ onSearch(term) }, label = { Text(term, maxLines = 1, overflow = TextOverflow.Ellipsis) })
                 }
             }
+        } else if (history.isEmpty() && books.isEmpty() && !running && onRetry == null && status == null) {
+            ReaderPageState(
+                PageState.Empty("输入书名或作者，搜索已启用书源"),
+                Modifier.padding(top = Metrics.spaceLarge.dp),
+            )
         }
         if (running || onRetry != null || status != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
