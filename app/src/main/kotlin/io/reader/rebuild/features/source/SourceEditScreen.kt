@@ -78,7 +78,7 @@ internal fun SourceEditScreen(
                     is M2RulesMutationReceiptSourceImport -> onBack()
                     is M2RulesMutationReceiptRejected -> {
                         issue = if (result.data.error.details?.reason == "sourceVersionConflict") {
-                            "书源已被其他操作更新，已保留当前草稿。可复制草稿后重新读取书源。"
+                            "书源已被其他操作更新，当前草稿已保留，可复制后重新读取。"
                         } else "未能保存此次修改，已保留草稿。"
                     }
                     else -> issue = "无法核对此次保存结果，已保留草稿。"

@@ -224,7 +224,7 @@ private fun ReaderProduct(
     val pending = pendingImport
     val notice = when {
         route != null || remove != null -> null
-        pending != null -> RecoveryNoticeState(pending, "本地导入仍待核对", "保留原文件和导入身份，可核对原操作。",
+        pending != null -> RecoveryNoticeState(pending, "本地导入仍待核对", "已保留原文件，可核对上次导入。",
             shelfGeneration, RecoveryAction("核对导入", shelfGeneration))
         shelfFailure != null && books != null -> RecoveryNoticeState("shelf", "书架更新失败", checkNotNull(shelfFailure),
             shelfGeneration, RecoveryAction("重新读取", shelfGeneration))
@@ -276,8 +276,8 @@ private fun ReaderProduct(
                                 onDownloads = { navigate(Destination.Downloads()) },
                                 onSettings = { navigate(Destination.Settings) },
                                 onImport = ::importBook,
-                                onCheckUpdates = { feedback("updates", "当前仅支持已准入书源更新") },
-                                onShelfData = { feedback("shelf-data", "书架数据管理将在本地备份恢复准入后开放") },
+                                onCheckUpdates = { feedback("updates", "暂不支持自动检查更新") },
+                                onShelfData = { feedback("shelf-data", "本地备份与恢复暂未开放") },
                             )
                         }
                         if (importRunning) ReaderTaskProgress(ReaderTaskProgressState("正在导入所选文件", 0, 0, 1, 0))

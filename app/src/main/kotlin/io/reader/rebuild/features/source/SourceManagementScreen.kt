@@ -202,7 +202,7 @@ internal fun SourceManagementScreen(
 
     BackHandler(enabled = route !is SourcePageRoute.Login, onBack = ::back)
     val notice = pending?.let {
-        RecoveryNoticeState(it.operationId, "需要核对书源操作", "从原回执核对已提交的操作。",
+        RecoveryNoticeState(it.operationId, "需要核对书源操作", "核对已提交的操作结果。",
             it.generation, RecoveryAction("核对", it.generation))
     }
     ReaderMessageOverlay(
@@ -217,7 +217,7 @@ internal fun SourceManagementScreen(
                     try {
                         val receipt = coordinator.verifyPending(operationId)
                         when (receipt) {
-                            null -> feedback("source.verify", "原操作还没有可核对的回执")
+                            null -> feedback("source.verify", "暂未收到可核对的结果")
                             is M2RulesMutationReceiptRejected -> feedback("source.verify", "原操作未生效")
                             else -> {
                                 if (route == verifyingRoute) when (receipt) {
@@ -237,7 +237,7 @@ internal fun SourceManagementScreen(
                     } catch (failure: CancellationException) {
                         throw failure
                     } catch (_: Exception) {
-                        feedback("source.verify", "暂时无法核对原回执")
+                        feedback("source.verify", "暂时无法核对结果")
                     } finally {
                         busy = false
                         revision++

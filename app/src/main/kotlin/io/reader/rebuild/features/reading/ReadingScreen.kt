@@ -324,8 +324,8 @@ internal fun ReadingScreen(
                             onBookChanged(it.book)
                             unsettled = null
                             sheet = null
-                        } else message("recover", "尚无可确认的换源回执，请稍后核对")
-                    }.onFailure { message("recover", "无法撤回换源，已保留原操作") }
+                        } else message("recover", "暂未收到换源结果，请稍后核对")
+                    }.onFailure { message("recover", "无法撤回换源，已保留上次记录") }
                     busy = false
                 }
             }

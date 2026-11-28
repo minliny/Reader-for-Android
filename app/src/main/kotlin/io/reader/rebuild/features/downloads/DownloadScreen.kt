@@ -166,7 +166,7 @@ internal fun DownloadScreen(
     val original = pending.firstOrNull()
     val recovery = if (original == null || verifying) null else RecoveryNoticeState(
         requireNotNull(original.operationId), "下载任务待核对",
-        "按原操作核对下载结果。", owner, RecoveryAction("核对原任务", owner),
+        "核对上次下载结果。", owner, RecoveryAction("核对原任务", owner),
     )
     val cached = storage
     ReaderMessageOverlay(confirmation == null, toast, recovery, { id, generation, actionGeneration ->
