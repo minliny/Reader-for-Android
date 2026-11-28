@@ -330,6 +330,66 @@
             "platformDifference": "生产 Android 浏览器顶底栏；内容槽为稳定离线正文。真实 WebView 与 Cookie 单独运行 instrumentation。",
             "pixelSHA256": "1fe5bc2f6a184da1dea457eac77e712975194ecee7f7e8b2f405b3e11e3b66a6",
             "pngSHA256": "87781627cc48a20fb79487ecf495ba3a02fde7c07eddcdb773eab4e045cef600"
+        },
+        {
+            "id": "m3-manga-reading",
+            "referenceState": "漫画阅读页，竖向条漫分片绘制",
+            "sample": "第 2 章 · 1/3",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "43a329682ab244046af468ac60b54a838dd2e83818d85b1cfc3eda8e6d50c81e",
+            "pngSHA256": "a6c7ae869e2e37d8b3a07fe5c48f7a21e28820ddc504b1fb98529db02cc137a9"
+        },
+        {
+            "id": "m3-manga-retry",
+            "referenceState": "漫画单图失败原位重试",
+            "sample": "保持占位几何和页序",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "2a682ff5bc61de827a09542aa9152ab0226fddc43b300d13277717a57c71b9df",
+            "pngSHA256": "0302d4c8c85052fd50b91b78705e35d7f8e2a51a35a1295a0616418fc59e2701"
+        },
+        {
+            "id": "m3-tts-capsule",
+            "referenceState": "听书胶囊悬浮态",
+            "sample": "正文高亮与暂停入口",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "09e23e0073e528e8536712f1c0dd3f2fe410aa7dd30b475581767ff1974de605",
+            "pngSHA256": "510adf7193e27dc14771a431bbfe54d12484b7b4741b8358377120d237ceaeff"
+        },
+        {
+            "id": "m3-tts-playback",
+            "referenceState": "朗读播控面板",
+            "sample": "上一段、暂停、下一段、速率",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "d38b78243f66c4db30b1ab5c92a6e5073afa0c99fb4049d10cf7e29034378c24",
+            "pngSHA256": "ff3528f9a75904c0fcffc1fda2ef922e18f8537afa444eff29337af38afcf703"
+        },
+        {
+            "id": "m3-tts-engines",
+            "referenceState": "HttpTTS 配置页",
+            "sample": "系统音色与 HttpTTS 引擎",
+            "width": 402,
+            "height": 700,
+            "fontScale": 1.0,
+            "theme": "day",
+            "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
+            "pixelSHA256": "297f725f1983fea592ace9ce6d7867fa89453c0e90cea25b91cf60732069fbeb",
+            "pngSHA256": "0c4b9bdd6d7a9b272d8f65a5374efffd392e75e9e2fb7162fa1bf91a7bb380e5"
         }
     ]
 }

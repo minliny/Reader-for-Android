@@ -44,6 +44,7 @@ internal fun ReadingControlsContent(
     onBack: () -> Unit = {},
     onRefresh: (() -> Unit)? = null,
     onSwitch: (() -> Unit)? = null,
+    onSpeech: (() -> Unit)? = null,
 ) {
     val colors = LocalReaderColors.current
     Surface(Modifier.widthIn(max = 560.dp).fillMaxWidth()
@@ -67,6 +68,7 @@ internal fun ReadingControlsContent(
                 ReaderAction(ReaderIconRegistry.nextChapter, "下一章", onNext)
                 if (onRefresh != null) ReaderAction(ReaderIconRegistry.refresh, "刷新正文", onRefresh)
                 if (onSwitch != null) ReaderAction(ReaderIconRegistry.sourceSwitch, "换源", onSwitch)
+                if (onSpeech != null) ReaderAction(ReaderIconRegistry.ttsHeadphones, "听书", onSpeech)
             }
             if (expanded) {
                 ReadingControlStepper("字号",

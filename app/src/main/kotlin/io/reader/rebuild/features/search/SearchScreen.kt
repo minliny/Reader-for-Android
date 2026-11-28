@@ -55,8 +55,7 @@ internal fun SearchScreen(coordinator: SearchCoordinator, sources: suspend () ->
 
     val books = results.flatMap { settled ->
         val data = settled.result.getOrNull()
-        if (data == null || data.contentKind == M2BookSearchDataContentKind.MANGA ||
-            data.contentKind == M2BookSearchDataContentKind.AUDIO) emptyList()
+        if (data == null || data.contentKind == M2BookSearchDataContentKind.AUDIO) emptyList()
         else data.books.map { BookReference(data.sourceId, it, sourceNames[data.sourceId]) }
     }.distinctBy { it.key }
     SearchContent(query, history, books, running, stopped, { query = it }, ::dispatch, {

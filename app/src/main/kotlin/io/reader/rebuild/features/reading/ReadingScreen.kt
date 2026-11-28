@@ -65,6 +65,7 @@ internal fun ReadingScreen(
     onBack: () -> Unit,
     keepAwake: Boolean = false,
     onBookChanged: (BookReference) -> Unit = {},
+    speech: SpeechSessionCoordinator? = null,
 ) {
     val screenScope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -79,6 +80,7 @@ internal fun ReadingScreen(
     var loadFailure by remember(journey) { mutableStateOf<String?>(null) }
     var controls by remember(journey) { mutableStateOf(false) }
     var expanded by remember(journey) { mutableStateOf(false) }
+    var speechPanel by remember(journey) { mutableStateOf(false) }
     var sheet by remember(journey) { mutableStateOf<ReaderSheet?>(null) }
     var directory by remember(journey) { mutableStateOf<List<DirectoryEntry>>(emptyList()) }
     var unsettled by remember(journey) { mutableStateOf<ReadingSwitchRecovery?>(null) }
@@ -285,7 +287,13 @@ internal fun ReadingScreen(
                         onPrevious = { adjacent(-1) }, onNext = { adjacent(1) }, onBack = ::exit,
                         onRefresh = if (readingChapter.online == null) null else ::refresh,
                         onSwitch = if (readingChapter.online == null) null else ({ sheet = ReaderSheet.SOURCES }),
+                        onSpeech = speech?.let { { speechPanel = true } },
                     )
+                }
+                if (speechPanel && readingChapter != null && speech != null) {
+                    Box(Modifier.align(Alignment.BottomCenter)) {
+                        SpeechReadingControls(readingChapter, speech)
+                    }
                 }
             }
         }

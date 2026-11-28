@@ -17,7 +17,7 @@ import org.robolectric.annotation.LooperMode
 @LooperMode(LooperMode.Mode.PAUSED)
 class ReaderGoldenTest {
     @Test fun productScenesMatchReviewedPixels() {
-        val scenes = messageGoldenScenes() + localGoldenScenes() + onlineGoldenScenes() + sourceGoldenScenes()
+        val scenes = messageGoldenScenes() + localGoldenScenes() + onlineGoldenScenes() + sourceGoldenScenes() + m3GoldenScenes()
         check(scenes.map { it.id }.distinct().size == scenes.size)
         val baseline = File("src/test/resources/goldens")
         val proposal = System.getenv("READER_GOLDEN_CANDIDATES")?.let(::File)

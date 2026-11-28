@@ -58,6 +58,7 @@ import io.reader.rebuild.features.bookshelf.BookshelfContent
 import io.reader.rebuild.features.detail.BookDetailScreen
 import io.reader.rebuild.features.library.BookReference
 import io.reader.rebuild.features.downloads.DownloadScreen
+import io.reader.rebuild.features.manga.MangaReadingScreen
 import io.reader.rebuild.features.reading.ReadingJourney
 import io.reader.rebuild.features.reading.ReadingScreen
 import io.reader.rebuild.features.search.SearchScreen
@@ -249,12 +250,14 @@ private fun ReaderProduct(
                 val destination = route?.page
                 if (destination is Destination.Read) key(route.id) {
                     val journey = remember(route.id) { ReadingJourney(session.core, session.local, session.online, session.switching) }
-                    ReadingScreen(destination.book, destination.directory, destination.sources, journey, session.actions,
+                    if (destination.book.isManga()) {
+                        MangaReadingScreen(destination.book, session.mangaReader(), ::back, ::feedback)
+                    } else ReadingScreen(destination.book, destination.directory, destination.sources, journey, session.actions,
                         appearance, onAppearance, ::back, keepAwake = keepAwake, onBookChanged = {
                             navigation.updateReadingBook(it)
                             selected = it
                             shelfGeneration++
-                        })
+                        }, speech = session.speech)
                 } else Column(Modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
                     if (destination == null) {
                         ReaderTopBar("书架") {
@@ -308,3 +311,5 @@ private fun ReaderProduct(
         }
     }
 }
+
+private fun BookReference.isManga(): Boolean = kind?.lowercase() in setOf("manga", "comic", "漫画")
