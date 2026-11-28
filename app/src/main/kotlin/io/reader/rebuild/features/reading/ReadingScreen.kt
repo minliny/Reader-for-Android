@@ -281,6 +281,8 @@ internal fun ReadingScreen(
                     )
                 }
                 if (readingChapter != null && controls) Box(Modifier.align(Alignment.BottomCenter)) {
+                    val chapterPos = directory.indexOfFirst { it.index == readingChapter.index }
+                    val chapterNum = if (chapterPos >= 0) chapterPos + 1 else 0
                     ReadingControlsContent(readingChapter.book.title, readingChapter.title, appearance, expanded,
                         onExpand = { expanded = !expanded }, onAppearance = onAppearance,
                         onDirectory = { sheet = ReaderSheet.DIRECTORY }, onBookmarks = { sheet = ReaderSheet.BOOKMARKS },
@@ -288,6 +290,7 @@ internal fun ReadingScreen(
                         onRefresh = if (readingChapter.online == null) null else ::refresh,
                         onSwitch = if (readingChapter.online == null) null else ({ sheet = ReaderSheet.SOURCES }),
                         onSpeech = speech?.let { { speechPanel = true } },
+                        chapterNumber = chapterNum, chapterCount = directory.size,
                     )
                 }
                 if (speechPanel && readingChapter != null && speech != null) {

@@ -53,7 +53,7 @@ internal fun SourceLoginScreen(
             throw failure
         } catch (failure: Exception) {
             openingFailure = if ((failure as? NetworkHostFailure)?.code == M2HostErrorCode.CAPABILITY_UNAVAILABLE) {
-                PageState.Failure("当前系统 WebView 无法隔离书源登录会话", null)
+                PageState.Failure("当前系统组件无法隔离此书源的登录会话", null)
             } else PageState.Failure("无法打开登录页", attempt.toLong())
             return@LaunchedEffect
         }

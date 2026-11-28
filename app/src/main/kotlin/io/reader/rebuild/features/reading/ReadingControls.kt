@@ -60,6 +60,8 @@ internal fun ReadingControlsContent(
     onRefresh: (() -> Unit)? = null,
     onSwitch: (() -> Unit)? = null,
     onSpeech: (() -> Unit)? = null,
+    chapterNumber: Int = 0,
+    chapterCount: Int = 0,
 ) {
     val colors = LocalReaderColors.current
     var module by remember { mutableStateOf(ControlModule.PAGE) }
@@ -81,7 +83,7 @@ internal fun ReadingControlsContent(
                             ControlModule.SETTINGS -> SettingsModule(appearance, onAppearance)
                         }
                     } else {
-                        QuickHome(onDirectory, onSwitch, onBookmarks, chapter, onPrevious, onNext)
+                        QuickHome(onDirectory, onSwitch, onBookmarks, chapter, onPrevious, onNext, chapterNumber, chapterCount)
                         ControlModuleNavigation(module) { module = it; onExpand() }
                     }
                 }
@@ -109,11 +111,12 @@ private fun ControlHeader(title: String, chapter: String, expanded: Boolean, onB
 
 @Composable
 private fun QuickHome(onDirectory: () -> Unit, onSwitch: (() -> Unit)?, onBookmarks: () -> Unit,
-    chapter: String, onPrevious: () -> Unit, onNext: () -> Unit) {
+    chapter: String, onPrevious: () -> Unit, onNext: () -> Unit,
+    chapterNumber: Int = 0, chapterCount: Int = 0) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         QuickAction(ReaderIconRegistry.directory, "目录", onDirectory)
         QuickAction(ReaderIconRegistry.search, "搜索", {})
-        QuickAction(ReaderIconRegistry.sourceSwitch, "替换", onSwitch ?: {}, enabled = onSwitch != null)
+        QuickAction(ReaderIconRegistry.sourceSwitch, "换源", onSwitch ?: {}, enabled = onSwitch != null)
     }
     Surface(Modifier.fillMaxWidth(), color = LocalReaderColors.current.surface, shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, LocalReaderColors.current.outline)) {
@@ -125,10 +128,19 @@ private fun QuickHome(onDirectory: () -> Unit, onSwitch: (() -> Unit)?, onBookma
                 ReaderAction(ReaderIconRegistry.nextChapter, "下一章", onNext)
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text("第 1 / 共 4 章", Modifier.weight(1f), style = readerTextStyle(Metrics.rowDetail))
+                if (chapterNumber > 0 && chapterCount > 0) {
+                    Text("第 $chapterNumber / 共 $chapterCount 章", Modifier.weight(1f), style = readerTextStyle(Metrics.rowDetail))
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 TextButton(onBookmarks) { Text("加书签") }
             }
-            Slider(value = .28f, onValueChange = {}, modifier = Modifier.fillMaxWidth())
+            val chapterProgress = if (chapterNumber > 0 && chapterCount > 0) {
+                (chapterNumber.toFloat() / chapterCount.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+            Slider(value = chapterProgress, onValueChange = {}, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -198,8 +210,6 @@ private fun AppearanceModule(appearance: ReadingAppearance, onAppearance: (Readi
                 border = BorderStroke(if (paper.id == appearance.paper.id) 2.dp else 1.dp, colors.outline)) {}
         }
     }
-    Text("字体库", style = readerTextStyle(Metrics.sectionHeading))
-    Text("内置 Noto Sans SC · Noto Serif SC", style = readerTextStyle(Metrics.rowDetail), color = colors.secondaryText)
     Text("排版库", style = readerTextStyle(Metrics.sectionHeading))
     ReadingControlStepper("字号", { onAppearance(appearance.copy(font = (appearance.font - 1).coerceAtLeast(12.0))) },
         { onAppearance(appearance.copy(font = (appearance.font + 1).coerceAtMost(36.0))) })
@@ -219,9 +229,8 @@ private fun SettingsModule(appearance: ReadingAppearance, onAppearance: (Reading
 @Composable
 private fun SpeechModuleHint(onSpeech: (() -> Unit)?) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("朗读控台", style = readerTextStyle(Metrics.sectionHeading))
-        Button(onClick = onSpeech ?: {}, enabled = onSpeech != null) { Text("打开听书控台") }
-        Text("系统音色与 HttpTTS 引擎在听书控台中管理。", style = readerTextStyle(Metrics.rowDetail))
+        Text("朗读", style = readerTextStyle(Metrics.sectionHeading))
+        Button(onClick = onSpeech ?: {}, enabled = onSpeech != null) { Text("打开朗读面板") }
     }
 }
 

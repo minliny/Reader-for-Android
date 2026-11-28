@@ -54,7 +54,7 @@ internal fun MangaReaderBottomBar(page: Long, total: Long, horizontal: Boolean, 
             OutlinedButton(onNext, enabled = page + 1 < total) { Text("下一话") }
             Button(onToggleMode) { Text(if (horizontal) "条漫" else "翻页") }
             OutlinedButton(onSave) { Text("下载") }
-            ReaderAction(ReaderIconRegistry.close, "收起控台", onCollapse)
+            ReaderAction(ReaderIconRegistry.close, "收起", onCollapse)
         }
     }
 }

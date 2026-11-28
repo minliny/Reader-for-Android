@@ -218,7 +218,7 @@ internal fun SourceManagementScreen(
                         val receipt = coordinator.verifyPending(operationId)
                         when (receipt) {
                             null -> feedback("source.verify", "原操作还没有可核对的回执")
-                            is M2RulesMutationReceiptRejected -> feedback("source.verify", "Core 已确认原操作未应用")
+                            is M2RulesMutationReceiptRejected -> feedback("source.verify", "原操作未生效")
                             else -> {
                                 if (route == verifyingRoute) when (receipt) {
                                     is M2RulesMutationReceiptSourceImport -> {
@@ -231,7 +231,7 @@ internal fun SourceManagementScreen(
                                     is M2RulesMutationReceiptRuleSubUpdateApplyV1 -> subscriptionRevision++
                                     else -> Unit
                                 }
-                                feedback("source.verify", "Core 已确认原操作")
+                                feedback("source.verify", "已确认原操作")
                             }
                         }
                     } catch (failure: CancellationException) {

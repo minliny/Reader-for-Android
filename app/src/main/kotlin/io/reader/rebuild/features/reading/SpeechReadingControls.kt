@@ -35,11 +35,10 @@ internal fun SpeechReadingControls(
 ) {
     val colors = LocalReaderColors.current
     val snapshot by coordinator.snapshot.collectAsStateWithLifecycle()
-    val highlight by coordinator.highlight.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var expanded by remember(chapter.ownerId) { mutableStateOf(false) }
     var engine by remember(chapter.ownerId) { mutableStateOf("系统音色") }
-    var httpEndpoint by remember(chapter.ownerId) { mutableStateOf("https://tts.local/voice") }
+    var httpEndpoint by remember(chapter.ownerId) { mutableStateOf("") }
     var editingHttp by remember(chapter.ownerId) { mutableStateOf(false) }
     var httpEnabled by remember(chapter.ownerId) { mutableStateOf(true) }
     val bodyVersion = chapter.positionScope.bodyVersion
@@ -52,7 +51,17 @@ internal fun SpeechReadingControls(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReaderIcon(ReaderIconRegistry.ttsHeadphones, "朗读", size = 22.dp)
                 Text("朗读", color = colors.primaryText, modifier = Modifier.weight(1f))
-                Text(active?.state?.wireValue ?: "idle", color = colors.secondaryText)
+                Text(
+                    when (active?.state?.wireValue) {
+                        "playing" -> "朗读中"
+                        "paused" -> "已暂停"
+                        "preparing", "loading" -> "准备中"
+                        "stopped" -> "已停止"
+                        "failed" -> "失败"
+                        else -> "未开始"
+                    },
+                    color = colors.secondaryText,
+                )
                 Button(onClick = { scope.launch {
                     if (active == null) readerResult {
                         coordinator.start(SpeechChapter(identity, chapter.text, bodyVersion, processingVersion), chapter.title,
@@ -63,8 +72,6 @@ internal fun SpeechReadingControls(
                     Text(if (active == null) "开始" else if (active.state.wireValue == "playing") "暂停" else "播放")
                 }
             }
-            val currentHighlight = highlight
-            if (currentHighlight != null) Text("高亮 ${currentHighlight.start}–${currentHighlight.endExclusive}", color = colors.accent)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { scope.launch { coordinator.send(io.reader.rebuild.host.media.SpeechAction.Previous) } }) { Text("上一段") }
                 OutlinedButton(onClick = { scope.launch { coordinator.send(io.reader.rebuild.host.media.SpeechAction.Next) } }) { Text("下一段") }
@@ -75,7 +82,7 @@ internal fun SpeechReadingControls(
                 Text("音色与引擎", color = colors.secondaryText)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { engine = "系统音色" }) { Text("系统音色") }
-                    OutlinedButton(onClick = { engine = "HttpTTS" }) { Text("HttpTTS") }
+                    OutlinedButton(onClick = { engine = "在线朗读" }) { Text("在线朗读") }
                 }
                 Text("当前引擎 · $engine", color = colors.accent)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -84,8 +91,14 @@ internal fun SpeechReadingControls(
                     TextButton({ editingHttp = !editingHttp }) { Text(if (editingHttp) "收起" else "编辑") }
                 }
                 if (editingHttp) {
-                    OutlinedTextField(httpEndpoint, { httpEndpoint = it }, Modifier.fillMaxWidth(),
-                        label = { Text("HttpTTS 地址") }, singleLine = true)
+                    OutlinedTextField(
+                        httpEndpoint,
+                        { httpEndpoint = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("在线朗读地址") },
+                        placeholder = { Text("https://…") },
+                        singleLine = true,
+                    )
                     Button(onClick = { editingHttp = false }) { Text("保存引擎") }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
