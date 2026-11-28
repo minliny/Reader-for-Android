@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,7 +101,7 @@ private fun ShelfSection(books: List<BookshelfEntryData>, cover: Boolean, onCove
 private fun ViewModeSwitch(cover: Boolean, onList: () -> Unit, onCover: () -> Unit, enabled: Boolean) {
     val colors = LocalReaderColors.current
     Surface(shape = RoundedCornerShape(Metrics.segmentedTrackRadius.dp), color = colors.field,
-        border = BorderStroke(1.dp, colors.outline), modifier = Modifier.height(34.dp)) {
+        border = BorderStroke(1.dp, colors.outline), modifier = Modifier.height(34.dp).alpha(if (enabled) 1f else .42f)) {
         Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
             ViewModeItem("列表", ReaderIconRegistry.directory, !cover, enabled, onList)
             ViewModeItem("封面", ReaderIconRegistry.shelf, cover, enabled, onCover)

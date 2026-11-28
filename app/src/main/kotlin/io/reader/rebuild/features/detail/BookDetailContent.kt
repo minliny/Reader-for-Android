@@ -23,6 +23,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -47,6 +51,7 @@ internal fun BookDetailContent(
     onSwitch: (() -> Unit)? = null,
 ) {
     val colors = LocalReaderColors.current
+    var introExpanded by remember(book.key) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(Metrics.screenInset.dp),
             verticalArrangement = Arrangement.spacedBy(Metrics.spaceMedium.dp)) {
@@ -76,9 +81,15 @@ internal fun BookDetailContent(
                 border = BorderStroke(1.dp, colors.outline), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(Metrics.cardPadding.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("内容简介", style = readerTextStyle(Metrics.sectionHeading))
-                    Text(book.intro?.takeIf(String::isNotBlank) ?: "暂无简介", color = colors.secondaryText,
-                        style = readerTextStyle(Metrics.rowLabel), maxLines = 5, overflow = TextOverflow.Ellipsis)
-                    TextButton(onClick = {}) { Text("展开 / 收起") }
+                    val intro = book.intro?.takeIf(String::isNotBlank)
+                    Text(intro ?: "暂无简介", color = colors.secondaryText,
+                        style = readerTextStyle(Metrics.rowLabel), maxLines = if (introExpanded) Int.MAX_VALUE else 5,
+                        overflow = if (introExpanded) TextOverflow.Clip else TextOverflow.Ellipsis)
+                    if (intro != null && intro.length > 160) {
+                        TextButton(onClick = { introExpanded = !introExpanded }) {
+                            Text(if (introExpanded) "收起" else "展开")
+                        }
+                    }
                 }
             }
             Surface(shape = RoundedCornerShape(Metrics.cardRadius.dp), color = colors.surface,
@@ -86,9 +97,13 @@ internal fun BookDetailContent(
                 Column(Modifier.padding(top = Metrics.cardPadding.dp, bottom = 6.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = Metrics.cardPadding.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("目录预览", style = readerTextStyle(Metrics.sectionHeading))
-                        Text(" · ${if (book.local) "本地章节" else "在线目录"}", color = colors.secondaryText, style = readerTextStyle(Metrics.rowDetail))
+                        Text(" · ${if (book.local) "4 章" else "在线目录"}", color = colors.secondaryText,
+                            style = readerTextStyle(Metrics.rowDetail))
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDirectory) { ReaderIcon(ReaderIconRegistry.directory, "完整目录", size = 18.dp); Text("完整目录") }
+                        OutlinedButton(onClick = onDirectory, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)) {
+                            ReaderIcon(ReaderIconRegistry.directory, "完整目录", size = 18.dp)
+                            Text("完整目录", Modifier.padding(start = 4.dp))
+                        }
                     }
                     val preview = listOf("第一章 · 开始", "第二章 · 风起", book.lastChapter ?: "第三章 · 继续阅读", "第四章 · 远方")
                     preview.forEachIndexed { index, title ->

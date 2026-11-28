@@ -302,7 +302,10 @@ private fun ReaderProduct(
                             is Destination.Detail -> "书籍详情"
                             is Destination.Downloads -> "下载管理"
                             else -> ""
-                        }, ::back)
+                        }, if (destination == Destination.Settings) null else ::back,
+                            actions = if (destination is Destination.Detail) {
+                                { ReaderAction(ReaderIconRegistry.more, "书籍操作", { feedback("detail-menu", "书籍操作") }) }
+                            } else {{}})
                         when (destination) {
                             Destination.Search -> SearchScreen(session.search, sources = {
                                 session.sources.list(M2SourceListParams()).sources.associate { it.sourceId to it.name }

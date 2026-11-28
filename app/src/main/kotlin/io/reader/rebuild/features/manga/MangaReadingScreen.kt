@@ -101,29 +101,17 @@ internal fun MangaReadingScreen(
         } else if (current?.content is MangaPageFrame.Content.Unavailable) {
             MangaUnavailable(onRetry = { load(ordinal) })
         }
-        Surface(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = colors.panel) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { ReaderIcon(ReaderIconRegistry.back, "退出漫画") }
-                Text(book.title, Modifier.weight(1f), color = colors.primaryText)
-                Text("${ordinal + 1}/${chapter?.totalPages ?: 0}", color = colors.secondaryText)
-            }
-        }
-        if (controls) Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = colors.panel) {
-            Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { if (ordinal > 0) load(ordinal - 1) }, enabled = ordinal > 0) { Text("上一页") }
-                Button(onClick = { load(ordinal + 1) }, enabled = ordinal + 1 < (chapter?.totalPages ?: 0)) { Text("下一页") }
-                Button(onClick = { horizontal = !horizontal }) { Text(if (horizontal) "竖向" else "横向") }
-                Button(onClick = {
-                    val window = chapter ?: return@Button
-                    val selected = page ?: return@Button
-                    scope.launch { readerResult { reader.save(window, selected, .5, .5) }
-                        .onSuccess { feedback("manga-save", "漫画位置已保存") }
-                        .onFailure { feedback("manga-save", "漫画位置保存失败") } }
-                }) { Text("保存") }
-                Button(onClick = { controls = false }) { Text("收起") }
-            }
-        } else {
+        MangaReaderTopBar(book, "第 ${ordinal + 1} 页", onBack)
+        if (controls) MangaReaderBottomBar(page = ordinal, total = chapter?.totalPages ?: 0,
+            horizontal = horizontal, onPrevious = { if (ordinal > 0) load(ordinal - 1) },
+            onNext = { load(ordinal + 1) }, onToggleMode = { horizontal = !horizontal }, onSave = {
+                val window = chapter ?: return@MangaReaderBottomBar
+                val selected = page ?: return@MangaReaderBottomBar
+                scope.launch { readerResult { reader.save(window, selected, .5, .5) }
+                    .onSuccess { feedback("manga-save", "漫画位置已保存") }
+                    .onFailure { feedback("manga-save", "漫画位置保存失败") } }
+            }, onCollapse = { controls = false })
+        else {
             Button(modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp), onClick = { controls = true }) { Text("控制") }
         }
     }

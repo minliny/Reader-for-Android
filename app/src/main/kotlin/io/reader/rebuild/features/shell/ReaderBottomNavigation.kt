@@ -48,6 +48,7 @@ internal fun ReaderBottomNavigation(
             val (icon, label) = iconAndLabel
             Column(
                 Modifier
+                    .padding(4.dp)
                 .then(Modifier.width(if (wide) 66.dp else 78.dp))
                     .background(
                         if (selectedItem) colors.accentFill else androidx.compose.ui.graphics.Color.Transparent,

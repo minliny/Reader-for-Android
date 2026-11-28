@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +38,10 @@ internal fun SpeechReadingControls(
     val highlight by coordinator.highlight.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var expanded by remember(chapter.ownerId) { mutableStateOf(false) }
+    var engine by remember(chapter.ownerId) { mutableStateOf("系统音色") }
+    var httpEndpoint by remember(chapter.ownerId) { mutableStateOf("https://tts.local/voice") }
+    var editingHttp by remember(chapter.ownerId) { mutableStateOf(false) }
+    var httpEnabled by remember(chapter.ownerId) { mutableStateOf(true) }
     val bodyVersion = chapter.positionScope.bodyVersion
     val processingVersion = chapter.positionScope.processingVersion
     val identity = M3TtsChapterRef(chapter.book.sourceId, chapter.book.bookId, chapter.index, chapter.title)
@@ -65,7 +72,22 @@ internal fun SpeechReadingControls(
                 OutlinedButton(onClick = { expanded = !expanded }) { Text(if (expanded) "收起" else "设置") }
             }
             if (expanded) {
-                Text("系统音色", color = colors.secondaryText)
+                Text("音色与引擎", color = colors.secondaryText)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { engine = "系统音色" }) { Text("系统音色") }
+                    OutlinedButton(onClick = { engine = "HttpTTS" }) { Text("HttpTTS") }
+                }
+                Text("当前引擎 · $engine", color = colors.accent)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("在线引擎", Modifier.weight(1f))
+                    Switch(httpEnabled, { httpEnabled = it })
+                    TextButton({ editingHttp = !editingHttp }) { Text(if (editingHttp) "收起" else "编辑") }
+                }
+                if (editingHttp) {
+                    OutlinedTextField(httpEndpoint, { httpEndpoint = it }, Modifier.fillMaxWidth(),
+                        label = { Text("HttpTTS 地址") }, singleLine = true)
+                    Button(onClick = { editingHttp = false }) { Text("保存引擎") }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { scope.launch { coordinator.send(io.reader.rebuild.host.media.SpeechAction.Rate(80)) } }) { Text("0.8×") }
                     Button(onClick = { scope.launch { coordinator.send(io.reader.rebuild.host.media.SpeechAction.Rate(100)) } }) { Text("1.0×") }

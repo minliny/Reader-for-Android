@@ -3,6 +3,8 @@ package io.reader.rebuild.features.shell
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.TextButton
@@ -47,8 +49,10 @@ internal fun ReaderHomeMenu(
                     Triple(ReaderIconRegistry.storage, "书架数据管理", onShelfData),
                 ).forEach { (icon, label, action) ->
                     TextButton(onClick = { open = false; action() }, Modifier.fillMaxWidth()) {
-                        ReaderIcon(icon, null)
-                        Text(label, Modifier.padding(start = 12.dp), style = readerTextStyle(ReaderDesignMetrics.rowLabel))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            ReaderIcon(icon, null)
+                            Text(label, Modifier.padding(start = 12.dp), style = readerTextStyle(ReaderDesignMetrics.rowLabel))
+                        }
                     }
                 }
             }
