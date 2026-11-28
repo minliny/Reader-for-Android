@@ -113,7 +113,6 @@ private fun GoldenShelf(books: List<BookshelfEntryData>, side: (@Composable () -
     Column(Modifier.fillMaxSize()) {
         ReaderTopBar("书架") {
             ReaderAction(ReaderIconRegistry.search, "全局搜索", {})
-            ReaderAction(ReaderIconRegistry.add, "导入本地书籍", {})
             ReaderHomeMenu({}, {}, {})
         }
         BookshelfContent(books, side = side, initialCover = cover)

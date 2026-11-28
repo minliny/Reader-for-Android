@@ -76,8 +76,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "93f86a082cb6d6203c508c6026c909493acf348a0468f6e99fc6fd68d6bbe37f",
-            "pngSHA256": "1e4296bdec19d4b2cea96dfc9be081655eb447df79ed82dc178a0b4c88e806fb"
+            "pixelSHA256": "3f3fb60a4233832c9104468a26b4d69ca1bccff567ee59ac75f14afac6d6c070",
+            "pngSHA256": "6890db3db6886715f4748131818596ee1e60e31d6b508fd8f2c656a1a51ceb9c"
         },
         {
             "id": "shelf-night",
@@ -88,8 +88,8 @@
             "fontScale": 1.0,
             "theme": "night",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "10d9ab5d2d21a4dfe08c713ac2be25cfdf63df28d64e4f22e1cba86cef9ca8f6",
-            "pngSHA256": "8f9452c5448c5fcc3296df1e97939deae4768560414510e56640f0e870a4f5c1"
+            "pixelSHA256": "fc14a6435cd49789e385aa9fba7f8625a5317ee6439a5f6cf760d595caaa8eee",
+            "pngSHA256": "7a057e92b506f383506a0c6a302c8e02f375c92a8dda279ce90ad8433f77be60"
         },
         {
             "id": "shelf-empty",
@@ -100,8 +100,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "9b62fac88afba79071401e38e63ef07dd34e21e561df69fc8825ac0d91275a22",
-            "pngSHA256": "28f1d52439aae03b8f9d24e667c436bbc316aa695282b215e715c91cd093f9d6"
+            "pixelSHA256": "8893841ac4a6eab9a41e6d0c07bac8989b81d747c08da497d8b971c5eca29d5c",
+            "pngSHA256": "eb8fd769f8a99deed18a3c71cf42ce33a06950e72ccd65742a07a5db11f6fbd5"
         },
         {
             "id": "shelf-recovery",
@@ -124,8 +124,8 @@
             "fontScale": 1.4,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "897510a4e4e9c5cff29c3bcb6348b36f621400834a5f06dc58f6b4d75b4bcd58",
-            "pngSHA256": "2d10d3c755b74f7d1a3ab5b92af61a0c04edd830af6c3dc221b37287248c6b5e"
+            "pixelSHA256": "92d7bf88d08bdcf5ad721bb3d1fe6a189a590a67119950e0e3c7b7806aac08a8",
+            "pngSHA256": "a736846bd01042b4762eb2d0385d6b372a308f3d386079770ed69c5d32e209c3"
         },
         {
             "id": "shelf-wide",
@@ -136,8 +136,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "28127c4484cb02fdc4d45954db7402e53271b5c9587ab2abdb24aa3e6bdaea23",
-            "pngSHA256": "873fb2c31a3f235fa70351bd14488f22af78563dd0834061943f4c0081fd2e89"
+            "pixelSHA256": "0f346a45b48c8d76bf624eef204c798503e919e25c08e7bfdbb6f61c61d4d957",
+            "pngSHA256": "048a0ee078e53fdadf4d28190aec9cb6e568f8c77d711521a11d5ca6722137a6"
         },
         {
             "id": "shelf-cover-grid",
@@ -148,8 +148,8 @@
             "fontScale": 1.0,
             "theme": "day",
             "platformDifference": "Android Material 3, Noto, system navigation and Android drawable semantics.",
-            "pixelSHA256": "34e9baf77b2e79dfcb694879a79ebe88282a6bf40468742af4d296df2d252342",
-            "pngSHA256": "f8a91100d4ca187c739cc416f6df07aa615f7fc905d440502f6ccfc31fdad04b"
+            "pixelSHA256": "6224a1c6dfc73d8b93f6015c9ab19f8c9a5ad19e1dded14ef9995097399498ba",
+            "pngSHA256": "a678d58016e633819e25638f0fc01c575b1d51d28fdf6f0636b89827d8cf29b0"
         },
         {
             "id": "shelf-more-sheet",
